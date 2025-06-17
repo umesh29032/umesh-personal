@@ -1,0 +1,110 @@
+{% extends 'accounts/base.html' %}
+   {% block title %}Logout | Company Portal{% endblock %}
+   {% block content %}
+   <div class="login-container">
+       <div class="login-card">
+           <div class="login-header">
+               <div class="company-logo">
+                   <i class="fas fa-rocket"></i>
+                   <span>Company Portal</span>
+               </div>
+               <h1>Log Out</h1>
+               <p>Are you sure you want to log out?</p>
+           </div>
+           <form method="post" action="{% url 'account_logout' %}" class="login-form">
+               {% csrf_token %}
+               <button type="submit" class="login-button">
+                   <span>Confirm Logout</span>
+                   <i class="fas fa-sign-out-alt"></i>
+               </button>
+           </form>
+           <div class="signup-link">
+               <a href="{% url 'home' %}">Cancel</a>
+           </div>
+       </div>
+   </div>
+   <style>
+       .login-container {
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           justify-content: center;
+           min-height: calc(100vh - 70px);
+           padding: 20px;
+           background-color: var(--background-light);
+       }
+       .login-card {
+           width: 100%;
+           max-width: 450px;
+           background: #ffffff;
+           border-radius: 8px;
+           box-shadow: var(--shadow);
+           padding: 40px;
+           margin-bottom: 20px;
+       }
+       .login-header {
+           text-align: center;
+           margin-bottom: 30px;
+       }
+       .company-logo {
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           margin-bottom: 20px;
+           color: var(--primary-color);
+           font-size: 24px;
+           font-weight: 500;
+       }
+       .company-logo i {
+           font-size: 28px;
+           margin-right: 10px;
+       }
+       .login-header h1 {
+           font-size: 24px;
+           font-weight: 500;
+           margin-bottom: 8px;
+           color: var(--text-dark);
+       }
+       .login-header p {
+           color: var(--text-secondary);
+           font-size: 16px;
+       }
+       .login-form {
+           margin-bottom: 30px;
+       }
+       .login-button {
+           width: 100%;
+           padding: 12px 24px;
+           background-color: var(--primary-color);
+           color: #ffffff;
+           border: none;
+           border-radius: 4px;
+           font-size: 16px;
+           font-weight: 500;
+           cursor: pointer;
+           display: flex;
+           align-items: center;
+           justify-content: center;
+           transition: background-color 0.3s ease;
+       }
+       .login-button:hover {
+           background-color: var(--secondary-color);
+       }
+       .login-button i {
+           margin-left: 10px;
+       }
+       .signup-link {
+           text-align: center;
+           font-size: 14px;
+           color: var(--text-secondary);
+       }
+       .signup-link a {
+           color: var(--primary-color);
+           text-decoration: none;
+           font-weight: 500;
+       }
+       .signup-link a:hover {
+           text-decoration: underline;
+       }
+   </style>
+   {% endblock %}
