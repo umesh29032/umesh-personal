@@ -6,6 +6,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from allauth.socialaccount.providers.google import provider
 from django.views.generic import TemplateView
+from django.contrib.auth import get_user_model
+from accounts.serializers import UserSerializer
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -29,6 +31,8 @@ class GoogleLoginContinueView(TemplateView):
 def login_view(request):
     import allauth.socialaccount.views
     print("121324435",dir(allauth.socialaccount.views))
+    # import allauth.account
+    # print(dir(allauth.account))
     if request.method == 'POST':
         email = request.POST['email']
         password = request.POST['password']
@@ -84,6 +88,13 @@ def custom_logout(request):
 def home(request):
     from django.urls import reverse
     print(reverse('account_logout'))  # Should print /accounts/logout/
+    User = get_user_model()
+    users = User.objects.all()
+    for user in users:
+        print(user.id, user.email, user.is_active)
+    users = User.objects.all()
+    serializer = UserSerializer(users, many=True)
+    print("json data",serializer.data)
     return render(request, 'accounts/home.html')
 
 def custom_google_login(request):
