@@ -1,0 +1,427 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref} % For clickable URLs
+
+% Configuring listings for code blocks
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    language=Python,
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    commentstyle=\color{green!50!black},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    numbersep=5pt,
+}
+
+\title{Django Project Setup Guide with Custom User Model and Google Authentication}
+\author{Parth}
+\date{June 19, 2025, 10:13 AM IST}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This guide documents the complete setup of a Django project with a custom `User` model (`accounts_user`), Google authentication via `django-allauth` 65.9.0, PostgreSQL 14 integration, pgAdmin 4 for database management, JSON serialization, and model relationships. It is designed for a local Ubuntu environment and prepared for Git version control.
+
+\section{Project Overview}
+\begin{itemize}
+    \item \textbf{Django Version}: 5.2.3
+    \item \textbf{Python Version}: 3.12.10
+    \item \textbf{django-allauth Version}: 65.9.0
+    \item \textbf{Database}: PostgreSQL 14
+    \item \textbf{Custom User Model}: `accounts_user`
+    \item \textbf{UI}: Professional design in `accounts/templates/accounts/base.html`
+    \item \textbf{Date}: June 19, 2025, 10:13 AM IST
+    \item \textbf{Git Repository}: Intended for tracking changes
+\end{itemize}
+
+\section{Step-by-Step Setup}
+
+\subsection{1. Initial Project Setup}
+\begin{itemize}
+    \item Create and configure the project:
+          \begin{lstlisting}
+          # Command to create virtual environment and install dependencies
+          python -m venv env
+          source env/bin/activate
+          pip install django==5.2.3 django-allauth==65.9.0 psycopg2-binary
+          django-admin startproject myproject
+          cd myproject
+          python manage.py startapp accounts
+          \end{lstlisting}
+          \textit{Explanation}: Sets up a virtual environment, installs Django and `django-allauth`, and creates the project structure.
+
+    \item Update `myproject/settings.py` with apps and database:
+          \begin{lstlisting}
+          # Initial INSTALLED_APPS and DATABASES configuration
+          INSTALLED_APPS = [
+              'django.contrib.admin',
+              'django.contrib.auth',
+              'django.contrib.contenttypes',
+              'django.contrib.sessions',
+              'django.contrib.messages',
+              'django.contrib.staticfiles',
+              'django.contrib.sites',
+              'allauth',
+              'allauth.account',
+              'allauth.socialaccount',
+              'allauth.socialaccount.providers.google',
+              'accounts',
+          ]
+
+          DATABASES = {
+              'default': {
+                  'ENGINE': 'django.db.backends.postgresql',
+                  'NAME': 'mydb',
+                  'USER': 'myuser',
+                  'PASSWORD': 'mypassword',
+                  'HOST': 'localhost',
+                  'PORT': '5432',
+              }
+          }
+
+          AUTH_USER_MODEL = 'accounts.User'
+          \end{lstlisting}
+          \textit{Explanation}: Registers apps and sets PostgreSQL as the database with a custom user model.
+\end{itemize}
+
+\subsection{2. Custom User Model and Relationships}
+\begin{itemize}
+    \item Define in `accounts/models.py`:
+          \begin{lstlisting}
+          # Custom User model with additional fields and Profile relationship
+          from django.contrib.auth.models import AbstractUser
+          from django.db import models
+
+          class User(AbstractUser):
+              phone_number = models.CharField(max_length=15, blank=True, null=True)
+              birth_date = models.DateField(blank=True, null=True)
+              bio = models.TextField(blank=True)
+              profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+              salary = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+              def __str__(self):
+                  return self.email
+
+              def to_json(self):
+                  return {
+                      "id": self.id,
+                      "email": self.email,
+                      "phone_number": self.phone_number,
+                      "birth_date": self.birth_date.isoformat() if self.birth_date else None,
+                      "bio": self.bio,
+                      "salary": float(self.salary) if self.salary else None,
+                  }
+
+          class Profile(models.Model):
+              user = models.OneToOneField(User, on_delete=models.CASCADE)
+              address = models.TextField(blank=True)
+              skills = models.TextField(blank=True)
+
+              def __str__(self):
+                  return f"{self.user.email}'s Profile"
+          \end{lstlisting}
+          \textit{Explanation}: Extends `AbstractUser` with custom fields and adds a `Profile` model linked via `OneToOneField`.
+
+    \item Apply migrations:
+          \begin{lstlisting}
+          python manage.py makemigrations
+          python manage.py migrate
+          \end{lstlisting}
+          \textit{Explanation}: Creates database tables for `accounts_user` and `accounts_profile`.
+\end{itemize}
+
+\subsection{3. Google Authentication with django-allauth}
+\begin{itemize}
+    \item Configure `settings.py`:
+          \begin{lstlisting}
+          # Authentication and allauth settings
+          AUTHENTICATION_BACKENDS = [
+              'django.contrib.auth.backends.ModelBackend',
+              'allauth.account.auth_backends.AuthenticationBackend',
+          ]
+          SITE_ID = 1
+          ACCOUNT_LOGIN_METHODS = {'email'}
+          ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+          SOCIALACCOUNT_LOGIN_REDIRECT_URL = '/myaccounts/home/'
+          ACCOUNT_LOGOUT_REDIRECT_URL = '/myaccounts/login/'
+          LOGIN_REDIRECT_URL = '/myaccounts/home/'
+          SOCIALACCOUNT_PROVIDERS = {
+              'google': {
+                  'SCOPE': ['profile', 'email'],
+                  'AUTH_PARAMS': {'access_type': 'online'},
+                  'APP': {
+                      'client_id': 'YOUR_GOOGLE_CLIENT_ID',
+                      'secret': 'YOUR_GOOGLE_CLIENT_SECRET',
+                      'key': ''
+                  }
+              }
+          }
+          \end{lstlisting}
+          \textit{Explanation}: Sets up email-based login and Google OAuth2 authentication.
+
+    \item Update `myproject/urls.py`:
+          \begin{lstlisting}
+          # URL configuration
+          from django.contrib import admin
+          from django.urls import path, include
+          from accounts.views import GoogleLoginContinueView
+
+          urlpatterns = [
+              path('admin/', admin.site.urls),
+              path('myaccounts/', include('accounts.urls')),
+              path('accounts/', include('allauth.urls')),
+              path('google-login-continue/', GoogleLoginContinueView.as_view(), name='google_login_continue'),
+          ]
+          \end{lstlisting}
+          \textit{Explanation}: Includes `allauth` URLs and a custom API view.
+
+    \item Create `accounts/urls.py`:
+          \begin{lstlisting}
+          # App-specific URLs
+          from django.urls import path
+          from . import views
+
+          app_name = 'accounts'
+
+          urlpatterns = [
+              path('login/', views.login_view, name='login'),
+          ]
+          \end{lstlisting}
+          \textit{Explanation}: Defines the login URL.
+
+    \item Create `accounts/views.py`:
+          \begin{lstlisting}
+          # Views for login and API
+          from django.shortcuts import render, redirect
+          from django.contrib.auth import authenticate, login
+          from django.contrib import messages
+          from rest_framework.views import APIView
+          from rest_framework.response import Response
+          from .serializers import UserSerializer
+          from django.contrib.auth import get_user_model
+
+          User = get_user_model()
+
+          def login_view(request):
+              if request.method == 'POST':
+                  email = request.POST['email']
+                  password = request.POST['password']
+                  user = authenticate(request, email=email, password=password)
+                  if user is not None:
+                      login(request, user)
+                      next_url = request.POST.get('next', '/myaccounts/home/')
+                      return redirect(next_url)
+                  else:
+                      messages.error(request, 'Invalid email or password.')
+              return render(request, 'accounts/login.html', {'next': request.GET.get('next', '/myaccounts/home/')})
+
+          class GoogleLoginContinueView(APIView):
+              def get(self, request):
+                  users = User.objects.all()
+                  serializer = UserSerializer(users, many=True)
+                  return Response(serializer.data)
+          \end{lstlisting}
+          \textit{Explanation}: Handles login and provides a REST API endpoint.
+
+    \item Create `accounts/templates/accounts/login.html`:
+          \begin{lstlisting}
+          <!-- Login template -->
+          {% extends 'accounts/base.html' %}
+          {% load socialaccount %}
+
+          {% block title %}Login | Company Portal{% endblock %}
+
+          {% block content %}
+          <div class="login-container">
+              <div class="login-card">
+                  <h1>Login</h1>
+                  {% if messages %}
+                      {% for message in messages %}
+                          <p>{{ message }}</p>
+                      {% endfor %}
+                  {% endif %}
+                  <form method="post">
+                      {% csrf_token %}
+                      <input type="email" name="email" placeholder="Email" required>
+                      <input type="password" name="password" placeholder="Password" required>
+                      <button type="submit">Login</button>
+                      <a href="{% url 'accounts:google_login' %}?next={{ next|default:'/myaccounts/home/'|urlencode }}">Login with Google</a>
+                  </form>
+              </div>
+          </div>
+          {% endblock %}
+          \end{lstlisting}
+          \textit{Explanation}: Provides a login form with Google OAuth option.
+\end{itemize}
+
+\subsection{4. PostgreSQL Setup}
+\begin{itemize}
+    \item Install and configure PostgreSQL:
+          \begin{lstlisting}
+          # Install PostgreSQL 14
+          sudo apt update
+          sudo apt install postgresql-14
+          sudo service postgresql start
+
+          # Create database and user
+          sudo -u postgres createuser -P myuser
+          sudo -u postgres createdb mydb -O myuser
+          \end{lstlisting}
+          \textit{Explanation}: Sets up PostgreSQL and creates a database/user.
+
+    \item Configure `pg_hba.conf`:
+          \begin{lstlisting}
+          # Edit authentication rules
+          sudo nano /etc/postgresql/14/main/pg_hba.conf
+          local   all             postgres                                peer
+          local   all             myuser                                  md5
+          host    mydb            myuser          127.0.0.1/32            md5
+          host    all             all             ::1/128                 scram-sha-256
+          \end{lstlisting}
+          \textit{Explanation}: Enables password authentication for `myuser`.
+
+    \item Restart PostgreSQL:
+          \begin{lstlisting}
+          sudo service postgresql restart
+          \end{lstlisting}
+          \textit{Explanation}: Applies configuration changes.
+\end{itemize}
+
+\subsection{5. pgAdmin 4 Setup}
+\begin{itemize}
+    \item Install pgAdmin 4:
+          \begin{lstlisting}
+          # Install and configure pgAdmin
+          sudo apt update
+          curl https://www.pgadmin.org/static/packages_pgadmin_org.pub | sudo apt-key add
+          sudo sh -c 'echo "deb https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_release -cs) pgadmin4 main" > /etc/apt/sources.list.d/pgadmin4.list'
+          sudo apt update
+          sudo apt install pgadmin4
+          sudo /usr/pgadmin4/bin/setup-web.sh
+          \end{lstlisting}
+          \textit{Explanation}: Installs pgAdmin as a web application.
+
+    \item Connect to database:
+          \begin{itemize}
+              \item Access `http://127.0.0.1/pgadmin4` with setup email/password.
+              \item Add server: Name=`MyLocalDB`, Host=`localhost`, Port=`5432`, Database=`postgres`, User=`myuser`, Password=`mypassword`.
+              \item Expand `mydb` > `public` to view `accounts_user`.
+          \end{itemize}
+          \textit{Explanation}: Configures pgAdmin to manage the local database.
+\end{itemize}
+
+\subsection{6. Install Additional Packages}
+\begin{itemize}
+    \item Install Django REST Framework and Pillow:
+          \begin{lstlisting}
+          # Install additional dependencies
+          pip install djangorestframework Pillow
+          \end{lstlisting}
+          \textit{Explanation}: Adds REST API support and image handling.
+
+    \item Update `INSTALLED_APPS` in `settings.py`:
+          \begin{lstlisting}
+          # Add REST framework
+          INSTALLED_APPS = [
+              ...,
+              'rest_framework',
+          ]
+          \end{lstlisting}
+          \textit{Explanation}: Enables Django REST Framework.
+\end{itemize}
+
+\subsection{7. Serializer and API View}
+\begin{itemize}
+    \item Create `accounts/serializers.py`:
+          \begin{lstlisting}
+          # Serializer for User model
+          from rest_framework import serializers
+          from django.contrib.auth import get_user_model
+
+          User = get_user_model()
+
+          class UserSerializer(serializers.ModelSerializer):
+              class Meta:
+                  model = User
+                  fields = '__all__'
+          \end{lstlisting}
+          \textit{Explanation}: Serializes `User` data for API responses.
+
+    \item Update `accounts/views.py` with API view (already included above).
+\end{itemize}
+
+\subsection{8. Git Integration}
+\begin{itemize}
+    \item Initialize Git repository:
+          \begin{lstlisting}
+          # Initialize and commit setup
+          cd /home/parth/umesh-personal/Django_app/myproject
+          git init
+          git add .
+          git commit -m "Initial commit: Setup Django project with custom User model, allauth, and PostgreSQL"
+          \end{lstlisting}
+          \textit{Explanation}: Starts version control.
+
+    \item Add this document:
+          \begin{lstlisting}
+          git add django_setup_guide.tex
+          git commit -m "Add comprehensive setup guide in LaTeX"
+          \end{lstlisting}
+          \textit{Explanation}: Tracks the setup documentation.
+
+    \item Optional remote repository:
+          \begin{lstlisting}
+          git remote add origin https://github.com/yourusername/yourrepo.git
+          git push -u origin master
+          \end{lstlisting}
+          \textit{Explanation}: Pushes to a remote repository (replace URL).
+\end{itemize}
+
+\section{Testing and Verification}
+\begin{itemize}
+    \item Run server and test:
+          \begin{lstlisting}
+          python manage.py runserver
+          \end{lstlisting}
+          \textit{Explanation}: Tests the application at `http://127.0.0.1:8000/myaccounts/login/`.
+
+    \item Query in psql:
+          \begin{lstlisting}
+          psql -U myuser -d mydb -h localhost
+          SELECT * FROM accounts_user ORDER BY id ASC;
+          \end{lstlisting}
+          \textit{Explanation}: Verifies data in the database.
+
+    \item View in pgAdmin:
+          \begin{itemize}
+              \item Check `accounts_user` under `mydb` > `public`.
+          \end{itemize}
+          \textit{Explanation}: Confirms GUI access.
+\end{itemize}
+
+\section{Troubleshooting}
+\begin{itemize}
+    \item Check logs: `tail -n 50 debug.log`.
+    \item Backup: `pg_dump -U myuser -h localhost mydb > mydb_backup_20250619.sql`.
+    \item Common fixes: Ensure migrations, correct credentials, and running services.
+\end{itemize}
+
+\section{Compilation Instructions}
+\begin{itemize}
+    \item Save as `django_setup_guide.tex`.
+    \item Install LaTeX: `sudo apt install texlive-full texlive-fonts-extra`.
+    \item Compile: `latexmk -pdf django_setup_guide.tex`.
+    \item View: `evince django_setup_guide.pdf`.
+\end{itemize}
+
+\end{document}
