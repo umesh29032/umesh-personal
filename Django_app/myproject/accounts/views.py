@@ -8,6 +8,8 @@ from allauth.socialaccount.providers.google import provider
 from django.views.generic import TemplateView
 from django.contrib.auth import get_user_model
 from accounts.serializers import UserSerializer
+from .forms import UserEditForm
+from django.shortcuts import render, get_object_or_404
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -101,3 +103,21 @@ def custom_google_login(request):
     if request.GET.get('process') == 'login':
         return redirect('/accounts/google/login/continue/')
     return render(request, 'socialaccount/custom_google_login.html', {'next': request.GET.get('next', '')})
+
+def user_list_view(request):
+    users = User.objects.all()
+    search_name = request.GET.get('search_name', '')
+    if search_name:
+        users = users.filter(first_name__icontains=search_name) | users.filter(last_name__icontains=search_name)
+    return render(request, 'accounts/user_list.html', {'users': users})
+
+def user_detail_view(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == 'POST':
+        form = UserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return redirect('user_list')
+    else:
+        form = UserEditForm(instance=user)
+    return render(request, 'accounts/user_detail.html', {'form': form, 'user': user})

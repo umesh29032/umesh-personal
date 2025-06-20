@@ -1,4 +1,5 @@
 {% load socialaccount %}
+{% load static %} <!-- Add this line if missing  for tailwind-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,269 +8,89 @@
     <title>{% block title %}{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        :root {
-            --primary-color: #2c3e50;
-            --secondary-color: #3498db;
-            --accent-color: #2980b9;
-            --text-light: #ecf0f1;
-            --text-dark: #2c3e50;
-            --background-light: #f8f9fa;
-            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            --transition: all 0.3s ease;
+    <link href="{% static 'theme/css/dist/styles.css' %}" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2c3e50',
+                        secondary: '#3498db',
+                        accent: '#2980b9',
+                        textlight: '#ecf0f1',
+                        textdark: '#2c3e50',
+                        backgroundlight: '#f8f9fa',
+                        danger: '#e74c3c',
+                        dangerhover: '#c0392b',
+                    },
+                    boxShadow: {
+                        nav: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                        sidenav: '4px 0 15px rgba(0, 0, 0, 0.1)',
+                    },
+                    transitionProperty: {
+                        'all': 'all',
+                    },
+                }
+            }
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+    </script>
+    <style>
+        body {
             font-family: 'Roboto', sans-serif;
         }
-
-        body {
-            background-color: var(--background-light);
-            color: var(--text-dark);
+        
+        .sidenav {
+            transition: width 0.3s ease;
         }
-
-        /* Enhanced Navbar Styles */
-        .navbar {
-            background-color: var(--primary-color);
-            color: var(--text-light);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 2rem;
-            box-shadow: var(--shadow);
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-            height: 70px;
+        
+        .content {
+            transition: margin 0.3s ease;
         }
-
-        .navbar .brand-container {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+        
+        .overlay {
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-
-        .navbar .brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: var(--text-light);
-            letter-spacing: 0.5px;
+        
+        .sidenav-link {
+            border-left: 4px solid transparent;
+            transition: all 0.3s ease;
         }
-
-        .navbar .brand:hover {
-            color: var(--secondary-color);
+        
+        .sidenav-link:hover, .sidenav-link.active {
+            background-color: #f5f7fa;
+            color: #3498db;
+            border-left-color: #3498db;
         }
-
-        .navbar .menu-btn {
-            background: none;
-            border: none;
-            color: var(--text-light);
-            font-size: 1.5rem;
-            cursor: pointer;
-            transition: var(--transition);
-            padding: 0.5rem;
-            border-radius: 4px;
+        
+        .sidenav-link.active {
+            background-color: #e8f4fc;
         }
-
-        .navbar .menu-btn:hover {
+        
+        .menu-btn:hover {
             background-color: rgba(255, 255, 255, 0.1);
             transform: scale(1.1);
         }
-
-        .navbar .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .navbar .user-info .user-greeting {
-            font-size: 1rem;
-            font-weight: 400;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .navbar .user-info .user-greeting i {
-            font-size: 1.2rem;
-        }
-
-        .navbar .user-info a {
-            color: var(--text-light);
-            text-decoration: none;
-            font-size: 0.9rem;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .navbar .user-info .logout-btn {
-            background-color: #e74c3c;
-        }
-
-        .navbar .user-info .logout-btn:hover {
-            background-color: #c0392b;
-        }
-
-        .navbar .user-info .login-btn {
-            background-color: var(--secondary-color);
-        }
-
-        .navbar .user-info .login-btn:hover {
-            background-color: var(--accent-color);
-        }
-
-        /* Modern Side Navigation */
-        .sidenav {
-            height: 100%;
-            width: 0;
-            position: fixed;
-            z-index: 1001;
-            top: 0;
-            left: 0;
-            background-color: white;
-            overflow-x: hidden;
-            transition: 0.3s;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
-            padding-top: 80px;
-        }
-
-        .sidenav.open {
-            width: 280px;
-        }
-
-        .sidenav .closebtn {
-            position: absolute;
-            top: 20px;
-            right: 25px;
-            font-size: 2rem;
-            color: var(--text-dark);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .sidenav .closebtn:hover {
-            color: var(--secondary-color);
+        
+        .closebtn:hover {
+            color: #3498db;
             transform: rotate(90deg);
-        }
-
-        .sidenav .menu-header {
-            padding: 1rem 1.5rem;
-            font-size: 1rem;
-            color: #7f8c8d;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 500;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 0.5rem;
-        }
-
-        .sidenav a {
-            padding: 1rem 1.5rem;
-            text-decoration: none;
-            font-size: 1rem;
-            color: var(--text-dark);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            transition: var(--transition);
-            border-left: 4px solid transparent;
-        }
-
-        .sidenav a i {
-            width: 24px;
-            text-align: center;
-        }
-
-        .sidenav a:hover {
-            background-color: #f5f7fa;
-            color: var(--secondary-color);
-            border-left: 4px solid var(--secondary-color);
-        }
-
-        .sidenav a.active {
-            background-color: #e8f4fc;
-            color: var(--secondary-color);
-            border-left: 4px solid var(--secondary-color);
-        }
-
-        /* Overlay when sidenav is open */
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            display: none;
-            transition: var(--transition);
-        }
-
-        .overlay.active {
-            display: block;
-        }
-
-        /* Content Area */
-        .content {
-            margin-top: 70px;
-            padding: 2rem;
-            min-height: calc(100vh - 70px);
-            background-color: var(--background-light);
-            transition: var(--transition);
-        }
-
-        .content.shifted {
-            margin-left: 280px;
-        }
-
-        /* Responsive Design */
-        @media screen and (max-width: 992px) {
-            .navbar {
-                padding: 0 1rem;
-            }
-            
-            .navbar .brand {
-                font-size: 1.3rem;
-            }
-            
-            .navbar .user-info .user-greeting span {
-                display: none;
-            }
-        }
-
-        @media screen and (max-width: 768px) {
-            .content {
-                padding: 1.5rem;
-            }
-        }
-
-        @media screen and (max-width: 576px) {
-            .content {
-                padding: 1rem;
-            }
         }
     </style>
 </head>
-<body>
+<body class="bg-backgroundlight text-textdark">
     <!-- Navbar -->
-    <div class="navbar">
-        <div class="brand-container">
-            <button class="menu-btn" onclick="toggleNav()">
+    <nav class="fixed top-0 left-0 w-full bg-primary text-textlight shadow-nav z-50 h-[70px] flex justify-between items-center px-8">
+        <div class="flex items-center gap-4">
+            <button class="menu-btn text-textlight text-2xl cursor-pointer p-2 rounded transition-all" onclick="toggleNav()">
                 <i class="fas fa-bars"></i>
             </button>
-            <a href="{% url 'home' %}" class="brand">Company Portal</a>
+            <a href="{% url 'accounts:home' %}" class="brand text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider">Company Portal</a>
         </div>
-        <div class="user-info">
-            <div class="user-greeting">
-                <i class="fas fa-user-circle"></i>
-                <span>
+        <div class="flex items-center gap-6">
+            <div class="user-greeting flex items-center gap-2">
+                <i class="fas fa-user-circle text-xl"></i>
+                <span class="hidden md:inline">
                     {% if user.is_authenticated %}
                         {{ user.email }}
                     {% else %}
@@ -278,66 +99,66 @@
                 </span>
             </div>
             {% if user.is_authenticated %}
-                <a href="{% url 'account_logout' %}" class="logout-btn">Logout</a>
+                <a href="{% url 'account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
             {% else %}
-                <a href="{% url 'login' %}" class="login-btn">Login</a>
+                <a href="{% url 'login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
             {% endif %}
         </div>
-    </div>
+    </nav>
 
     <!-- Overlay -->
-    <div class="overlay" id="overlay" onclick="closeNav()"></div>
+    <div class="overlay fixed inset-0 bg-black bg-opacity-50 z-[1000] opacity-0 invisible" id="overlay" onclick="closeNav()"></div>
 
     <!-- Side Navigation -->
-    <div id="mySidenav" class="sidenav">
-        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+    <div id="mySidenav" class="sidenav fixed h-full w-0 left-0 top-0 z-[1001] bg-white overflow-x-hidden pt-20">
+        <a href="javascript:void(0)" class="closebtn absolute top-5 right-6 text-3xl text-textdark cursor-pointer transition-all" onclick="closeNav()">&times;</a>
         
-        <div class="menu-header">Main Menu</div>
-        <a href="{% url 'home' %}" class="{% if request.path == '/' %}active{% endif %}">
-            <i class="fas fa-home"></i>
+        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Main Menu</div>
+        <a href="{% url 'accounts:home' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if request.path == '/' %}active{% endif %}">
+            <i class="fas fa-home w-6 text-center"></i>
             <span>Home</span>
         </a>
         
         {% if user.is_authenticated %}
-            <div class="menu-header">Account</div>
-            <a href="{% url 'account_logout' %}">
-                <i class="fas fa-sign-out-alt"></i>
+            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
+            <a href="{% url 'account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                <i class="fas fa-sign-out-alt w-6 text-center"></i>
                 <span>Logout</span>
             </a>
         {% else %}
-            <div class="menu-header">Authentication</div>
-            <a href="{% url 'login' %}" class="{% if 'login' in request.path %}active{% endif %}">
-                <i class="fas fa-sign-in-alt"></i>
+            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Authentication</div>
+            <a href="{% url 'login' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">
+                <i class="fas fa-sign-in-alt w-6 text-center"></i>
                 <span>Login</span>
             </a>
-            <a href="{% url 'register' %}" class="{% if 'register' in request.path %}active{% endif %}">
-                <i class="fas fa-user-plus"></i>
+            <a href="{% url 'register' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'register' in request.path %}active{% endif %}">
+                <i class="fas fa-user-plus w-6 text-center"></i>
                 <span>Register</span>
             </a>
-            <a href="{% provider_login_url 'google' %}">
-                <i class="fab fa-google"></i>
+            <a href="{% provider_login_url 'google' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                <i class="fab fa-google w-6 text-center"></i>
                 <span>Sign in with Google</span>
             </a>
         {% endif %}
         
         <!-- Add more menu items as needed -->
-        <div class="menu-header">Resources</div>
-        <a href="#">
-            <i class="fas fa-file-alt"></i>
+        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Resources</div>
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+            <i class="fas fa-file-alt w-6 text-center"></i>
             <span>Documents</span>
         </a>
-        <a href="#">
-            <i class="fas fa-cog"></i>
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+            <i class="fas fa-cog w-6 text-center"></i>
             <span>Settings</span>
         </a>
-        <a href="#">
-            <i class="fas fa-question-circle"></i>
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+            <i class="fas fa-question-circle w-6 text-center"></i>
             <span>Help</span>
         </a>
     </div>
 
     <!-- Content -->
-    <div class="content" id="main-content">
+    <div class="content mt-[70px] min-h-[calc(100vh-70px)] bg-backgroundlight p-8" id="main-content">
         {% block content %}
         {% endblock %}
     </div>
@@ -349,9 +170,13 @@
             const overlay = document.getElementById("overlay");
             const content = document.getElementById("main-content");
             
-            sidenav.classList.toggle("open");
-            overlay.classList.toggle("active");
-            content.classList.toggle("shifted");
+            sidenav.classList.toggle("w-0");
+            sidenav.classList.toggle("w-72");
+            overlay.classList.toggle("opacity-0");
+            overlay.classList.toggle("opacity-100");
+            overlay.classList.toggle("invisible");
+            overlay.classList.toggle("visible");
+            content.classList.toggle("md:ml-72");
         }
 
         function closeNav() {
@@ -359,9 +184,11 @@
             const overlay = document.getElementById("overlay");
             const content = document.getElementById("main-content");
             
-            sidenav.classList.remove("open");
-            overlay.classList.remove("active");
-            content.classList.remove("shifted");
+            sidenav.classList.add("w-0");
+            sidenav.classList.remove("w-72");
+            overlay.classList.add("opacity-0", "invisible");
+            overlay.classList.remove("opacity-100", "visible");
+            content.classList.remove("md:ml-72");
         }
 
         // Close the sidenav when clicking outside of it
@@ -369,7 +196,7 @@
             const sidenav = document.getElementById("mySidenav");
             const menuBtn = document.querySelector(".menu-btn");
             
-            if (sidenav.classList.contains("open") && 
+            if (sidenav.classList.contains("w-72") && 
                 !sidenav.contains(event.target) && 
                 !menuBtn.contains(event.target)) {
                 closeNav();

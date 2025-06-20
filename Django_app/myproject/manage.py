@@ -2,7 +2,12 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
 
+# Add this before the Django imports
+widget_tweaks_path = Path.home() / '.local' / 'lib' / 'python3.12' / 'site-packages'
+if str(widget_tweaks_path) not in sys.path:
+    sys.path.append(str(widget_tweaks_path))
 
 def main():
     """Run administrative tasks."""

@@ -3,12 +3,14 @@ from django.urls import path, include
 from django.views.generic.base import RedirectView
 from django.contrib.auth import views as auth_views
 from accounts.views import  GoogleLoginContinueView
-from accounts.views import CustomGoogleLoginView
+from accounts.views import user_list_view, user_detail_view,CustomGoogleLoginView
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),  # Added for password reset
     path('accounts/', include('allauth.urls')),
-    path('myaccounts/', include('accounts.urls')),  # Avoid conflict with allauth
+    path('myaccounts/', include('accounts.urls',namespace='accounts')),  # Avoid conflict with allauth
+    path('users/',user_list_view,name='user_list'),
+    path('user/<int:user_id>/',user_detail_view,name='user_detail')
     # path('accounts/google/login/', CustomGoogleLoginView.as_view(), name='custom_google_login'),
     # path('accounts/google/login/', custom_google_login, name='custom_google_login'),
     # path('accounts/google/login/continue/', GoogleLoginContinueView.as_view(), name='google_login_continue'),
