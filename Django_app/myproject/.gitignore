@@ -1,4 +1,5 @@
 /env
 .env
 debug.log
-*.log
+*.log*.log
+debug.log
