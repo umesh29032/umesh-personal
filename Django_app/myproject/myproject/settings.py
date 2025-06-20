@@ -424,6 +424,7 @@ ACCOUNT_EMAIL_VERIFICATION = 'optional'
 LOGIN_REDIRECT_URL = '/myaccounts/home/'
 LOGOUT_REDIRECT_URL = '/myaccounts/login/'
 LOGIN_URL = '/myaccounts/login/'
+# SOCIALACCOUNT_LOGIN_ON_GET = True # if you want login on get request direct login without redirecting to login page
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {

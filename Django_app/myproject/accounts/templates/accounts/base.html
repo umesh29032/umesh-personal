@@ -99,9 +99,9 @@
                 </span>
             </div>
             {% if user.is_authenticated %}
-                <a href="{% url 'account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
+                <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
             {% else %}
-                <a href="{% url 'login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
+                <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
             {% endif %}
         </div>
     </nav>
@@ -121,17 +121,17 @@
         
         {% if user.is_authenticated %}
             <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
-            <a href="{% url 'account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+            <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
                 <i class="fas fa-sign-out-alt w-6 text-center"></i>
                 <span>Logout</span>
             </a>
         {% else %}
             <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Authentication</div>
-            <a href="{% url 'login' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">
+            <a href="{% url 'accounts:login' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">
                 <i class="fas fa-sign-in-alt w-6 text-center"></i>
                 <span>Login</span>
             </a>
-            <a href="{% url 'register' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'register' in request.path %}active{% endif %}">
+            <a href="{% url 'accounts:register' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'register' in request.path %}active{% endif %}">
                 <i class="fas fa-user-plus w-6 text-center"></i>
                 <span>Register</span>
             </a>

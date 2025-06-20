@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from accounts.serializers import UserSerializer
 from .forms import UserEditForm
 from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -31,8 +32,8 @@ class GoogleLoginContinueView(TemplateView):
         return redirect('/accounts/google/login/')
 
 def login_view(request):
-    import allauth.socialaccount.views
-    print("121324435",dir(allauth.socialaccount.views))
+    # import allauth.socialaccount.views
+    # print("121324435",dir(allauth.socialaccount.views))
     # import allauth.account
     # print(dir(allauth.account))
     if request.method == 'POST':
@@ -41,8 +42,9 @@ def login_view(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            return redirect('home')
+            return redirect('accounts:home')
         else:
+            messages.error(request, "Invalid credentials")
             return render(request, 'accounts/login.html', {'error': 'Invalid credentials'})
     return render(request, 'accounts/login.html')
 
@@ -65,7 +67,7 @@ def register_view(request):
             user = User.objects.create_user(email=email, password=password)
             user.save()
             messages.success(request, "Registration successful. Please log in.")
-            return redirect('login')
+            return redirect('accounts:login')
         except Exception as e:
             messages.error(request, f"Registration failed: {str(e)}")
             return render(request, 'accounts/register.html')
@@ -74,7 +76,7 @@ def register_view(request):
 
 def custom_logout(request):
     logout(request)
-    return redirect('login')  # Redirect to login page after logout
+    return redirect('accounts:login')  # Redirect to login page after logout
 
 # def google_login(request):
 #     if request.GET.get('process') == 'login':
@@ -86,7 +88,7 @@ def custom_logout(request):
 #         print("Template error:", str(e))
 #     return render(request, 'socialaccount/google_login.html')
 
-@login_required(login_url="login")
+@login_required(login_url="accounts:login")
 def home(request):
     from django.urls import reverse
     print(reverse('account_logout'))  # Should print /accounts/logout/
@@ -117,7 +119,7 @@ def user_detail_view(request, user_id):
         form = UserEditForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
-            return redirect('user_list')
+            return redirect('accounts:user_list')
     else:
         form = UserEditForm(instance=user)
     return render(request, 'accounts/user_detail.html', {'form': form, 'user': user})

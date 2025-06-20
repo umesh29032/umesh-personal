@@ -41,7 +41,7 @@
             <div class="form-group">
                 <div class="label-container">
                     <label for="password">Password</label>
-                    <a href="{% url 'password_reset' %}" class="forgot-password">Forgot password?</a>
+                    <a href="{% url 'accounts:password_reset' %}" class="forgot-password">Forgot password?</a>
                 </div>
                 <div class="input-with-icon">
                     <i class="fas fa-lock"></i>
@@ -71,7 +71,7 @@
         </div>
 
         <div class="signup-link">
-            Don't have an account? <a href="{% url 'register' %}">Sign up</a>
+            Don't have an account? <a href="{% url 'accounts:register' %}">Sign up</a>
         </div>
     </div>
 

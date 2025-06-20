@@ -19,7 +19,7 @@ class RegisterForm(forms.ModelForm):
 class UserEditForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'phone_number', 'birth_date', 'bio', 'salary', 'is_active', 'is_staff']
+        fields = ['email', 'first_name', 'last_name', 'phone_number', 'birth_date', 'bio', 'salary', 'is_active', 'is_staff', 'is_superuser']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
