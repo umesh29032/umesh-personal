@@ -1,81 +1,436 @@
-{% extends 'accounts/base.html' %}
 {% load socialaccount %}
-{% block title %}Register{% endblock %}
-{% block content %}
-<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create a new account
-        </h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
-            Or
-            <a href="{% url 'accounts:login' %}" class="font-medium text-indigo-600 hover:text-indigo-500">
-                sign in to your existing account
-            </a>
-        </p>
-    </div>
+{% load static %}
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | Kapil Enterprises</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Local Tailwind CSS -->
+    <link href="{% static 'theme/css/dist/styles.css' %}" rel="stylesheet">
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-card">
+            <div class="register-header">
+                <div class="company-logo">
+                    <i class="fas fa-rocket"></i>
+                    <span>Kapil Enterprises</span>
+                </div>
+                <h1>Create Account</h1>
+                <p>Join us and start your journey</p>
+            </div>
+
             {% if messages %}
+            <div class="messages-container">
                 {% for message in messages %}
-                    <div class="p-4 mb-4 text-sm rounded-lg {% if message.tags == 'error' %} bg-red-100 text-red-800 {% else %} bg-green-100 text-green-800 {% endif %}" role="alert">
-                        {{ message }}
-                    </div>
+                <div class="alert alert-{{ message.tags }}">
+                    <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                    {{ message }}
+                </div>
                 {% endfor %}
+            </div>
             {% endif %}
-            <form class="space-y-6" method="post">
+
+            <form method="post" class="register-form">
                 {% csrf_token %}
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Email address</label>
-                    <div class="mt-1">
-                        <input id="email" name="email" type="email" autocomplete="email" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="name" name="name" placeholder="Enter your full name" required>
                     </div>
                 </div>
 
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <div class="mt-1">
-                        <input id="password" name="password" type="password" autocomplete="new-password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" placeholder="Enter your email" required>
                     </div>
                 </div>
 
-                <div>
-                    <label for="confirm_password" class="block text-sm font-medium text-gray-700">Confirm Password</label>
-                    <div class="mt-1">
-                        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="Create a password" required>
+                        <button type="button" class="toggle-password" aria-label="Show password">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
-                <div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Register
-                    </button>
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm your password" required>
+                        <button type="button" class="toggle-password" aria-label="Show password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
+
+                <button type="submit" class="register-button">
+                    <span>Create Account</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
             </form>
 
-            <div class="mt-6">
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-300"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="px-2 bg-white text-gray-500">
-                            Or continue with
-                        </span>
-                    </div>
-                </div>
+            <div class="divider">
+                <span>or continue with</span>
+            </div>
 
-                <div class="mt-6">
-                    <div>
-                        <a href="{% provider_login_url 'google' %}" class="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                            <svg class="w-5 h-5 mr-2" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 381.5 512 244 512 109.8 512 0 402.2 0 261.8 0 120.5 109.8 11.8 244 11.8c70.3 0 129.8 27.8 174.2 71.9l-64.5 64.5C337 154.6 294.3 131.8 244 131.8c-70.9 0-128.5 57.6-128.5 128.5s57.6 128.5 128.5 128.5c80.6 0 116.5-63.6 120.2-92.8H244v-79.1h236.5c2.3 12.7 3.5 25.8 3.5 39.6z"></path></svg>
-                            Sign in with Google
-                        </a>
-                    </div>
-                </div>
+            <div class="social-login">
+               <a href="{% provider_login_url 'google' %}" class="social-button google">
+                    <i class="fab fa-google"></i>
+                    <span>Sign up with Google</span>
+                </a>
+            </div>
+
+            <div class="signup-link">
+                Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a>
+            </div>
+        </div>
+
+        <div class="register-footer">
+            <p>© 2023 Kapil Enterprises. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Help Center</a>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <style>
+        :root {
+            --primary-color: #4285f4;
+            --primary-dark: #3367d6;
+            --text-color: #202124;
+            --text-secondary: #5f6368;
+            --border-color: #dadce0;
+            --error-color: #d93025;
+            --success-color: #34a853;
+            --warning-color: #f9ab00;
+            --background-color: #f8f9fa;
+            --white: #ffffff;
+            --google-blue: #4285f4;
+            --google-red: #ea4335;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .register-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .register-card {
+            width: 100%;
+            max-width: 450px;
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            margin-bottom: 20px;
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .company-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            font-size: 24px;
+            font-weight: 500;
+        }
+
+        .company-logo i {
+            font-size: 28px;
+            margin-right: 10px;
+        }
+
+        .register-header h1 {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        .register-header p {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .messages-container {
+            margin-bottom: 20px;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .alert-error {
+            background-color: rgba(217, 48, 37, 0.1);
+            color: var(--error-color);
+            border-left: 3px solid var(--error-color);
+        }
+
+        .alert-success {
+            background-color: rgba(52, 168, 83, 0.1);
+            color: var(--success-color);
+            border-left: 3px solid var(--success-color);
+        }
+
+        .alert i {
+            margin-right: 10px;
+        }
+
+        .register-form {
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .input-with-icon {
+            position: relative;
+        }
+
+        .input-with-icon i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .input-with-icon input {
+            width: 100%;
+            padding: 12px 16px 12px 40px;
+            font-size: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            transition: border 0.3s ease;
+        }
+
+        .input-with-icon input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .register-button {
+            width: 100%;
+            padding: 12px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.3s ease;
+        }
+
+        .register-button:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .register-button i {
+            margin-left: 10px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 25px 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .divider::before {
+            margin-right: 16px;
+        }
+
+        .divider::after {
+            margin-left: 16px;
+        }
+
+        .social-login {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .social-button {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .social-button i {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+
+        .social-button.google {
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            background-color: white;
+        }
+
+        .social-button.google:hover {
+            background-color: #f8f9fa;
+        }
+
+        .signup-link {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .signup-link a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .signup-link a:hover {
+            text-decoration: underline;
+        }
+
+        .register-footer {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .footer-links {
+            margin-top: 10px;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin: 0 8px;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 480px) {
+            .register-card {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Toggle password visibility for both password fields
+            const togglePasswordButtons = document.querySelectorAll('.toggle-password');
+            
+            togglePasswordButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const input = this.parentElement.querySelector('input');
+                    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                    input.setAttribute('type', type);
+                    
+                    // Toggle eye icon
+                    const icon = this.querySelector('i');
+                    icon.classList.toggle('fa-eye');
+                    icon.classList.toggle('fa-eye-slash');
+                    
+                    // Update aria-label for accessibility
+                    this.setAttribute('aria-label', 
+                        type === 'password' ? 'Show password' : 'Hide password');
+                });
+            });
+
+            // Add focus effects
+            const inputs = document.querySelectorAll('.input-with-icon input');
+            inputs.forEach(input => {
+                const icon = input.parentElement.querySelector('i:not(.toggle-password i)');
+                
+                input.addEventListener('focus', function() {
+                    if (icon) icon.style.color = 'var(--primary-color)';
+                });
+                
+                input.addEventListener('blur', function() {
+                    if (icon) icon.style.color = 'var(--text-secondary)';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

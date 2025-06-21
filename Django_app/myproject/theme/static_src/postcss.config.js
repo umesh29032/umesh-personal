@@ -1,13 +1,6 @@
-// module.exports = {
-//   plugins: {
-//     "@tailwindcss/postcss": {},
-//     "postcss-simple-vars": {},
-//     "postcss-nested": {}
-//   },
-// }
 module.exports = {
   plugins: {
-    tailwindcss: {},
+    '@tailwindcss/postcss': {},
     'postcss-nested': {},
     'postcss-simple-vars': {},
     autoprefixer: {},

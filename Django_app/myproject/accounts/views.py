@@ -11,6 +11,8 @@ from accounts.serializers import UserSerializer
 from .forms import UserEditForm
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
+import json
+from django.core.serializers.json import DjangoJSONEncoder
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -51,9 +53,15 @@ def login_view(request):
 def register_view(request):
     print("hererer",User.objects.all())
     if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
         email = request.POST['email']
         password = request.POST['password']
         confirm_password = request.POST['confirm_password']
+        
+        # Validation
+        if not name:
+            messages.error(request, "Name is required")
+            return render(request, 'accounts/register.html')
         
         if password != confirm_password:
             messages.error(request, "Passwords do not match")
@@ -64,7 +72,17 @@ def register_view(request):
             return render(request, 'accounts/register.html')
         
         try:
-            user = User.objects.create_user(email=email, password=password)
+            # Split name into first and last name
+            name_parts = name.split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            user = User.objects.create_user(
+                email=email, 
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
             user.save()
             messages.success(request, "Registration successful. Please log in.")
             return redirect('accounts:login')
@@ -97,9 +115,32 @@ def home(request):
     for user in users:
         print(user.id, user.email, user.is_active)
     users = User.objects.all()
-    serializer = UserSerializer(users, many=True)
+    # Current user ko request.user se milta hai
+    # current_user = request.user 
+    # user_data = {
+    #     'id': current_user.id,
+    #     'email': current_user.email,
+    #     'first_name': current_user.first_name,
+    #     'last_name': current_user.last_name,
+    #     'is_active': current_user.is_active,
+    #     'is_staff': current_user.is_staff,
+    #     'is_superuser': current_user.is_superuser,
+    #     'last_login': current_user.last_login,
+    #     'date_joined': current_user.date_joined,
+    #     'phone_number': current_user.phone_number,
+    #     'birth_date': current_user.birth_date,
+    #     'bio': current_user.bio,
+    #     'profile_picture': str(current_user.profile_picture) if current_user.profile_picture else None,
+    #     'salary': float(current_user.salary) if current_user.salary else None,
+    # }
+    # user_json = json.dumps(user_data, indent=2, cls=DjangoJSONEncoder)
+    serializer = UserSerializer(request.user,many=False)
     print("json data",serializer.data)
     return render(request, 'accounts/home.html')
+
+def test_page(request):
+    """Test page to verify Tailwind CSS is working"""
+    return render(request, 'accounts/test.html')
 
 def custom_google_login(request):
     if request.GET.get('process') == 'login':
@@ -123,3 +164,6 @@ def user_detail_view(request, user_id):
     else:
         form = UserEditForm(instance=user)
     return render(request, 'accounts/user_detail.html', {'form': form, 'user': user})
+
+def inventory(request):
+    return render(request, 'accounts/inventory.html')  # Create this later

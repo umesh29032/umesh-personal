@@ -1,4 +1,3 @@
-
 # accounts/forms.py
 from django import forms
 from django.contrib.auth import get_user_model
@@ -19,14 +18,14 @@ class RegisterForm(forms.ModelForm):
 class UserEditForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'phone_number', 'birth_date', 'bio', 'salary', 'is_active', 'is_staff', 'is_superuser']
-
+        fields = ['email', 'first_name', 'last_name', 'phone_number', 'birth_date','date_joined', 'bio', 'salary', 'is_active', 'is_staff', 'is_superuser']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Customize form fields
         self.fields['phone_number'].widget.attrs.update({'placeholder': 'Enter phone number (numbers only)'})
         self.fields['salary'].widget.attrs.update({'step': '0.01', 'placeholder': 'Enter salary (e.g., 5000.00)'})
         self.fields['birth_date'].widget = forms.DateInput(attrs={'type': 'date'})
+        self.fields['date_joined'].widget = forms.DateTimeInput(attrs={'type': 'datetime-local'})
 
     def clean_phone_number(self):
         phone = self.cleaned_data['phone_number']

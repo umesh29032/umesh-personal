@@ -1,5 +1,5 @@
 {% load socialaccount %}
-{% load static %} <!-- Add this line if missing  for tailwind-->
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,53 +8,66 @@
     <title>{% block title %}{% endblock %}</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Local Tailwind CSS -->
     <link href="{% static 'theme/css/dist/styles.css' %}" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#2c3e50',
-                        secondary: '#3498db',
-                        accent: '#2980b9',
-                        textlight: '#ecf0f1',
-                        textdark: '#2c3e50',
-                        backgroundlight: '#f8f9fa',
-                        danger: '#e74c3c',
-                        dangerhover: '#c0392b',
-                    },
-                    boxShadow: {
-                        nav: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                        sidenav: '4px 0 15px rgba(0, 0, 0, 0.1)',
-                    },
-                    transitionProperty: {
-                        'all': 'all',
-                    },
-                }
-            }
-        }
-    </script>
+    
+    {% load tailwind_tags %}
+    {% tailwind_css %}  
     <style>
+        /* Custom CSS Variables for missing colors */
+        :root {
+            --color-primary: #2c3e50;
+            --color-secondary: #3498db;
+            --color-accent: #2980b9;
+            --color-textlight: #ecf0f1;
+            --color-textdark: #2c3e50;
+            --color-backgroundlight: #f8f9fa;
+            --color-danger: #e74c3c;
+            --color-dangerhover: #c0392b;
+        }
+        
+        /* Custom utility classes */
+        .bg-primary { background-color: var(--color-primary) !important; }
+        .text-primary { color: var(--color-primary) !important; }
+        .bg-secondary { background-color: var(--color-secondary) !important; }
+        .text-secondary { color: var(--color-secondary) !important; }
+        .bg-accent { background-color: var(--color-accent) !important; }
+        .text-accent { color: var(--color-accent) !important; }
+        .text-textlight { color: var(--color-textlight) !important; }
+        .text-textdark { color: var(--color-textdark) !important; }
+        .bg-backgroundlight { background-color: var(--color-backgroundlight) !important; }
+        .bg-danger { background-color: var(--color-danger) !important; }
+        .bg-dangerhover { background-color: var(--color-dangerhover) !important; }
+        .hover\:bg-dangerhover:hover { background-color: var(--color-dangerhover) !important; }
+        
         body {
             font-family: 'Roboto', sans-serif;
+            background-color: var(--color-backgroundlight);
         }
         
         .sidenav {
             transition: width 0.3s ease;
+            background-color: white;
+            z-index: 1001;
         }
         
         .content {
             transition: margin 0.3s ease;
+            background-color: var(--color-backgroundlight);
+            min-height: calc(100vh - 70px);
         }
         
         .overlay {
             transition: opacity 0.3s ease, visibility 0.3s ease;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
         }
         
         .sidenav-link {
             border-left: 4px solid transparent;
             transition: all 0.3s ease;
+            color: var(--color-textdark);
         }
         
         .sidenav-link:hover, .sidenav-link.active {
@@ -76,34 +89,116 @@
             color: #3498db;
             transform: rotate(90deg);
         }
+        
+        /* New: Styles for collapsible submenu */
+        .submenu {
+            display: none;
+            padding-left: 2rem;
+        }
+        
+        .sidenav-link.has-submenu {
+            position: relative;
+        }
+        
+        .sidenav-link.has-submenu::after {
+            content: '▼';
+            position: absolute;
+            right: 1rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidenav-link.has-submenu.active::after {
+            transform: rotate(180deg);
+        }
+        
+        .submenu.active {
+            display: block;
+        }
+        
+        /* Change: Updated style for keeping nav open based on data attribute */
+        [data-keep-nav-open="true"] #mySidenav {
+            width: 18rem !important; /* Force open state */
+        }
+        [data-keep-nav-open="true"] #mySidenav.w-0 {
+            width: 0 !important; /* Ensure it can still close */
+        }
+        [data-keep-nav-open="true"] #overlay {
+            opacity: 0 !important;
+            visibility: visible !important;
+            pointer-events: none !important;
+        }
+        [data-keep-nav-open="true"] #main-content {
+            margin-left: 18rem !important; /* Adjusted margin to match sidenav width */
+        }
+        
+        /* Ensure proper responsive behavior */
+        @media (max-width: 768px) {
+            [data-keep-nav-open="true"] #mySidenav {
+                width: 0 !important; /* Keep closed on mobile */
+            }
+            [data-keep-nav-open="true"] #main-content {
+                margin-left: 0 !important;
+            }
+            
+            .content {
+                margin-left: 0 !important;
+            }
+        }
+        
+        /* Fix for content not going black */
+        #main-content {
+            background-color: var(--color-backgroundlight) !important;
+            color: var(--color-textdark) !important;
+        }
     </style>
 </head>
-<body class="bg-backgroundlight text-textdark">
+{{keep_nav_open}}
+<body class="bg-backgroundlight text-textdark" data-keep-nav-open="{% block keep_nav_open %}false{% endblock %}">
+    {% if user.is_authenticated %}
     <!-- Navbar -->
-    <nav class="fixed top-0 left-0 w-full bg-primary text-textlight shadow-nav z-50 h-[70px] flex justify-between items-center px-8">
-        <div class="flex items-center gap-4">
+    <nav class="flex justify-between items-center fixed top-0 left-0 w-full bg-primary text-textlight shadow-nav z-50 h-[60px]  px-8">
+        <div class="flex justify-start align-middle gap-4">
             <button class="menu-btn text-textlight text-2xl cursor-pointer p-2 rounded transition-all" onclick="toggleNav()">
                 <i class="fas fa-bars"></i>
             </button>
-            <a href="{% url 'accounts:home' %}" class="brand text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider">Company Portal</a>
-        </div>
-        <div class="flex items-center gap-6">
-            <div class="user-greeting flex items-center gap-2">
-                <i class="fas fa-user-circle text-xl"></i>
-                <span class="hidden md:inline">
-                    {% if user.is_authenticated %}
-                        {{ user.email }}
-                    {% else %}
-                        Guest
-                    {% endif %}
-                </span>
+            <!-- Change: Updated brand name and added logo placeholder -->
+            <a href="{% url 'accounts:home' %}" class="brand text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider flex items-center gap-2">
+                <span class="text-xl">🌟</span> <!-- Placeholder for logo -->
+                Kapil Enterprises
+            </a>
             </div>
-            {% if user.is_authenticated %}
-                <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
-            {% else %}
-                <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
-            {% endif %}
-        </div>
+                <div class="flex justify-middle gap-4">
+                    
+                        <a href="{#% url 'shop' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Shop</a>
+                        <a href="{#% url 'men' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Men</a>
+                        <a href="{#% url 'women' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Women</a>
+                        <a href="{#% url 'about' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">About</a>
+                        <a href="{#% url 'contact' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
+                        <a href="{#% url 'cart' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+                            <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </a>
+                </div>
+            <div class="flex items-center gap-6">
+                <div class="user-greeting flex items-center gap-2">
+                    <i class="fas fa-user-circle text-xl"></i>
+                    <span class="hidden md:inline">
+                        {% if user.is_authenticated %}
+                            {{ user.email }}
+                        {% else %}
+                            Guest
+                        {% endif %}
+                    </span>
+                </div>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
+                {% else %}
+                    <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
+                {% endif %}
+            </div>
+        
+        
     </nav>
 
     <!-- Overlay -->
@@ -111,15 +206,31 @@
 
     <!-- Side Navigation -->
     <div id="mySidenav" class="sidenav fixed h-full w-0 left-0 top-0 z-[1001] bg-white overflow-x-hidden pt-20">
-        <a href="javascript:void(0)" class="closebtn absolute top-5 right-6 text-3xl text-textdark cursor-pointer transition-all" onclick="closeNav()">&times;</a>
+        <a href="javascript:void(0)" class="closebtn absolute top-5 right-6 text-3xl text-textdark cursor-pointer transition-all" onclick="closeNav()">×</a>
         
         <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Main Menu</div>
-        <a href="{% url 'accounts:home' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if request.path == '/' %}active{% endif %}">
+        <a href="{% url 'accounts:home' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'home' in request.path %}active{% endif %}">
             <i class="fas fa-home w-6 text-center"></i>
             <span>Home</span>
         </a>
-        
         {% if user.is_authenticated %}
+            <!-- Change: Added Inventory option for internal use -->
+            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Management</div>
+            <a href="javascript:void(0)" class="sidenav-link has-submenu flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'inventory' in request.path %}active{% endif %}" onclick="toggleSubmenu('inventory-submenu')">
+                <i class="fas fa-warehouse w-6 text-center"></i>
+                <span>Inventory</span>
+            </a>
+            <div id="inventory-submenu" class="submenu">
+                <a href="{% url 'accounts:user_list' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'user_list' or 'user_detail' in request.path %}active{% endif %}">
+                    <i class="fas fa-users w-6 text-center"></i>
+                    <span>All Users</span>
+                </a>
+                <!-- Add more sub-sections as needed -->
+                <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                    <i class="fas fa-boxes w-6 text-center"></i>
+                    <span>Stock Levels</span>
+                </a>
+            </div>
             <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
             <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
                 <i class="fas fa-sign-out-alt w-6 text-center"></i>
@@ -156,44 +267,60 @@
             <span>Help</span>
         </a>
     </div>
+    {% endif %}
 
     <!-- Content -->
-    <div class="content mt-[70px] min-h-[calc(100vh-70px)] bg-backgroundlight p-8" id="main-content">
+    <div class="content {% if user.is_authenticated %}mt-[70px]{% endif %} min-h-[calc(100vh-70px)] bg-backgroundlight p-8" id="main-content">
         {% block content %}
         {% endblock %}
     </div>
 
     <!-- JavaScript for Side Navigation -->
+    {% if user.is_authenticated %}
     <script>
+        // Cache DOM elements for better performance
+        const sidenav = document.getElementById("mySidenav");
+        const overlay = document.getElementById("overlay");
+        const content = document.getElementById("main-content");
+        
         function toggleNav() {
-            const sidenav = document.getElementById("mySidenav");
-            const overlay = document.getElementById("overlay");
-            const content = document.getElementById("main-content");
-            
-            sidenav.classList.toggle("w-0");
-            sidenav.classList.toggle("w-72");
-            overlay.classList.toggle("opacity-0");
-            overlay.classList.toggle("opacity-100");
-            overlay.classList.toggle("invisible");
-            overlay.classList.toggle("visible");
-            content.classList.toggle("md:ml-72");
+            if (sidenav.classList.contains("w-0")) {
+                // Open sidebar
+                sidenav.classList.remove("w-0");
+                sidenav.classList.add("w-72");
+                sidenav.style.width = "18rem";
+                
+                // Show overlay
+                overlay.classList.remove("opacity-0", "invisible");
+                overlay.classList.add("opacity-100", "visible");
+                
+                // Adjust content margin only on desktop
+                if (window.innerWidth >= 768) {
+                    content.classList.add("md:ml-72");
+                    content.style.marginLeft = "18rem";
+                }
+            } else {
+                closeNav();
+            }
         }
 
         function closeNav() {
-            const sidenav = document.getElementById("mySidenav");
-            const overlay = document.getElementById("overlay");
-            const content = document.getElementById("main-content");
-            
+            // Close sidebar
             sidenav.classList.add("w-0");
             sidenav.classList.remove("w-72");
+            sidenav.style.width = "0";
+            
+            // Hide overlay
             overlay.classList.add("opacity-0", "invisible");
             overlay.classList.remove("opacity-100", "visible");
+            
+            // Reset content margin
             content.classList.remove("md:ml-72");
+            content.style.marginLeft = "";
         }
 
         // Close the sidenav when clicking outside of it
         document.addEventListener('click', function(event) {
-            const sidenav = document.getElementById("mySidenav");
             const menuBtn = document.querySelector(".menu-btn");
             
             if (sidenav.classList.contains("w-72") && 
@@ -202,6 +329,82 @@
                 closeNav();
             }
         });
+        
+        // Function to toggle submenu
+        function toggleSubmenu(submenuId) {
+            const submenu = document.getElementById(submenuId);
+            const link = submenu.previousElementSibling;
+            submenu.classList.toggle('active');
+            link.classList.toggle('active');
+        }
+        
+        // Initialize navbar on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const body = document.body;
+            const keepNavOpen = body.getAttribute('data-keep-nav-open');
+            
+            // Check if navbar should be open by default
+            if (keepNavOpen === 'true' && window.innerWidth >= 768) {
+                // Force open the navbar
+                sidenav.classList.remove("w-0");
+                sidenav.classList.add("w-72");
+                sidenav.style.width = "18rem";
+                
+                overlay.classList.add("opacity-0", "invisible");
+                overlay.style.pointerEvents = "none";
+                content.classList.add("md:ml-72");
+                content.style.marginLeft = "18rem";
+            }
+            
+            // Set active class based on current path
+            document.querySelectorAll('.sidenav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                
+                // Check if this link matches the current page
+                if (href && href !== 'javascript:void(0)' && href !== '#') {
+                    // Remove any URL parameters for comparison
+                    const cleanHref = href.split('?')[0];
+                    const cleanCurrentPath = currentPath.split('?')[0];
+                    
+                    if (cleanHref === cleanCurrentPath) {
+                        link.classList.add('active');
+                        
+                        // If this link is in a submenu, open the submenu
+                        const submenu = link.closest('.submenu');
+                        if (submenu) {
+                            submenu.classList.add('active');
+                            const parentLink = submenu.previousElementSibling;
+                            if (parentLink && parentLink.classList.contains('has-submenu')) {
+                                parentLink.classList.add('active');
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Special handling for submenu parent links
+            const submenuParents = document.querySelectorAll('.sidenav-link.has-submenu');
+            submenuParents.forEach(parent => {
+                const submenu = parent.nextElementSibling;
+                if (submenu && submenu.classList.contains('submenu')) {
+                    const activeChild = submenu.querySelector('.sidenav-link.active');
+                    if (activeChild) {
+                        parent.classList.add('active');
+                        submenu.classList.add('active');
+                    }
+                }
+            });
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth < 768) {
+                // On mobile, always close sidebar and reset content
+                closeNav();
+            }
+        });
     </script>
+    {% endif %}
 </body>
 </html>
