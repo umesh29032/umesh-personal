@@ -18,7 +18,16 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
+    USER_TYPE_CHOICES = (
+        ("admin", "Admin"),
+        ("cutting_master", "Cutting Master"),
+        ("supplier", "Supplier"),
+        ("karigar", "Karigar"),
+        ("kapde_wala", "Kapde Wala"),
+    )
+
     email = models.EmailField(unique=True)
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='karigar')
     first_name = models.CharField(max_length=30, blank=True)
     last_name = models.CharField(max_length=30, blank=True)
     is_active = models.BooleanField(default=True)
@@ -33,11 +42,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     bio = models.TextField(blank=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    
+    # add user type
     # is_authenticated = models.BooleanField(default=False)
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
+
+    def save(self, *args, **kwargs):
+        if self.user_type == 'admin':
+            self.is_staff = True
+        super().save(*args, **kwargs)
 
     @property
     def is_authenticated(self):

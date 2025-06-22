@@ -4,8 +4,8 @@
 {% block content %}
 <div class="max-w-6xl mx-auto">
     <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-lg p-8 mb-8 text-white">
-        <h1 class="text-4xl font-bold mb-4">Welcome, {{ user.first_name|default:"User" }}!</h1>
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-lg p-8 mb-8 text-black">
+        <h1 class="text-4xl font-bold mb-4">Welcome, {{user.first_name|default:'' |add:" "|add:user.last_name|default:'' }}!</h1>
         <p class="text-xl opacity-90">You're successfully logged in to your dashboard.</p>
     </div>
     

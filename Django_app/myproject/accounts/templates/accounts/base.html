@@ -158,8 +158,8 @@
     <!-- Navbar -->
     <nav class="flex justify-between items-center fixed top-0 left-0 w-full bg-primary text-textlight shadow-nav z-50 h-[60px]  px-8">
         <div class="flex justify-start align-middle gap-4">
-            <button class="menu-btn text-textlight text-2xl cursor-pointer p-2 rounded transition-all" onclick="toggleNav()">
-                <i class="fas fa-bars"></i>
+            <button class="menu-btn text-textlight cursor-pointer rounded transition-all" onclick="toggleNav()">
+                <i class="fas fa-bars text-3xl"></i>
             </button>
             <!-- Change: Updated brand name and added logo placeholder -->
             <a href="{% url 'accounts:home' %}" class="brand text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider flex items-center gap-2">
@@ -215,27 +215,29 @@
         </a>
         {% if user.is_authenticated %}
             <!-- Change: Added Inventory option for internal use -->
-            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Management</div>
-            <a href="javascript:void(0)" class="sidenav-link has-submenu flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'inventory' in request.path %}active{% endif %}" onclick="toggleSubmenu('inventory-submenu')">
-                <i class="fas fa-warehouse w-6 text-center"></i>
-                <span>Inventory</span>
-            </a>
-            <div id="inventory-submenu" class="submenu">
-                <a href="{% url 'accounts:user_list' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'user_list' or 'user_detail' in request.path %}active{% endif %}">
-                    <i class="fas fa-users w-6 text-center"></i>
-                    <span>All Users</span>
+            {% if user.user_type == 'admin' %}
+                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Management</div>
+                <a href="javascript:void(0)" class="sidenav-link has-submenu flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'inventory' in request.path %}active{% endif %}" onclick="toggleSubmenu('inventory-submenu')">
+                    <i class="fas fa-warehouse w-6 text-center"></i>
+                    <span>Inventory</span>
                 </a>
-                <!-- Add more sub-sections as needed -->
-                <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
-                    <i class="fas fa-boxes w-6 text-center"></i>
-                    <span>Stock Levels</span>
+                <div id="inventory-submenu" class="submenu">
+                    <a href="{% url 'accounts:user_list' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'user_list' or 'user_detail' in request.path %}active{% endif %}">
+                        <i class="fas fa-users w-6 text-center"></i>
+                        <span>All Users</span>
+                    </a>
+                    <!-- Add more sub-sections as needed -->
+                    <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                        <i class="fas fa-boxes w-6 text-center"></i>
+                        <span>Stock Levels</span>
+                    </a>
+                </div>
+            {% endif %}
+                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
+                <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                    <i class="fas fa-sign-out-alt w-6 text-center"></i>
+                    <span>Logout</span>
                 </a>
-            </div>
-            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
-            <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
-                <i class="fas fa-sign-out-alt w-6 text-center"></i>
-                <span>Logout</span>
-            </a>
         {% else %}
             <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Authentication</div>
             <a href="{% url 'accounts:login' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">

@@ -13,6 +13,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 import json
 from django.core.serializers.json import DjangoJSONEncoder
+from .decorators import user_type_required,user_types_required
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -147,6 +148,8 @@ def custom_google_login(request):
         return redirect('/accounts/google/login/continue/')
     return render(request, 'socialaccount/custom_google_login.html', {'next': request.GET.get('next', '')})
 
+@login_required(login_url="accounts:login")
+@user_types_required('admin')
 def user_list_view(request):
     users = User.objects.all()
     search_name = request.GET.get('search_name', '')
@@ -154,16 +157,20 @@ def user_list_view(request):
         users = users.filter(first_name__icontains=search_name) | users.filter(last_name__icontains=search_name)
     return render(request, 'accounts/user_list.html', {'users': users})
 
+@login_required(login_url="accounts:login")
+@user_types_required('admin')
 def user_detail_view(request, user_id):
-    user = get_object_or_404(User, id=user_id)
+    edit_user = get_object_or_404(User, id=user_id)
     if request.method == 'POST':
-        form = UserEditForm(request.POST, instance=user)
+        form = UserEditForm(request.POST, instance=edit_user)
         if form.is_valid():
             form.save()
             return redirect('accounts:user_list')
     else:
-        form = UserEditForm(instance=user)
-    return render(request, 'accounts/user_detail.html', {'form': form, 'user': user})
+        form = UserEditForm(instance=edit_user)
+    return render(request, 'accounts/user_detail.html', {'form': form, 'user':request.user,'edit_user': edit_user})
 
+@login_required(login_url="accounts:login")
+@user_types_required('admin')
 def inventory(request):
     return render(request, 'accounts/inventory.html')  # Create this later

@@ -2,7 +2,7 @@
 {% load static %}
 {% load widget_tweaks %}
 {% block keep_nav_open %}true{% endblock %}
-{% block title %}{{ user.email }} | User Details | Kapil Enterprises{% endblock %}
+{% block title %}{{ edit_user.email }} | User Details | Kapil Enterprises{% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
@@ -10,24 +10,24 @@
     <div class="flex flex-col md:flex-row items-start md:items-center gap-8 mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-200 transform transition-all duration-300 hover:shadow-xl">
         <!-- Avatar with gradient and hover effect -->
         <div class="w-28 h-28 rounded-full bg-gradient-to-br from-indigo-100 to-blue-100 flex items-center justify-center shadow-md border border-indigo-200 overflow-hidden hover:scale-105 transition-transform duration-300">
-            <span class="text-4xl font-extrabold text-indigo-800">{{ user.email|first|upper }}</span>
+            <span class="text-4xl font-extrabold text-indigo-800">{{ edit_user.email|first|upper }}</span>
         </div>
         
         <div class="flex-1">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 w-full">
                 <div>
                     <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
-                        {{ user.get_full_name|default:user.email }}
+                        {{edit_user.first_name|default:'' |add:" "|add:edit_user.last_name|default:'' }} | {{ edit_user.get_full_name|default:edit_user.email }}
                     </h1>
                     <div class="flex flex-wrap items-center mt-3 space-x-4">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {% if user.is_active %}bg-green-100 text-green-800 border-green-200{% else %}bg-red-100 text-red-800 border-red-200{% endif %} border shadow-sm animate-pulse-once">
-                            <svg class="-ml-0.5 mr-1.5 h-3 w-3 {% if user.is_active %}text-green-600{% else %}text-red-600{% endif %}" fill="currentColor" viewBox="0 0 8 8">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {% if edit_user.is_active %}bg-green-100 text-green-800 border-green-200{% else %}bg-red-100 text-red-800 border-red-200{% endif %} border shadow-sm animate-pulse-once">
+                            <svg class="-ml-0.5 mr-1.5 h-3 w-3 {% if edit_user.is_active %}text-green-600{% else %}text-red-600{% endif %}" fill="currentColor" viewBox="0 0 8 8">
                                 <circle cx="4" cy="4" r="3" />
                             </svg>
-                            {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                            {% if edit_user.is_active %}Active{% else %}Inactive{% endif %}
                         </span>
                         <span class="text-sm text-gray-600 font-light">
-                            Joined: {{ user.date_joined|date:"F d, Y" }}
+                            Joined: {{ edit_user.date_joined|date:"F d, Y" }}
                         </span>
                     </div>
                 </div>
@@ -52,30 +52,30 @@
                 <div class="px-5 py-6 space-y-5">
                     <div>
                         <dt class="text-sm font-medium text-gray-600">Email</dt>
-                        <dd class="mt-1 text-sm text-gray-900 font-medium">{{ user.email }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900 font-medium">{{ edit_user.email }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-600">Date Joined</dt>
                         <dd class="mt-1 text-sm text-gray-900">
-                            {{ user.date_joined|date:"F d, Y, g:i a"|default:"Not available" }}
+                            {{ edit_user.date_joined|date:"F d, Y, g:i a"|default:"Not available" }}
                         </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-600">Created At</dt>
                         <dd class="mt-1 text-sm text-gray-900">
-                            {{ user.created_at|date:"F d, Y, g:i a"|default:"Not available" }}
+                            {{ edit_user.created_at|date:"F d, Y, g:i a"|default:"Not available" }}
                         </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-600">Last Updated</dt>
                         <dd class="mt-1 text-sm text-gray-900">
-                            {{ user.updated_at|date:"F d, Y, g:i a"|default:"Not available" }}
+                            {{ edit_user.updated_at|date:"F d, Y, g:i a"|default:"Not available" }}
                         </dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-600">Last Login</dt>
                         <dd class="mt-1 text-sm text-gray-900">
-                            {{ user.last_login|date:"F d, Y, g:i a"|default:"Never" }}
+                            {{ edit_user.last_login|date:"F d, Y, g:i a"|default:"Never" }}
                         </dd>
                     </div>
                     <div>
@@ -98,7 +98,7 @@
                     
                     <div class="px-5 py-4 border-b border-gray-200 bg-gray-50/90">
                         <h3 class="text-lg font-semibold text-gray-800">Edit Profile</h3>
-                        <p class="mt-1 text-sm text-gray-600">Update user details and permissions.</p>
+                        <p class="mt-1 text-sm text-gray-600">Update {{ edit_user.email }} details and permissions.</p>
                     </div>
                     
                     <div class="px-5 py-6 space-y-6">
