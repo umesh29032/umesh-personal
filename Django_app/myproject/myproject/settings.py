@@ -313,7 +313,16 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key')
 
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    '0.0.0.0',
+    'localhost',
+    '9c35-103-214-60-198.ngrok-free.app'
+]
+CSRF_TRUSTED_ORIGINS = [
+    "https://9c35-103-214-60-198.ngrok-free.app"
+]
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -466,3 +475,4 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 ACCOUNT_LOGIN_METHOD = 'email' # if you want login by email only
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'  # For local testing, use http (not https)
