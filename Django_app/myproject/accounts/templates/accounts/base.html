@@ -131,7 +131,7 @@
             margin-left: 18rem !important; /* Adjusted margin to match sidenav width */
         }
         
-        /* Ensure proper responsive behavior */
+        /* Mobile responsive fixes */
         @media (max-width: 768px) {
             [data-keep-nav-open="true"] #mySidenav {
                 width: 0 !important; /* Keep closed on mobile */
@@ -142,14 +142,44 @@
             
             .content {
                 margin-left: 0 !important;
+                padding: 1rem !important;
+            }
+            
+            /* Mobile navbar adjustments */
+            nav {
+                padding: 0 1rem !important;
+            }
+            
+            .brand {
+                font-size: 1.25rem !important;
+            }
+            
+            /* Mobile sidebar full width */
+            #mySidenav.w-72 {
+                width: 100vw !important;
+                max-width: 300px;
+            }
+            
+            /* Ensure overlay works on mobile */
+            .overlay.opacity-100 {
+                display: block !important;
             }
         }
         
-        /* Fix for content not going black */
+        /* Fix for content display */
         #main-content {
             background-color: var(--color-backgroundlight) !important;
             color: var(--color-textdark) !important;
+            width: 100%;
+            overflow-x: hidden;
         }
+        
+        /* Ensure proper content width
+        .content {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+        } */
     </style>
 </head>
 {{keep_nav_open}}
@@ -167,23 +197,26 @@
                 Kapil Enterprises
             </a>
             </div>
-                <div class="flex justify-middle gap-4">
-                    
-                        <a href="{#% url 'shop' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Shop</a>
-                        <a href="{#% url 'men' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Men</a>
-                        <a href="{#% url 'women' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Women</a>
-                        <a href="{#% url 'about' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">About</a>
-                        <a href="{#% url 'contact' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
-                        <a href="{#% url 'cart' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-                            <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                        </a>
+                <div class="hidden sm:block justify-middle gap-4">
+                    <a href="{#% url 'shop' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Shop</a>
+                    <a href="{#% url 'men' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Men</a>
+                    <a href="{#% url 'women' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Women</a>
+                    <a href="{#% url 'about' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">About</a>
+                    <a href="{#% url 'contact' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
+                    <a href="{#% url 'cart' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium ">
+                        <span>Cart</span>
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z">
+                            </path>
+                        </svg>
+                    </a>
                 </div>
-            <div class="flex items-center gap-6">
+                    
+            <div class="flex items-center gap-2 md:gap-6">
                 <div class="user-greeting flex items-center gap-2">
                     <i class="fas fa-user-circle text-xl"></i>
-                    <span class="hidden md:inline">
+                    <span class="hidden md:inline text-sm">
                         {% if user.is_authenticated %}
                             {{ user.email }}
                         {% else %}
@@ -191,11 +224,11 @@
                         {% endif %}
                     </span>
                 </div>
-                {% if user.is_authenticated %}
-                    <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
-                {% else %}
-                    <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-sm py-2 px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
-                {% endif %}
+                <!-- {% if user.is_authenticated %} -->
+                    <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-xs md:text-sm py-1 md:py-2 px-2 md:px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
+                <!-- {% else %}
+                    <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-xs md:text-sm py-1 md:py-2 px-2 md:px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
+                {% endif %} -->
             </div>
         
         
@@ -272,7 +305,7 @@
     {% endif %}
 
     <!-- Content -->
-    <div class="content {% if user.is_authenticated %}mt-[70px]{% endif %} min-h-[calc(100vh-70px)] bg-backgroundlight p-8" id="main-content">
+    <div class="content {% if user.is_authenticated %}mt-[70px]{% endif %} min-h-[calc(100vh-70px)] w-full bg-backgroundlight p-8" id="main-content">
         {% block content %}
         {% endblock %}
     </div>
@@ -290,8 +323,16 @@
                 // Open sidebar
                 sidenav.classList.remove("w-0");
                 sidenav.classList.add("w-72");
-                sidenav.style.width = "18rem";
+                // sidenav.style.width = "18rem";
                 
+                // For mobile: full width
+                if (window.innerWidth < 768) {
+                    sidenav.style.width = "100%";
+                } else {
+                    sidenav.style.width = "18rem";
+                    content.classList.add("md:ml-72");
+                    content.style.marginLeft = "18rem";
+                }
                 // Show overlay
                 overlay.classList.remove("opacity-0", "invisible");
                 overlay.classList.add("opacity-100", "visible");
