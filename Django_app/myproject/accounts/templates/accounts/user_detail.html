@@ -103,23 +103,43 @@
                     
                     <div class="px-5 py-6 space-y-6">
                         {% for field in form %}
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                            <div class="sm:col-span-1">
-                                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
-                                    {{ field.label }}
-                                    {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
-                                </label>
-                                {% if field.help_text %}
-                                <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
-                                {% endif %}
-                            </div>
-                            <div class="sm:col-span-3">
-                                {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
-                                {% if field.errors %}
-                                <p class="mt-2 text-sm text-red-600">{{ field.errors }}</p>
-                                {% endif %}
-                            </div>
-                        </div>
+                            {% if field.name == 'new_password' or field.name == 'confirm_password' %}
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                                        <div class="sm:col-span-1">
+                                            <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                                {{ field.label }}
+                                                {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                                            </label>
+                                            {% if field.help_text %}
+                                                <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="sm:col-span-3">
+                                            {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
+                                            {% if field.errors %}
+                                                <p class="mt-2 text-sm text-red-600">{{ field.errors }}</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                            {% else %}
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                                    <div class="sm:col-span-1">
+                                        <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                            {{ field.label }}
+                                            {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+                                        </label>
+                                        {% if field.help_text %}
+                                        <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="sm:col-span-3">
+                                        {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
+                                        {% if field.errors %}
+                                        <p class="mt-2 text-sm text-red-600">{{ field.errors }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
                         {% endfor %}
                     </div>
                     
