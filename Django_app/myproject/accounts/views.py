@@ -14,6 +14,16 @@ from django.http import JsonResponse, HttpResponseRedirect, HttpResponse
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 from .decorators import user_type_required,user_types_required
+from django.forms.models import model_to_dict
+def get_object_details_with_m2m(obj):
+    """
+    Returns a dictionary of all attributes including ManyToMany field data.
+    """
+    data = model_to_dict(obj)
+    # Handle ManyToMany fields manually
+    for field in obj._meta.many_to_many:
+        data[field.name] = list(obj.__getattribute__(field.name).values_list('name', flat=True))
+    return data
 # from allauth.socialaccount.providers.google.views import GoogleLoginView
 # from allauth.socialaccount.views import SocialLoginView
 # class GoogleLoginContinueView(SocialLoginView):
@@ -154,6 +164,7 @@ def user_detail_view(request, user_id):
     # print("form",form.fields['skills'])
     # print("form",form.fields['skills'].queryset)
     # print("user skills",edit_user.skills.all())
+    # print("edit_user details using m2m",get_object_details_with_m2m(edit_user))
     return render(request, 'accounts/user_detail.html', {'form': form, 'user':request.user,'edit_user': edit_user})
 
 @login_required(login_url="accounts:login")
