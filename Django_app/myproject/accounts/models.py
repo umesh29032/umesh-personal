@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
+# from django.contrib.postgres.fields import ArrayField
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -17,10 +19,22 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_superuser', True)
         return self.create_user(email, password, **extra_fields)
 
+class Skill(models.Model):
+    SKILL_TYPE_CHOICES = (
+        ("cutting_master", "Cutting Master"),
+        ("dhage_katne_wala", "Dhage Katne Wala"),
+        ("embroidery", "Embroidery"),
+        ("tailoring", "Tailoring"),
+        ("other", "Other"),
+    )
+    name = models.CharField(max_length=20, choices=SKILL_TYPE_CHOICES, unique=True)
+
+    def __str__(self):
+        return self.name
+
 class User(AbstractBaseUser, PermissionsMixin):
     USER_TYPE_CHOICES = (
         ("admin", "Admin"),
-        ("cutting_master", "Cutting Master"),
         ("supplier", "Supplier"),
         ("karigar", "Karigar"),
         ("kapde_wala", "Kapde Wala"),
@@ -42,8 +56,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     bio = models.TextField(blank=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
     salary = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    skills = models.ManyToManyField(Skill, related_name='users', blank=True)  # Multiple skills    # add user type
     
-    # add user type
     # is_authenticated = models.BooleanField(default=False)
     objects = UserManager()
 

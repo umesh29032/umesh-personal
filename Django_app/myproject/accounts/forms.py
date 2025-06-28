@@ -3,6 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import AuthenticationForm
+from .models import Skill
 # from .models import User
 User = get_user_model()
 class LoginForm(AuthenticationForm):
@@ -19,16 +20,18 @@ class UserEditForm(forms.ModelForm):
     new_password = forms.CharField(
         label="New Password",
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        required=False
+        required=False,
+        # initial=''
     )
     confirm_password = forms.CharField(
         label="Confirm New Password",
         widget=forms.PasswordInput(attrs={'class': 'form-control'}),
-        required=False
+        required=False,
+        # initial=''
     )
     class Meta:
         model = User
-        fields = ['email','password', 'first_name', 'last_name', 'phone_number', 'birth_date','date_joined','user_type', 'bio', 'salary', 'is_active', 'is_staff', 'is_superuser']
+        fields = ['email','password', 'first_name', 'last_name', 'phone_number', 'birth_date','date_joined','user_type','skills', 'bio', 'salary', 'is_active', 'is_staff', 'is_superuser']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Customize form fields
@@ -37,7 +40,9 @@ class UserEditForm(forms.ModelForm):
         self.fields['birth_date'].widget = forms.DateInput(attrs={'type': 'date'})
         self.fields['date_joined'].widget = forms.DateTimeInput(attrs={'type': 'datetime-local'})
         self.fields['user_type'].widget = forms.Select(choices=User.USER_TYPE_CHOICES)
-
+        self.fields['skills'].queryset = Skill.objects.all()  # Populate with Skill objects
+        self.fields['skills'].widget = forms.CheckboxSelectMultiple()  # Use checkboxes instead
+        
     def clean(self):
         cleaned_data = super().clean()
         new_password = cleaned_data.get('new_password')

@@ -37,6 +37,15 @@
                     </svg>
                     Back to Users
                 </a>
+                <form method="post" action="{% url 'accounts:delete_user' edit_user.id %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center px-5 py-2.5 border border-red-300 shadow-md text-sm font-semibold rounded-xl text-red-800 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-300 transition-all duration-300 hover:shadow-lg" onclick="return confirm('Are you sure you want to delete {{ edit_user.email }}?');">
+                        <svg class="-ml-1 mr-2 h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-1 1v1H6a1 1 0 000 2h1v9a1 1 0 001 1h4a1 1 0 001-1V6h1a1 1 0 100-2h-2V3a1 1 0 00-1-1H9zm2 3V3H9v2h2zm-1 11V6H8v9h2z" clip-rule="evenodd" />
+                        </svg>
+                        Delete User
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -103,25 +112,8 @@
                     
                     <div class="px-5 py-6 space-y-6">
                         {% for field in form %}
-                            {% if field.name == 'new_password' or field.name == 'confirm_password' %}
-                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                                        <div class="sm:col-span-1">
-                                            <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
-                                                {{ field.label }}
-                                                {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
-                                            </label>
-                                            {% if field.help_text %}
-                                                <p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>
-                                            {% endif %}
-                                        </div>
-                                        <div class="sm:col-span-3">
-                                            {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
-                                            {% if field.errors %}
-                                                <p class="mt-2 text-sm text-red-600">{{ field.errors }}</p>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                            {% else %}
+                            {% comment %} {% if field.name == 'new_password' or field.name == 'confirm_password' %}
+                            {% endcomment %}
                                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
                                     <div class="sm:col-span-1">
                                         <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
@@ -133,13 +125,32 @@
                                         {% endif %}
                                     </div>
                                     <div class="sm:col-span-3">
-                                        {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
+                                        {% if field.name == 'skills' %}
+
+                                            {% comment %} {% for value, label in field.field.choices %}
+                                                <div class="flex items-center mb-2">
+                                                    <input type="checkbox" name="skills" value="{{ value }}" id="id_skills_{{ forloop.counter0 }}" class="mr-2 leading-tight">
+                                                    <label for="id_skills_{{ forloop.counter0 }}" class="text-sm text-gray-700">{{ label }}</label>
+                                                </div>
+                                            {% endfor %} {% endcomment %}
+                                        {% render_field field class="mt-1 block w-full hidden" %}
+                                        <!-- Manually generate checkboxes using queryset and field.value -->
+                                        {% for skill in field.field.queryset %}
+                                            <div class="flex items-center mb-2">
+                                                <input type="checkbox" name="skills" value="{{ skill.pk }}" id="id_skills_{{ forloop.counter0 }}"
+                                                       {% if skill.pk in field.value %}checked{% endif %} class="mr-2 leading-tight">
+                                                <label for="id_skills_{{ forloop.counter0 }}" class="text-sm text-gray-700">{{ skill }}</label>
+                                            </div>
+                                        {% endfor %}
+                                                
+                                        {% else %}
+                                            {% render_field field class="mt-1 block w-full rounded-md border-2 border-gray-400 bg-white py-2 px-3 focus:border-black focus:ring-2 focus:ring-gray-200 sm:text-sm shadow-sm transition-all duration-200 placeholder-gray-400" %}
+                                        {% endif %}
                                         {% if field.errors %}
                                         <p class="mt-2 text-sm text-red-600">{{ field.errors }}</p>
                                         {% endif %}
                                     </div>
                                 </div>
-                            {% endif %}
                         {% endfor %}
                     </div>
                     

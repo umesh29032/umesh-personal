@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, login
 from django.shortcuts import render, redirect
 from django.contrib import messages  # Added import
-from accounts.models import User
+from accounts.models import User,Skill
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from allauth.socialaccount.providers.google import provider
@@ -116,24 +116,7 @@ def home(request):
     for user in users:
         print(user.id, user.email, user.is_active)
     users = User.objects.all()
-    # Current user ko request.user se milta hai
-    # current_user = request.user 
-    # user_data = {
-    #     'id': current_user.id,
-    #     'email': current_user.email,
-    #     'first_name': current_user.first_name,
-    #     'last_name': current_user.last_name,
-    #     'is_active': current_user.is_active,
-    #     'is_staff': current_user.is_staff,
-    #     'is_superuser': current_user.is_superuser,
-    #     'last_login': current_user.last_login,
-    #     'date_joined': current_user.date_joined,
-    #     'phone_number': current_user.phone_number,
-    #     'birth_date': current_user.birth_date,
-    #     'bio': current_user.bio,
-    #     'profile_picture': str(current_user.profile_picture) if current_user.profile_picture else None,
-    #     'salary': float(current_user.salary) if current_user.salary else None,
-    # }
+    
     # user_json = json.dumps(user_data, indent=2, cls=DjangoJSONEncoder)
     serializer = UserSerializer(request.user,many=False)
     print("json data",serializer.data)
@@ -168,9 +151,52 @@ def user_detail_view(request, user_id):
             return redirect('accounts:user_list')
     else:
         form = UserEditForm(instance=edit_user)
+    # print("form",form.fields['skills'])
+    # print("form",form.fields['skills'].queryset)
+    # print("user skills",edit_user.skills.all())
     return render(request, 'accounts/user_detail.html', {'form': form, 'user':request.user,'edit_user': edit_user})
 
 @login_required(login_url="accounts:login")
 @user_types_required('admin')
 def inventory(request):
     return render(request, 'accounts/inventory.html')  # Create this later
+
+@login_required
+@user_types_required('admin')
+def skill_management(request):
+    for all_skill in Skill.objects.all():
+        print("all_skill",all_skill.name)
+    if request.method == 'POST':
+        if 'name' in request.POST:
+            name = request.POST['name'].strip()
+            if not Skill.objects.filter(name=name).exists():
+                Skill.objects.create(name=name)
+                messages.success(request, f"Skill '{name}' added successfully.")
+            else:
+                messages.error(request, f"Skill '{name}' already exists.")
+        
+        return redirect('accounts:skill_management')
+    
+    skills = Skill.objects.all()
+    return render(request, 'accounts/skills_management.html', {'skills': skills})
+
+@login_required
+@user_types_required('admin')
+def delete_skill(request, pk):
+    skill = get_object_or_404(Skill, id=pk)
+    if request.method == 'POST':
+        skill.delete()
+        messages.success(request, f"Skill '{skill.name}' deleted successfully.")
+        return redirect('accounts:skill_management')
+    return render(request, 'accounts/skills_management.html', {'skills': Skill.objects.all()})
+
+
+@login_required
+@user_types_required('admin')
+def delete_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == 'POST':
+        user.delete()
+        messages.success(request, f"User '{user.email}' deleted successfully.")
+        return redirect('accounts:user_list')  # Redirect to user list after deletion
+    return render(request, 'accounts/user_detail.html', {'edit_user': user})

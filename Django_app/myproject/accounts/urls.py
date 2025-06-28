@@ -13,7 +13,11 @@ urlpatterns = [
     path('logout/', views.custom_logout, name='account_logout'),  # Override allauth logout
     path('users/', views.user_list_view, name='user_list'),
     path('user/<int:user_id>/', views.user_detail_view, name='user_detail'),
+    path('user/delete/<int:user_id>/', views.delete_user, name='delete_user'),
     path('inventory/', views.inventory, name='inventory'),
+    path('skills/', views.skill_management, name='skill_management'),
+    path('skills/delete/<int:pk>/', views.delete_skill, name='delete_skill'),  # For DELETE action
+    
     # path('google/login/', views.google_login, name='google_login'),
     
     # Password Reset URLs
