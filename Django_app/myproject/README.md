@@ -1,87 +1,164 @@
-# check my postgrey server is working or not
-systemctl status postgresql
-<!-- if not working how to run that? -->
-# PostgreSQL Database Setup and Management
+# Kapil Enterprises - Business Management System
 
-This is a quick guide to setting up and managing the PostgreSQL database for this project.
+A comprehensive business management system built with Django for Kapil Enterprises. This application helps manage inventory, users, and business operations efficiently.
 
-## Quick Commands Cheatsheet
+## Features
 
-Here are all the necessary commands in one place.
+- **User Authentication**: Secure login and registration system with email verification
+- **Role-Based Access Control**: Different user types (Admin, Supplier, Karigar, Kapde Wala) with specific permissions
+- **Dashboard**: Interactive dashboard with business metrics and quick actions
+- **User Management**: Add, edit, and remove users with different roles
+- **Skills Management**: Track and manage employee skills
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Google Authentication**: Sign in with Google account
+
+## Tech Stack
+
+- **Backend**: Django 5.2
+- **Database**: PostgreSQL
+- **Frontend**: Tailwind CSS
+- **Authentication**: Django AllAuth
+- **API**: Django REST Framework
+- **Caching**: Redis
+
+## Installation
+
+### Prerequisites
+
+- Python 3.10+
+- PostgreSQL
+- Redis (optional, for caching)
+- Node.js and npm (for Tailwind CSS)
+
+### Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/kapil-enterprises.git
+   cd kapil-enterprises
+   ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   python -m venv env
+   source env/bin/activate  # On Windows: env\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Create a `.env` file in the project root with the following variables:
+   ```
+   SECRET_KEY=your_secret_key
+   DEBUG=True
+   DATABASE_NAME=mydb
+   DATABASE_USER=myuser
+   DATABASE_PASSWORD=mypassword
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_SECRET=your_google_secret
+   ```
+
+5. Run migrations:
+   ```bash
+   python manage.py migrate
+   ```
+
+6. Create a superuser:
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+7. Install and build Tailwind CSS:
+   ```bash
+   python manage.py tailwind install
+   python manage.py tailwind build
+   ```
+
+8. Run the development server:
+   ```bash
+   python manage.py runserver
+   ```
+
+Visit `http://127.0.0.1:8000/` in your browser to access the application.
+
+## Development
+
+### Tailwind CSS
+
+To watch for changes in Tailwind CSS:
 
 ```bash
-# --- 1. PostgreSQL Server Management ---
-
-# Check if PostgreSQL server is running
-systemctl status postgresql
-
-# Start the PostgreSQL server if it's not running
-sudo systemctl start postgresql
-
-# (Optional) Enable the server to start automatically on system boot
-sudo systemctl enable postgresql
-
-
-# --- 2. View Databases & Users ---
-
-# List all existing databases
-sudo -u postgres psql -c "\l"
-
-                             List of databases
-   Name    |  Owner   | Encoding | Collate | Ctype |   Access privileges   
------------+----------+----------+---------+-------+-----------------------
- mydb      | postgres | UTF8     | en_IN   | en_IN | =Tc/postgres         +
-           |          |          |         |       | postgres=CTc/postgres+
-           |          |          |         |       | myuser=CTc/postgres
- postgres  | postgres | UTF8     | en_IN   | en_IN | 
- template0 | postgres | UTF8     | en_IN   | en_IN | =c/postgres          +
-           |          |          |         |       | postgres=CTc/postgres
- template1 | postgres | UTF8     | en_IN   | en_IN | =c/postgres          +
-           |          |          |         |       | postgres=CTc/postgres
-(4 rows)
-
-# List all existing users (roles)
-sudo -u postgres psql -c "\du"
-
-
-# --- 3. Reset User Password ---
-
-# To reset a password, you first need to log into the psql shell.
-# Replace 'your_username' and 'your_new_password' with your actual credentials.
-sudo -u postgres psql -c "ALTER USER your_username WITH PASSWORD 'your_new_password';"
-
-# Example:
-# sudo -u postgres psql -c "ALTER USER myuser WITH PASSWORD 'supersecret123';"
-
-
-# --- 4. Restore Database from Backup ---
-
-# This command restores the database from the latest backup file.
-# Make sure you have created the database and user first.
-# It will prompt for the password of the user you specify (-U).
-
-# a. (If needed) Create a new database and user first
-# sudo -u postgres psql -c "CREATE DATABASE myproject;"
-# sudo -u postgres psql -c "CREATE USER myuser WITH PASSWORD 'mypassword';"
-# sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE myproject TO myuser;"
-
-# b. Restore the database from the .sql file
-psql -U myuser -d myproject -f mydb_backup_20250620.sql
+python manage.py tailwind start
 ```
 
-## How to Connect with pgAdmin
+### Running Tests
 
-1.  **Open pgAdmin**.
-2.  Right-click on **Servers** -> **Create** -> **Server...**.
-3.  **General Tab**: Give it a name (e.g., "Local Django Project").
-4.  **Connection Tab**:
-    *   **Host**: `localhost`
-    *   **Port**: `5432`
-    *   **Maintenance Database**: `myproject`
-    *   **Username**: The username you created (e.g., `myuser`).
-    *   **Password**: The password you set for that user.
-5.  Click **Save**.
+```bash
+python manage.py test
+```
 
-<!-- connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL: no pg_hba.conf entry for host "127.0.0.1", user "myuser", database "postgres", SSL encryption
-connection to server at "127.0.0.1", port 5432 failed: FATAL: no pg_hba.conf entry for host "127.0.0.1", user "myuser", database "postgres", no encryption -->
-echo 'host    all             all             127.0.0.1/32            md5' | sudo tee -a /etc/postgresql/14/main/pg_hba.conf
+## Project Structure
+
+```
+myproject/
+├── accounts/            # User authentication and management
+├── core/                # Core functionality and utilities
+├── myproject/           # Project settings and main URLs
+├── templates/           # Global templates
+├── theme/               # Tailwind CSS configuration
+├── staticfiles/         # Collected static files
+├── media/               # User-uploaded files
+├── DOCUMENTATION.md     # Comprehensive project documentation
+└── update_docs.py       # Script to update documentation
+```
+
+## Documentation
+
+This project maintains detailed documentation in the `DOCUMENTATION.md` file, which includes:
+- Project overview
+- Technology stack
+- Key features
+- Project structure
+- Changelog of all updates
+- User roles and permissions
+- Database schema
+- API endpoints
+- Installation and setup instructions
+- Development guidelines
+- Deployment instructions
+- Troubleshooting tips
+- Future enhancement plans
+
+### Updating Documentation
+
+To keep the documentation up to date, use the provided script:
+
+```bash
+# Make the script executable (first time only)
+chmod +x update_docs.py
+
+# Run the script to add new changes to the documentation
+./update_docs.py
+```
+
+The script will guide you through adding new changes to the documentation in a structured format.
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is proprietary and confidential. Unauthorized copying, distribution, or use is strictly prohibited.
+
+## Contact
+
+For support or inquiries, please contact support@kapilenterprises.com

@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found | Kapil Enterprises</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <!-- Local Tailwind CSS -->
+    <link href="{% static 'theme/css/dist/styles.css' %}" rel="stylesheet">
+    
+    <style>
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-20px);
+            }
+            100% {
+                transform: translateY(0px);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <div class="flex-grow flex items-center justify-center p-6">
+        <div class="max-w-md w-full text-center">
+            <!-- Logo -->
+            <div class="flex items-center justify-center mb-8">
+                <span class="text-3xl mr-2">🌟</span>
+                <h1 class="text-2xl font-bold text-gray-800">Kapil Enterprises</h1>
+            </div>
+            
+            <!-- Error illustration -->
+            <div class="mb-8 relative">
+                <div class="text-9xl font-bold text-gray-200">404</div>
+                <div class="absolute inset-0 flex items-center justify-center animate-float">
+                    <svg class="w-40 h-40 text-blue-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Error message -->
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">Page Not Found</h2>
+            <p class="text-gray-600 mb-8">The page you are looking for doesn't exist or has been moved.</p>
+            
+            <!-- Action buttons -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="javascript:history.back()" class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 shadow-sm text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Go Back
+                </a>
+                <a href="{% url 'index' %}" class="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-home mr-2"></i>
+                    Go Home
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="py-6 text-center text-gray-500 text-sm">
+        <p>&copy; 2023 Kapil Enterprises. All rights reserved.</p>
+    </footer>
+</body>
+</html> 

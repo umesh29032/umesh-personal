@@ -15,6 +15,9 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from .decorators import user_type_required,user_types_required
 from django.forms.models import model_to_dict
+from django.db.models import Count, Sum
+from django.utils import timezone
+from datetime import timedelta
 def get_object_details_with_m2m(obj):
     """
     Returns a dictionary of all attributes including ManyToMany field data.
@@ -119,18 +122,30 @@ def custom_logout(request):
 
 @login_required(login_url="accounts:login")
 def home(request):
-    from django.urls import reverse
-    print(reverse('account_logout'))  # Should print /accounts/logout/
-    User = get_user_model()
-    users = User.objects.all()
-    for user in users:
-        print(user.id, user.email, user.is_active)
-    users = User.objects.all()
+    """
+    Dashboard home view showing key metrics and recent activity.
+    """
+    # Get user count
+    user_count = User.objects.count()
     
-    # user_json = json.dumps(user_data, indent=2, cls=DjangoJSONEncoder)
-    serializer = UserSerializer(request.user,many=False)
-    print("json data",serializer.data)
-    return render(request, 'accounts/home.html')
+    # Get user type distribution for potential chart data
+    user_types = User.objects.values('user_type').annotate(count=Count('id'))
+    
+    # Get skills distribution
+    skills = Skill.objects.annotate(user_count=Count('users'))
+    
+    # Sample data for demonstration (in a real app, this would come from your database)
+    context = {
+        'user_count': user_count,
+        'order_count': 125,  # Example data
+        'revenue': '1,25,000',  # Example data
+        'inventory_count': 450,  # Example data
+        'user_types': list(user_types),
+        'skills': list(skills.values('name', 'user_count')),
+        'recent_users': User.objects.order_by('-created_at')[:5],  # 5 most recent users
+    }
+    
+    return render(request, 'accounts/home.html', context)
 
 def test_page(request):
     """Test page to verify Tailwind CSS is working"""
@@ -180,8 +195,9 @@ def skill_management(request):
     if request.method == 'POST':
         if 'name' in request.POST:
             name = request.POST['name'].strip()
+            description = request.POST.get('description', '').strip()
             if not Skill.objects.filter(name=name).exists():
-                Skill.objects.create(name=name)
+                Skill.objects.create(name=name, description=description)
                 messages.success(request, f"Skill '{name}' added successfully.")
             else:
                 messages.error(request, f"Skill '{name}' already exists.")

@@ -1,73 +1,259 @@
 {% extends 'accounts/base.html' %}
-{% block title %}Home{% endblock %}
+{% block title %}Dashboard | Kapil Enterprises{% endblock %}
 {% block keep_nav_open %}false{% endblock %}
 {% block content %}
-<div class="max-w-6xl mx-auto">
-    <!-- Hero Section -->
-    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-lg p-8 mb-8 text-black">
-        <h1 class="text-4xl font-bold mb-4">Welcome, {{user.first_name|default:'' |add:" "|add:user.last_name|default:'' }}!</h1>
-        <p class="text-xl opacity-90">You're successfully logged in to your dashboard.</p>
-    </div>
-    
-    <!-- Quick Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-blue-100 text-blue-600">
-                    <i class="fas fa-users text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Users</h3>
-                    <p class="text-gray-600">Manage user accounts</p>
-                </div>
-            </div>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Welcome Banner -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl shadow-lg p-6 md:p-8 mb-6 text-white relative overflow-hidden">
+        <div class="absolute right-0 top-0 w-64 h-full opacity-10">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full">
+                <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" />
+                <path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198c.03-.028.061-.056.091-.086L12 5.43z" />
+            </svg>
         </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-green-100 text-green-600">
-                    <i class="fas fa-chart-line text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Analytics</h3>
-                    <p class="text-gray-600">View your activity</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
-            <div class="flex items-center">
-                <div class="p-3 rounded-full bg-purple-100 text-purple-600">
-                    <i class="fas fa-cog text-xl"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-gray-800">Settings</h3>
-                    <p class="text-gray-600">Configure preferences</p>
-                </div>
+        <div class="relative z-10">
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">Welcome, {{user.full_name|default:user.email}}!</h1>
+            <p class="text-lg md:text-xl opacity-90 mb-4">{{user.user_type|title}} Dashboard</p>
+            <div class="flex flex-wrap gap-2 mt-4">
+                <span class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm font-medium">
+                    <i class="fas fa-calendar-alt mr-2"></i>{% now "l, F j, Y" %}
+                </span>
+                {% if user.last_login %}
+                <span class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm font-medium">
+                    <i class="fas fa-clock mr-2"></i>Last login: {{user.last_login|date:"M d, Y H:i"}}
+                </span>
+                {% endif %}
             </div>
         </div>
     </div>
     
-    <!-- Quick Actions -->
-    <div class="bg-white rounded-lg shadow-md p-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">Quick Actions</h2>
-        <div class="flex flex-wrap gap-4">
-            <a href="{% url 'accounts:user_list' %}" class="inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
-                <i class="fas fa-users mr-2"></i>
-                View Users
-            </a>
-            <a href="{% url 'accounts:skill_management' %}" class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200">
-                <i class="fas fa-vial mr-2"></i>
-                Skill Management
-            </a>
-            <a href="{% url 'accounts:test' %}" class="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200">
-                <i class="fas fa-vial mr-2"></i>
-                Test Page
-            </a>
-            <a href="{% url 'accounts:account_logout' %}" class="inline-flex items-center px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200">
-                <i class="fas fa-sign-out-alt mr-2"></i>
-                Logout
-            </a>
+    <!-- Dashboard Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+        <!-- Users Card -->
+        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="card-icon rounded-full bg-blue-100 text-blue-600 w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-users text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-base font-semibold text-gray-800">Users</h3>
+                        <div class="flex items-baseline">
+                            <p class="text-2xl font-bold text-gray-800">{{ user_count|default:"5" }}</p>
+                            <span class="ml-2 text-xs font-medium text-green-600">
+                                <i class="fas fa-arrow-up"></i> 12%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-50">
+                    <a href="{% url 'accounts:user_list' %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        View All Users
+                        <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Orders Card -->
+        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="card-icon rounded-full bg-green-100 text-green-600 w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-shopping-cart text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-base font-semibold text-gray-800">Orders</h3>
+                        <div class="flex items-baseline">
+                            <p class="text-2xl font-bold text-gray-800">{{ order_count|default:"125" }}</p>
+                            <span class="ml-2 text-xs font-medium text-green-600">
+                                <i class="fas fa-arrow-up"></i> 8%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-50">
+                    <a href="#" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        View All Orders
+                        <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Revenue Card -->
+        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="card-icon rounded-full bg-purple-100 text-purple-600 w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-rupee-sign text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-base font-semibold text-gray-800">Revenue</h3>
+                        <div class="flex items-baseline">
+                            <p class="text-2xl font-bold text-gray-800">₹{{ revenue|default:"1,25,000" }}</p>
+                            <span class="ml-2 text-xs font-medium text-green-600">
+                                <i class="fas fa-arrow-up"></i> 15%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-50">
+                    <a href="#" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        View Report
+                        <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Inventory Card -->
+        <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="card-icon rounded-full bg-amber-100 text-amber-600 w-12 h-12 flex items-center justify-center">
+                        <i class="fas fa-boxes text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-base font-semibold text-gray-800">Inventory</h3>
+                        <div class="flex items-baseline">
+                            <p class="text-2xl font-bold text-gray-800">{{ inventory_count|default:"450" }}</p>
+                            <span class="ml-2 text-xs font-medium text-red-600">
+                                <i class="fas fa-arrow-down"></i> 3%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-50">
+                    <a href="{% url 'accounts:inventory' %}" class="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center">
+                        View Inventory
+                        <i class="fas fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions & Recent Activities -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Quick Actions -->
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-bold text-gray-800">Quick Actions</h2>
+                </div>
+                <div class="p-5 space-y-3">
+                    <a href="{% url 'accounts:user_list' %}" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-blue-100 text-blue-600 flex-shrink-0">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-800">Manage Users</p>
+                            <p class="text-xs text-gray-500">View and edit user accounts</p>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'accounts:skill_management' %}" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-green-100 text-green-600 flex-shrink-0">
+                            <i class="fas fa-vial"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-800">Skill Management</p>
+                            <p class="text-xs text-gray-500">Manage employee skills</p>
+                        </div>
+                    </a>
+                    
+                    <a href="#" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-purple-100 text-purple-600 flex-shrink-0">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-800">Analytics</p>
+                            <p class="text-xs text-gray-500">View business insights</p>
+                        </div>
+                    </a>
+                    
+                    <a href="#" class="flex items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                        <div class="w-10 h-10 flex items-center justify-center rounded-full bg-amber-100 text-amber-600 flex-shrink-0">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm font-medium text-gray-800">Settings</p>
+                            <p class="text-xs text-gray-500">Configure your account</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activities -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-bold text-gray-800">Recent Activities</h2>
+                </div>
+                <div class="p-5">
+                    <div class="space-y-5">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                    <i class="fas fa-user-plus"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800">New user registered</p>
+                                <p class="text-xs text-gray-500">Rahul Kumar joined as Karigar</p>
+                                <p class="text-xs text-gray-400 mt-1">2 hours ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                    <i class="fas fa-shopping-cart"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800">New order placed</p>
+                                <p class="text-xs text-gray-500">Order #38294 for ₹12,500</p>
+                                <p class="text-xs text-gray-400 mt-1">5 hours ago</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                    <i class="fas fa-box"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800">Inventory updated</p>
+                                <p class="text-xs text-gray-500">15 new items added to stock</p>
+                                <p class="text-xs text-gray-400 mt-1">Yesterday</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                    <i class="fas fa-rupee-sign"></i>
+                                </div>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-800">Payment received</p>
+                                <p class="text-xs text-gray-500">₹45,000 from Sharma Textiles</p>
+                                <p class="text-xs text-gray-400 mt-1">2 days ago</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-5 pt-3 border-t border-gray-100 text-center">
+                        <a href="#" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                            View All Activities
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

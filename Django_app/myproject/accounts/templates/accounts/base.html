@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
     <!-- Local Tailwind CSS -->
@@ -42,7 +42,7 @@
         .hover\:bg-dangerhover:hover { background-color: var(--color-dangerhover) !important; }
         
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--color-backgroundlight);
         }
         
@@ -90,7 +90,7 @@
             transform: rotate(90deg);
         }
         
-        /* New: Styles for collapsible submenu */
+        /* Styles for collapsible submenu */
         .submenu {
             display: none;
             padding-left: 2rem;
@@ -115,7 +115,7 @@
             display: block;
         }
         
-        /* Change: Updated style for keeping nav open based on data attribute */
+        /* Updated style for keeping nav open based on data attribute */
         [data-keep-nav-open="true"] #mySidenav {
             width: 18rem !important; /* Force open state */
         }
@@ -129,6 +129,78 @@
         }
         [data-keep-nav-open="true"] #main-content {
             margin-left: 3rem !important; /* Adjusted margin to match sidenav width */
+        }
+        
+        /* Header dropdown menu */
+        .mobile-dropdown {
+            display: none;
+            position: absolute;
+            top: 60px;
+            right: 0;
+            background-color: white;
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            z-index: 1002;
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+        
+        .mobile-dropdown.active {
+            display: block;
+        }
+        
+        .mobile-dropdown a {
+            display: block;
+            padding: 12px 16px;
+            text-decoration: none;
+            color: var(--color-textdark);
+            transition: all 0.2s ease;
+        }
+        
+        .mobile-dropdown a:hover {
+            background-color: #f5f7fa;
+            color: var(--color-secondary);
+        }
+        
+        /* Search box */
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+        }
+        
+        .search-container input {
+            width: 100%;
+            padding: 8px 16px 8px 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .search-container input:focus {
+            background-color: rgba(255,255,255,0.2);
+            outline: none;
+            border-color: rgba(255,255,255,0.4);
+        }
+        
+        .search-container i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255,255,255,0.7);
+        }
+        
+        /* Card icon styles */
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
         
         /* Mobile responsive fixes */
@@ -164,6 +236,22 @@
             .overlay.opacity-100 {
                 display: block !important;
             }
+            
+            /* Hide desktop nav items */
+            .desktop-nav {
+                display: none !important;
+            }
+            
+            /* Show mobile menu button */
+            .mobile-menu-btn {
+                display: block !important;
+            }
+            
+            /* Adjust search container */
+            .search-container {
+                max-width: 100%;
+                margin: 8px 0;
+            }
         }
         
         /* Fix for content display */
@@ -172,131 +260,194 @@
             color: var(--color-textdark) !important;
             width: 100%;
             overflow-x: hidden;
+            padding-top: 20px !important; /* Add fixed top padding for all pages */
         }
-        
-        /* Ensure proper content width
-        .content {
-            width: 100%;
-            max-width: 100vw;
-            overflow-x: hidden;
-        } */
     </style>
 </head>
 <body class="bg-backgroundlight text-textdark overflow-x-hidden" data-keep-nav-open="{% block keep_nav_open %}false{% endblock %}">
     {% if user.is_authenticated %}
     <!-- Navbar -->
-    <nav class="flex justify-between items-center fixed top-0 left-0 w-full bg-primary text-textlight shadow-nav z-50 h-[60px]  px-8">
-        <div class="flex justify-start align-middle gap-4">
-            <button class="menu-btn text-textlight cursor-pointer rounded transition-all" onclick="toggleNav()">
-                <i class="fas fa-bars text-3xl"></i>
+    <nav class="flex justify-between items-center fixed top-0 left-0 w-full bg-primary text-textlight shadow-md z-50 h-[60px] px-4 md:px-8">
+        <div class="flex justify-start items-center gap-4">
+            <button class="menu-btn text-textlight cursor-pointer rounded transition-all p-2 hover:bg-white/10" onclick="toggleNav()">
+                <i class="fas fa-bars text-xl"></i>
             </button>
-            <!-- Change: Updated brand name and added logo placeholder -->
-            <a href="{% url 'accounts:home' %}" class="brand text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider flex items-center gap-2">
-                <span class="text-xl">🌟</span> <!-- Placeholder for logo -->
-                Kapil Enterprises
-            </a>
-            </div>
-                <div class="hidden sm:block justify-middle gap-4">
-                    <a href="{#% url 'shop' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Shop</a>
-                    <a href="{#% url 'men' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Men</a>
-                    <a href="{#% url 'women' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Women</a>
-                    <a href="{#% url 'about' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">About</a>
-                    <a href="{#% url 'contact' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">Contact</a>
-                    <a href="{#% url 'cart' %#}" class="text-white-600 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium ">
-                        <span>Cart</span>
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z">
-                            </path>
-                        </svg>
-                    </a>
+            <!-- Brand name and logo -->
+            <a href="{% url 'accounts:home' %}" class="brand text-xl md:text-2xl font-bold no-underline text-textlight hover:text-secondary tracking-wider flex items-center gap-2">
+                <div class="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full">
+                    <span class="text-lg">🌟</span>
                 </div>
-                    
-            <div class="flex items-center gap-2 md:gap-6">
-                <div class="user-greeting flex items-center gap-2">
-                    <i class="fas fa-user-circle text-xl"></i>
-                    <span class="hidden md:inline text-sm">
+                <span class="hidden sm:inline">Kapil Enterprises</span>
+                <span class="sm:hidden">KE</span>
+            </a>
+        </div>
+        
+        <!-- Desktop Navigation -->
+        <div class="hidden md:flex items-center justify-center flex-1 mx-4">
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search..." class="text-sm">
+            </div>
+        </div>
+        
+        <div class="desktop-nav hidden md:flex items-center gap-6">
+            <a href="#" class="text-white hover:text-secondary transition-colors">Shop</a>
+            <a href="#" class="text-white hover:text-secondary transition-colors">Men</a>
+            <a href="#" class="text-white hover:text-secondary transition-colors">Women</a>
+            <a href="#" class="text-white hover:text-secondary transition-colors">About</a>
+            <a href="#" class="text-white hover:text-secondary transition-colors">Contact</a>
+            <a href="#" class="text-white hover:text-secondary transition-colors flex items-center gap-1">
+                <span>Cart</span>
+                <i class="fas fa-shopping-cart"></i>
+            </a>
+        </div>
+            
+        <div class="flex items-center gap-2 md:gap-4">
+            <!-- User profile dropdown -->
+            <div class="relative">
+                <button onclick="toggleUserDropdown()" class="flex items-center gap-2 bg-opacity-20 hover:bg-opacity-30 bg-white rounded-full p-1 px-2 transition-all">
+                    <div class="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full">
+                        <i class="fas fa-user text-sm"></i>
+                    </div>
+                    <span class="hidden md:inline text-sm truncate max-w-[100px]">
                         {% if user.is_authenticated %}
                             {{ user.email }}
                         {% else %}
                             Guest
                         {% endif %}
                     </span>
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </button>
+                
+                <!-- User dropdown menu -->
+                <div id="userDropdown" class="mobile-dropdown right-0 w-48">
+                    <div class="border-b border-gray-200 py-2 px-4">
+                        <p class="font-medium text-sm">{{ user.email }}</p>
+                        <p class="text-xs text-gray-500">{{ user.user_type|title }}</p>
+                    </div>
+                    <a href="#" class="flex items-center gap-2">
+                        <i class="fas fa-user w-5 text-center"></i>
+                        <span>Profile</span>
+                    </a>
+                    <a href="#" class="flex items-center gap-2">
+                        <i class="fas fa-cog w-5 text-center"></i>
+                        <span>Settings</span>
+                    </a>
+                    <div class="border-t border-gray-200">
+                        <a href="{% url 'accounts:account_logout' %}" class="flex items-center gap-2 text-danger">
+                            <i class="fas fa-sign-out-alt w-5 text-center"></i>
+                            <span>Logout</span>
+                        </a>
+                    </div>
                 </div>
-                <!-- {% if user.is_authenticated %} -->
-                    <a href="{% url 'accounts:account_logout' %}" class="logout-btn bg-danger text-white no-underline text-xs md:text-sm py-1 md:py-2 px-2 md:px-4 rounded font-medium hover:bg-dangerhover transition-colors">Logout</a>
-                <!-- {% else %}
-                    <a href="{% url 'accounts:login' %}" class="login-btn bg-secondary text-white no-underline text-xs md:text-sm py-1 md:py-2 px-2 md:px-4 rounded font-medium hover:bg-accent transition-colors">Login</a>
-                {% endif %} -->
             </div>
-        
-        
+            
+            <!-- Mobile menu button -->
+            <button onclick="toggleMobileMenu()" class="mobile-menu-btn hidden text-white p-2 rounded-full hover:bg-white/10 transition-all">
+                <i class="fas fa-ellipsis-v"></i>
+            </button>
+            
+            <!-- Mobile dropdown menu -->
+            <div id="mobileMenu" class="mobile-dropdown right-0 w-48">
+                <div class="py-2 border-b border-gray-200">
+                    <div class="px-4 py-2">
+                        <div class="search-container">
+                            <i class="fas fa-search text-gray-500"></i>
+                            <input type="text" placeholder="Search..." class="w-full p-2 pl-8 border border-gray-300 rounded-lg text-gray-800">
+                        </div>
+                    </div>
+                </div>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-store w-5 text-center"></i>
+                    <span>Shop</span>
+                </a>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-male w-5 text-center"></i>
+                    <span>Men</span>
+                </a>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-female w-5 text-center"></i>
+                    <span>Women</span>
+                </a>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-info-circle w-5 text-center"></i>
+                    <span>About</span>
+                </a>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-envelope w-5 text-center"></i>
+                    <span>Contact</span>
+                </a>
+                <a href="#" class="flex items-center gap-2">
+                    <i class="fas fa-shopping-cart w-5 text-center"></i>
+                    <span>Cart</span>
+                </a>
+            </div>
+        </div>
     </nav>
 
     <!-- Overlay -->
     <div class="overlay fixed inset-0 bg-black bg-opacity-50 z-[1000] opacity-0 invisible" id="overlay" onclick="closeNav()"></div>
 
     <!-- Side Navigation -->
-    <div id="mySidenav" class="sidenav fixed h-full w-0 left-0 top-0 z-[1001] bg-white overflow-x-hidden pt-20">
-        <a href="javascript:void(0)" class="closebtn absolute top-5 right-6 text-3xl text-textdark cursor-pointer transition-all" onclick="closeNav()">×</a>
+    <div id="mySidenav" class="sidenav fixed h-full w-0 left-0 top-0 z-[1001] bg-white overflow-x-hidden pt-20 shadow-lg">
+        <a href="javascript:void(0)" class="closebtn absolute top-5 right-6 text-2xl text-textdark cursor-pointer transition-all" onclick="closeNav()">×</a>
         
-        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Main Menu</div>
-        <a href="{% url 'accounts:home' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'home' in request.path %}active{% endif %}">
+        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-3 border-b border-gray-200 mb-2">Main Menu</div>
+        <a href="{% url 'accounts:home' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark {% if 'home' in request.path %}active{% endif %}">
             <i class="fas fa-home w-6 text-center"></i>
             <span>Home</span>
         </a>
         {% if user.is_authenticated %}
-            <!-- Change: Added Inventory option for internal use -->
+            <!-- Management section for admin users -->
             {% if user.user_type == 'admin' %}
-                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Management</div>
-                <a href="javascript:void(0)" class="sidenav-link has-submenu flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'inventory' in request.path %}active{% endif %}" onclick="toggleSubmenu('inventory-submenu')">
+                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-3 border-b border-gray-200 mb-2">Management</div>
+                <a href="javascript:void(0)" class="sidenav-link has-submenu flex items-center gap-4 px-6 py-3 no-underline text-textdark {% if 'inventory' in request.path %}active{% endif %}" onclick="toggleSubmenu('inventory-submenu')">
                     <i class="fas fa-warehouse w-6 text-center"></i>
                     <span>Inventory</span>
                 </a>
                 <div id="inventory-submenu" class="submenu">
-                    <a href="{% url 'accounts:user_list' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'user_list' or 'user_detail' in request.path %}active{% endif %}">
+                    <a href="{% url 'accounts:user_list' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark {% if 'user_list' or 'user_detail' in request.path %}active{% endif %}">
                         <i class="fas fa-users w-6 text-center"></i>
                         <span>All Users</span>
                     </a>
-                    <!-- Add more sub-sections as needed -->
-                    <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                    <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
                         <i class="fas fa-boxes w-6 text-center"></i>
                         <span>Stock Levels</span>
                     </a>
                 </div>
             {% endif %}
-                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Account</div>
-                <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+                <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-3 border-b border-gray-200 mb-2">Account</div>
+                <a href="{% url 'accounts:account_logout' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
                     <i class="fas fa-sign-out-alt w-6 text-center"></i>
                     <span>Logout</span>
                 </a>
         {% else %}
-            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Authentication</div>
-            <a href="{% url 'accounts:login' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">
+            <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-3 border-b border-gray-200 mb-2">Authentication</div>
+            <a href="{% url 'accounts:login' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark {% if 'login' in request.path %}active{% endif %}">
                 <i class="fas fa-sign-in-alt w-6 text-center"></i>
                 <span>Login</span>
             </a>
-            <a href="{% url 'accounts:register' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark {% if 'register' in request.path %}active{% endif %}">
+            <a href="{% url 'accounts:register' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark {% if 'register' in request.path %}active{% endif %}">
                 <i class="fas fa-user-plus w-6 text-center"></i>
                 <span>Register</span>
             </a>
-            <a href="{% provider_login_url 'google' %}" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+            <a href="{% provider_login_url 'google' %}" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
                 <i class="fab fa-google w-6 text-center"></i>
                 <span>Sign in with Google</span>
             </a>
         {% endif %}
         
-        <!-- Add more menu items as needed -->
-        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-4 border-b border-gray-200 mb-2">Resources</div>
-        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+        <!-- Resources section -->
+        <div class="menu-header text-sm text-gray-500 uppercase tracking-wider font-medium px-6 py-3 border-b border-gray-200 mb-2">Resources</div>
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
             <i class="fas fa-file-alt w-6 text-center"></i>
             <span>Documents</span>
         </a>
-        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
             <i class="fas fa-cog w-6 text-center"></i>
             <span>Settings</span>
         </a>
-        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-4 no-underline text-textdark">
+        <a href="#" class="sidenav-link flex items-center gap-4 px-6 py-3 no-underline text-textdark">
             <i class="fas fa-question-circle w-6 text-center"></i>
             <span>Help</span>
         </a>
@@ -304,9 +455,14 @@
     {% endif %}
 
     <!-- Content -->
-    <div class="content {% if user.is_authenticated %}mt-[70px] min-h-[calc(100vh-70px)] w-full overflow-y-auto{% endif %}" id="main-content">
-        {% block content %}
-        {% endblock %}
+    <div class="content {% if user.is_authenticated %}mt-[60px] min-h-[calc(100vh-60px)] w-full overflow-y-auto{% endif %}" id="main-content">
+        <!-- Top margin wrapper -->
+        <div class="w-full" style="margin-top: 20px;">
+            <div class="mx-4 md:mx-8 mb-4">
+            {% block content %}
+            {% endblock %}
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript for Side Navigation -->
@@ -316,13 +472,14 @@
         const sidenav = document.getElementById("mySidenav");
         const overlay = document.getElementById("overlay");
         const content = document.getElementById("main-content");
+        const userDropdown = document.getElementById("userDropdown");
+        const mobileMenu = document.getElementById("mobileMenu");
         
         function toggleNav() {
             if (sidenav.classList.contains("w-0")) {
                 // Open sidebar
                 sidenav.classList.remove("w-0");
                 sidenav.classList.add("w-72");
-                // sidenav.style.width = "18rem";
                 
                 // For mobile: full width
                 if (window.innerWidth < 768) {
@@ -360,15 +517,50 @@
             content.classList.remove("md:ml-72");
             content.style.marginLeft = "";
         }
+        
+        // Toggle user dropdown
+        function toggleUserDropdown() {
+            userDropdown.classList.toggle('active');
+            // Close mobile menu if open
+            if (mobileMenu.classList.contains('active')) {
+                mobileMenu.classList.remove('active');
+            }
+        }
+        
+        // Toggle mobile menu
+        function toggleMobileMenu() {
+            mobileMenu.classList.toggle('active');
+            // Close user dropdown if open
+            if (userDropdown.classList.contains('active')) {
+                userDropdown.classList.remove('active');
+            }
+        }
 
-        // Close the sidenav when clicking outside of it
+        // Close dropdowns when clicking outside
         document.addEventListener('click', function(event) {
             const menuBtn = document.querySelector(".menu-btn");
+            const userBtn = document.querySelector("button[onclick='toggleUserDropdown()']");
+            const mobileMenuBtn = document.querySelector("button[onclick='toggleMobileMenu()']");
             
+            // Close sidenav when clicking outside
             if (sidenav.classList.contains("w-72") && 
                 !sidenav.contains(event.target) && 
                 !menuBtn.contains(event.target)) {
                 closeNav();
+            }
+            
+            // Close user dropdown when clicking outside
+            if (userDropdown.classList.contains('active') && 
+                !userDropdown.contains(event.target) && 
+                !userBtn.contains(event.target)) {
+                userDropdown.classList.remove('active');
+            }
+            
+            // Close mobile menu when clicking outside
+            if (mobileMenu.classList.contains('active') && 
+                !mobileMenu.contains(event.target) && 
+                !mobileMenuBtn.contains(event.target)) {
+                mobileMenu.classList.remove('active');
             }
         });
         
@@ -391,12 +583,7 @@
                 // Force open the navbar
                 sidenav.classList.remove("w-0");
                 sidenav.classList.add("w-72");
-                //sidenav.style.width = "18rem";
-                
-                //overlay.classList.add("opacity-0", "invisible");
-                //overlay.style.pointerEvents = "none";
                 content.classList.add("md:ml-72");
-                //content.style.marginLeft = "18rem";
             }
             
             // Set active class based on current path
@@ -437,6 +624,12 @@
                     }
                 }
             });
+            
+            // Show mobile menu button on small screens
+            if (window.innerWidth < 768) {
+                document.querySelector('.mobile-menu-btn').classList.remove('hidden');
+                document.querySelector('.mobile-menu-btn').classList.add('flex');
+            }
         });
         
         // Handle window resize
@@ -444,6 +637,13 @@
             if (window.innerWidth < 768) {
                 // On mobile, always close sidebar and reset content
                 closeNav();
+                // Show mobile menu button
+                document.querySelector('.mobile-menu-btn').classList.remove('hidden');
+                document.querySelector('.mobile-menu-btn').classList.add('flex');
+            } else {
+                // Hide mobile menu button on desktop
+                document.querySelector('.mobile-menu-btn').classList.add('hidden');
+                document.querySelector('.mobile-menu-btn').classList.remove('flex');
             }
         });
     </script>

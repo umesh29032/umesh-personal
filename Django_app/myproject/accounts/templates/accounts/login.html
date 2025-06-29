@@ -12,87 +12,6 @@
     
     <!-- Local Tailwind CSS -->
     <link href="{% static 'theme/css/dist/styles.css' %}" rel="stylesheet">
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-header">
-                <div class="company-logo">
-                    <!-- Replace with your logo or company name -->
-                    <i class="fas fa-rocket"></i>
-                    <span>Kapil Enterprises</span>
-                </div>
-                <h1>Welcome back</h1>
-                <p>Sign in to access your account</p>
-            </div>
-
-            {% if messages %}
-            <div class="messages-container">
-                {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            <form method="post" class="login-form">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="email">Email address</label>
-                    <div class="input-with-icon">
-                        <i class="fas fa-envelope"></i>
-                        <input type="email" id="email" name="email" placeholder="Enter your email" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <div class="label-container">
-                        <label for="password">Password</label>
-                        <a href="{% url 'accounts:password_reset' %}" class="forgot-password">Forgot password?</a>
-                    </div>
-                    <div class="input-with-icon">
-                        <i class="fas fa-lock"></i>
-                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
-                        <button type="button" class="toggle-password" aria-label="Show password">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <button type="submit" class="login-button">
-                    <span>Sign in</span>
-                    <i class="fas fa-arrow-right"></i>
-                </button>
-            </form>
-
-            <div class="divider">
-                <span>or continue with</span>
-            </div>
-
-            <div class="social-login">
-               <a href="{% provider_login_url 'google' %}" class="social-button google">
-                    <i class="fab fa-google"></i>
-                    <span>Login with Google</span>
-                </a>
-                <!-- Add more social login options as needed -->
-            </div>
-
-            <div class="signup-link">
-                Don't have an account? <a href="{% url 'accounts:register' %}">Sign up</a>
-            </div>
-        </div>
-
-        <div class="login-footer">
-            <p>© 2023 Company Name. All rights reserved.</p>
-            <div class="footer-links">
-                <a href="#">Privacy Policy</a>
-                <a href="#">Terms of Service</a>
-                <a href="#">Help Center</a>
-            </div>
-        </div>
-    </div>
 
     <style>
         :root {
@@ -117,7 +36,7 @@
         }
 
         body {
-            font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+            font-family: 'Roboto', sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
             line-height: 1.6;
@@ -348,6 +267,8 @@
             color: var(--text-color);
             border: 1px solid var(--border-color);
             background-color: white;
+            width: 100%;
+            justify-content: center;
         }
 
         .social-button.google:hover {
@@ -396,6 +317,85 @@
             }
         }
     </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="company-logo">
+                    <i class="fas fa-star"></i>
+                    <span>Kapil Enterprises</span>
+                </div>
+                <h1>Welcome back</h1>
+                <p>Sign in to access your account</p>
+            </div>
+
+            {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% else %}fa-check-circle{% endif %}"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" class="login-form">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="email">Email address</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" placeholder="Enter your email" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-container">
+                        <label for="password">Password</label>
+                        <a href="{% url 'accounts:password_reset' %}" class="forgot-password">Forgot password?</a>
+                    </div>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <button type="button" class="toggle-password" aria-label="Show password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-button">
+                    <span>Sign in</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <div class="divider">
+                <span>or continue with</span>
+            </div>
+
+            <div class="social-login">
+               <a href="{% provider_login_url 'google' %}" class="social-button google">
+                    <i class="fab fa-google"></i>
+                    <span>Login with Google</span>
+                </a>
+            </div>
+
+            <div class="signup-link">
+                Don't have an account? <a href="{% url 'accounts:register' %}">Sign up</a>
+            </div>
+        </div>
+
+        <div class="login-footer">
+            <p>© 2023 Kapil Enterprises. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Help Center</a>
+            </div>
+        </div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -435,4 +435,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
