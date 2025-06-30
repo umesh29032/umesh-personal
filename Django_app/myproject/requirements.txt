@@ -19,6 +19,7 @@ django-tailwind @ git+https://github.com/timonweb/django-tailwind.git@43138b3adf
 djangorestframework==3.16.0
 djlint==1.36.4
 EditorConfig==0.17.1
+git-filter-repo==2.47.0
 idna==3.10
 Jinja2==3.1.6
 jsbeautifier==1.15.4
