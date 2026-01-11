@@ -1,0 +1,21 @@
+{% extends 'accounts/base_auth.html' %}
+
+{% block title %}Reset Password{% endblock %}
+
+{% block page_title %}Set New Password{% endblock %}
+
+{% block content %}
+<div class="auth-card" style="margin: 0 auto;">
+    <h2 class="text-center">Set New Password</h2>
+    <p class="text-center">Enter the OTP and your new password.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="number" name="otp" placeholder="OTP Code" required style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 16px;">
+        
+        <input type="password" name="password" placeholder="New Password" required style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 20px;">
+        
+        <button type="submit">Update Password</button>
+    </form>
+</div>
+{% endblock %}

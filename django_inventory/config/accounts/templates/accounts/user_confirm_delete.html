@@ -1,0 +1,22 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Delete User{% endblock %}
+
+{% block page_title %}Delete User{% endblock %}
+
+{% block content %}
+<div class="auth-card" style="margin: 0 auto; max-width: 500px; text-align: center;">
+    <div style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+    <h2 style="color: #ef4444;">Delete User?</h2>
+    <p>Are you sure you want to delete the user <strong>{{ object.email }}</strong>?</p>
+    <p style="color: var(--gray-500); font-size: 14px;">This action cannot be undone. All data associated with this user will be permanently removed.</p>
+
+    <form method="post" style="margin-top: 32px;">
+        {% csrf_token %}
+        <div style="display: flex; gap: 12px;">
+            <a href="{% url 'accounts:user_list' %}" class="btn-secondary" style="background: var(--gray-200); color: var(--gray-800); text-align: center; padding: 14px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; flex: 1;">Cancel</a>
+            <button type="submit" style="background: #ef4444; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2); flex: 1;">Confirm Delete</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

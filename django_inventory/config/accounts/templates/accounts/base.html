@@ -15,28 +15,44 @@
 
 <div class="app-layout">
 
+    <!-- MOBILE OVERLAY -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
     <!-- SIDEBAR -->
-    <aside class="app-sidebar">
-        <h2>Kapil Enterprises</h2>
+    <aside class="app-sidebar" id="appSidebar">
+        <div class="sidebar-header">
+            <h2>Kapil Enterprises</h2>
+            <button class="close-sidebar-btn" onclick="toggleSidebar()">×</button>
+        </div>
 
-        <a href="{% url 'accounts:home' %}"
-           class="{% if request.path == '/home/' %}active{% endif %}">
-            📊 Dashboard
-        </a>
+        <nav class="sidebar-nav">
+            <a href="{% url 'accounts:home' %}"
+               class="{% if request.path == '/home/' %}active{% endif %}">
+                <span>📊</span> Dashboard
+            </a>
 
-        {% comment %}
-        <!-- Future Navigation Items -->
-        <a href="#">📦 Inventory</a>
-        <a href="#">👕 Products</a>
-        <a href="#">📈 Reports</a>
-        <a href="#">⚙️ Settings</a>
-        {% endcomment %}
+            <!-- Inventory Link -->
+             <a href="{% url 'inventory:product_list' %}"
+               class="{% if 'inventory' in request.path %}active{% endif %}">
+                <span>📦</span> Inventory
+            </a>
 
-        <hr style="margin:20px 0;border-color:#334155;">
-        
-        <a href="{% url 'accounts:logout' %}" style="color: #ef4444;">
-            🚪 Logout
-        </a>
+            <!-- Users Link (Superuser Only) -->
+            {% if request.user.is_superuser %}
+            <a href="{% url 'accounts:user_list' %}"
+               class="{% if 'users' in request.path %}active{% endif %}">
+                <span>👥</span> Users
+            </a>
+            {% endif %}
+            
+            <a href="#"><span>⚙️</span> Settings</a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="{% url 'accounts:logout' %}" style="color: #ef4444;">
+                <span>🚪</span> Logout
+            </a>
+        </div>
     </aside>
 
     <!-- MAIN CONTENT AREA -->
@@ -44,8 +60,15 @@
 
         <!-- TOP BAR -->
         <header class="app-topbar">
-            <strong>{% block page_title %}Dashboard{% endblock %}</strong>
-            <span>👤 {{ request.user.email }}</span>
+            <div class="topbar-left">
+                <button class="hamburger-btn" onclick="toggleSidebar()">
+                    ☰
+                </button>
+                <strong>{% block page_title %}Dashboard{% endblock %}</strong>
+            </div>
+            <div class="user-profile">
+                <span>👤 {{ request.user.email }}</span>
+            </div>
         </header>
 
         <!-- PAGE CONTENT -->
@@ -66,6 +89,12 @@
 
     </div>
 </div>
+
+<script>
+    function toggleSidebar() {
+        document.body.classList.toggle('sidebar-open');
+    }
+</script>
 
 </body>
 </html>
