@@ -1,0 +1,72 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Garment Inventory Management System">
+    <title>{% block title %}Inventory Management{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'accounts/css/auth.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="app-sidebar">
+        <h2>🏭 Garment Inventory</h2>
+
+        <a href="{% url 'accounts:home' %}"
+           class="{% if request.path == '/home/' %}active{% endif %}">
+            📊 Dashboard
+        </a>
+
+        {% comment %}
+        <!-- Future Navigation Items -->
+        <a href="#">📦 Inventory</a>
+        <a href="#">👕 Products</a>
+        <a href="#">📈 Reports</a>
+        <a href="#">⚙️ Settings</a>
+        {% endcomment %}
+
+        <hr style="margin:20px 0;border-color:#334155;">
+        
+        <a href="{% url 'accounts:logout' %}" style="color: #ef4444;">
+            🚪 Logout
+        </a>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="app-main">
+
+        <!-- TOP BAR -->
+        <header class="app-topbar">
+            <strong>{% block page_title %}Dashboard{% endblock %}</strong>
+            <span>👤 {{ request.user.email }}</span>
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main class="app-content">
+            <!-- Messages -->
+            {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+    </div>
+</div>
+
+</body>
+</html>
+

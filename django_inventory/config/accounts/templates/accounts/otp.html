@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify OTP | Garment Inventory</title>
+    <link rel="stylesheet" href="{% static 'accounts/css/auth.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="auth-bg">
+
+<div class="auth-card">
+    <h2>🔐 Verify OTP</h2>
+    <p>Enter the 6-digit code sent to your email</p>
+
+    <!-- Error Messages -->
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- OTP Form -->
+    <form method="post">
+        {% csrf_token %}
+        <input
+            type="text"
+            name="otp"
+            placeholder="000000"
+            maxlength="6"
+            pattern="[0-9]{6}"
+            required
+            autocomplete="one-time-code"
+            inputmode="numeric"
+        >
+        <button type="submit">Verify OTP</button>
+    </form>
+
+    <!-- Timer -->
+    <p id="timer" class="timer">
+        Resend OTP in <span id="countdown">60</span>s
+    </p>
+
+    <!-- Resend Link -->
+    <a
+        id="resendLink"
+        href="{% url 'accounts:resend_otp' %}"
+        style="display:none;"
+    >
+        🔄 Resend OTP
+    </a>
+
+    <!-- Back to Login -->
+    <a href="{% url 'accounts:login' %}" style="color: #6b7280; font-weight: 500;">
+        ← Back to login
+    </a>
+</div>
+
+<script>
+let timeLeft = 60;
+const countdownEl = document.getElementById("countdown");
+const resendLink = document.getElementById("resendLink");
+const timerText = document.getElementById("timer");
+
+const timer = setInterval(() => {
+    timeLeft--;
+    countdownEl.innerText = timeLeft;
+
+    if (timeLeft <= 0) {
+        clearInterval(timer);
+        timerText.style.display = "none";
+        resendLink.style.display = "block";
+    }
+}, 1000);
+
+// Auto-focus OTP input
+document.querySelector('input[name="otp"]').focus();
+</script>
+
+</body>
+</html>
+
