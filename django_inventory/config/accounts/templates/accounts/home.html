@@ -1,0 +1,72 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Dashboard | Inventory{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Tabs -->
+<div class="tabs">
+    <a class="active">📊 Overview</a>
+    <a href="#">💰 Sales</a>
+    <a href="#">📦 Stock</a>
+    <a href="#">📈 Analytics</a>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpis">
+    <div class="kpi" style="border-left: 4px solid #3b82f6;">
+        <h3>📦 Total Products</h3>
+        <p>128</p>
+        <small style="color: #10b981; font-size: 13px; font-weight: 600;">↑ 12% from last month</small>
+    </div>
+    
+    <div class="kpi" style="border-left: 4px solid #10b981;">
+        <h3>✅ In Stock</h3>
+        <p>92</p>
+        <small style="color: #6b7280; font-size: 13px;">Available items</small>
+    </div>
+    
+    <div class="kpi" style="border-left: 4px solid #f59e0b;">
+        <h3>⚠️ Low Stock</h3>
+        <p>6</p>
+        <small style="color: #ef4444; font-size: 13px; font-weight: 600;">Needs attention</small>
+    </div>
+    
+    <div class="kpi" style="border-left: 4px solid #8b5cf6;">
+        <h3>💵 Total Value</h3>
+        <p>₹2.4L</p>
+        <small style="color: #10b981; font-size: 13px; font-weight: 600;">↑ 8% growth</small>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="margin-top: 32px;">
+    <h3 style="margin-bottom: 16px; color: #1f2937; font-size: 18px;">⚡ Quick Actions</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <button style="padding: 16px; background: white; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e5e7eb'; this.style.transform='translateY(0)'">
+            ➕ Add Product
+        </button>
+        <button style="padding: 16px; background: white; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e5e7eb'; this.style.transform='translateY(0)'">
+            📥 Import Stock
+        </button>
+        <button style="padding: 16px; background: white; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e5e7eb'; this.style.transform='translateY(0)'">
+            📊 Generate Report
+        </button>
+        <button style="padding: 16px; background: white; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='#e5e7eb'; this.style.transform='translateY(0)'">
+            🔍 Search Items
+        </button>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div style="margin-top: 32px; background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+    <h3 style="margin-bottom: 20px; color: #1f2937; font-size: 18px;">📋 Recent Activity</h3>
+    <div style="color: #6b7280; text-align: center; padding: 40px;">
+        <p style="font-size: 15px;">No recent activity to display</p>
+        <p style="font-size: 13px; margin-top: 8px;">Start managing your inventory to see updates here</p>
+    </div>
+</div>
+
+{% endblock %}
+
