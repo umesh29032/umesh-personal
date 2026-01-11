@@ -1,0 +1,64 @@
+{% extends 'accounts/base_auth.html' %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block page_title %}Sign Up{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+    <!-- Left Panel -->
+    <div class="login-left">
+        <h1>Join Kapil Enterprises</h1>
+        <p>Create an account to start managing your inventory and production tracking.</p>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="login-right">
+        <div class="login-card">
+            <h2 class="text-center">Create Account</h2>
+            <p class="text-center">Enter your details to sign up</p>
+
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if form.errors %}
+                <div class="alert alert-error">
+                   {% for field in form %}
+                       {% for error in field.errors %}
+                           {{ error }}<br>
+                       {% endfor %}
+                   {% endfor %}
+                   {% for error in form.non_field_errors %}
+                       {{ error }}
+                   {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="form-group mb-3">
+                    {{ form.email }}
+                </div>
+
+                <div class="form-group mb-3">
+                    {{ form.password }}
+                </div>
+
+                <div class="form-group mb-3">
+                    {{ form.confirm_password }}
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    <span>Sign Up</span>
+                </button>
+            </form>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <a href="{% url 'accounts:login' %}" style="display: block; text-align: center; color: var(--primary-blue); text-decoration: none; font-weight: 600;">
+                Already have an account? Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

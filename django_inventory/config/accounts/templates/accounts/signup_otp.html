@@ -1,0 +1,56 @@
+{% extends 'accounts/base_auth.html' %}
+
+{% block title %}Verify OTP{% endblock %}
+
+{% block page_title %}Verify OTP{% endblock %}
+
+{% block content %}
+<div class="auth-card" style="margin: 0 auto;">
+    <h2 class="text-center">Verify OTP</h2>
+    <p class="text-center">Enter the code sent to your email.</p>
+
+    <form method="post">
+        {% csrf_token %}
+        <!-- OTP Input -->
+        <input type="number" name="otp" placeholder="123456" required>
+        
+        <button type="submit">Verify & Create Account</button>
+    </form>
+
+    <!-- Timer -->
+    <p id="timer" class="timer" style="text-align: center; margin-top: 16px; color: var(--gray-500);">
+        Resend OTP in <span id="countdown">60</span>s
+    </p>
+
+    <!-- Resend Link -->
+    <a
+        id="resendLink"
+        href="{% url 'accounts:signup_resend_otp' %}"
+        style="display:none; text-align: center; margin-top: 16px; color: var(--primary-blue); text-decoration: none; font-weight: 600;"
+    >
+        🔄 Resend OTP
+    </a>
+</div>
+
+<script>
+let timeLeft = 60;
+const countdownEl = document.getElementById("countdown");
+const resendLink = document.getElementById("resendLink");
+const timerText = document.getElementById("timer");
+
+const timer = setInterval(() => {
+    timeLeft--;
+    countdownEl.innerText = timeLeft;
+
+    if (timeLeft <= 0) {
+        clearInterval(timer);
+        timerText.style.display = "none";
+        resendLink.style.display = "block";
+    }
+}, 1000);
+
+// Auto-focus OTP input
+const otpInput = document.querySelector('input[name="otp"]');
+if(otpInput) otpInput.focus();
+</script>
+{% endblock %}
