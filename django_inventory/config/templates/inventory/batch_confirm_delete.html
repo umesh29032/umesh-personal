@@ -1,0 +1,21 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Batch{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4" style="max-width: 600px; margin: 0 auto; border-radius: 16px; overflow: hidden;">
+    <div class="card-header py-3" style="background: #fef2f2; border-bottom: 1px solid #fee2e2;">
+        <h6 class="m-0 font-weight-bold text-danger">⚠️ Confirm Deletion</h6>
+    </div>
+    <div class="card-body" style="padding: 32px;">
+        <p style="font-size: 16px; color: var(--gray-700);">Are you sure you want to delete the batch <strong>{{ object.batch_number }}</strong>?</p>
+        <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 24px;">This action will remove the batch and all its associated assignments. This cannot be undone.</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" style="padding: 10px 24px; border-radius: 8px;">Confirm Delete</button>
+            <a href="{% url 'inventory:batch_list' %}" class="btn btn-secondary" style="padding: 10px 24px; border-radius: 8px; margin-left: 12px;">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

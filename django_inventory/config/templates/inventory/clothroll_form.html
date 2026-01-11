@@ -1,0 +1,169 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ object|yesno:"Edit Roll,Add Roll" }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+    
+    <!-- Header -->
+    <div style="margin-bottom: 24px;">
+        <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900);">
+            {{ object|yesno:"Update Cloth Roll,New Cloth Roll" }}
+        </h1>
+        <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">
+            Enter the details for the raw material roll.
+        </p>
+    </div>
+
+    <!-- Main Card -->
+    <form method="post" style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); padding: 32px; border: 1px solid var(--gray-200);">
+        {% csrf_token %}
+        
+        <!-- Section 1: Identification -->
+        <div style="margin-bottom: 32px;">
+            <h3 style="font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="background: #eff6ff; color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">1</span>
+                Identification
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <!-- Roll Number -->
+                <div class="form-group">
+                    <label for="{{ form.roll_number.id_for_label }}">Roll Number*</label>
+                    {{ form.roll_number }}
+                    {% if form.roll_number.help_text %}
+                    <small>{{ form.roll_number.help_text }}</small>
+                    {% endif %}
+                </div>
+                 <!-- Supplier -->
+                 <div class="form-group">
+                    <label for="{{ form.supplier.id_for_label }}">Supplier</label>
+                    {{ form.supplier }}
+                </div>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--gray-100); margin: 0 0 32px 0;">
+
+        <!-- Section 2: Specifications -->
+        <div style="margin-bottom: 32px;">
+            <h3 style="font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="background: #eff6ff; color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">2</span>
+                Specifications
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <!-- Type -->
+                <div class="form-group">
+                    <label for="{{ form.cloth_type.id_for_label }}">Fabric Type*</label>
+                    {{ form.cloth_type }}
+                </div>
+                <!-- Color -->
+                <div class="form-group">
+                    <label for="{{ form.color.id_for_label }}">Color*</label>
+                    {{ form.color }}
+                </div>
+                 <!-- Width -->
+                 <div class="form-group">
+                    <label for="{{ form.width.id_for_label }}">Width <span style="font-weight: 400; color: var(--gray-500);">(inches)</span></label>
+                    {{ form.width }}
+                </div>
+                <!-- GSM -->
+                <div class="form-group">
+                    <label for="{{ form.gsm.id_for_label }}">GSM <span style="font-weight: 400; color: var(--gray-500);">(g/m²)</span></label>
+                    {{ form.gsm }}
+                </div>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--gray-100); margin: 0 0 32px 0;">
+
+        <!-- Section 3: Inventory Details -->
+        <div style="margin-bottom: 32px;">
+            <h3 style="font-size: 16px; font-weight: 600; color: var(--gray-900); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="background: #eff6ff; color: #3b82f6; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">3</span>
+                Inventory Details
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                <!-- Total Length -->
+                <div class="form-group">
+                    <label for="{{ form.total_length.id_for_label }}">Total Length (m)*</label>
+                    {{ form.total_length }}
+                </div>
+                <!-- Remaining Length -->
+                <div class="form-group">
+                    <label for="{{ form.remaining_length.id_for_label }}">Current Length (m)*</label>
+                    {{ form.remaining_length }}
+                </div>
+                 <!-- Cost -->
+                 <div class="form-group">
+                    <label for="{{ form.cost_per_meter.id_for_label }}">Cost per Meter</label>
+                    {{ form.cost_per_meter }}
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 20px;">
+                <!-- Location -->
+                <div class="form-group">
+                    <label for="{{ form.location.id_for_label }}">Storage Location</label>
+                    {{ form.location }}
+                </div>
+                <!-- Status -->
+                <div class="form-group">
+                    <label for="{{ form.status.id_for_label }}">Status</label>
+                    {{ form.status }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display: flex; gap: 12px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--gray-100);">
+            <button type="submit" class="btn-primary" style="padding: 12px 32px; font-size: 15px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; background: var(--primary-blue); color: white; transition: all 0.2s;">
+                Save Roll
+            </button>
+            <a href="{% url 'inventory:cloth_roll_list' %}" style="padding: 12px 24px; font-size: 15px; border-radius: 10px; border: 1px solid var(--gray-300); background: white; color: var(--gray-700); text-decoration: none; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center;">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .form-group label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .form-group input, 
+    .form-group select, 
+    .form-group textarea {
+        padding: 12px 16px;
+        border: 1px solid var(--gray-300);
+        border-radius: 10px;
+        font-size: 14px;
+        color: var(--gray-900);
+        transition: all 0.2s ease;
+        background: var(--gray-50);
+        width: 100%;
+        box-sizing: border-box; /* Crucial for grid layout */
+    }
+
+    .form-group input:focus, 
+    .form-group select:focus, 
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary-blue);
+        background: white;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .form-group small {
+        font-size: 12px;
+        color: var(--gray-500);
+    }
+</style>
+{% endblock %}

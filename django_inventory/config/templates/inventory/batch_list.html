@@ -1,0 +1,124 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Batches{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+    
+    <!-- Action Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.02em;">Production Batches</h1>
+            <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">Track and manage manufacturing orders.</p>
+        </div>
+        <a href="{% url 'inventory:batch_add' %}" class="btn-primary" style="text-decoration: none; padding: 12px 24px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+            <span>+</span> New Batch
+        </a>
+    </div>
+
+    <!-- Main Card -->
+    <div style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid var(--gray-200);">
+        
+        <!-- Toolbar -->
+        <div style="padding: 20px 24px; border-bottom: 1px solid var(--gray-100); display: flex; gap: 16px; align-items: center;">
+            <div style="position: relative; flex: 1; max-width: 300px;">
+                <input type="text" placeholder="Search batches..." style="width: 100%; padding: 10px 16px 10px 40px; border: 1px solid var(--gray-200); border-radius: 10px; font-size: 14px; background-color: var(--gray-50);">
+                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.5;">🔍</span>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-responsive">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead style="background: var(--gray-50); border-bottom: 1px solid var(--gray-200);">
+                    <tr>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Batch #</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Name / Order</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Current Stage</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Date</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Status</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr style="border-bottom: 1px solid var(--gray-100); transition: background 0.1s ease-in-out;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='white'">
+                        <td style="padding: 16px 24px; font-weight: 600; color: var(--gray-900);">
+                            <a href="#" style="text-decoration: none; color: var(--primary-blue);">{{ batch.batch_number }}</a>
+                        </td>
+                        <td style="padding: 16px 24px; color: var(--gray-700); font-weight: 500;">
+                            {{ batch.name }}
+                        </td>
+                        <td style="padding: 16px 24px; color: var(--gray-700);">
+                            {% if batch.current_stage %}
+                                {{ batch.current_stage.name }}
+                            {% else %}
+                                <span style="color: var(--gray-400);">-</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 16px 24px; color: var(--gray-600); font-size: 13px;">
+                            {{ batch.created_at|date:"M d, Y" }}
+                        </td>
+                        <td style="padding: 16px 24px;">
+                            {% if batch.status == 'PLANNED' %}
+                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #eff6ff; color: #1d4ed8; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #dbeafe;">
+                                    Planned
+                                </span>
+                            {% elif batch.status == 'WIP' %}
+                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #fffbeb; color: #b45309; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #fef3c7;">
+                                    In Progress
+                                </span>
+                            {% elif batch.status == 'COMPLETED' %}
+                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #ecfdf5; color: #047857; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #d1fae5;">
+                                    Completed
+                                </span>
+                            {% else %}
+                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #fef2f2; color: #b91c1c; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #fee2e2;">
+                                    {{ batch.get_status_display }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 16px 24px; text-align: right;">
+                            <a href="{% url 'inventory:batch_edit' batch.pk %}" style="text-decoration: none; display: inline-block; padding: 6px; border-radius: 6px; color: var(--gray-500); transition: all 0.2s;" onmouseover="this.style.background='var(--gray-100)'; this.style.color='var(--primary-blue)'" onmouseout="this.style.background='transparent'; this.style.color='var(--gray-500)'" title="Edit">
+                                ✏️
+                            </a>
+                            <a href="{% url 'inventory:batch_delete' batch.pk %}" style="text-decoration: none; display: inline-block; padding: 6px; border-radius: 6px; color: var(--gray-500); transition: all 0.2s; margin-left: 4px;" onmouseover="this.style.background='#fee2e2'; this.style.color='#ef4444'" onmouseout="this.style.background='transparent'; this.style.color='var(--gray-500)'" title="Delete">
+                                🗑️
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="padding: 60px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📑</div>
+                            <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900);">No batches found</h3>
+                            <p style="color: var(--gray-500); margin-bottom: 24px;">Create your first production batch to start tracking.</p>
+                            <a href="{% url 'inventory:batch_add' %}" class="btn-primary" style="text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">
+                                + New Batch
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div style="padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+            <div style="color: var(--gray-500); font-size: 14px;">
+                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+            <div style="display: flex; gap: 8px;">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Previous</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Next</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
