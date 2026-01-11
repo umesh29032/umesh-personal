@@ -18,6 +18,16 @@
         <h3 class="section-title">Basic Information</h3>
         <div class="form-grid">
             <div class="form-group">
+                <label for="id_profile_picture">Profile Picture</label>
+                {% if object.profile_picture %}
+                    <div class="current-image mb-2">
+                        <img src="{{ object.profile_picture.url }}" alt="Current Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gray-200);">
+                    </div>
+                {% endif %}
+                <input type="file" name="profile_picture" id="id_profile_picture" class="form-control" accept="image/*">
+            </div>
+
+            <div class="form-group">
                 <label for="id_email">Email Address</label>
                 <input type="email" name="email" value="{{ object.email }}" id="id_email" required class="form-control">
             </div>

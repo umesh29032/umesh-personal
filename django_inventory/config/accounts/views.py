@@ -199,8 +199,15 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
     success_url = reverse_lazy('accounts:user_list')
     
     def form_valid(self, form):
+        response = super().form_valid(form)
+        # If the user is updating their own profile and changed the password,
+        # update the session so they don't get logged out.
+        if self.object == self.request.user and form.cleaned_data.get('new_password'):
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(self.request, self.object)
+            
         messages.success(self.request, "User details updated successfully.")
-        return super().form_valid(form)
+        return response
 
 class UserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     model = User
