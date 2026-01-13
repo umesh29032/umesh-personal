@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     LoginView, VerifyOTPView, HomeView, LogoutView, ResendOTPView, 
     UserListView, UserUpdateView, UserDeleteView, PasswordLoginView,
-    SignupView, SignupVerifyView, ForgotPasswordView, ResetPasswordVerifyView, ResendSignupOTPView
+    SignupView, SignupVerifyView, ForgotPasswordView, ResetPasswordVerifyView, ResendSignupOTPView,
+    SkillListView, SkillCreateView, SkillUpdateView, SkillDeleteView
 )
 
 app_name = "accounts"
@@ -15,6 +16,11 @@ urlpatterns = [
     path("resend-otp/", ResendOTPView.as_view(), name="resend_otp"),
 
 
+
+    path("skills/", SkillListView.as_view(), name="skill_list"),
+    path("skills/add/", SkillCreateView.as_view(), name="skill_add"),
+    path("skills/<int:pk>/edit/", SkillUpdateView.as_view(), name="skill_edit"),
+    path("skills/<int:pk>/delete/", SkillDeleteView.as_view(), name="skill_delete"),
 
     path("users/", UserListView.as_view(), name="user_list"),
     path("users/<int:pk>/edit/", UserUpdateView.as_view(), name="user_edit"),

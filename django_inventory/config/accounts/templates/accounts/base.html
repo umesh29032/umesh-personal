@@ -33,8 +33,20 @@
 
             <!-- Inventory Link -->
              <a href="{% url 'inventory:product_list' %}"
-               class="{% if 'inventory' in request.path %}active{% endif %}">
+               class="{% if 'products' in request.path %}active{% endif %}">
                 <span>📦</span> Inventory
+            </a>
+            
+            <!-- Batches Link (Processed) -->
+            <a href="{% url 'inventory:batch_list' %}"
+               class="{% if 'batches' in request.path %}active{% endif %}">
+                <span>📑</span> Production Batches
+            </a>
+
+            <!-- Cloth Stock Link -->
+             <a href="{% url 'inventory:cloth_roll_list' %}"
+               class="{% if 'cloth' in request.path %}active{% endif %}">
+                <span>🧵</span> Cloth Stock
             </a>
 
             <!-- Users Link (Superuser Only) -->
@@ -42,6 +54,10 @@
             <a href="{% url 'accounts:user_list' %}"
                class="{% if 'users' in request.path %}active{% endif %}">
                 <span>👥</span> Users
+            </a>
+            <a href="{% url 'accounts:skill_list' %}"
+               class="{% if 'skills' in request.path %}active{% endif %}">
+                <span>🛠️</span> User Skills
             </a>
             {% endif %}
             

@@ -9,9 +9,10 @@ from django.utils.decorators import method_decorator
 from django.conf import settings
 from django.contrib import messages
 from accounts.decorators import login_required_view
-from .models import User
-from .forms import UserEditForm, SignupForm
-from django.views.generic import ListView, UpdateView, DeleteView, FormView
+from .models import User, Skill
+from .forms import UserEditForm, SignupForm, SkillForm
+from django.views.generic import ListView, UpdateView, DeleteView, FormView, CreateView
+from django.db.models import Q
 from django.contrib.auth.views import LoginView as DjangoLoginView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy, reverse
@@ -190,6 +191,35 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
     context_object_name = "users"
     paginate_by = 10
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        q = self.request.GET.get('q')
+        skills = self.request.GET.getlist('skills')
+
+        if q:
+            queryset = queryset.filter(
+                Q(first_name__icontains=q) | 
+                Q(last_name__icontains=q) | 
+                Q(email__icontains=q)
+            )
+        
+        if skills:
+            queryset = queryset.filter(skills__id__in=skills).distinct()
+            
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['skills'] = Skill.objects.all()
+        # Convert string IDs from GET to integers for correct template comparison
+        try:
+            context['selected_skills'] = [int(x) for x in self.request.GET.getlist('skills')]
+        except ValueError:
+            context['selected_skills'] = []
+            
+        context['search_query'] = self.request.GET.get('q', '')
+        return context
+
 
 
 class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
@@ -365,3 +395,37 @@ class ResendSignupOTPView(View):
 
 
 
+class SkillListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+    model = Skill
+    template_name = "accounts/skill_list.html"
+    context_object_name = "skills"
+    ordering = ['name']
+
+class SkillCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    model = Skill
+    form_class = SkillForm
+    template_name = "accounts/skill_form.html"
+    success_url = reverse_lazy('accounts:skill_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Skill added successfully.")
+        return super().form_valid(form)
+
+class SkillUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+    model = Skill
+    form_class = SkillForm
+    template_name = "accounts/skill_form.html"
+    success_url = reverse_lazy('accounts:skill_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Skill updated successfully.")
+        return super().form_valid(form)
+
+class SkillDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    model = Skill
+    template_name = "accounts/skill_confirm_delete.html"
+    success_url = reverse_lazy('accounts:skill_list')
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(self.request, "Skill deleted successfully.")
+        return super().delete(request, *args, **kwargs)
