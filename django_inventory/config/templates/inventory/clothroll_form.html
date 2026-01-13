@@ -18,6 +18,21 @@
     <!-- Main Card -->
     <form method="post" style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); padding: 32px; border: 1px solid var(--gray-200);">
         {% csrf_token %}
+        {% if form.errors %}
+            <div style="background-color: #fee2e2; border: 1px solid #ef4444; color: #b91c1c; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                <p style="font-weight: bold; margin-bottom: 0.5rem;">Please fix the following errors:</p>
+                <ul style="list-style-type: disc; padding-left: 1.5rem;">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li>{{ field.label }}: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
         
         <!-- Section 1: Identification -->
         <div style="margin-bottom: 32px;">
@@ -26,6 +41,11 @@
                 Identification
             </h3>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                <!-- Purchased Date -->
+                <div class="form-group">
+                    <label for="{{ form.purchased_date.id_for_label }}">Purchased Date</label>
+                    {{ form.purchased_date }}
+                </div>
                 <!-- Roll Number -->
                 <div class="form-group">
                     <label for="{{ form.roll_number.id_for_label }}">Roll Number*</label>
@@ -38,6 +58,11 @@
                  <div class="form-group">
                     <label for="{{ form.supplier.id_for_label }}">Supplier</label>
                     {{ form.supplier }}
+                </div>
+                <!-- Batch Alloted -->
+                <div class="form-group">
+                    <label for="{{ form.batch_alloted.id_for_label }}">Alloted To Batch</label>
+                    {{ form.batch_alloted }}
                 </div>
             </div>
         </div>
@@ -109,6 +134,11 @@
                 <div class="form-group">
                     <label for="{{ form.status.id_for_label }}">Status</label>
                     {{ form.status }}
+                </div>
+                <!-- Exhaustion Date -->
+                <div class="form-group">
+                    <label for="{{ form.exhaustion_date.id_for_label }}">Exhaustion Date</label>
+                    {{ form.exhaustion_date }}
                 </div>
             </div>
         </div>

@@ -1,0 +1,52 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Skill Management{% endblock %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div>
+            <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900);">Skills</h1>
+            <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">Manage available skills for users.</p>
+        </div>
+        <a href="{% url 'accounts:skill_add' %}" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; background: #2563eb; color: white; padding: 10px 20px; border-radius: 10px; font-weight: 600; text-decoration: none; transition: all 0.2s;">
+            <span>+</span> Add Skill
+        </a>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card" style="background: white; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid var(--gray-200); overflow: hidden;">
+        <div class="table-responsive">
+            <table class="table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: var(--gray-50); border-bottom: 1px solid var(--gray-200);">
+                        <th style="padding: 16px 24px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gray-500);">Skill Name</th>
+                        <th style="padding: 16px 24px; text-align: right; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gray-500);">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for skill in skills %}
+                    <tr style="border-bottom: 1px solid var(--gray-100);">
+                        <td style="padding: 16px 24px; font-weight: 500; color: var(--gray-900);">
+                            {{ skill.name }}
+                        </td>
+                        <td style="padding: 16px 24px; text-align: right;">
+                            <a href="{% url 'accounts:skill_edit' skill.pk %}" style="text-decoration: none; font-size: 14px; margin-right: 12px;" title="Edit">✏️</a>
+                            <a href="{% url 'accounts:skill_delete' skill.pk %}" style="text-decoration: none; font-size: 14px;" title="Delete">🗑️</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="2" style="text-align: center; padding: 48px;">
+                            <p style="color: var(--gray-500);">No skills found. Add your first skill!</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

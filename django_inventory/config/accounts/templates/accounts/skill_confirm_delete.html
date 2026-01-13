@@ -1,0 +1,30 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Delete Skill{% endblock %}
+
+{% block content %}
+<div style="max-width: 480px; margin: 60px auto;">
+    <div class="card" style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); padding: 32px; text-align: center;">
+        <div style="width: 64px; height: 64px; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+            <span style="font-size: 32px;">⚠️</span>
+        </div>
+        
+        <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px;">Delete Skill?</h1>
+        <p style="color: var(--gray-600); line-height: 1.5; margin-bottom: 32px;">
+            Are you sure you want to delete the skill <strong>"{{ object.name }}"</strong>? This action cannot be undone.
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+            <div style="display: flex; gap: 12px;">
+                <a href="{% url 'accounts:skill_list' %}" style="flex: 1; display: inline-flex; align-items: center; justify-content: center; padding: 12px; border-radius: 10px; font-weight: 600; text-decoration: none; color: var(--gray-700); background: var(--gray-100); transition: background 0.2s;">
+                    Cancel
+                </a>
+                <button type="submit" style="flex: 1; background: #dc2626; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    Delete Skill
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

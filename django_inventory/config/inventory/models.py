@@ -58,6 +58,10 @@ class ClothRoll(models.Model):
     
     # Location tracking - usually starts in Storage
     location = models.ForeignKey(Stage, on_delete=models.SET_NULL, null=True, related_name='cloth_rolls')
+    batch_alloted = models.ForeignKey('Batch', on_delete=models.SET_NULL, null=True, blank=True, related_name='alloted_cloth_rolls', verbose_name="Alloted Batch")
+    purchased_date = models.DateField(blank=True, null=True,verbose_name="Purchased Date")
+    exhaustion_date = models.DateField(blank=True, null=True,verbose_name="Exhaustion Date")
+
     
     status = models.CharField(
         max_length=20, 

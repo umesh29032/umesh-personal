@@ -57,9 +57,11 @@ class ProductListView(LoginRequiredMixin, ListView):
     paginate_by = 10
     ordering = ['-created_at']
 
+
 from django.views.generic import CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from .models import ClothRoll
+from .forms import ClothRollForm
 
 class ClothRollListView(LoginRequiredMixin, ListView):
     model = ClothRoll
@@ -70,13 +72,13 @@ class ClothRollListView(LoginRequiredMixin, ListView):
 
 class ClothRollCreateView(LoginRequiredMixin, CreateView):
     model = ClothRoll
-    fields = ['roll_number', 'cloth_type', 'color', 'width', 'gsm', 'total_length', 'remaining_length', 'cost_per_meter', 'supplier', 'location', 'status']
+    form_class = ClothRollForm
     template_name = "inventory/clothroll_form.html"
     success_url = reverse_lazy('inventory:cloth_roll_list')
 
 class ClothRollUpdateView(LoginRequiredMixin, UpdateView):
     model = ClothRoll
-    fields = ['roll_number', 'cloth_type', 'color', 'width', 'gsm', 'total_length', 'remaining_length', 'cost_per_meter', 'supplier', 'location', 'status']
+    form_class = ClothRollForm
     template_name = "inventory/clothroll_form.html"
     success_url = reverse_lazy('inventory:cloth_roll_list')
 

@@ -5,136 +5,371 @@
 {% block page_title %}User Management{% endblock %}
 
 {% block content %}
-<div class="card">
+<div style="max-width: 1200px; margin: 0 auto;">
+    
+    <!-- Header with Stats or Title -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <h2>Users</h2>
+        <div>
+            <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900);">Team Members</h1>
+            <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">Manage user access and roles.</p>
+        </div>
+        <!-- Add User Button (Placeholder link if relevant) -->
+        <!-- <a href="#" class="btn-primary">Add New User</a> -->
     </div>
 
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Role</th>
-                    <th>Joined</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                <tr>
-                    <td>{{ user.email }}</td>
-                    <td>
-                        {% if user.is_active %}
-                            <span class="badge badge-success">Active</span>
-                        {% else %}
-                            <span class="badge badge-danger">Inactive</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if user.is_superuser %}
-                            <span class="badge badge-primary">Admin</span>
-                        {% elif user.is_staff %}
-                            <span class="badge badge-info">Staff</span>
-                        {% else %}
-                            <span class="badge badge-secondary">User</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ user.date_joined|date:"M d, Y" }}</td>
-                    <td>
-                        <a href="{% url 'accounts:user_edit' user.pk %}" class="btn-sm btn-outline">Edit</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="text-center">No users found.</td>
-                </tr>
+    <!-- Filter & Search Toolbar -->
+    <form method="get" class="search-toolbar">
+        <!-- Search Input -->
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" name="q" placeholder="Search by name or email..." value="{{ search_query }}" autocomplete="off">
+        </div>
+
+        <!-- Skills Filter (Chips) -->
+        <div class="skills-filter">
+            <span class="filter-label">Filter by Skills:</span>
+            <div class="skills-list">
+                {% for skill in skills %}
+                    <label class="skill-chip {% if skill.id in selected_skills %}active{% endif %}">
+                        <input type="checkbox" name="skills" value="{{ skill.id }}" 
+                               {% if skill.id in selected_skills %}checked{% endif %}
+                               onchange="this.form.submit()" style="display: none;">
+                        {{ skill.get_name_display }}
+                    </label>
                 {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="pagination">
-        <span class="step-links">
-            {% if page_obj.has_previous %}
-                <a href="?page=1">&laquo; first</a>
-                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+            </div>
+            
+            {% if search_query or selected_skills %}
+                <a href="{% url 'accounts:user_list' %}" class="clear-filters">Clear All</a>
             {% endif %}
+        </div>
+    </form>
 
-            <span class="current">
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+    <!-- Main Card -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th width="35%">User</th>
+                        <th width="15%">Role</th>
+                        <th width="20%">Status</th>
+                        <th width="20%">Joined</th>
+                        <th width="10%" style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                {% if user.profile_picture %}
+                                    <img src="{{ user.profile_picture.url }}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                {% else %}
+                                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px;">
+                                        {{ user.email|first|upper }}
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <div style="font-weight: 600; color: var(--gray-900);">
+                                        {{ user.first_name }} {{ user.last_name }}
+                                    </div>
+                                    <div style="font-size: 13px; color: var(--gray-500);">
+                                        {{ user.email }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if user.is_superuser %}
+                                <span class="badge badge-primary">Admin</span>
+                            {% elif user.is_staff %}
+                                <span class="badge badge-info">Staff</span>
+                            {% else %}
+                                <span class="badge badge-secondary">User</span>
+                            {% endif %}
+                        </td>
+                         <td>
+                            {% if user.is_active %}
+                                <span class="badge badge-success">
+                                    <span class="dot-success"></span> Active
+                                </span>
+                            {% else %}
+                                <span class="badge badge-danger">
+                                    <span class="dot-danger"></span> Inactive
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--gray-600); font-size: 14px;">
+                            {{ user.date_joined|date:"M d, Y" }}
+                        </td>
+                        <td style="text-align: right;">
+                            <a href="{% url 'accounts:user_edit' user.pk %}" class="btn-icon" title="Edit User">
+                                ✏️
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 48px;">
+                            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">🔍</div>
+                            <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900);">No users found</h3>
+                            <p style="color: var(--gray-500);">Try adjusting your search or filters.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <div class="pagination-footer">
+            <span class="page-info">
+                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
             </span>
+            <div class="pagination-controls">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% for skill in selected_skills %}&skills={{ skill }}{% endfor %}" class="btn-page">Previous</a>
+                {% else %}
+                    <span class="btn-page disabled">Previous</span>
+                {% endif %}
 
-            {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}">next</a>
-                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
-            {% endif %}
-        </span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% for skill in selected_skills %}&skills={{ skill }}{% endfor %}" class="btn-page">Next</a>
+                {% else %}
+                    <span class="btn-page disabled">Next</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 
 <style>
-/* Table Styles tailored for this page */
+/* Layout & Cards */
 .card {
     background: white;
-    padding: 24px;
-    border-radius: 16px;
-    box-shadow: var(--shadow-md);
+    border-radius: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
 }
 
+/* Search Toolbar */
+.search-toolbar {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+    border: 1px solid var(--gray-200);
+}
+
+.search-box {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 12px 16px 12px 48px;
+    border: 1px solid var(--gray-300);
+    border-radius: 12px;
+    font-size: 15px;
+    transition: all 0.2s;
+    background: var(--gray-50);
+}
+
+.search-box input:focus {
+    background: white;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+}
+
+.search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Skills Filter */
+.skills-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.filter-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 4px;
+}
+
+.skills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.skill-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--gray-200);
+    background: white;
+    color: var(--gray-600);
+    user-select: none;
+}
+
+.skill-chip:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-300);
+}
+
+.skill-chip.active {
+    background: #ebf5ff; /* Light blue bg */
+    border-color: #3b82f6; /* Blue border */
+    color: #1d4ed8; /* Dark blue text */
+    font-weight: 600;
+}
+
+.clear-filters {
+    font-size: 13px;
+    color: #ef4444;
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: auto;
+    padding: 4px 8px;
+}
+
+.clear-filters:hover {
+    text-decoration: underline;
+}
+
+/* Table Styling */
 .table {
     width: 100%;
     border-collapse: collapse;
 }
 
-.table th, .table td {
-    padding: 16px;
-    text-align: left;
-    border-bottom: 1px solid var(--gray-200);
-}
-
 .table th {
+    padding: 16px 24px;
+    text-align: left;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 12px;
     font-weight: 600;
-    color: var(--gray-500);
     text-transform: uppercase;
-    font-size: 13px;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
 }
 
+.table td {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: middle;
+}
+
+.table tr:last-child td {
+    border-bottom: none;
+}
+
+.table tr:hover {
+    background: var(--gray-50);
+}
+
+/* Badges */
 .badge {
-    padding: 4px 12px;
+    padding: 4px 10px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.badge-success { background: #dcfce7; color: #166534; }
-.badge-danger { background: #fee2e2; color: #991b1b; }
-.badge-primary { background: #dbeafe; color: #1e40af; }
-.badge-info { background: #e0f2fe; color: #075985; }
-.badge-secondary { background: #f3f4f6; color: #374151; }
+.badge-success { background: #ecfdf5; color: #059669; }
+.badge-danger { background: #fef2f2; color: #dc2626; }
+.badge-primary { background: #eff6ff; color: #2563eb; }
+.badge-info { background: #f0f9ff; color: #0284c7; }
+.badge-secondary { background: #f3f4f6; color: #4b5563; }
 
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 13px;
-    border-radius: 6px;
+.dot-success { width: 6px; height: 6px; border-radius: 50%; background: #059669; }
+.dot-danger { width: 6px; height: 6px; border-radius: 50%; background: #dc2626; }
+
+/* Buttons */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--gray-500);
     text-decoration: none;
-    font-weight: 500;
     transition: all 0.2s;
 }
 
-.btn-outline {
-    border: 1px solid var(--gray-300);
-    color: var(--gray-700);
+.btn-icon:hover {
+    background: var(--gray-100);
+    color: var(--primary-blue);
 }
 
-.btn-outline:hover {
+/* Pagination */
+.pagination-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid var(--gray-200);
     background: var(--gray-50);
+}
+
+.page-info {
+    font-size: 13px;
+    color: var(--gray-500);
+}
+
+.pagination-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-page {
+    padding: 6px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--gray-700);
+    text-decoration: none;
+    background: white;
+    transition: all 0.2s;
+}
+
+.btn-page:hover {
     border-color: var(--gray-400);
+    background: var(--gray-50);
+}
+
+.btn-page.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--gray-50);
 }
 </style>
 {% endblock %}

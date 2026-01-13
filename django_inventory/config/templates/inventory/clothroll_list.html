@@ -42,9 +42,11 @@
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Roll #</th>
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Type</th>
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Color</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Purchased</th>
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Length (Rem/Total)</th>
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Location</th>
-                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Status</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Batch</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Status/Exhaust</th>
                         <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); text-align: right;">Actions</th>
                     </tr>
                 </thead>
@@ -63,20 +65,33 @@
                                 {{ roll.color }}
                             </div>
                         </td>
+                        <td style="padding: 16px 24px; color: var(--gray-700);">{{ roll.purchased_date|date:"M d, Y"|default:"-" }}</td>
                         <td style="padding: 16px 24px;">
                             <div style="font-weight: 600; color: var(--gray-900);">{{ roll.remaining_length }} m</div>
                             <div style="font-size: 12px; color: var(--gray-500);">of {{ roll.total_length }} m</div>
                         </td>
                         <td style="padding: 16px 24px; color: var(--gray-700);">{{ roll.location.name|default:"-" }}</td>
+                        <td style="padding: 16px 24px; color: var(--gray-700);">
+                            {% if roll.batch_alloted %}
+                            <a href="#" style="color: var(--primary-blue); font-weight: 500; text-decoration: none;">{{ roll.batch_alloted.batch_number }}</a>
+                            {% else %}
+                            <span style="color: var(--gray-400);">-</span>
+                            {% endif %}
+                        </td>
                         <td style="padding: 16px 24px;">
                             {% if roll.status == 'AVAILABLE' %}
                                 <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #ecfdf5; color: #059669; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px;">
                                     <span style="width: 6px; height: 6px; border-radius: 50%; background: #059669;"></span> Available
                                 </span>
                             {% elif roll.status == 'EXHAUSTED' %}
-                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #f3f4f6; color: #4b5563; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px;">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af;"></span> Exhausted
-                                </span>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #f3f4f6; color: #4b5563; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px; width: fit-content;">
+                                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af;"></span> Exhausted
+                                    </span>
+                                    {% if roll.exhaustion_date %}
+                                    <span style="font-size: 11px; color: var(--gray-500); margin-left: 4px;">on {{ roll.exhaustion_date|date:"M d" }}</span>
+                                    {% endif %}
+                                </div>
                             {% else %}
                                 <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #fffbeb; color: #d97706; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px;">
                                     <span style="width: 6px; height: 6px; border-radius: 50%; background: #d97706;"></span> Partial

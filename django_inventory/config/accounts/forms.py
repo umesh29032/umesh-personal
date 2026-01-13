@@ -1,6 +1,15 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import User
+from .models import User, Skill
+
+class SkillForm(forms.ModelForm):
+    class Meta:
+        model = Skill
+        fields = ['name']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Enter skill name (e.g., Python, Welding)'})
+        }
+
 
 class UserEditForm(forms.ModelForm):
     new_password = forms.CharField(

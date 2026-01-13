@@ -55,6 +55,10 @@
                class="{% if 'users' in request.path %}active{% endif %}">
                 <span>👥</span> Users
             </a>
+            <a href="{% url 'accounts:skill_list' %}"
+               class="{% if 'skills' in request.path %}active{% endif %}">
+                <span>🛠️</span> User Skills
+            </a>
             {% endif %}
             
             <a href="#"><span>⚙️</span> Settings</a>
