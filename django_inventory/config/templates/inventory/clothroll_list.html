@@ -6,33 +6,42 @@
 <div style="max-width: 1200px; margin: 0 auto;">
     
     <!-- Action Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <div>
-            <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.02em;">Raw Material Inventory</h1>
-            <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">Manage your cloth rolls, stock, and locations.</p>
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Raw Material Inventory</h1>
+            <p>Manage your cloth rolls, stock, and locations.</p>
         </div>
-        <a href="{% url 'inventory:cloth_roll_add' %}" class="btn-primary" style="text-decoration: none; padding: 12px 24px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
-            <span>+</span> Add New Roll
+        <a href="{% url 'inventory:cloth_roll_add' %}" class="btn-primary">
+            + Add New Roll
         </a>
     </div>
 
     <!-- Main Card -->
-    <div style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); overflow: hidden; border: 1px solid var(--gray-200);">
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(14,11,9,0.06); border: 1px solid var(--cream-3);">
         
-        <!-- Toolbar / Filter (Visual Placeholder for now) -->
-        <div style="padding: 20px 24px; border-bottom: 1px solid var(--gray-100); display: flex; gap: 16px; align-items: center;">
-            <div style="position: relative; flex: 1; max-width: 300px;">
-                <input type="text" placeholder="Search rolls..." style="width: 100%; padding: 10px 16px 10px 40px; border: 1px solid var(--gray-200); border-radius: 10px; font-size: 14px; background-color: var(--gray-50);">
+        <!-- Toolbar / Filter -->
+        <form method="get" style="padding: 20px 24px; border-bottom: 1px solid var(--gray-100); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <div style="position: relative; flex: 1; min-width: 180px; max-width: 280px;">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search rolls..." style="width: 100%; padding: 10px 16px 10px 40px; border: 1px solid var(--gray-200); border-radius: 10px; font-size: 14px; background-color: var(--gray-50); box-sizing: border-box;">
                 <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: 0.5;">🔍</span>
             </div>
-            <div style="flex: 1;"></div>
-            <button style="padding: 8px 16px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-600); cursor: pointer;">
-                Filter
-            </button>
-            <button style="padding: 8px 16px; border: 1px solid var(--gray-200); background: white; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-600); cursor: pointer;">
-                Export
-            </button>
-        </div>
+            <select name="cloth_type" style="padding: 10px 14px; border: 1px solid var(--gray-200); border-radius: 10px; font-size: 14px; background: var(--gray-50); color: var(--gray-700);">
+                <option value="">All Types</option>
+                {% for val, label in type_choices %}
+                    <option value="{{ val }}" {% if selected_type == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="status" style="padding: 10px 14px; border: 1px solid var(--gray-200); border-radius: 10px; font-size: 14px; background: var(--gray-50); color: var(--gray-700);">
+                <option value="">All Statuses</option>
+                {% for val, label in status_choices %}
+                    <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" style="padding: 10px 20px; background: var(--primary-blue); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;">Filter</button>
+            {% if search_query or selected_status or selected_type %}
+                <a href="{% url 'inventory:cloth_roll_list' %}" style="padding: 10px 16px; border: 1px solid var(--gray-300); border-radius: 10px; text-decoration: none; color: var(--gray-600); font-size: 14px;">Clear</a>
+            {% endif %}
+        </form>
 
         <!-- Table -->
         <div class="table-responsive">
@@ -52,53 +61,47 @@
                 </thead>
                 <tbody>
                     {% for roll in cloth_rolls %}
-                    <tr style="border-bottom: 1px solid var(--gray-100); transition: background 0.1s ease-in-out;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='white'">
-                        <td style="padding: 16px 24px; font-weight: 600; color: var(--gray-900);">{{ roll.roll_number }}</td>
-                        <td style="padding: 16px 24px; color: var(--gray-700);">
+                    <tr style="border-bottom: 1px solid var(--gray-100); transition: background 0.1s ease-in-out;" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                        <td data-label="Roll #" style="padding: 16px 24px; font-weight: 600; color: var(--gray-900);">{{ roll.roll_number }}</td>
+                        <td data-label="Type" style="padding: 16px 24px; color: var(--gray-700);">
                             <span style="display: inline-block; padding: 4px 10px; background: #eff6ff; color: #1d4ed8; border-radius: 6px; font-size: 13px; font-weight: 500;">
                                 {{ roll.cloth_type }}
                             </span>
                         </td>
-                        <td style="padding: 16px 24px; color: var(--gray-700);">
+                        <td data-label="Color" style="padding: 16px 24px; color: var(--gray-700);">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <span style="width: 12px; height: 12px; border-radius: 50%; background-color: {{ roll.color|default:'gray' }}; border: 1px solid rgba(0,0,0,0.1);"></span>
                                 {{ roll.color }}
                             </div>
                         </td>
-                        <td style="padding: 16px 24px; color: var(--gray-700);">{{ roll.purchased_date|date:"M d, Y"|default:"-" }}</td>
-                        <td style="padding: 16px 24px;">
+                        <td data-label="Purchased" style="padding: 16px 24px; color: var(--gray-700);">{{ roll.purchased_date|date:"M d, Y"|default:"-" }}</td>
+                        <td data-label="Length" style="padding: 16px 24px;">
                             <div style="font-weight: 600; color: var(--gray-900);">{{ roll.remaining_length }} m</div>
                             <div style="font-size: 12px; color: var(--gray-500);">of {{ roll.total_length }} m</div>
                         </td>
-                        <td style="padding: 16px 24px; color: var(--gray-700);">{{ roll.location.name|default:"-" }}</td>
-                        <td style="padding: 16px 24px; color: var(--gray-700);">
+                        <td data-label="Location" style="padding: 16px 24px; color: var(--gray-700);">{{ roll.location.name|default:"-" }}</td>
+                        <td data-label="Batch" style="padding: 16px 24px; color: var(--gray-700);">
                             {% if roll.batch_alloted %}
                             <a href="#" style="color: var(--primary-blue); font-weight: 500; text-decoration: none;">{{ roll.batch_alloted.batch_number }}</a>
                             {% else %}
                             <span style="color: var(--gray-400);">-</span>
                             {% endif %}
                         </td>
-                        <td style="padding: 16px 24px;">
+                        <td data-label="Status" style="padding: 16px 24px;">
                             {% if roll.status == 'AVAILABLE' %}
-                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #ecfdf5; color: #059669; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px;">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #059669;"></span> Available
-                                </span>
+                                <span class="badge badge-available"><span class="badge-dot"></span> Available</span>
                             {% elif roll.status == 'EXHAUSTED' %}
                                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                                    <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #f3f4f6; color: #4b5563; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px; width: fit-content;">
-                                        <span style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af;"></span> Exhausted
-                                    </span>
+                                    <span class="badge badge-exhausted"><span class="badge-dot"></span> Exhausted</span>
                                     {% if roll.exhaustion_date %}
-                                    <span style="font-size: 11px; color: var(--gray-500); margin-left: 4px;">on {{ roll.exhaustion_date|date:"M d" }}</span>
+                                    <span style="font-size: 11px; color: var(--text-secondary); margin-left: 4px;">on {{ roll.exhaustion_date|date:"M d" }}</span>
                                     {% endif %}
                                 </div>
                             {% else %}
-                                <span style="display: inline-flex; align-items: center; padding: 4px 12px; background: #fffbeb; color: #d97706; border-radius: 20px; font-size: 13px; font-weight: 600; gap: 6px;">
-                                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #d97706;"></span> Partial
-                                </span>
+                                <span class="badge badge-reserved"><span class="badge-dot"></span> Partial</span>
                             {% endif %}
                         </td>
-                        <td style="padding: 16px 24px; text-align: right;">
+                        <td data-label="Actions" class="td-actions" style="padding: 16px 24px; text-align: right;">
                             <a href="{% url 'inventory:cloth_roll_edit' roll.pk %}" style="text-decoration: none; display: inline-block; padding: 6px; border-radius: 6px; color: var(--gray-500); transition: all 0.2s;" onmouseover="this.style.background='var(--gray-100)'; this.style.color='var(--primary-blue)'" onmouseout="this.style.background='transparent'; this.style.color='var(--gray-500)'" title="Edit">
                                 ✏️
                             </a>
@@ -131,13 +134,13 @@
             </div>
             <div style="display: flex; gap: 8px;">
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Previous</a>
+                    <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&cloth_type={{ selected_type }}&status={{ selected_status }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Previous</a>
                 {% else %}
                     <span style="padding: 8px 16px; border: 1px solid var(--gray-200); border-radius: 8px; color: var(--gray-300); font-size: 14px; font-weight: 500; background: var(--gray-50); cursor: not-allowed;">Previous</span>
                 {% endif %}
 
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Next</a>
+                    <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&cloth_type={{ selected_type }}&status={{ selected_status }}" style="padding: 8px 16px; border: 1px solid var(--gray-300); border-radius: 8px; text-decoration: none; color: var(--gray-700); font-size: 14px; font-weight: 500; background: white;">Next</a>
                 {% else %}
                     <span style="padding: 8px 16px; border: 1px solid var(--gray-200); border-radius: 8px; color: var(--gray-300); font-size: 14px; font-weight: 500; background: var(--gray-50); cursor: not-allowed;">Next</span>
                 {% endif %}

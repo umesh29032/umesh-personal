@@ -1,21 +1,142 @@
-{% extends 'accounts/base_auth.html' %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set New Password — Kapil Enterprises</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root { --ink: #0e0b09; --ink-2: #1c1814; --copper: #b87333; --copper-l: #d4924a; --cream: #f5ede0; --cream-2: #ede3d4; --stone: #7a6a58; --smoke: #c4b39e; --white: #faf7f2; }
+        html, body { min-height: 100%; font-family: 'Syne', sans-serif; background: linear-gradient(160deg, #130428 0%, #240a52 50%, #100324 100%); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+        body { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; position: relative; }
+        body::before { content: ''; position: fixed; inset: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px); pointer-events: none; }
+        body::after { content: ''; position: fixed; top: -80px; right: -80px; width: 480px; height: 480px; background: radial-gradient(circle, rgba(184,115,51,0.18) 0%, rgba(120,60,20,0.06) 45%, transparent 70%); pointer-events: none; }
 
-{% block title %}Reset Password{% endblock %}
+        .card { width: 100%; max-width: 420px; background: var(--cream); border-radius: 12px; overflow: hidden; position: relative; z-index: 1; opacity: 0; animation: riseIn 0.7s cubic-bezier(0.22,1,0.36,1) 0.1s forwards; }
+        .card-accent { height: 3px; background: linear-gradient(to right, var(--ink-2), var(--copper), var(--copper-l), var(--copper)); }
+        .card-body { padding: 44px 44px 40px; position: relative; z-index: 1; }
 
-{% block page_title %}Set New Password{% endblock %}
+        .steps { display: flex; align-items: center; gap: 6px; margin-bottom: 28px; }
+        .step { height: 3px; border-radius: 2px; }
+        .step.done   { flex: 1; background: var(--copper); }
+        .step.active { flex: 1.5; background: var(--ink); }
+        .step.idle   { flex: 1; background: var(--cream-2); }
 
-{% block content %}
-<div class="auth-card" style="margin: 0 auto;">
-    <h2 class="text-center">Set New Password</h2>
-    <p class="text-center">Enter the OTP and your new password.</p>
+        .monogram { width: 48px; height: 48px; border: 1.5px solid var(--copper); border-radius: 4px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; position: relative; }
+        .monogram::before { content: ''; position: absolute; inset: 3px; border: 1px solid rgba(184,115,51,0.25); border-radius: 2px; }
+        .monogram span { font-family: 'Cormorant Garamond', serif; font-size: 18px; font-weight: 600; color: var(--copper); }
 
-    <form method="post">
-        {% csrf_token %}
-        <input type="number" name="otp" placeholder="OTP Code" required style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 16px;">
-        
-        <input type="password" name="password" placeholder="New Password" required style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 8px; margin-bottom: 20px;">
-        
-        <button type="submit">Update Password</button>
-    </form>
+        .heading { font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 300; font-style: italic; color: var(--ink); line-height: 1.1; margin-bottom: 6px; }
+        .heading em { font-style: normal; font-weight: 600; }
+        .sub { font-size: 12px; font-weight: 500; color: var(--stone); margin-bottom: 28px; line-height: 1.6; }
+
+        .alerts { margin-bottom: 20px; }
+        .alert { padding: 11px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; margin-bottom: 8px; line-height: 1.5; }
+        .alert-error   { background: #fef1ee; color: #7c2d12; border-left: 3px solid #dc4533; }
+        .alert-success { background: #f0fdf4; color: #14532d; border-left: 3px solid #22c55e; }
+
+        .otp-label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: 10px; }
+        .otp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+        .otp-digit { flex: 1 1 0; min-width: 0; width: 0; height: 64px; background: #ffffff; border: 1.5px solid #b8a48e; border-radius: 6px; text-align: center; font-family: 'Inter', sans-serif; font-size: 28px; font-weight: 600; color: var(--ink); outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; caret-color: var(--copper); -webkit-appearance: none; box-shadow: 0 1px 3px rgba(0,0,0,0.06) inset; }
+        .otp-digit:focus { border-color: var(--copper); background: #fffdf9; box-shadow: 0 0 0 3px rgba(184,115,51,0.18), 0 1px 3px rgba(0,0,0,0.04) inset; }
+        .otp-digit.filled { border-color: var(--copper); background: #fffdf9; }
+        .otp-sep { width: 12px; height: 2px; background: #7a6252; border-radius: 1px; flex-shrink: 0; }
+
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: 7px; }
+        .field input { width: 100%; padding: 13px 16px; background: var(--white); border: 1.5px solid #b8a48e; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; color: var(--ink); outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; box-shadow: 0 1px 3px rgba(0,0,0,0.06) inset; }
+        .field input::placeholder { color: var(--smoke); }
+        .field input:focus { border-color: var(--copper); background: #fffdf9; box-shadow: 0 0 0 3px rgba(184,115,51,0.12), 0 1px 3px rgba(0,0,0,0.04) inset; }
+        .field-hint { font-size: 11px; color: var(--smoke); margin-top: 5px; }
+
+        .btn-cta { width: 100%; padding: 15px 24px; background: var(--ink); color: var(--cream); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; position: relative; overflow: hidden; transition: background 0.2s, transform 0.15s; margin-top: 6px; }
+        .btn-cta::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 40%, rgba(184,115,51,0.15) 100%); }
+        .btn-cta:hover { background: var(--ink-2); transform: translateY(-1px); }
+        .btn-cta:active { transform: translateY(0); }
+
+        .form-link { display: block; text-align: center; margin-top: 18px; font-size: 12px; font-weight: 500; color: var(--stone); text-decoration: none; transition: color 0.2s; }
+        .form-link:hover { color: var(--copper); }
+
+        @keyframes riseIn { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @media (max-width: 480px) { .card-body { padding: 32px 24px 28px; } .heading { font-size: 28px; } }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="card-accent"></div>
+    <div class="card-body">
+        <div class="steps">
+            <div class="step done"></div>
+            <div class="step done"></div>
+            <div class="step active"></div>
+        </div>
+        <div class="monogram"><span>KE</span></div>
+        <h1 class="heading"><em>Set</em> your<br>new password.</h1>
+        <p class="sub">Enter the code from your email and choose a new password.</p>
+
+        {% if messages %}
+        <div class="alerts">{% for message in messages %}<div class="alert alert-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>
+        {% endif %}
+
+        <form method="post" id="resetForm">
+            {% csrf_token %}
+            <label class="otp-label">OTP Code</label>
+            <input type="hidden" name="otp" id="otpHidden">
+            <div class="otp-row">
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="0" autofocus>
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="1">
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="2">
+                <div class="otp-sep"></div>
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="3">
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="4">
+                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="5">
+            </div>
+            <div class="field">
+                <label for="password">New Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="new-password">
+                <p class="field-hint">Minimum 8 characters</p>
+            </div>
+            <button type="submit" class="btn-cta" id="submitBtn">Update Password →</button>
+        </form>
+        <a href="{% url 'accounts:forgot_password' %}" class="form-link">← Request a new code</a>
+    </div>
 </div>
-{% endblock %}
+<script>
+(function () {
+    const digits = Array.from(document.querySelectorAll('.otp-digit'));
+    const hidden = document.getElementById('otpHidden');
+
+    function sync() {
+        const val = digits.map(d => d.value).join('');
+        hidden.value = val;
+        digits.forEach(d => d.classList.toggle('filled', d.value !== ''));
+    }
+
+    digits.forEach((el, i) => {
+        el.addEventListener('input', e => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(-1);
+            if (e.target.value && i < 5) digits[i + 1].focus();
+            sync();
+        });
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !el.value && i > 0) { digits[i - 1].focus(); digits[i - 1].value = ''; sync(); }
+            if (e.key === 'ArrowLeft' && i > 0) digits[i - 1].focus();
+            if (e.key === 'ArrowRight' && i < 5) digits[i + 1].focus();
+        });
+        el.addEventListener('focus', () => el.select());
+        el.addEventListener('paste', e => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+            text.split('').slice(0, 6).forEach((ch, j) => { if (digits[j]) digits[j].value = ch; });
+            digits[Math.min(text.length, 5)].focus();
+            sync();
+        });
+    });
+})();
+</script>
+</body>
+</html>

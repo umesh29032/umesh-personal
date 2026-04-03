@@ -1,64 +1,141 @@
-{% extends 'accounts/base_auth.html' %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account — Kapil Enterprises</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Inter:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --ink: #0e0b09; --ink-2: #1c1814; --ink-3: #2a2420;
+            --copper: #b87333; --copper-l: #d4924a; --copper-d: #8a5520;
+            --cream: #f5ede0; --cream-2: #ede3d4;
+            --stone: #7a6a58; --smoke: #c4b39e; --white: #faf7f2;
+        }
+        html, body { height: 100%; font-family: 'Syne', sans-serif; background: #160632; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+        .page { display: flex; min-height: 100dvh; }
 
-{% block title %}Sign Up{% endblock %}
+        /* Left panel */
+        .left {
+            flex: 0 0 42%; background: linear-gradient(160deg, #130428 0%, #240a52 45%, #190838 80%, #100324 100%); position: relative; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: center; padding: 60px 60px;
+        }
+        .left::before {
+            content: ''; position: absolute; inset: 0;
+            background-image: repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px), repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px);
+            pointer-events: none;
+        }
+        .left::after { content: ''; position: absolute; top: -60px; right: -60px; width: 480px; height: 480px; background: radial-gradient(circle, rgba(184,115,51,0.22) 0%, rgba(120,60,20,0.08) 45%, transparent 70%); pointer-events: none; }
+        .thread-line { position: absolute; top: 0; left: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, transparent 0%, var(--copper) 30%, var(--copper) 70%, transparent 100%); opacity: 0.6; }
+        .deco-letter { position: absolute; bottom: -80px; right: -60px; font-family: 'Cormorant Garamond', serif; font-size: 360px; font-weight: 300; color: rgba(255,255,255,0.025); line-height: 1; user-select: none; pointer-events: none; }
+        .brand { position: relative; z-index: 1; }
+        .monogram { width: 50px; height: 50px; border: 1.5px solid var(--copper); border-radius: 4px; display: flex; align-items: center; justify-content: center; margin-bottom: 36px; position: relative; opacity: 0; animation: fadeUp 0.7s 0.1s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .monogram::before { content: ''; position: absolute; inset: 3px; border: 1px solid rgba(184,115,51,0.3); border-radius: 2px; }
+        .monogram span { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 600; color: var(--copper); }
+        .brand-name { font-family: 'Cormorant Garamond', serif; font-size: clamp(34px, 4vw, 52px); font-weight: 300; color: var(--white); line-height: 1.05; margin-bottom: 6px; opacity: 0; animation: fadeUp 0.8s 0.25s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .brand-name em { font-style: italic; color: var(--copper-l); }
+        .brand-sub { font-size: 11px; font-weight: 500; letter-spacing: 0.2em; color: var(--stone); text-transform: uppercase; margin-bottom: 44px; opacity: 0; animation: fadeUp 0.7s 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .left-tagline { font-size: 14px; color: rgba(255,255,255,0.45); line-height: 1.7; max-width: 280px; opacity: 0; animation: fadeUp 0.7s 0.5s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .left-tagline strong { color: rgba(255,255,255,0.75); font-weight: 600; }
 
-{% block page_title %}Sign Up{% endblock %}
+        /* Right panel */
+        .right { flex: 1; background: var(--cream); display: flex; align-items: center; justify-content: center; padding: 40px 40px; position: relative; overflow-y: auto; }
+        .right-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(to right, var(--copper-d), var(--copper-l), var(--copper-d)); }
+        .form-shell { width: 100%; max-width: 380px; position: relative; z-index: 1; padding: 8px 0; opacity: 0; animation: fadeUp 0.8s 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .form-eyebrow { font-size: 11px; font-weight: 500; color: var(--copper); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 10px; }
+        .form-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; font-weight: 300; color: var(--ink); line-height: 1.1; letter-spacing: -0.01em; }
+        .form-title em { font-style: italic; }
+        .form-sub { margin-top: 8px; font-size: 12px; color: var(--stone); font-weight: 500; margin-bottom: 28px; line-height: 1.5; }
 
-{% block content %}
-<div class="login-wrapper">
-    <!-- Left Panel -->
-    <div class="login-left">
-        <h1>Join Kapil Enterprises</h1>
-        <p>Create an account to start managing your inventory and production tracking.</p>
+        .alerts { margin-bottom: 20px; }
+        .alert { padding: 11px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; margin-bottom: 8px; line-height: 1.5; }
+        .alert-error { background: #fef1ee; color: #7c2d12; border-left: 3px solid #dc4533; }
+        .alert-success { background: #f0fdf4; color: #14532d; border-left: 3px solid #22c55e; }
+
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: 7px; }
+        .field input { width: 100%; padding: 13px 16px; background: var(--white); border: 1.5px solid var(--cream-2); border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 400; color: var(--ink); outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; }
+        .field input::placeholder { color: var(--smoke); }
+        .field input:focus { border-color: var(--copper); box-shadow: 0 0 0 3px rgba(184,115,51,0.12); }
+        .field-hint { font-size: 11px; color: var(--smoke); margin-top: 5px; }
+
+        .btn-cta { width: 100%; padding: 15px 24px; background: var(--ink); color: var(--cream); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; position: relative; overflow: hidden; transition: background 0.2s, transform 0.15s; margin-top: 8px; }
+        .btn-cta::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 40%, rgba(184,115,51,0.15) 100%); }
+        .btn-cta:hover { background: var(--ink-3); transform: translateY(-1px); }
+        .btn-cta:active { transform: translateY(0); }
+
+        .form-links { margin-top: 24px; text-align: center; }
+        .form-links a { font-size: 12px; font-weight: 500; color: var(--stone); text-decoration: none; transition: color 0.2s; }
+        .form-links a:hover { color: var(--copper); }
+        .form-links a span { color: var(--copper); font-weight: 600; }
+
+        .divider { height: 1px; background: var(--cream-2); margin: 16px 0; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 860px) { .left { display: none; } .right { padding: 36px 24px; } }
+        @media (max-width: 480px) { .right { padding: 28px 18px; } .form-title { font-size: 30px; } }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="left">
+        <div class="thread-line"></div>
+        <div class="deco-letter">K</div>
+        <div class="brand">
+            <div class="monogram"><span>KE</span></div>
+            <h1 class="brand-name">Kapil<br><em>Enterprises</em></h1>
+            <p class="brand-sub">Inventory Management System</p>
+            <p class="left-tagline">
+                Join your team on the platform that keeps<br>
+                <strong>every cloth roll, batch, and worker</strong><br>
+                accounted for — from cut to finish.
+            </p>
+        </div>
     </div>
 
-    <!-- Right Panel -->
-    <div class="login-right">
-        <div class="login-card">
-            <h2 class="text-center">Create Account</h2>
-            <p class="text-center">Enter your details to sign up</p>
+    <div class="right">
+        <div class="right-accent"></div>
+        <div class="form-shell">
+            <p class="form-eyebrow">New Account</p>
+            <h2 class="form-title">Create your<br><em>account.</em></h2>
+            <p class="form-sub">An OTP will be sent to verify your email address</p>
+
+            {% if form.errors %}
+            <div class="alerts">
+                {% for field in form %}{% for error in field.errors %}<div class="alert alert-error">{{ field.label }}: {{ error }}</div>{% endfor %}{% endfor %}
+                {% for error in form.non_field_errors %}<div class="alert alert-error">{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
 
             <form method="post">
                 {% csrf_token %}
-                
-                {% if form.errors %}
-                <div class="alert alert-error">
-                   {% for field in form %}
-                       {% for error in field.errors %}
-                           {{ error }}<br>
-                       {% endfor %}
-                   {% endfor %}
-                   {% for error in form.non_field_errors %}
-                       {{ error }}
-                   {% endfor %}
-                </div>
-                {% endif %}
-
-                <div class="form-group mb-3">
+                <div class="field">
+                    <label for="id_email">Work Email</label>
                     {{ form.email }}
                 </div>
-
-                <div class="form-group mb-3">
+                <div class="field">
+                    <label for="id_password">Password</label>
                     {{ form.password }}
+                    <p class="field-hint">Minimum 8 characters</p>
                 </div>
-
-                <div class="form-group mb-3">
+                <div class="field">
+                    <label for="id_confirm_password">Confirm Password</label>
                     {{ form.confirm_password }}
                 </div>
-
-                <button type="submit" class="btn-primary">
-                    <span>Sign Up</span>
-                </button>
+                <button type="submit" class="btn-cta">Create Account →</button>
             </form>
 
-            <div class="divider">
-                <span>OR</span>
+            <div class="divider"></div>
+            <div class="form-links">
+                <a href="{% url 'accounts:login' %}">Already have an account? <span>Sign in →</span></a>
             </div>
-
-            <a href="{% url 'accounts:login' %}" style="display: block; text-align: center; color: var(--primary-blue); text-decoration: none; font-weight: 600;">
-                Already have an account? Login
-            </a>
         </div>
     </div>
 </div>
-{% endblock %}
+</body>
+</html>

@@ -7,14 +7,12 @@
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto;">
     
-    <!-- Header with Stats or Title -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-        <div>
-            <h1 style="font-size: 24px; font-weight: 700; color: var(--gray-900);">Team Members</h1>
-            <p style="color: var(--gray-500); font-size: 14px; margin-top: 4px;">Manage user access and roles.</p>
+    <!-- Header -->
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Team Members</h1>
+            <p>Manage user access and roles.</p>
         </div>
-        <!-- Add User Button (Placeholder link if relevant) -->
-        <!-- <a href="#" class="btn-primary">Add New User</a> -->
     </div>
 
     <!-- Filter & Search Toolbar -->
@@ -61,7 +59,7 @@
                 <tbody>
                     {% for user in users %}
                     <tr>
-                        <td>
+                        <td data-label="User">
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 {% if user.profile_picture %}
                                     <img src="{{ user.profile_picture.url }}" alt="" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
@@ -80,16 +78,20 @@
                                 </div>
                             </div>
                         </td>
-                        <td>
-                            {% if user.is_superuser %}
+                        <td data-label="Role">
+                            {% if user.user_type == 'admin' %}
                                 <span class="badge badge-primary">Admin</span>
-                            {% elif user.is_staff %}
-                                <span class="badge badge-info">Staff</span>
+                            {% elif user.user_type == 'manager' %}
+                                <span class="badge badge-info">Manager</span>
+                            {% elif user.user_type == 'karigar' %}
+                                <span class="badge badge-warning">Karigar</span>
+                            {% elif user.user_type == 'helper' %}
+                                <span class="badge badge-secondary">Helper</span>
                             {% else %}
-                                <span class="badge badge-secondary">User</span>
+                                <span class="badge badge-secondary">{{ user.get_user_type_display }}</span>
                             {% endif %}
                         </td>
-                         <td>
+                         <td data-label="Status">
                             {% if user.is_active %}
                                 <span class="badge badge-success">
                                     <span class="dot-success"></span> Active
@@ -100,13 +102,13 @@
                                 </span>
                             {% endif %}
                         </td>
-                        <td style="color: var(--gray-600); font-size: 14px;">
+                        <td data-label="Joined" style="color: var(--gray-600); font-size: 14px;">
                             {{ user.date_joined|date:"M d, Y" }}
                         </td>
-                        <td style="text-align: right;">
-                            <a href="{% url 'accounts:user_edit' user.pk %}" class="btn-icon" title="Edit User">
-                                ✏️
-                            </a>
+                        <td data-label="Actions" class="td-actions" style="text-align: right;">
+                            <a href="{% url 'accounts:user_edit' user.pk %}" class="btn-icon" title="Edit User">✏️</a>
+                            <a href="{% url 'accounts:user_delete' user.pk %}" class="btn-icon btn-icon-danger" title="Delete User"
+                               onclick="return confirm('Delete {{ user.email }}? This cannot be undone.')">🗑️</a>
                         </td>
                     </tr>
                     {% empty %}
@@ -149,16 +151,16 @@
 <style>
 /* Layout & Cards */
 .card {
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    border: 1px solid var(--gray-200);
-    overflow: hidden;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(14,11,9,0.06);
+    border: 1px solid var(--cream-3);
+    /* No overflow:hidden — allows table-responsive to scroll on mobile */
 }
 
 /* Search Toolbar */
 .search-toolbar {
-    background: white;
+    background: var(--card-bg);
     padding: 20px;
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -182,7 +184,7 @@
 }
 
 .search-box input:focus {
-    background: white;
+    background: var(--white);
     border-color: var(--primary-blue);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     outline: none;
@@ -230,7 +232,7 @@
     cursor: pointer;
     transition: all 0.2s;
     border: 1px solid var(--gray-200);
-    background: white;
+    background: var(--card-bg);
     color: var(--gray-600);
     user-select: none;
 }
@@ -303,11 +305,20 @@
     gap: 6px;
 }
 
-.badge-success { background: #ecfdf5; color: #059669; }
-.badge-danger { background: #fef2f2; color: #dc2626; }
-.badge-primary { background: #eff6ff; color: #2563eb; }
-.badge-info { background: #f0f9ff; color: #0284c7; }
+.badge-success   { background: #ecfdf5; color: #059669; }
+.badge-danger    { background: #fef2f2; color: #dc2626; }
+.badge-primary   { background: #eff6ff; color: #2563eb; }
+.badge-info      { background: #f0f9ff; color: #0284c7; }
 .badge-secondary { background: #f3f4f6; color: #4b5563; }
+.badge-warning   { background: #fffbeb; color: #b45309; }
+
+html[data-theme="dark"] .badge-success   { background: rgba(16,185,129,0.15); color: #6ee7b7; }
+html[data-theme="dark"] .badge-danger    { background: rgba(239,68,68,0.15);  color: #fca5a5; }
+html[data-theme="dark"] .badge-primary   { background: rgba(59,130,246,0.18); color: #93c5fd; }
+html[data-theme="dark"] .badge-info      { background: rgba(2,132,199,0.18);  color: #7dd3fc; }
+html[data-theme="dark"] .badge-secondary { background: rgba(107,114,128,0.2); color: #9ca3af; }
+html[data-theme="dark"] .badge-warning   { background: rgba(245,158,11,0.15); color: #fcd34d; }
+html[data-theme="dark"] .skill-chip.active { background: rgba(59,130,246,0.18); border-color: rgba(59,130,246,0.5); color: #93c5fd; }
 
 .dot-success { width: 6px; height: 6px; border-radius: 50%; background: #059669; }
 .dot-danger { width: 6px; height: 6px; border-radius: 50%; background: #dc2626; }
@@ -328,6 +339,11 @@
 .btn-icon:hover {
     background: var(--gray-100);
     color: var(--primary-blue);
+}
+
+.btn-icon-danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
 }
 
 /* Pagination */
@@ -357,7 +373,7 @@
     font-size: 13px;
     color: var(--gray-700);
     text-decoration: none;
-    background: white;
+    background: var(--card-bg);
     transition: all 0.2s;
 }
 

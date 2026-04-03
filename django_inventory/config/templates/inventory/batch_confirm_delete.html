@@ -3,19 +3,61 @@
 {% block page_title %}Delete Batch{% endblock %}
 
 {% block content %}
-<div class="card shadow mb-4" style="max-width: 600px; margin: 0 auto; border-radius: 16px; overflow: hidden;">
-    <div class="card-header py-3" style="background: #fef2f2; border-bottom: 1px solid #fee2e2;">
-        <h6 class="m-0 font-weight-bold text-danger">⚠️ Confirm Deletion</h6>
-    </div>
-    <div class="card-body" style="padding: 32px;">
-        <p style="font-size: 16px; color: var(--gray-700);">Are you sure you want to delete the batch <strong>{{ object.batch_number }}</strong>?</p>
-        <p style="font-size: 14px; color: var(--gray-500); margin-bottom: 24px;">This action will remove the batch and all its associated assignments. This cannot be undone.</p>
-        
-        <form method="post">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger" style="padding: 10px 24px; border-radius: 8px;">Confirm Delete</button>
-            <a href="{% url 'inventory:batch_list' %}" class="btn btn-secondary" style="padding: 10px 24px; border-radius: 8px; margin-left: 12px;">Cancel</a>
-        </form>
+<div style="max-width: 600px; margin: 0 auto;">
+    <div style="background: white; border-radius: 20px; overflow: hidden; border: 1px solid #fee2e2; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
+
+        <div style="background: #fef2f2; border-bottom: 1px solid #fee2e2; padding: 20px 28px; display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 22px;">⚠️</span>
+            <h2 style="font-size: 18px; font-weight: 700; color: #b91c1c; margin: 0;">Confirm Batch Deletion</h2>
+        </div>
+
+        <div style="padding: 28px;">
+            <p style="font-size: 16px; color: #374151; margin-bottom: 8px;">
+                You are about to permanently delete batch <strong style="color: #111827;">{{ object.batch_number }}</strong> — {{ object.name }}.
+            </p>
+            <p style="font-size: 14px; color: #6b7280; margin-bottom: 20px;">
+                This will also delete all of the following associated records:
+            </p>
+
+            <div style="background: #fef2f2; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">🧵</span>
+                    <div>
+                        <div style="font-size: 20px; font-weight: 700; color: #b91c1c;">{{ cloth_count }}</div>
+                        <div style="font-size: 12px; color: #ef4444;">Cloth Assignment{{ cloth_count|pluralize }}</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">👷</span>
+                    <div>
+                        <div style="font-size: 20px; font-weight: 700; color: #b91c1c;">{{ worker_count }}</div>
+                        <div style="font-size: 12px; color: #ef4444;">Worker Assignment{{ worker_count|pluralize }}</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">⚙️</span>
+                    <div>
+                        <div style="font-size: 20px; font-weight: 700; color: #b91c1c;">{{ operation_count }}</div>
+                        <div style="font-size: 12px; color: #ef4444;">Operation{{ operation_count|pluralize }}</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">📦</span>
+                    <div>
+                        <div style="font-size: 20px; font-weight: 700; color: #b91c1c;">{{ product_count }}</div>
+                        <div style="font-size: 12px; color: #ef4444;">Product{{ product_count|pluralize }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <p style="font-size: 13px; color: #9ca3af; margin-bottom: 24px;">This action cannot be undone.</p>
+
+            <form method="post" style="display: flex; gap: 12px;">
+                {% csrf_token %}
+                <button type="submit" style="padding: 12px 28px; background: #ef4444; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;">Yes, Delete Batch</button>
+                <a href="{% url 'inventory:batch_detail' object.pk %}" style="padding: 12px 24px; background: white; border: 1px solid #d1d5db; border-radius: 10px; text-decoration: none; color: #374151; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center;">Cancel</a>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

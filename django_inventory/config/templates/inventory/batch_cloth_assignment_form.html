@@ -1,0 +1,75 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit Cloth Assignment{% else %}Assign Cloth{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 0 auto;">
+
+    <nav class="breadcrumb">
+        <a href="{% url 'inventory:batch_list' %}">Batches</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'inventory:batch_detail' batch.pk %}">{{ batch.batch_number }}</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{% if object %}Edit Cloth Assignment{% else %}Assign Cloth{% endif %}</span>
+    </nav>
+
+    <div class="form-page-header">
+        <h1>{% if object %}Edit Cloth Assignment{% else %}Assign Cloth to Batch{% endif %}</h1>
+        <p>Batch: <strong>{{ batch.batch_number }} — {{ batch.name }}</strong></p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="form-section">
+            <div class="form-error-banner">
+                <span class="form-error-banner-icon">⚠️</span>
+                <div>
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="{{ form.cloth_roll.id_for_label }}">Cloth Roll <span style="color:#ef4444;">*</span></label>
+                {{ form.cloth_roll }}
+                {% if form.cloth_roll.errors %}{{ form.cloth_roll.errors }}{% endif %}
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="{{ form.reserved_length.id_for_label }}">Reserved Length <span class="label-unit">(m)</span></label>
+                    {{ form.reserved_length }}
+                    {% if form.reserved_length.errors %}{{ form.reserved_length.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.status.id_for_label }}">Status</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}{{ form.status.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.consumed_length.id_for_label }}">Consumed Length <span class="label-unit">(m)</span></label>
+                    {{ form.consumed_length }}
+                    {% if form.consumed_length.errors %}{{ form.consumed_length.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.wastage_length.id_for_label }}">Wastage Length <span class="label-unit">(m)</span></label>
+                    {{ form.wastage_length }}
+                    {% if form.wastage_length.errors %}{{ form.wastage_length.errors }}{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Assignment</button>
+            <a href="{% url 'inventory:batch_detail' batch.pk %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

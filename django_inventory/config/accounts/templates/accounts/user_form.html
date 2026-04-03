@@ -1,292 +1,157 @@
 {% extends 'accounts/base.html' %}
 
 {% block title %}Edit User{% endblock %}
-
 {% block page_title %}Edit User{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="form-header">
-        <h2>Edit User Profile</h2>
-        <a href="{% url 'accounts:user_delete' object.pk %}" class="btn-danger-outline">Delete User</a>
+<div style="max-width: 900px; margin: 0 auto;">
+
+    <div class="form-page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+        <div>
+            <h1>Edit User Profile</h1>
+            <p>Update the account details and permissions for this user.</p>
+        </div>
+        <a href="{% url 'accounts:user_delete' object.pk %}"
+           style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; font-size:13px; font-weight:600; color:#ef4444; border:1.5px solid #fca5a5; border-radius:8px; text-decoration:none; background:white; transition:background .2s, border-color .2s; white-space:nowrap;"
+           onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''">
+            Delete User
+        </a>
     </div>
-    
-    <form method="post" enctype="multipart/form-data">
+
+    <form method="post" enctype="multipart/form-data" class="form-card">
         {% csrf_token %}
-        
-        <!-- Section: Basic Info -->
-        <h3 class="section-title">Basic Information</h3>
-        <div class="form-grid">
-            <div class="form-group">
-                <label for="id_profile_picture">Profile Picture</label>
-                {% if object.profile_picture %}
-                    <div class="current-image mb-2">
-                        <img src="{{ object.profile_picture.url }}" alt="Current Profile" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gray-200);">
+
+        <!-- Section 1: Basic Information -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <span class="form-section-badge">1</span>
+                Basic Information
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="id_profile_picture">Profile Picture</label>
+                    {% if object.profile_picture %}
+                    <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+                        <img src="{{ object.profile_picture.url }}" alt="Current Profile"
+                             style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid var(--gray-200); flex-shrink:0;">
+                        <span style="font-size:13px; color:var(--gray-500);">Current photo — upload a new one to replace it</span>
                     </div>
-                {% endif %}
-                <input type="file" name="profile_picture" id="id_profile_picture" class="form-control" accept="image/*">
-            </div>
+                    {% endif %}
+                    <input type="file" name="profile_picture" id="id_profile_picture" accept="image/*">
+                </div>
 
-            <div class="form-group">
-                <label for="id_email">Email Address</label>
-                <input type="email" name="email" value="{{ object.email }}" id="id_email" required class="form-control">
-            </div>
+                <div class="form-group">
+                    <label for="id_email">Email Address</label>
+                    <input type="email" name="email" value="{{ object.email }}" id="id_email" required>
+                </div>
 
-            <!-- Password Field (Custom) -->
-            <div class="form-group">
-                <label for="id_new_password">Set New Password</label>
-                <input type="password" name="new_password" id="id_new_password" class="form-control" placeholder="Leave blank to keep current">
-                <small style="color: var(--gray-500); font-size: 12px;">Only fill this if you want to change the user's password.</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="id_user_type">User Type</label>
-                <select name="user_type" id="id_user_type" class="form-control">
-                    {% for value, label in form.user_type.field.choices %}
+                <div class="form-group">
+                    <label for="id_new_password">Set New Password</label>
+                    <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
+                    <small>Fill only if you want to change the password.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_user_type">User Type</label>
+                    <select name="user_type" id="id_user_type">
+                        {% for value, label in form.user_type.field.choices %}
                         <option value="{{ value }}" {% if object.user_type == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+                        {% endfor %}
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label for="id_first_name">First Name</label>
-                <input type="text" name="first_name" value="{{ object.first_name }}" id="id_first_name" class="form-control">
-            </div>
+                <div class="form-group">
+                    <label for="id_first_name">First Name</label>
+                    <input type="text" name="first_name" value="{{ object.first_name }}" id="id_first_name">
+                </div>
 
-            <div class="form-group">
-                <label for="id_last_name">Last Name</label>
-                <input type="text" name="last_name" value="{{ object.last_name }}" id="id_last_name" class="form-control">
-            </div>
+                <div class="form-group">
+                    <label for="id_last_name">Last Name</label>
+                    <input type="text" name="last_name" value="{{ object.last_name }}" id="id_last_name">
+                </div>
 
-            <div class="form-group">
-                <label for="id_phone_number">Phone Number</label>
-                <input type="text" name="phone_number" value="{{ object.phone_number|default:'' }}" id="id_phone_number" class="form-control" placeholder="+919999999999">
-            </div>
+                <div class="form-group">
+                    <label for="id_phone_number">Phone Number</label>
+                    <input type="text" name="phone_number" value="{{ object.phone_number|default:'' }}" id="id_phone_number" placeholder="+91 99999 99999">
+                </div>
 
-             <div class="form-group">
-                <label for="id_birth_date">Birth Date</label>
-                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date" class="form-control">
-            </div>
-        </div>
-
-        <!-- Section: Professional Details -->
-        <h3 class="section-title mt-4">Professional Details</h3>
-        <div class="form-grid">
-            <div class="form-group">
-                <label for="id_salary">Salary (₹)</label>
-                <input type="number" step="0.01" name="salary" value="{{ object.salary|default:'' }}" id="id_salary" class="form-control">
-            </div>
-            
-            <div class="form-group full-width">
-                <label for="id_skills">Skills</label>
-                <select name="skills" id="id_skills" multiple class="form-control" style="height: 100px;">
-                    {% for value, label in form.skills.field.choices %}
-                        <option value="{{ value }}" {% if value in object.skills.all|date:"U" %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <small class="text-muted">Hold Ctrl to select multiple skills</small>
-            </div>
-
-            <div class="form-group full-width">
-                <label for="id_bio">Biography</label>
-                <textarea name="bio" id="id_bio" rows="4" class="form-control">{{ object.bio }}</textarea>
+                <div class="form-group">
+                    <label for="id_birth_date">Birth Date</label>
+                    <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date">
+                </div>
             </div>
         </div>
 
-        <!-- Section: Permissions -->
-        <h3 class="section-title mt-4">Permissions & Status</h3>
-        <div class="permissions-grid">
-            <label class="checkbox-container">
-                <input type="checkbox" name="is_active" id="id_is_active" {% if object.is_active %}checked{% endif %}>
-                <span class="checkmark"></span>
-                <strong>Active User</strong>
-                <p class="help-text">Designates whether this user should be treated as active.</p>
-            </label>
+        <!-- Section 2: Professional Details -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <span class="form-section-badge">2</span>
+                Professional Details
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
 
-            <label class="checkbox-container">
-                <input type="checkbox" name="is_staff" id="id_is_staff" {% if object.is_staff %}checked{% endif %}>
-                <span class="checkmark"></span>
-                <strong>Staff Status</strong>
-                <p class="help-text">Designates whether the user can log into this admin site.</p>
-            </label>
+                <div class="form-group">
+                    <label for="id_salary">Salary <span class="label-unit">(₹)</span></label>
+                    <input type="number" step="0.01" name="salary" value="{{ object.salary|default:'' }}" id="id_salary">
+                </div>
 
-            <label class="checkbox-container">
-                <input type="checkbox" name="is_superuser" id="id_is_superuser" {% if object.is_superuser %}checked{% endif %}>
-                <span class="checkmark"></span>
-                <strong>Superuser Status</strong>
-                <p class="help-text">Designates that this user has all permissions without explicitly assigning them.</p>
-            </label>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="id_skills">Skills</label>
+                    <select name="skills" id="id_skills" multiple>
+                        {% for value, label in form.skills.field.choices %}
+                        <option value="{{ value }}" {% if value in user_skill_ids %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <small>Hold Ctrl (or Cmd on Mac) to select multiple skills.</small>
+                </div>
+
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <label for="id_bio">Biography</label>
+                    <textarea name="bio" id="id_bio" rows="4">{{ object.bio }}</textarea>
+                </div>
+            </div>
         </div>
 
-        <div class="form-actions mt-4">
-            <a href="{% url 'accounts:user_list' %}" class="btn-secondary">Cancel</a>
+        <!-- Section 3: Permissions & Status -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <span class="form-section-badge">3</span>
+                Permissions &amp; Status
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
+
+                <label class="toggle-row">
+                    <input type="checkbox" name="is_active" id="id_is_active" {% if object.is_active %}checked{% endif %}>
+                    <div>
+                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Active User</div>
+                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">User can log in and access the system.</div>
+                    </div>
+                </label>
+
+                <label class="toggle-row">
+                    <input type="checkbox" name="is_staff" id="id_is_staff" {% if object.is_staff %}checked{% endif %}>
+                    <div>
+                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Staff Status</div>
+                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">Allows access to the Django admin site.</div>
+                    </div>
+                </label>
+
+                <label class="toggle-row">
+                    <input type="checkbox" name="is_superuser" id="id_is_superuser" {% if object.is_superuser %}checked{% endif %}>
+                    <div>
+                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Superuser</div>
+                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">Full permissions without explicit assignment.</div>
+                    </div>
+                </label>
+
+            </div>
+        </div>
+
+        <div class="form-actions">
             <button type="submit" class="btn-primary">Save Changes</button>
+            <a href="{% url 'accounts:user_list' %}" class="btn-cancel">Cancel</a>
         </div>
     </form>
 </div>
-
-<style>
-/* Professional Form Styles */
-.card {
-    background: white;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: var(--shadow-md);
-    max-width: 900px;
-    margin: 0 auto;
-}
-
-.form-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 32px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.form-header h2 {
-    margin: 0;
-    font-size: 24px;
-    color: var(--gray-900);
-}
-
-.section-title {
-    font-size: 16px;
-    color: var(--primary-blue);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 20px;
-    font-weight: 700;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 24px;
-}
-
-.permissions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.full-width {
-    grid-column: 1 / -1;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: var(--gray-700);
-    font-size: 14px;
-}
-
-.form-control {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid var(--gray-300);
-    border-radius: 8px;
-    font-size: 15px;
-    transition: all 0.2s;
-}
-
-.form-control:focus {
-    border-color: var(--primary-blue);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    outline: none;
-}
-
-/* Checkbox Styles */
-.checkbox-container {
-    display: block;
-    padding: 16px;
-    border: 1px solid var(--gray-200);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.checkbox-container:hover {
-    background: var(--gray-50);
-}
-
-.checkbox-container input {
-    margin-right: 10px;
-    width: 16px;
-    height: 16px;
-    accent-color: var(--primary-blue);
-}
-
-.help-text {
-    margin: 4px 0 0 28px;
-    font-size: 13px;
-    color: var(--gray-500);
-}
-
-/* Buttons */
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 16px;
-    margin-top: 40px;
-    padding-top: 24px;
-    border-top: 1px solid var(--gray-200);
-}
-
-.btn-secondary {
-    background: white;
-    border: 1px solid var(--gray-300);
-    color: var(--gray-700);
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-    background: var(--gray-50);
-    border-color: var(--gray-400);
-}
-
-.btn-primary {
-    background: var(--primary-blue);
-    color: white;
-    border: none;
-    padding: 12px 32px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-primary:hover {
-    background: var(--primary-blue-dark);
-}
-
-.btn-danger-outline {
-    color: #ef4444;
-    border: 1px solid #ef4444;
-    padding: 8px 16px;
-    border-radius: 6px;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.btn-danger-outline:hover {
-    background: #fef2f2;
-}
-
-.text-muted {
-    font-size: 12px;
-    color: var(--gray-500);
-    margin-top: 4px;
-    display: block;
-}
-</style>
 {% endblock %}
