@@ -1,0 +1,60 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit Stage{% else %}Add Stage{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 0 auto;">
+
+    <div class="form-page-header">
+        <h1>{% if object %}Edit Stage{% else %}New Stage{% endif %}</h1>
+        <p>Define a manufacturing or storage stage.</p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="form-section">
+            <div class="form-error-banner">
+                <span class="form-error-banner-icon">⚠️</span>
+                <div>
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="grid-2" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}">Stage Name <span style="color:#ef4444;">*</span></label>
+                    {{ form.name }}
+                    {% if form.name.errors %}{{ form.name.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.stage_type.id_for_label }}">Type <span style="color:#ef4444;">*</span></label>
+                    {{ form.stage_type }}
+                    {% if form.stage_type.errors %}{{ form.stage_type.errors }}{% endif %}
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="{{ form.description.id_for_label }}">Description</label>
+                {{ form.description }}
+                {% if form.description.errors %}{{ form.description.errors }}{% endif %}
+            </div>
+            <label class="toggle-row">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" style="font-size:14px; color:var(--gray-700); font-weight:500; cursor:pointer; margin:0;">Active stage</label>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Stage</button>
+            <a href="{% url 'inventory:stage_list' %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Stage{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 80px auto; text-align: center;">
+    <div style="background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); padding: 48px; border: 1px solid var(--gray-200);">
+        <div style="font-size: 48px; margin-bottom: 20px;">🏭</div>
+        <h2 style="font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 12px;">Delete Stage?</h2>
+        <p style="color: var(--gray-500); font-size: 15px; margin-bottom: 4px;"><strong>{{ object.name }}</strong></p>
+        <p style="color: var(--gray-400); font-size: 13px; margin-bottom: 32px;">Deleting a stage with active (WIP) batches is not allowed. All associated machines will also be removed.</p>
+        <form method="post" style="display: flex; gap: 12px; justify-content: center;">
+            {% csrf_token %}
+            <button type="submit" style="padding: 12px 28px; background: #ef4444; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;">Delete</button>
+            <a href="{% url 'inventory:stage_list' %}" style="padding: 12px 24px; border: 1px solid var(--gray-300); border-radius: 10px; text-decoration: none; color: var(--gray-700); font-size: 15px; font-weight: 600;">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

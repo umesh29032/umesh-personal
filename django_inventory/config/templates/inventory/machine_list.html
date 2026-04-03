@@ -1,0 +1,61 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Machines{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto;">
+
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Machines</h1>
+            <p>Manage production equipment assigned to each stage.</p>
+        </div>
+        <a href="{% url 'inventory:machine_add' %}" class="btn-primary">+ Add Machine</a>
+    </div>
+
+    <div style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(14,11,9,0.06); border: 1px solid var(--cream-3);">
+        <div class="table-responsive">
+            <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead style="background: var(--gray-50); border-bottom: 1px solid var(--gray-200);">
+                    <tr>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Machine Name</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Type</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Stage</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);">Status</th>
+                        <th style="padding: 16px 24px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for machine in machines %}
+                    <tr style="border-bottom: 1px solid var(--gray-100);" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background=''">
+                        <td data-label="Machine" style="padding: 16px 24px; font-weight: 600; color: var(--gray-900);">⚙️ {{ machine.name }}</td>
+                        <td data-label="Type" style="padding: 16px 24px; color: var(--gray-700);">{{ machine.machine_type|default:"—" }}</td>
+                        <td data-label="Stage" style="padding: 16px 24px; color: var(--gray-700);">{{ machine.stage.name }}</td>
+                        <td data-label="Status" style="padding: 16px 24px;">
+                            {% if machine.is_active %}
+                                <span style="display: inline-flex; padding: 3px 10px; background: #ecfdf5; color: #047857; border-radius: 20px; font-size: 12px; font-weight: 600;">Active</span>
+                            {% else %}
+                                <span style="display: inline-flex; padding: 3px 10px; background: var(--gray-100); color: var(--gray-500); border-radius: 20px; font-size: 12px; font-weight: 600;">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Actions" class="td-actions" style="padding: 16px 24px; text-align: right;">
+                            <a href="{% url 'inventory:machine_edit' machine.pk %}" style="text-decoration: none; display: inline-block; padding: 6px; border-radius: 6px; color: var(--gray-500);" title="Edit">✏️</a>
+                            <a href="{% url 'inventory:machine_delete' machine.pk %}" style="text-decoration: none; display: inline-block; padding: 6px; border-radius: 6px; color: var(--gray-500); margin-left: 4px;" title="Delete">🗑️</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="padding: 60px; text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⚙️</div>
+                            <h3 style="font-size: 18px; font-weight: 600; color: var(--gray-900);">No machines defined</h3>
+                            <p style="color: var(--gray-500); margin-bottom: 24px;">Add machines to track which equipment is used in operations.</p>
+                            <a href="{% url 'inventory:machine_add' %}" class="btn-primary" style="text-decoration: none; padding: 12px 24px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">+ Add Machine</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

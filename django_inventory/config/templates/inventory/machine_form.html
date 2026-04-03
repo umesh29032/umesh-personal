@@ -1,0 +1,60 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit Machine{% else %}Add Machine{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+
+    <div class="form-page-header">
+        <h1>{% if object %}Edit Machine{% else %}New Machine{% endif %}</h1>
+        <p>Add or update a machine in your factory.</p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="form-section">
+            <div class="form-error-banner">
+                <span class="form-error-banner-icon">⚠️</span>
+                <div>
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="grid-2" style="margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="{{ form.name.id_for_label }}">Machine Name <span style="color:#ef4444;">*</span></label>
+                    {{ form.name }}
+                    {% if form.name.errors %}{{ form.name.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.machine_type.id_for_label }}">Machine Type <span class="label-unit">(e.g. Single Needle)</span></label>
+                    {{ form.machine_type }}
+                    {% if form.machine_type.errors %}{{ form.machine_type.errors }}{% endif %}
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="{{ form.stage.id_for_label }}">Assigned Stage <span style="color:#ef4444;">*</span></label>
+                {{ form.stage }}
+                {% if form.stage.errors %}{{ form.stage.errors }}{% endif %}
+            </div>
+            <label class="toggle-row">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" style="font-size:14px; color:var(--gray-700); font-weight:500; cursor:pointer; margin:0;">Machine is active</label>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Machine</button>
+            <a href="{% url 'inventory:machine_list' %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

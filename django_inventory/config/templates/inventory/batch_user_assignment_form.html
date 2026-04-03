@@ -1,0 +1,62 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit Worker Assignment{% else %}Assign Worker{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto;">
+
+    <nav class="breadcrumb">
+        <a href="{% url 'inventory:batch_list' %}">Batches</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'inventory:batch_detail' batch.pk %}">{{ batch.batch_number }}</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{% if object %}Edit Worker Assignment{% else %}Assign Worker{% endif %}</span>
+    </nav>
+
+    <div class="form-page-header">
+        <h1>{% if object %}Edit Worker Assignment{% else %}Assign Worker to Batch{% endif %}</h1>
+        <p>Batch: <strong>{{ batch.batch_number }} — {{ batch.name }}</strong></p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="form-section">
+            <div class="form-error-banner">
+                <span class="form-error-banner-icon">⚠️</span>
+                <div>
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="{{ form.user.id_for_label }}">Worker <span style="color:#ef4444;">*</span></label>
+                {{ form.user }}
+                {% if form.user.errors %}{{ form.user.errors }}{% endif %}
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="{{ form.role.id_for_label }}">Role <span style="color:#ef4444;">*</span></label>
+                {{ form.role }}
+                {% if form.role.errors %}{{ form.role.errors }}{% endif %}
+            </div>
+            <label class="toggle-row">
+                {{ form.is_active }}
+                <label for="{{ form.is_active.id_for_label }}" style="font-size:14px; color:var(--gray-700); font-weight:500; cursor:pointer; margin:0;">Active assignment</label>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Assignment</button>
+            <a href="{% url 'inventory:batch_detail' batch.pk %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

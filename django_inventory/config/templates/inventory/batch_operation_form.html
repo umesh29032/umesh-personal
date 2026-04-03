@@ -1,0 +1,104 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit Operation{% else %}Log Operation{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 0 auto;">
+
+    <nav class="breadcrumb">
+        <a href="{% url 'inventory:batch_list' %}">Batches</a>
+        <span class="breadcrumb-sep">›</span>
+        <a href="{% url 'inventory:batch_detail' batch.pk %}">{{ batch.batch_number }}</a>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-current">{% if object %}Edit Operation{% else %}Log Operation{% endif %}</span>
+    </nav>
+
+    <div class="form-page-header">
+        <h1>{% if object %}Edit Operation{% else %}Log Work Operation{% endif %}</h1>
+        <p>Batch: <strong>{{ batch.batch_number }} — {{ batch.name }}</strong></p>
+    </div>
+
+    <form method="post" class="form-card">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="form-section">
+            <div class="form-error-banner">
+                <span class="form-error-banner-icon">⚠️</span>
+                <div>
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Section 1: Assignment -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <span class="form-section-badge">1</span>
+                Assignment
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="{{ form.stage.id_for_label }}">Stage <span style="color:#ef4444;">*</span></label>
+                    {{ form.stage }}
+                    {% if form.stage.errors %}{{ form.stage.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.user.id_for_label }}">Worker <span style="color:#ef4444;">*</span></label>
+                    {{ form.user }}
+                    {% if form.user.errors %}{{ form.user.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.machine.id_for_label }}">Machine <span class="label-unit">(optional)</span></label>
+                    {{ form.machine }}
+                    {% if form.machine.errors %}{{ form.machine.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.output_quantity.id_for_label }}">Output Quantity</label>
+                    {{ form.output_quantity }}
+                    {% if form.output_quantity.errors %}{{ form.output_quantity.errors }}{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Timing -->
+        <div class="form-section">
+            <div class="form-section-title">
+                <span class="form-section-badge">2</span>
+                Timing
+            </div>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="{{ form.start_time.id_for_label }}">Start Time <span style="color:#ef4444;">*</span></label>
+                    {{ form.start_time }}
+                    {% if form.start_time.errors %}{{ form.start_time.errors }}{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.end_time.id_for_label }}">End Time <span class="label-unit">(optional)</span></label>
+                    {{ form.end_time }}
+                    {% if form.end_time.errors %}{{ form.end_time.errors }}{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Notes -->
+        <div class="form-section">
+            <div class="form-group">
+                <label for="{{ form.notes.id_for_label }}">Notes <span class="label-unit">(optional)</span></label>
+                {{ form.notes }}
+                {% if form.notes.errors %}{{ form.notes.errors }}{% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Operation</button>
+            <a href="{% url 'inventory:batch_detail' batch.pk %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
