@@ -2,6 +2,8 @@ from django.db import models
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
+
 from .constants import (
     StageType, BatchStatus, ClothType, UnitChoice,
     RoleChoice, TransactionType, ColorChoice
@@ -92,6 +94,14 @@ class ClothRoll(models.Model):
             self.status = 'AVAILABLE'
         super().save(*args, **kwargs)
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(remaining_length__gte=0),
+                name="clothroll_remaining_nonneg",
+            ),
+        ]
+
     def __str__(self):
         return f"Roll {self.roll_number} - {self.get_cloth_type_display()} ({self.remaining_length}m left)"
 
@@ -119,7 +129,6 @@ class Batch(models.Model):
     is_active = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
-        from django.utils import timezone
         if self.status == BatchStatus.COMPLETED and not self.completed_date:
             self.completed_date = timezone.now()
         elif self.status != BatchStatus.COMPLETED:
@@ -153,6 +162,11 @@ class BatchClothAssignment(models.Model):
     assigned_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['batch', 'status'], name='batchcloth_batch_status_idx'),
+        ]
+
     def __str__(self):
         return f"{self.batch.batch_number} - {self.cloth_roll.roll_number}"
 
@@ -171,7 +185,12 @@ class BatchUserAssignment(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
-        unique_together = ('batch', 'user', 'role')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['batch', 'user', 'role'],
+                name='unique_batch_user_role',
+            ),
+        ]
 
     def __str__(self):
         # User model uses email as identifier (no username field)
@@ -267,4 +286,5 @@ class StockLedger(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.transaction_type} - {self.item} ({self.quantity})"
+        item_label = self.item or f"{self.content_type} #{self.object_id} (deleted)"
+        return f"{self.transaction_type} - {item_label} ({self.quantity})"

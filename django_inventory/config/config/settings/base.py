@@ -34,9 +34,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # third-party
-    'rest_framework',
-
     # REQUIRED for django-allauth
     'django.contrib.sites',
 
@@ -49,6 +46,7 @@ INSTALLED_APPS = [
     # local apps
     'accounts',
     'inventory',
+    'storefront',
 ]
 
 AUTHENTICATION_BACKENDS = (
@@ -101,6 +99,7 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default='postgres'),
         'HOST': config('DB_HOST', default='localhost'),
         'PORT': config('DB_PORT', default='5432'),
+        'CONN_MAX_AGE': 600,  # Reuse DB connections for 10 minutes
     }
 }
 
@@ -121,7 +120,16 @@ STATICFILES_DIRS = [
     BASE_DIR / "accounts/static",
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Django 5.1+ uses STORAGES instead of deprecated STATICFILES_STORAGE
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -160,8 +168,8 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # Redirect URLs
-LOGIN_URL = "/"
-LOGIN_REDIRECT_URL = "/home/"
+LOGIN_URL = "/app/"
+LOGIN_REDIRECT_URL = "/app/home/"
 LOGOUT_REDIRECT_URL = "/"
 
 # ─── Session Security ─────────────────────────────────────────────────────────
@@ -180,7 +188,10 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # request.session.modified = True whenever they mutate session data.
 SESSION_SAVE_EVERY_REQUEST = False
 
-# Logging
+# Logging — ensure the logs directory exists before Django tries to write to it
+_LOG_DIR = BASE_DIR / 'logs'
+_LOG_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

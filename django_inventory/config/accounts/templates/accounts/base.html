@@ -385,16 +385,22 @@
             z-index: 1;
         }
 
+        .logout-form { margin: 0; }
         .logout-link {
             display: flex;
             align-items: center;
             gap: 11px;
             padding: 10px 12px;
             color: rgba(239,68,68,0.70);
-            text-decoration: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
             border-radius: 7px;
             font-size: 13px;
             font-weight: 500;
+            font-family: inherit;
             transition: background 0.15s, color 0.15s;
             min-height: 44px;
             -webkit-tap-highlight-color: transparent;
@@ -1428,10 +1434,64 @@
         /* Table hover rows — JS sets background:white, caught by attr selector above.
            Also ensure table rows have correct base background. */
         html[data-theme="dark"] .tbl tbody tr:hover td { background: var(--cream); }
+
+        /* ── Skip to content (a11y) ────────────────────────────────── */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 16px;
+            z-index: 9999;
+            padding: 12px 24px;
+            background: var(--copper);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 0 0 8px 8px;
+            text-decoration: none;
+            transition: top 0.2s;
+        }
+        .skip-link:focus {
+            top: 0;
+        }
+
+        /* ── Global focus-visible ──────────────────────────────────── */
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid var(--copper);
+            outline-offset: 2px;
+        }
+        /* Remove outline on mouse click */
+        :focus:not(:focus-visible) {
+            outline: none;
+        }
+
+        /* ── Action link icons (replace inline handlers) ───────────── */
+        .action-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            color: var(--stone);
+            transition: background 0.15s, color 0.15s;
+        }
+        .action-icon:hover { background: var(--cream-2); color: var(--copper); }
+        .action-icon-danger:hover { background: #fee2e2; color: #ef4444; }
+        html[data-theme="dark"] .action-icon-danger:hover { background: rgba(239,68,68,0.15); color: #fca5a5; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
+
+<!-- Skip to content for keyboard users -->
+<a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- ── Mobile overlay ──────────────────────────────────────────────── -->
 <div class="overlay" onclick="toggleSidebar()"></div>
@@ -1550,14 +1610,17 @@
 
         <!-- Footer / Logout -->
         <div class="sidebar-footer">
-            <a href="{% url 'accounts:logout' %}" class="logout-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                Sign Out
-            </a>
+            <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
+                {% csrf_token %}
+                <button type="submit" class="logout-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Sign Out
+                </button>
+            </form>
         </div>
 
     </aside>
@@ -1608,7 +1671,7 @@
         </header>
 
         <!-- Page content -->
-        <main class="content">
+        <main class="content" id="main-content">
             {% if messages %}
             <div class="msg-stack">
                 {% for message in messages %}

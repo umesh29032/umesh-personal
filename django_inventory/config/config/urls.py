@@ -23,9 +23,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from storefront.views import public_home
+
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", include("accounts.urls")),
+    path("", public_home, name="public_home"),
+    path("app/", include("accounts.urls")),
     path("accounts/", include("allauth.urls")),
     path("inventory/", include("inventory.urls")),
 ]

@@ -13,8 +13,9 @@ from .stock_service import StockService
 
 logger = logging.getLogger(__name__)
 
-# Allowed status transitions — enforced at service level
-_VALID_TRANSITIONS = {
+# Allowed status transitions — enforced at service level.
+# Exported so views can show available transitions without duplicating the map.
+VALID_TRANSITIONS = {
     BatchStatus.PLANNED:   [BatchStatus.WIP, BatchStatus.CANCELLED],
     BatchStatus.WIP:       [BatchStatus.COMPLETED, BatchStatus.CANCELLED],
     BatchStatus.COMPLETED: [],
@@ -45,7 +46,7 @@ class BatchService:
         Move a batch to a new status, enforcing the allowed transition rules.
         Raises ValidationError for invalid transitions.
         """
-        allowed = _VALID_TRANSITIONS.get(batch.status, [])
+        allowed = VALID_TRANSITIONS.get(batch.status, [])
         if new_status not in allowed:
             raise ValidationError(
                 f"Cannot move batch from '{batch.status}' to '{new_status}'. "
@@ -71,6 +72,8 @@ class BatchService:
         """Reserve cloth for a batch (Lay Plan step)."""
         if reserved_length <= 0:
             raise ValidationError("Reserved length must be greater than 0.")
+        # Re-fetch with lock to prevent race conditions
+        cloth_roll = ClothRoll.objects.select_for_update().get(pk=cloth_roll.pk)
         if reserved_length > cloth_roll.remaining_length:
             raise ValidationError(
                 f"Reserved length ({reserved_length}m) exceeds available cloth "
@@ -109,7 +112,7 @@ class BatchService:
                 f"exceeds reserved length ({assignment.reserved_length}m)."
             )
 
-        roll = assignment.cloth_roll
+        roll = ClothRoll.objects.select_for_update().get(pk=assignment.cloth_roll_id)
         if total_used > roll.remaining_length:
             raise ValidationError(
                 f"Not enough cloth on roll '{roll.roll_number}'. "

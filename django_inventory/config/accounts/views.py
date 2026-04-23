@@ -5,13 +5,15 @@ from django.contrib import messages
 from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.views import LoginView as DjangoLoginView
-from django.core import signing
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
 from django.views import View
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
@@ -53,19 +55,25 @@ class LoginView(View):
         if not can_resend_otp(request, prefix="otp"):
             return redirect("accounts:verify_otp")
 
-        user, _ = User.objects.get_or_create(email=email)
+        # Only send OTP to existing users — don't auto-create accounts.
+        # Always show the same redirect to prevent account enumeration.
+        if User.objects.filter(email=email).exists():
+            otp = generate_otp()
+            store_otp_in_session(request, otp, prefix="otp")
+            request.session["otp_email"] = email
+            request.session.modified = True
 
-        otp = generate_otp()
-        store_otp_in_session(request, otp, prefix="otp")
-        request.session["otp_email"] = email
-        request.session.modified = True
-
-        try:
-            send_otp_email(email, otp, subject=f"Your Login OTP — {settings.SITE_NAME}")
-        except Exception:
-            logger.exception("Failed to send login OTP email to %s", email)
-            messages.error(request, "Failed to send OTP. Please try again.")
-            return render(request, "accounts/login.html")
+            try:
+                send_otp_email(email, otp, subject=f"Your Login OTP — {settings.SITE_NAME}")
+            except Exception:
+                logger.exception("Failed to send login OTP email to %s", email)
+                messages.error(request, "Failed to send OTP. Please try again.")
+                return render(request, "accounts/login.html")
+        else:
+            # Store email in session so the OTP page renders, but no OTP is sent.
+            # This prevents account enumeration (attacker can't tell if email exists).
+            request.session["otp_email"] = email
+            request.session.modified = True
 
         return redirect("accounts:verify_otp")
 
@@ -82,15 +90,18 @@ class ResendOTPView(View):
             messages.warning(request, f"Please wait {OTP_RESEND_COOLDOWN} seconds before resending.")
             return redirect("accounts:verify_otp")
 
-        otp = generate_otp()
-        store_otp_in_session(request, otp, prefix="otp")
-        request.session.modified = True
+        # Only send OTP if the user actually exists — mirrors LoginView logic.
+        # For non-existent emails we still redirect to the OTP page (anti-enumeration).
+        if User.objects.filter(email=email).exists():
+            otp = generate_otp()
+            store_otp_in_session(request, otp, prefix="otp")
+            request.session.modified = True
 
-        try:
-            send_otp_email(email, otp, subject=f"Your New Login OTP — {settings.SITE_NAME}")
-        except Exception:
-            logger.exception("Failed to resend login OTP email to %s", email)
-            messages.error(request, "Failed to resend OTP. Please try again.")
+            try:
+                send_otp_email(email, otp, subject=f"Your New Login OTP — {settings.SITE_NAME}")
+            except Exception:
+                logger.exception("Failed to resend login OTP email to %s", email)
+                messages.error(request, "Failed to resend OTP. Please try again.")
 
         return redirect("accounts:verify_otp")
 
@@ -139,17 +150,23 @@ class VerifyOTPView(View):
 
 @method_decorator(never_cache, name="dispatch")
 class LogoutView(View):
-    def get(self, request):
+    """POST-only logout to prevent CSRF logout attacks via malicious links."""
+
+    def post(self, request):
         logout(request)
         response = redirect("accounts:login")
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response["Pragma"] = "no-cache"
         return response
 
+    def get(self, request):
+        # Redirect GET requests to home — logout must be POST with CSRF token
+        return redirect("accounts:home")
+
 
 # ─── Home (protected redirect) ────────────────────────────────────────────────
 
-@method_decorator(login_required(login_url="/"), name="dispatch")
+@method_decorator(login_required(login_url="/app/"), name="dispatch")
 class HomeView(View):
     """Protected entry point — always redirects to the real inventory dashboard."""
 
@@ -229,15 +246,8 @@ class PasswordLoginView(DjangoLoginView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Only prefill the email (safe) — never prefill the password
         context["prefill_email"] = self.request.session.pop("login_prefill_email", "")
-        signed_pw = self.request.session.pop("login_prefill_password", "")
-        if signed_pw:
-            try:
-                context["prefill_password"] = signing.loads(signed_pw)
-            except signing.BadSignature:
-                context["prefill_password"] = ""
-        else:
-            context["prefill_password"] = ""
         return context
 
     def form_invalid(self, form):
@@ -396,12 +406,15 @@ class ResetPasswordVerifyView(View):
                 return redirect("accounts:forgot_password")
             return redirect("accounts:reset_password_verify")
 
-        min_length = getattr(settings, 'PASSWORD_MIN_LENGTH', 8)
-        if len(password) < min_length:
-            messages.error(request, f"Password must be at least {min_length} characters.")
+        # Run ALL Django password validators (length, common, numeric, similarity)
+        user = User.objects.get(email=email)
+        try:
+            validate_password(password, user=user)
+        except ValidationError as e:
+            for msg in e.messages:
+                messages.error(request, msg)
             return redirect("accounts:reset_password_verify")
 
-        user = User.objects.get(email=email)
         user.set_password(password)
         user.save()
 
@@ -409,9 +422,8 @@ class ResetPasswordVerifyView(View):
         request.session.pop("reset_email", None)
         request.session.modified = True
 
-        # Store prefill data so login_password page can pre-populate the fields
+        # Only prefill email (safe) — never store passwords in session
         request.session["login_prefill_email"] = email
-        request.session["login_prefill_password"] = signing.dumps(password)
         request.session.modified = True
 
         messages.success(request, "Password reset successfully. Please sign in.")

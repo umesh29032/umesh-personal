@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.db.models import Q, Sum
 from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse_lazy, reverse
@@ -9,7 +10,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView, D
 from ..models import Batch, BatchClothAssignment, BatchUserAssignment, BatchOperation
 from ..forms import BatchForm, BatchClothAssignmentForm, BatchUserAssignmentForm, BatchOperationForm
 from ..constants import BatchStatus
-from ..services import BatchService
+from ..services import BatchService, VALID_TRANSITIONS
 from .mixins import ManagerOrAdminMixin
 
 
@@ -127,11 +128,7 @@ class BatchDetailView(LoginRequiredMixin, DetailView):
         context['total_wastage'] = agg['total_wastage'] or 0
         u = self.request.user
         context['can_manage'] = u.is_superuser or getattr(u, 'user_type', '') in ('admin', 'manager')
-        _transitions = {
-            BatchStatus.PLANNED: [BatchStatus.WIP, BatchStatus.CANCELLED],
-            BatchStatus.WIP: [BatchStatus.COMPLETED, BatchStatus.CANCELLED],
-        }
-        context['allowed_transitions'] = _transitions.get(batch.status, [])
+        context['allowed_transitions'] = VALID_TRANSITIONS.get(batch.status, [])
         return context
 
 
@@ -210,7 +207,7 @@ class BatchUserAssignmentCreateView(LoginRequiredMixin, ManagerOrAdminMixin, Cre
         batch = self.get_batch()
         try:
             BatchService.assign_user(batch, form.cleaned_data['user'], form.cleaned_data['role'])
-        except Exception as e:
+        except (ValidationError, IntegrityError) as e:
             form.add_error(None, str(e))
             return self.form_invalid(form)
         messages.success(self.request, "Worker assigned to batch.")
@@ -274,7 +271,7 @@ class BatchTransitionView(LoginRequiredMixin, ManagerOrAdminMixin, View):
 
 # ── Operations ────────────────────────────────────────────────────────────────
 
-class BatchOperationCreateView(LoginRequiredMixin, CreateView):
+class BatchOperationCreateView(LoginRequiredMixin, ManagerOrAdminMixin, CreateView):
     model = BatchOperation
     form_class = BatchOperationForm
     template_name = "inventory/batch_operation_form.html"
