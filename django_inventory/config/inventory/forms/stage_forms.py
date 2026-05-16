@@ -6,9 +6,10 @@ from ..models import Stage, Machine
 class StageForm(forms.ModelForm):
     class Meta:
         model = Stage
-        fields = ['name', 'description', 'stage_type', 'is_active']
+        fields = ['name', 'code', 'category', 'stage_type', 'description', 'default_is_mandatory', 'is_active']
         widgets = {
             'stage_type':  forms.Select(attrs={'class': 'form-select'}),
+            'category':    forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 

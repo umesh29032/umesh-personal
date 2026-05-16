@@ -111,10 +111,19 @@ class User(AbstractUser):
         verbose_name="Salary"
     )
     skills = models.ManyToManyField(
-        Skill, 
-        related_name='users', 
-        blank=True, 
+        Skill,
+        related_name='users',
+        blank=True,
         verbose_name="Skills"
+    )
+    role = models.ForeignKey(
+        'inventory.Role',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name="Role",
+        help_text="RBAC role — determines permissions and sidebar visibility.",
     )
 
     USERNAME_FIELD = "email"

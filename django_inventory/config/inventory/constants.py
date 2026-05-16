@@ -4,11 +4,48 @@ class StageType(models.TextChoices):
     STORAGE = 'STORAGE', 'Storage (Warehouse)'
     PROCESSING = 'PROCESSING', 'Processing (Factory Floor)'
 
+class StageCategory(models.TextChoices):
+    """High-level classification of a stage across production lifecycle."""
+    PRODUCTION = 'PRODUCTION', 'Production'
+    LOGISTICS = 'LOGISTICS', 'Logistics'
+    FINANCIAL = 'FINANCIAL', 'Financial'
+
 class BatchStatus(models.TextChoices):
+    DRAFT = 'DRAFT', 'Draft'
     PLANNED = 'PLANNED', 'Planned'
     WIP = 'WIP', 'Work In Progress'
     COMPLETED = 'COMPLETED', 'Completed'
     CANCELLED = 'CANCELLED', 'Cancelled'
+
+class BatchStageStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+    COMPLETED = 'COMPLETED', 'Completed'
+    SKIPPED = 'SKIPPED', 'Skipped'
+
+class MachineAssignmentStatus(models.TextChoices):
+    ASSIGNED = 'ASSIGNED', 'Assigned'
+    IN_PROGRESS = 'IN_PROGRESS', 'In Progress'
+    COMPLETED = 'COMPLETED', 'Completed'
+
+class DispatchStatus(models.TextChoices):
+    SCHEDULED = 'SCHEDULED', 'Scheduled'
+    IN_TRANSIT = 'IN_TRANSIT', 'In Transit'
+    DELIVERED = 'DELIVERED', 'Delivered'
+    RETURNED = 'RETURNED', 'Returned'
+
+class PaymentStatus(models.TextChoices):
+    PENDING = 'PENDING', 'Pending'
+    PARTIAL = 'PARTIAL', 'Partially Received'
+    RECEIVED = 'RECEIVED', 'Received'
+    FAILED = 'FAILED', 'Failed'
+
+class PaymentMode(models.TextChoices):
+    CASH = 'CASH', 'Cash'
+    BANK_TRANSFER = 'BANK_TRANSFER', 'Bank Transfer'
+    UPI = 'UPI', 'UPI'
+    CHEQUE = 'CHEQUE', 'Cheque'
+    OTHER = 'OTHER', 'Other'
 
 class ClothType(models.TextChoices):
     COTTON = 'COTTON', 'Cotton'

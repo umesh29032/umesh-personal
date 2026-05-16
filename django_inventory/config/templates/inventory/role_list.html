@@ -1,0 +1,50 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}Roles & Permissions{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Roles & Permissions</h1>
+            <p>Bundles of permissions that govern what a user can see and do. Assign a role per user in the Team Members page.</p>
+        </div>
+        <a href="{% url 'inventory:role_add' %}" class="btn btn-primary">+ New Role</a>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:16px;">
+        {% for role in roles %}
+        <div class="card" style="padding:20px; position:relative;">
+            {% if role.is_system %}
+            <span title="System role — code cannot be changed" style="position:absolute; top:14px; right:14px; display:inline-flex; align-items:center; gap:6px; padding:4px 10px; background:var(--status-info-bg); color:var(--status-info-text); border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                System
+            </span>
+            {% endif %}
+
+            <div style="font-size:10px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--text-secondary); margin-bottom:6px;">{{ role.code }}</div>
+            <h3 style="font-family: 'Cormorant Garamond', serif; font-size:22px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">{{ role.name }}</h3>
+            <p style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.5;">{{ role.description|default:"—" }}</p>
+
+            <div style="display:flex; gap:16px; font-size:12px; color:var(--text-secondary); padding-top:14px; border-top:1px solid var(--border-subtle);">
+                <div><strong style="color:var(--text-primary);">{{ role.permissions.count }}</strong> permissions</div>
+                <div><strong style="color:var(--text-primary);">{{ role.users.count }}</strong> user{{ role.users.count|pluralize }}</div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <a href="{% url 'inventory:role_edit' role.pk %}" class="btn btn-clear" style="flex:1; justify-content:center; padding:8px 12px; font-size:13px;">Edit</a>
+                {% if not role.is_system %}
+                <a href="{% url 'inventory:role_delete' role.pk %}" class="btn" style="padding:8px 12px; font-size:13px; color:#991b1b; background:transparent; border:1px solid transparent;">Delete</a>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="empty-state" style="grid-column:1/-1;">
+            <h3>No roles defined</h3>
+            <p>System roles are usually seeded by migration. Something went wrong.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

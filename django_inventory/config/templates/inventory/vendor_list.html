@@ -1,0 +1,71 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}Vendors{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Vendors</h1>
+            <p>Buyers and partners to whom finished batches are dispatched.</p>
+        </div>
+        <a href="{% url 'inventory:vendor_add' %}" class="btn btn-primary">+ Add Vendor</a>
+    </div>
+
+    <div class="card" style="overflow: hidden;">
+    {% if vendors %}
+    <div class="table-responsive">
+        <table style="width:100%; border-collapse: collapse;">
+            <thead style="background: var(--surface-2); border-bottom: 1px solid var(--border-default);">
+                <tr>
+                    <th style="padding:14px 20px; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-secondary); text-align:left;">Vendor</th>
+                    <th style="padding:14px 20px; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-secondary); text-align:left;">Contact</th>
+                    <th style="padding:14px 20px; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-secondary); text-align:left;">GST</th>
+                    <th style="padding:14px 20px; font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--text-secondary); text-align:left;">Status</th>
+                    <th style="padding:14px 20px; text-align:right;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vendors %}
+                <tr style="border-bottom:1px solid var(--border-subtle);">
+                    <td style="padding:16px 20px;">
+                        <div style="font-weight:600; color:var(--text-primary);">{{ v.name }}</div>
+                        {% if v.address %}<div style="font-size:12px; color:var(--text-secondary);">{{ v.address|truncatechars:50 }}</div>{% endif %}
+                    </td>
+                    <td style="padding:16px 20px; color:var(--text-primary);">
+                        {% if v.contact_person %}<div>{{ v.contact_person }}</div>{% endif %}
+                        {% if v.phone %}<div style="font-size:12px; color:var(--text-secondary);">{{ v.phone }}</div>{% endif %}
+                        {% if v.email %}<div style="font-size:12px; color:var(--text-secondary);">{{ v.email }}</div>{% endif %}
+                    </td>
+                    <td style="padding:16px 20px; font-family:'SFMono-Regular',Menlo,monospace; font-size:12.5px; color:var(--text-secondary);">{{ v.gst_number|default:"—" }}</td>
+                    <td style="padding:16px 20px;">
+                        {% if v.is_active %}
+                            <span style="display:inline-block; padding:3px 10px; background:var(--status-success-bg); color:var(--status-success-text); border-radius:999px; font-size:12px; font-weight:600;">Active</span>
+                        {% else %}
+                            <span style="display:inline-block; padding:3px 10px; background:var(--status-neutral-bg); color:var(--status-neutral-text); border-radius:999px; font-size:12px; font-weight:600;">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:12px 20px; text-align:right; white-space:nowrap;">
+                        <a href="{% url 'inventory:vendor_edit' v.pk %}" class="action-icon" title="Edit" aria-label="Edit vendor">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </a>
+                        <a href="{% url 'inventory:vendor_delete' v.pk %}" class="action-icon action-icon-danger" title="Delete" aria-label="Delete vendor">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No vendors yet</h3>
+        <p>Add your first vendor so you can start dispatching completed batches.</p>
+        <a href="{% url 'inventory:vendor_add' %}" class="btn btn-primary">+ Add Vendor</a>
+    </div>
+    {% endif %}
+    </div>
+</div>
+{% endblock %}

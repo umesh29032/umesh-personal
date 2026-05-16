@@ -1520,92 +1520,22 @@
             </button>
         </div>
 
-        <!-- Navigation -->
+        <!-- Navigation — rendered from the permission-filtered sidebar registry -->
         <nav class="sidebar-nav">
-
+            {% for section in sidebar_menu %}
             <div class="nav-section">
-                <p class="nav-section-label">Main</p>
-
-                <a href="{% url 'inventory:inventory_dashboard' %}"
-                   class="nav-link {% if 'dashboard' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-                        <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-                    </svg>
-                    Dashboard
-                </a>
-
-                <a href="{% url 'inventory:product_list' %}"
-                   class="nav-link {% if 'products' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
-                        <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
-                    </svg>
-                    Inventory
-                </a>
-
-                <a href="{% url 'inventory:batch_list' %}"
-                   class="nav-link {% if 'batches' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-                        <rect x="9" y="3" width="6" height="4" rx="1"/>
-                        <path d="M9 12h6M9 16h4"/>
-                    </svg>
-                    Production Batches
-                </a>
-
-                <a href="{% url 'inventory:cloth_roll_list' %}"
-                   class="nav-link {% if 'cloth' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <circle cx="12" cy="12" r="2"/>
-                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-                    </svg>
-                    Cloth Stock
-                </a>
+                <p class="nav-section-label">{{ section.label }}</p>
+                {% for item in section.items %}
+                    {% with url_name=item.url_name %}
+                    <a href="{{ item.url }}"
+                       class="nav-link{% for m in item.match %}{% if m in request.path %} active{% endif %}{% endfor %}">
+                        {% include 'inventory/_nav_icon.html' %}
+                        {{ item.label }}
+                    </a>
+                    {% endwith %}
+                {% endfor %}
             </div>
-
-            {% if request.user.is_superuser %}
-            <div class="nav-section">
-                <p class="nav-section-label">Administration</p>
-
-                <a href="{% url 'accounts:user_list' %}"
-                   class="nav-link {% if 'users' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-                    </svg>
-                    Team Members
-                </a>
-
-                <a href="{% url 'accounts:skill_list' %}"
-                   class="nav-link {% if 'skills' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                    User Skills
-                </a>
-
-                <a href="{% url 'inventory:stage_list' %}"
-                   class="nav-link {% if 'stages' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                        <polyline points="9 22 9 12 15 12 15 22"/>
-                    </svg>
-                    Stages
-                </a>
-
-                <a href="{% url 'inventory:machine_list' %}"
-                   class="nav-link {% if 'machines' in request.path %}active{% endif %}">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/>
-                    </svg>
-                    Machines
-                </a>
-            </div>
-            {% endif %}
-
+            {% endfor %}
         </nav>
 
         <!-- Footer / Logout -->

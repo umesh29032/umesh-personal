@@ -1,0 +1,15 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% block page_title %}Delete Vendor{% endblock %}
+{% block content %}
+<div style="max-width: 500px; margin: 80px auto;">
+    <div class="confirm-card">
+        <div class="confirm-card-head"><h2>Delete Vendor?</h2></div>
+        <div class="confirm-card-body">You're about to delete <strong>{{ object.name }}</strong>. Dispatches and payments linked to this vendor will block deletion.</div>
+        <div class="confirm-card-foot">
+            <a href="{% url 'inventory:vendor_list' %}" class="btn btn-clear">Cancel</a>
+            <form method="post" style="margin:0;">{% csrf_token %}<button type="submit" class="btn btn-danger">Delete Permanently</button></form>
+        </div>
+    </div>
+</div>
+{% endblock %}

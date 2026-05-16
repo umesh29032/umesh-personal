@@ -1,0 +1,57 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if object %}Edit Batch Type{% else %}New Batch Type{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width: 680px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>{% if object %}Edit Batch Type{% else %}New Batch Type{% endif %}</h1>
+            <p>Define a product category — you'll attach its default stages next.</p>
+        </div>
+    </div>
+
+    <form method="post" novalidate class="form-card">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div style="padding:12px 14px; background: var(--status-danger-bg); color: var(--status-danger-text); border-radius:8px; margin-bottom:20px; font-size:13px;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-section-title"><span class="form-section-num">1</span> Details</div>
+
+            <div class="form-group" style="margin-bottom:18px;">
+                <label class="form-label" for="{{ form.name.id_for_label }}">Name *</label>
+                {{ form.name }}
+                {% if form.name.errors %}<small style="color:var(--danger); font-size:12px;">{{ form.name.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="form-group" style="margin-bottom:18px;">
+                <label class="form-label" for="{{ form.code.id_for_label }}">Code (slug) *</label>
+                {{ form.code }}
+                <small style="color:var(--text-secondary); font-size:12px;">Used in batch numbers, e.g. <code>3patti</code> → <code>3patti-2026-04-24</code>.</small>
+                {% if form.code.errors %}<small style="color:var(--danger); font-size:12px;">{{ form.code.errors.0 }}</small>{% endif %}
+            </div>
+
+            <div class="form-group" style="margin-bottom:18px;">
+                <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
+                {{ form.description }}
+            </div>
+
+            <label style="display:flex; align-items:center; gap:10px; font-size:13px; color:var(--text-primary);">
+                {{ form.is_active }}
+                <span>Active — available for new batches</span>
+            </label>
+        </div>
+
+        <div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end; padding-top:8px; border-top:1px solid var(--border-default); margin-top:8px;">
+            <a href="{% url 'inventory:batch_type_list' %}" class="btn btn-clear">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Create & Add Stages →{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
