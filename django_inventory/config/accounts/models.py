@@ -8,6 +8,11 @@ tells Django to use this class everywhere `request.user` appears.
 
 `BaseUserManager` is required because `create_user` / `create_superuser`
 hard-code `username` upstream — we override both to use email instead.
+
+Two identity concepts:
+  `user_type` — display label (karigar, manager, etc.) shown in the UI
+  `role`      — FK to inventory.Role, the RBAC source of truth for permissions
+  Never gate access on user_type; always use permission_service + role.
 """
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
@@ -71,6 +76,7 @@ class User(AbstractUser):
         ('manager', 'Manager'),
         ('karigar', 'Karigar'),
         ('helper', 'Helper'),
+        ('normal', 'Normal'),
     )
 
     username = None

@@ -1,157 +1,261 @@
 {% extends 'accounts/base.html' %}
 
-{% block title %}Edit User{% endblock %}
+{% block title %}Edit User — {{ object.email }}{% endblock %}
 {% block page_title %}Edit User{% endblock %}
 
 {% block content %}
-<div style="max-width: 900px; margin: 0 auto;">
+<div class="user-edit-shell">
 
-    <div class="form-page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
-        <div>
-            <h1>Edit User Profile</h1>
-            <p>Update the account details and permissions for this user.</p>
+    {# ─── Hero strip ─── #}
+    <div class="user-hero">
+        <div class="user-hero-bg"></div>
+        <div class="user-hero-inner">
+            <div class="user-hero-avatar">
+                {% if object.profile_picture %}
+                    <img src="{{ object.profile_picture.url }}" alt="">
+                {% else %}
+                    <span>{{ object.email|first|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="user-hero-meta">
+                <h1 class="user-hero-name">
+                    {% if object.first_name or object.last_name %}
+                        {{ object.first_name }} {{ object.last_name }}
+                    {% else %}
+                        {{ object.email }}
+                    {% endif %}
+                </h1>
+                <div class="user-hero-sub">
+                    <span class="hero-chip">{{ object.email }}</span>
+                    {% if object.role %}<span class="hero-chip hero-chip-copper">{{ object.role.name }}</span>{% endif %}
+                    <span class="hero-chip hero-chip-{% if object.is_active %}ok{% else %}off{% endif %}">
+                        {% if object.is_active %}● Active{% else %}○ Inactive{% endif %}
+                    </span>
+                    <span class="hero-chip hero-chip-muted">Joined {{ object.date_joined|date:"M Y" }}</span>
+                </div>
+            </div>
+            <div class="user-hero-actions">
+                <a href="{% url 'accounts:user_list' %}" class="hero-btn hero-btn-ghost">← Back</a>
+                <a href="{% url 'accounts:user_delete' object.pk %}" class="hero-btn hero-btn-danger">Delete</a>
+            </div>
         </div>
-        <a href="{% url 'accounts:user_delete' object.pk %}"
-           style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; font-size:13px; font-weight:600; color:#ef4444; border:1.5px solid #fca5a5; border-radius:8px; text-decoration:none; background:white; transition:background .2s, border-color .2s; white-space:nowrap;"
-           onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background=''">
-            Delete User
-        </a>
     </div>
 
-    <form method="post" enctype="multipart/form-data" class="form-card">
+    {% if form.non_field_errors %}
+        <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" id="userForm">
         {% csrf_token %}
 
-        <!-- Section 1: Basic Information -->
-        <div class="form-section">
-            <div class="form-section-title">
-                <span class="form-section-badge">1</span>
-                Basic Information
-            </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
+        <div class="form-grid">
 
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="id_profile_picture">Profile Picture</label>
-                    {% if object.profile_picture %}
-                    <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
-                        <img src="{{ object.profile_picture.url }}" alt="Current Profile"
-                             style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid var(--gray-200); flex-shrink:0;">
-                        <span style="font-size:13px; color:var(--gray-500);">Current photo — upload a new one to replace it</span>
+            {# ── LEFT column ── #}
+            <div class="form-col">
+
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">01</span>
+                        <div>
+                            <h2>Identity</h2>
+                            <p>Core profile and contact details.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <div class="field-row">
+                            <div class="field">
+                                <label for="id_profile_picture">Profile Picture</label>
+                                <div class="avatar-upload">
+                                    <div class="avatar-preview" id="avatarPreview">
+                                        {% if object.profile_picture %}
+                                            <img src="{{ object.profile_picture.url }}" alt="">
+                                        {% else %}
+                                            <span>{{ object.email|first|upper }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="avatar-upload-meta">
+                                        <input type="file" name="profile_picture" id="id_profile_picture" accept="image/*" onchange="previewAvatar(this)">
+                                        <label for="id_profile_picture" class="avatar-btn">Choose photo</label>
+                                        <small>PNG or JPG, ideally square.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_first_name">First Name</label>
+                                <input type="text" name="first_name" value="{{ object.first_name }}" id="id_first_name">
+                            </div>
+                            <div class="field">
+                                <label for="id_last_name">Last Name</label>
+                                <input type="text" name="last_name" value="{{ object.last_name }}" id="id_last_name">
+                            </div>
+                        </div>
+
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_email">Email Address *</label>
+                                <input type="email" name="email" value="{{ object.email }}" id="id_email" required>
+                            </div>
+                            <div class="field">
+                                <label for="id_phone_number">Phone Number</label>
+                                <input type="text" name="phone_number" value="{{ object.phone_number|default:'' }}" id="id_phone_number" placeholder="+91 99999 99999">
+                            </div>
+                        </div>
+
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_birth_date">Birth Date</label>
+                                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date">
+                            </div>
+                            <div class="field">
+                                <label for="id_new_password">Reset Password</label>
+                                <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
+                                <small>Only fill to issue a new password.</small>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label for="id_bio">Biography</label>
+                            <textarea name="bio" id="id_bio" rows="4" placeholder="Optional notes about this team member...">{{ object.bio }}</textarea>
+                        </div>
                     </div>
-                    {% endif %}
-                    <input type="file" name="profile_picture" id="id_profile_picture" accept="image/*">
-                </div>
+                </section>
 
-                <div class="form-group">
-                    <label for="id_email">Email Address</label>
-                    <input type="email" name="email" value="{{ object.email }}" id="id_email" required>
-                </div>
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">02</span>
+                        <div>
+                            <h2>Professional</h2>
+                            <p>Salary, skills, and craft specialties.</p>
+                        </div>
+                    </header>
 
-                <div class="form-group">
-                    <label for="id_new_password">Set New Password</label>
-                    <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
-                    <small>Fill only if you want to change the password.</small>
-                </div>
+                    <div class="panel-body">
+                        <div class="field">
+                            <label for="id_salary">Salary <span class="label-unit">(₹)</span></label>
+                            <input type="number" step="0.01" name="salary" value="{{ object.salary|default:'' }}" id="id_salary" placeholder="0.00">
+                        </div>
 
-                <div class="form-group">
-                    <label for="id_user_type">User Type</label>
-                    <select name="user_type" id="id_user_type">
-                        {% for value, label in form.user_type.field.choices %}
-                        <option value="{{ value }}" {% if object.user_type == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                        <div class="field">
+                            <label>Skills</label>
+                            <div class="chip-picker">
+                                {% for value, label in form.skills.field.choices %}
+                                    <label class="chip-pick {% if value in user_skill_ids %}is-on{% endif %}">
+                                        <input type="checkbox" name="skills" value="{{ value }}" {% if value in user_skill_ids %}checked{% endif %}>
+                                        <span>{{ label }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <small>Click a chip to toggle.</small>
+                        </div>
+                    </div>
+                </section>
+            </div>
 
-                <div class="form-group">
-                    <label for="id_first_name">First Name</label>
-                    <input type="text" name="first_name" value="{{ object.first_name }}" id="id_first_name">
-                </div>
+            {# ── RIGHT column ── #}
+            <div class="form-col">
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">03</span>
+                        <div>
+                            <h2>Role &amp; Access</h2>
+                            <p>RBAC role drives sidebar and permissions.</p>
+                        </div>
+                    </header>
 
-                <div class="form-group">
-                    <label for="id_last_name">Last Name</label>
-                    <input type="text" name="last_name" value="{{ object.last_name }}" id="id_last_name">
-                </div>
+                    <div class="panel-body">
+                        <div class="field">
+                            <label for="id_role">RBAC Role</label>
+                            <select name="role" id="id_role">
+                                <option value="">— None —</option>
+                                {% for value, label in form.role.field.choices %}
+                                    {% if value %}
+                                    <option value="{{ value }}" {% if object.role_id|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <small>Source of truth — determines sidebar visibility and permissions.</small>
+                        </div>
 
-                <div class="form-group">
-                    <label for="id_phone_number">Phone Number</label>
-                    <input type="text" name="phone_number" value="{{ object.phone_number|default:'' }}" id="id_phone_number" placeholder="+91 99999 99999">
-                </div>
+                        <div class="field">
+                            <label for="id_user_type">Legacy User Type</label>
+                            <select name="user_type" id="id_user_type">
+                                {% for value, label in form.user_type.field.choices %}
+                                <option value="{{ value }}" {% if object.user_type == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <small>Backward-compat — new code paths read Role above.</small>
+                        </div>
+                    </div>
+                </section>
 
-                <div class="form-group">
-                    <label for="id_birth_date">Birth Date</label>
-                    <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date">
-                </div>
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">04</span>
+                        <div>
+                            <h2>Status Flags</h2>
+                            <p>Account state and admin privileges.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <label class="switch-row">
+                            <input type="checkbox" name="is_active" {% if object.is_active %}checked{% endif %}>
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Active User</strong>
+                                <small>Can log in and access the system.</small>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <input type="checkbox" name="is_staff" {% if object.is_staff %}checked{% endif %}>
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Staff Status</strong>
+                                <small>Access to Django <code>/admin/</code>.</small>
+                            </span>
+                        </label>
+
+                        <label class="switch-row switch-row-danger">
+                            <input type="checkbox" name="is_superuser" {% if object.is_superuser %}checked{% endif %}>
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Superuser</strong>
+                                <small>Bypasses all permission checks. Use sparingly.</small>
+                            </span>
+                        </label>
+                    </div>
+                </section>
             </div>
         </div>
 
-        <!-- Section 2: Professional Details -->
-        <div class="form-section">
-            <div class="form-section-title">
-                <span class="form-section-badge">2</span>
-                Professional Details
-            </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px;">
-
-                <div class="form-group">
-                    <label for="id_salary">Salary <span class="label-unit">(₹)</span></label>
-                    <input type="number" step="0.01" name="salary" value="{{ object.salary|default:'' }}" id="id_salary">
-                </div>
-
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="id_skills">Skills</label>
-                    <select name="skills" id="id_skills" multiple>
-                        {% for value, label in form.skills.field.choices %}
-                        <option value="{{ value }}" {% if value in user_skill_ids %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                    <small>Hold Ctrl (or Cmd on Mac) to select multiple skills.</small>
-                </div>
-
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <label for="id_bio">Biography</label>
-                    <textarea name="bio" id="id_bio" rows="4">{{ object.bio }}</textarea>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section 3: Permissions & Status -->
-        <div class="form-section">
-            <div class="form-section-title">
-                <span class="form-section-badge">3</span>
-                Permissions &amp; Status
-            </div>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
-
-                <label class="toggle-row">
-                    <input type="checkbox" name="is_active" id="id_is_active" {% if object.is_active %}checked{% endif %}>
-                    <div>
-                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Active User</div>
-                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">User can log in and access the system.</div>
-                    </div>
-                </label>
-
-                <label class="toggle-row">
-                    <input type="checkbox" name="is_staff" id="id_is_staff" {% if object.is_staff %}checked{% endif %}>
-                    <div>
-                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Staff Status</div>
-                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">Allows access to the Django admin site.</div>
-                    </div>
-                </label>
-
-                <label class="toggle-row">
-                    <input type="checkbox" name="is_superuser" id="id_is_superuser" {% if object.is_superuser %}checked{% endif %}>
-                    <div>
-                        <div style="font-size:14px; font-weight:600; color:var(--gray-800);">Superuser</div>
-                        <div style="font-size:12px; color:var(--gray-500); margin-top:2px;">Full permissions without explicit assignment.</div>
-                    </div>
-                </label>
-
-            </div>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn-primary">Save Changes</button>
-            <a href="{% url 'accounts:user_list' %}" class="btn-cancel">Cancel</a>
+        {# Sticky action bar #}
+        <div class="sticky-actions">
+            <a href="{% url 'accounts:user_list' %}" class="btn-ghost">Cancel</a>
+            <button type="submit" class="btn-copper">Save Changes</button>
         </div>
     </form>
 </div>
+
+<script>
+function previewAvatar(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById('avatarPreview').innerHTML = `<img src="${e.target.result}" alt="">`;
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+document.querySelectorAll('.chip-pick input').forEach(cb => {
+    cb.addEventListener('change', e => e.target.closest('.chip-pick').classList.toggle('is-on', e.target.checked));
+});
+</script>
+
+<style>
+{% include 'accounts/_user_form_styles.html' %}
+</style>
 {% endblock %}
