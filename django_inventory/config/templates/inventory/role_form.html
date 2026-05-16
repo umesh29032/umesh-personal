@@ -1,0 +1,61 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if object %}Edit{% else %}New{% endif %} Role{% endblock %}
+
+{% block content %}
+<div style="max-width: 880px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>{% if object %}Edit Role{% else %}New Role{% endif %}</h1>
+            <p>Pick the permissions this role should carry. Users with this role will see only matching menu items and actions.</p>
+        </div>
+    </div>
+
+    <form method="post" class="form-card" novalidate>
+        {% csrf_token %}
+
+        {% if object.is_system %}
+        <div style="padding:12px 14px; background:var(--status-info-bg); color:var(--status-info-text); border-radius:8px; margin-bottom:20px; display:flex; align-items:center; gap:10px; font-size:13px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            <div><strong>System role.</strong> You may adjust permissions but the code <code>{{ object.code }}</code> is locked.</div>
+        </div>
+        {% endif %}
+
+        {% if form.non_field_errors %}
+            <div style="padding:12px 14px; background:var(--status-danger-bg); color:var(--status-danger-text); border-radius:8px; margin-bottom:20px; font-size:13px;">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-section-title"><span class="form-section-num">1</span> Identity</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group"><label class="form-label">Name *</label>{{ form.name }}</div>
+                <div class="form-group"><label class="form-label">Code *</label>{{ form.code }}</div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Description</label>{{ form.description }}</div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title"><span class="form-section-num">2</span> Permissions</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                {% for group_label, perms in grouped_permissions %}
+                <fieldset style="border:1px solid var(--border-default); border-radius:8px; padding:14px 16px;">
+                    <legend style="padding:0 8px; font-size:10px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--text-secondary);">{{ group_label }}</legend>
+                    {% for perm in perms %}
+                    <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:13px; color:var(--text-primary); cursor:pointer;">
+                        <input type="checkbox" name="permissions" value="{{ perm.pk }}" {% if perm in form.permissions.value|default_if_none:"" %}checked{% elif form.instance.pk and perm in form.instance.permissions.all %}checked{% endif %} style="margin-top:3px;">
+                        <span>{{ perm.name }}</span>
+                    </label>
+                    {% endfor %}
+                </fieldset>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end;">
+            <a href="{% url 'inventory:role_list' %}" class="btn btn-clear">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Create Role{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

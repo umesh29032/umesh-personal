@@ -1,3 +1,14 @@
+"""
+StockService — single writer for the StockLedger.
+
+Why a service (vs a signal)? Signals fire OUTSIDE the calling transaction.
+A failed downstream save would leave a phantom ledger entry. By calling
+`StockService.log(...)` from inside `@transaction.atomic`, the ledger row
+commits or rolls back atomically with the rest of the operation.
+
+`ContentType.objects.get_for_model(item)` resolves the polymorphic FK
+backing `StockLedger.item` (a GenericForeignKey).
+"""
 from django.contrib.contenttypes.models import ContentType
 
 from ..models import StockLedger

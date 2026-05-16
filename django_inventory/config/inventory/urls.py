@@ -53,4 +53,39 @@ urlpatterns = [
     path('machines/add/', views.MachineCreateView.as_view(), name='machine_add'),
     path('machines/<int:pk>/edit/', views.MachineUpdateView.as_view(), name='machine_edit'),
     path('machines/<int:pk>/delete/', views.MachineDeleteView.as_view(), name='machine_delete'),
+
+    # Batch Type CRUD + stage template editor
+    path('batch-types/', views.BatchTypeListView.as_view(), name='batch_type_list'),
+    path('batch-types/add/', views.BatchTypeCreateView.as_view(), name='batch_type_add'),
+    path('batch-types/<int:pk>/edit/', views.BatchTypeUpdateView.as_view(), name='batch_type_edit'),
+    path('batch-types/<int:pk>/delete/', views.BatchTypeDeleteView.as_view(), name='batch_type_delete'),
+    path('batch-types/<int:pk>/stages/', views.BatchTypeStagesView.as_view(), name='batch_type_stages'),
+    path('batch-types/<int:pk>/stages/add/', views.BatchTypeStageAddView.as_view(), name='batch_type_stage_add'),
+
+    # Vendor CRUD
+    path('vendors/', views.VendorListView.as_view(), name='vendor_list'),
+    path('vendors/add/', views.VendorCreateView.as_view(), name='vendor_add'),
+    path('vendors/<int:pk>/edit/', views.VendorUpdateView.as_view(), name='vendor_edit'),
+    path('vendors/<int:pk>/delete/', views.VendorDeleteView.as_view(), name='vendor_delete'),
+
+    # Dispatch CRUD
+    path('dispatches/', views.DispatchListView.as_view(), name='dispatch_list'),
+    path('dispatches/add/', views.DispatchCreateView.as_view(), name='dispatch_add'),
+    path('dispatches/<int:pk>/edit/', views.DispatchUpdateView.as_view(), name='dispatch_edit'),
+    path('dispatches/<int:pk>/delete/', views.DispatchDeleteView.as_view(), name='dispatch_delete'),
+
+    # Payments (Super Admin only)
+    path('payments/', views.PaymentListView.as_view(), name='payment_list'),
+    path('payments/add/', views.PaymentCreateView.as_view(), name='payment_add'),
+    path('payments/<int:pk>/edit/', views.PaymentUpdateView.as_view(), name='payment_edit'),
+    path('payments/<int:pk>/delete/', views.PaymentDeleteView.as_view(), name='payment_delete'),
+
+    # Roles & Permissions (Super Admin only)
+    path('roles/', views.RoleListView.as_view(), name='role_list'),
+    path('roles/add/', views.RoleCreateView.as_view(), name='role_add'),
+    path('roles/<int:pk>/edit/', views.RoleUpdateView.as_view(), name='role_edit'),
+    path('roles/<int:pk>/delete/', views.RoleDeleteView.as_view(), name='role_delete'),
+
+    # Karigar personal dashboard
+    path('my-work/', views.MyWorkView.as_view(), name='my_work'),
 ]

@@ -1,0 +1,21 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% block page_title %}Delete Batch Type{% endblock %}
+{% block content %}
+<div style="max-width: 500px; margin: 80px auto;">
+    <div class="confirm-card">
+        <div class="confirm-card-head">
+            <h2>Delete Batch Type?</h2>
+        </div>
+        <div class="confirm-card-body">
+            You're about to delete <strong>{{ object.name }}</strong> and its stage template. This cannot be undone. Batches that already reference this type will block deletion.
+        </div>
+        <div class="confirm-card-foot">
+            <a href="{% url 'inventory:batch_type_list' %}" class="btn btn-clear">Cancel</a>
+            <form method="post" style="margin:0;">{% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete Permanently</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

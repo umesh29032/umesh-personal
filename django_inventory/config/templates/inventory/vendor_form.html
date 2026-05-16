@@ -1,0 +1,64 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}{% if object %}Edit{% else %}New{% endif %} Vendor{% endblock %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>{% if object %}Edit Vendor{% else %}New Vendor{% endif %}</h1>
+            <p>Keep buyer records tidy — phone, GST, and contact person show up on every dispatch.</p>
+        </div>
+    </div>
+
+    <form method="post" class="form-card" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div style="padding:12px 14px; background:var(--status-danger-bg); color:var(--status-danger-text); border-radius:8px; margin-bottom:20px; font-size:13px;">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-section-title"><span class="form-section-num">1</span> Basic Info</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.name.id_for_label }}">Name *</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<small style="color:var(--danger); font-size:12px;">{{ form.name.errors.0 }}</small>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.contact_person.id_for_label }}">Contact Person</label>
+                    {{ form.contact_person }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.phone.id_for_label }}">Phone</label>
+                    {{ form.phone }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+                    {{ form.email }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.gst_number.id_for_label }}">GST Number</label>
+                    {{ form.gst_number }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">&nbsp;</label>
+                    <label style="display:flex; align-items:center; gap:10px; font-size:13px; padding-top:8px;">
+                        {{ form.is_active }} <span>Active</span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+                <label class="form-label" for="{{ form.address.id_for_label }}">Address</label>
+                {{ form.address }}
+            </div>
+        </div>
+
+        <div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end;">
+            <a href="{% url 'inventory:vendor_list' %}" class="btn btn-clear">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Add Vendor{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

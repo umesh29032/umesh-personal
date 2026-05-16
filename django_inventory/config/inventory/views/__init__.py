@@ -41,6 +41,23 @@ from .machine_views import (
     MachineUpdateView,
     MachineDeleteView,
 )
+from .batch_type_views import (
+    BatchTypeListView,
+    BatchTypeCreateView,
+    BatchTypeUpdateView,
+    BatchTypeDeleteView,
+    BatchTypeStagesView,
+    BatchTypeStageAddView,
+)
+from .vendor_views import (
+    VendorListView, VendorCreateView, VendorUpdateView, VendorDeleteView,
+    DispatchListView, DispatchCreateView, DispatchUpdateView, DispatchDeleteView,
+    PaymentListView, PaymentCreateView, PaymentUpdateView, PaymentDeleteView,
+)
+from .role_views import (
+    RoleListView, RoleCreateView, RoleUpdateView, RoleDeleteView,
+)
+from .worker_dashboard_views import MyWorkView
 
 __all__ = [
     'dashboard',
@@ -52,4 +69,11 @@ __all__ = [
     'ProductListView', 'ProductDetailView', 'ProductCreateView', 'ProductUpdateView', 'ProductDeleteView',
     'StageListView', 'StageCreateView', 'StageUpdateView', 'StageDeleteView',
     'MachineListView', 'MachineCreateView', 'MachineUpdateView', 'MachineDeleteView',
+    'BatchTypeListView', 'BatchTypeCreateView', 'BatchTypeUpdateView', 'BatchTypeDeleteView',
+    'BatchTypeStagesView', 'BatchTypeStageAddView',
+    'VendorListView', 'VendorCreateView', 'VendorUpdateView', 'VendorDeleteView',
+    'DispatchListView', 'DispatchCreateView', 'DispatchUpdateView', 'DispatchDeleteView',
+    'PaymentListView', 'PaymentCreateView', 'PaymentUpdateView', 'PaymentDeleteView',
+    'RoleListView', 'RoleCreateView', 'RoleUpdateView', 'RoleDeleteView',
+    'MyWorkView',
 ]

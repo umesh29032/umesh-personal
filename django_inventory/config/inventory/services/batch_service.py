@@ -1,3 +1,14 @@
+"""
+BatchService — every multi-row Batch operation goes through here.
+
+Django/Postgres primitives in play:
+  - @transaction.atomic         → wraps the call in BEGIN/COMMIT; any raise rolls back.
+  - select_for_update()         → row-level lock (SELECT ... FOR UPDATE) to stop
+                                  two managers consuming the same cloth roll.
+  - ValidationError             → bubbled up to the view, which converts it
+                                  to a Django messages.error toast.
+  - bulk_create([...])          → single INSERT for many rows (fewer round-trips).
+"""
 import logging
 
 from django.core.exceptions import ValidationError
@@ -6,15 +17,17 @@ from django.utils import timezone
 
 from ..models import (
     Batch, BatchClothAssignment, BatchUserAssignment,
-    BatchOperation, ClothRoll, Stage,
+    BatchOperation, BatchStage, BatchType, BatchTypeStage,
+    ClothRoll, Stage,
 )
-from ..constants import BatchStatus, TransactionType
+from ..constants import BatchStatus, BatchStageStatus, TransactionType
 from .stock_service import StockService
 
 logger = logging.getLogger(__name__)
 
-# Allowed status transitions — enforced at service level
-_VALID_TRANSITIONS = {
+# Allowed status transitions — enforced at service level.
+# Exported so views can show available transitions without duplicating the map.
+VALID_TRANSITIONS = {
     BatchStatus.PLANNED:   [BatchStatus.WIP, BatchStatus.CANCELLED],
     BatchStatus.WIP:       [BatchStatus.COMPLETED, BatchStatus.CANCELLED],
     BatchStatus.COMPLETED: [],
@@ -33,10 +46,52 @@ class BatchService:
     @staticmethod
     @transaction.atomic
     def create_batch(data: dict, user) -> Batch:
+        """
+        Create a Batch and, if a BatchType is attached, clone its stage template
+        into BatchStage rows so the batch has an isolated, editable workflow.
+        """
         data['created_by'] = user
         batch = Batch.objects.create(**data)
+        if batch.batch_type_id:
+            BatchService._clone_template_stages(batch)
         logger.info("Batch %s created by %s", batch.batch_number, user)
         return batch
+
+    @staticmethod
+    def _clone_template_stages(batch: Batch) -> None:
+        """Copy BatchType.stage_templates → BatchStage rows for this batch."""
+        template = BatchTypeStage.objects.filter(batch_type=batch.batch_type).order_by('sequence_order')
+        BatchStage.objects.bulk_create([
+            BatchStage(
+                batch=batch,
+                stage=row.stage,
+                sequence_order=row.sequence_order,
+                is_mandatory=row.is_mandatory,
+                status=BatchStageStatus.PENDING,
+            )
+            for row in template
+        ])
+
+    @staticmethod
+    @transaction.atomic
+    def add_adhoc_stage(batch: Batch, stage: Stage, sequence_order: int | None = None,
+                        is_mandatory: bool = True) -> BatchStage:
+        """Insert a stage into a single batch without mutating its BatchType template."""
+        if sequence_order is None:
+            last = BatchStage.objects.filter(batch=batch).order_by('-sequence_order').first()
+            sequence_order = (last.sequence_order + 1) if last else 1
+        bs, created = BatchStage.objects.get_or_create(
+            batch=batch,
+            stage=stage,
+            defaults={
+                'sequence_order': sequence_order,
+                'is_mandatory': is_mandatory,
+                'status': BatchStageStatus.PENDING,
+            },
+        )
+        if not created:
+            raise ValidationError(f"Stage '{stage.name}' is already part of this batch.")
+        return bs
 
     @staticmethod
     @transaction.atomic
@@ -45,7 +100,7 @@ class BatchService:
         Move a batch to a new status, enforcing the allowed transition rules.
         Raises ValidationError for invalid transitions.
         """
-        allowed = _VALID_TRANSITIONS.get(batch.status, [])
+        allowed = VALID_TRANSITIONS.get(batch.status, [])
         if new_status not in allowed:
             raise ValidationError(
                 f"Cannot move batch from '{batch.status}' to '{new_status}'. "
@@ -71,6 +126,8 @@ class BatchService:
         """Reserve cloth for a batch (Lay Plan step)."""
         if reserved_length <= 0:
             raise ValidationError("Reserved length must be greater than 0.")
+        # Re-fetch with lock to prevent race conditions
+        cloth_roll = ClothRoll.objects.select_for_update().get(pk=cloth_roll.pk)
         if reserved_length > cloth_roll.remaining_length:
             raise ValidationError(
                 f"Reserved length ({reserved_length}m) exceeds available cloth "
@@ -109,7 +166,7 @@ class BatchService:
                 f"exceeds reserved length ({assignment.reserved_length}m)."
             )
 
-        roll = assignment.cloth_roll
+        roll = ClothRoll.objects.select_for_update().get(pk=assignment.cloth_roll_id)
         if total_used > roll.remaining_length:
             raise ValidationError(
                 f"Not enough cloth on roll '{roll.roll_number}'. "

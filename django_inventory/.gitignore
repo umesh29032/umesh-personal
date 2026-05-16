@@ -66,6 +66,19 @@ logs/
 Thumbs.db
 .DS_Store
 
+# Obsidian
+sw obsidian/
+
+# Claude Code — project-local config (skills + agents shipped per-project).
+# Keep CLAUDE.md, skills/, agents/ tracked (team config).
+# Ignore personal/local-only files: memory, local settings, caches, secrets.
+.claude/settings.local.json
+.claude/memory/
+.claude/cache/
+.claude/logs/
+.claude/*.local.*
+CLAUDE.local.md
+
 # Backup files
 *.bak
 *.tmp
