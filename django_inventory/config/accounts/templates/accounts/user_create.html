@@ -1,0 +1,249 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Add User{% endblock %}
+{% block page_title %}Add User{% endblock %}
+
+{% block content %}
+<div class="user-edit-shell">
+
+    {# ─── Hero strip ─── #}
+    <div class="user-hero">
+        <div class="user-hero-bg"></div>
+        <div class="user-hero-inner">
+            <div class="user-hero-avatar user-hero-avatar-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M12 11a4 4 0 100-8 4 4 0 000 8zM6 21v-1a6 6 0 0112 0v1"/>
+                </svg>
+            </div>
+            <div class="user-hero-meta">
+                <h1 class="user-hero-name">New Team Member</h1>
+                <div class="user-hero-sub">
+                    <span class="hero-chip">Step 1 of 1</span>
+                    <span class="hero-chip hero-chip-muted">Credentials + role assignment</span>
+                </div>
+            </div>
+            <div class="user-hero-actions">
+                <a href="{% url 'accounts:user_list' %}" class="hero-btn hero-btn-ghost">← Back</a>
+            </div>
+        </div>
+    </div>
+
+    {% if form.non_field_errors %}
+        <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" id="userForm">
+        {% csrf_token %}
+
+        <div class="form-grid">
+
+            {# ── LEFT column ── #}
+            <div class="form-col">
+
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">01</span>
+                        <div>
+                            <h2>Credentials</h2>
+                            <p>Login email and initial password. User can change later.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <div class="field">
+                            <label for="id_email">Email Address *</label>
+                            <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" required placeholder="name@kapil.com">
+                            {% if form.email.errors %}<small class="field-error">{{ form.email.errors|join:" " }}</small>{% endif %}
+                        </div>
+
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_password">Password *</label>
+                                <input type="password" name="password" id="id_password" required oninput="checkPwd(this.value)">
+                                <div class="pwd-meter" id="pwdMeter"><span></span></div>
+                                {% if form.password.errors %}<small class="field-error">{{ form.password.errors|join:" " }}</small>{% endif %}
+                            </div>
+                            <div class="field">
+                                <label for="id_confirm_password">Confirm Password *</label>
+                                <input type="password" name="confirm_password" id="id_confirm_password" required oninput="checkMatch()">
+                                <small id="pwdMatch"></small>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">02</span>
+                        <div>
+                            <h2>Identity</h2>
+                            <p>Optional — user can fill these from their profile.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_first_name">First Name</label>
+                                <input type="text" name="first_name" id="id_first_name" value="{{ form.first_name.value|default:'' }}">
+                            </div>
+                            <div class="field">
+                                <label for="id_last_name">Last Name</label>
+                                <input type="text" name="last_name" id="id_last_name" value="{{ form.last_name.value|default:'' }}">
+                            </div>
+                        </div>
+
+                        <div class="field-grid-2">
+                            <div class="field">
+                                <label for="id_phone_number">Phone Number</label>
+                                <input type="text" name="phone_number" id="id_phone_number" value="{{ form.phone_number.value|default:'' }}" placeholder="+91 99999 99999">
+                            </div>
+                            <div class="field">
+                                <label for="id_salary">Salary <span class="label-unit">(₹)</span></label>
+                                <input type="number" step="0.01" name="salary" id="id_salary" value="{{ form.salary.value|default:'' }}" placeholder="0.00">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label>Skills</label>
+                            <div class="chip-picker">
+                                {% for value, label in form.skills.field.choices %}
+                                    <label class="chip-pick">
+                                        <input type="checkbox" name="skills" value="{{ value }}">
+                                        <span>{{ label }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <small>Click chips to toggle.</small>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            {# ── RIGHT column ── #}
+            <div class="form-col">
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">03</span>
+                        <div>
+                            <h2>Role &amp; Access</h2>
+                            <p>RBAC role determines what this user can see.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <div class="field">
+                            <label for="id_role">RBAC Role *</label>
+                            <select name="role" id="id_role" onchange="updateRolePreview()">
+                                <option value="">— Choose role —</option>
+                                {% for value, label in form.role.field.choices %}
+                                    {% if value %}
+                                    <option value="{{ value }}" data-label="{{ label }}" {% if form.role.value|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <div class="role-preview" id="rolePreview" style="display:none;">
+                                <span class="role-dot"></span>
+                                <span>Sidebar will show: <strong id="rolePreviewName">—</strong></span>
+                            </div>
+                            <small>Source of truth — drives sidebar visibility and permissions.</small>
+                        </div>
+
+                        <div class="field">
+                            <label for="id_user_type">Legacy User Type</label>
+                            <select name="user_type" id="id_user_type">
+                                {% for value, label in form.user_type.field.choices %}
+                                <option value="{{ value }}" {% if form.user_type.value == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <small>Backward-compat. Keep matching the Role above.</small>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <header class="panel-head">
+                        <span class="panel-num">04</span>
+                        <div>
+                            <h2>Status Flags</h2>
+                            <p>Login eligibility and admin privileges.</p>
+                        </div>
+                    </header>
+
+                    <div class="panel-body">
+                        <label class="switch-row">
+                            <input type="checkbox" name="is_active" checked>
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Active User</strong>
+                                <small>Can log in immediately after creation.</small>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <input type="checkbox" name="is_staff">
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Staff Status</strong>
+                                <small>Access to Django <code>/admin/</code>.</small>
+                            </span>
+                        </label>
+
+                        <label class="switch-row switch-row-danger">
+                            <input type="checkbox" name="is_superuser">
+                            <span class="switch"></span>
+                            <span class="switch-meta">
+                                <strong>Superuser</strong>
+                                <small>Bypasses all permission checks. Use sparingly.</small>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'accounts:user_list' %}" class="btn-ghost">Cancel</a>
+            <button type="submit" class="btn-copper">Create User</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function checkPwd(v) {
+    const m = document.getElementById('pwdMeter').firstElementChild;
+    let s = 0;
+    if (v.length >= 8) s++;
+    if (/[A-Z]/.test(v)) s++;
+    if (/[0-9]/.test(v)) s++;
+    if (/[^A-Za-z0-9]/.test(v)) s++;
+    m.style.width = (s * 25) + '%';
+    m.dataset.strength = s;
+    checkMatch();
+}
+function checkMatch() {
+    const a = document.getElementById('id_password').value;
+    const b = document.getElementById('id_confirm_password').value;
+    const t = document.getElementById('pwdMatch');
+    if (!b) { t.textContent = ''; return; }
+    if (a === b) { t.textContent = '✓ Passwords match'; t.style.color = 'var(--success)'; }
+    else { t.textContent = '✗ Passwords differ'; t.style.color = 'var(--danger)'; }
+}
+function updateRolePreview() {
+    const sel = document.getElementById('id_role');
+    const box = document.getElementById('rolePreview');
+    const name = document.getElementById('rolePreviewName');
+    const opt = sel.options[sel.selectedIndex];
+    if (sel.value) { box.style.display = 'flex'; name.textContent = opt.dataset.label; }
+    else { box.style.display = 'none'; }
+}
+document.querySelectorAll('.chip-pick input').forEach(cb => {
+    cb.addEventListener('change', e => e.target.closest('.chip-pick').classList.toggle('is-on', e.target.checked));
+});
+updateRolePreview();
+</script>
+
+<style>
+{% include 'accounts/_user_form_styles.html' %}
+</style>
+{% endblock %}

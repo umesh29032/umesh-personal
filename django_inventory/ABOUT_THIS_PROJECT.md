@@ -174,9 +174,10 @@ I want to add later:
 
 ## 9. Open bugs / things to clean up
 
-- **Stale shadow files**: `inventory/views.py`, `inventory/services.py`,
-  `inventory/forms.py`, `config/config/settings.py`. The package
-  versions of the same names are what actually load. Slated for deletion.
+- ~~**Stale shadow files**~~ — Deleted on 2026-05-16 (along with the broken
+  `verify_inventory.py` script that depended on the pre-refactor service API).
+  The package forms (`inventory/views/`, `inventory/services/`,
+  `inventory/forms/`, `config/settings/`) are now the only versions on disk.
 - **Tests are empty.** Every `tests.py` is a `pass`. Roadmap in
   ARCHITECTURE §13.
 - **Storefront media** is local-FS only. Move to S3 before production.

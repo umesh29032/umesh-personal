@@ -78,9 +78,9 @@ config/config/settings/
 └── production.py   # hardening (HSTS, secure cookies, prod ALLOWED_HOSTS)
 ```
 
-A **legacy `config/config/settings.py` shadow file** sits on disk but is no
-longer imported (the dir-form package wins). Treat it as dead — delete once
-verified.
+(The legacy `config/config/settings.py` shadow file was deleted on 2026-05-16
+after verifying no imports referenced it. The settings package is now the only
+source.)
 
 Secrets come from `.env` via `python-decouple` — never hard-coded.
 
@@ -276,16 +276,24 @@ race conditions when two batches consume the same roll concurrently.
 
 ---
 
-## 9. Known dead/legacy code
+## 9. Dead code sweep — 2026-05-16
 
-These exist on disk but are **not imported** (the package form of the same
-name takes precedence). Slated for deletion once a final sweep confirms no
-other code references them:
+The following shadow files were deleted after grep-verification that no live
+code referenced them. The package form of the same name had already taken
+precedence at import time:
 
-- `config/inventory/views.py` (537 lines) — superseded by `inventory/views/`
-- `config/inventory/services.py` (115 lines) — superseded by `inventory/services/`
-- `config/inventory/forms.py` (133 lines) — superseded by `inventory/forms/`
-- `config/config/settings.py` (248 lines) — superseded by `config/settings/`
+- ~~`config/inventory/views.py`~~ — superseded by `inventory/views/`
+- ~~`config/inventory/services.py`~~ — superseded by `inventory/services/`
+- ~~`config/inventory/forms.py`~~ — superseded by `inventory/forms/`
+- ~~`config/config/settings.py`~~ — superseded by `config/settings/`
+- ~~`config/verify_inventory.py`~~ — standalone test script using the
+  pre-refactor `InventoryService` API (which itself was removed in the
+  service-layer split).
+
+`config/inventory/signals.py` is intentionally kept as a tombstone comment
+file — it documents *why* this project does not use Django signals (they
+fired outside the triggering transaction and left half-written ledger
+rows). Do not "fix" the empty file by deleting it.
 
 ---
 

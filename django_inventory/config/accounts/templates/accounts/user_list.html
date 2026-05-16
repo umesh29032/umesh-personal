@@ -8,11 +8,16 @@
 <div style="max-width: 1200px; margin: 0 auto;">
     
     <!-- Header -->
-    <div class="page-header">
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;">
         <div class="page-header-text">
             <h1>Team Members</h1>
             <p>Manage user access and roles.</p>
         </div>
+        <a href="{% url 'accounts:user_add' %}"
+           style="display:inline-flex; align-items:center; gap:6px; padding:10px 18px; font-size:14px; font-weight:600; color:white; background:var(--primary-blue, #2563eb); border-radius:8px; text-decoration:none; transition:background .2s; white-space:nowrap;"
+           onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+            + Add User
+        </a>
     </div>
 
     <!-- Filter & Search Toolbar -->

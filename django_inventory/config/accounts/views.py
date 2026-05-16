@@ -1,3 +1,18 @@
+"""
+Accounts views — all authentication and user-management endpoints.
+
+Section map:
+  Authentication  — LoginView, ResendOTPView, VerifyOTPView, LogoutView
+  Home            — HomeView (protected redirect to inventory)
+  User management — UserListView, UserCreateView, UserUpdateView, UserDeleteView
+  Password login  — PasswordLoginView (extends Django's AuthenticationView)
+  Signup          — SignupView, SignupVerifyView, ResendSignupOTPView
+  Password reset  — ForgotPasswordView, ResetPasswordVerifyView
+  Skill management — SkillListView, SkillCreateView, SkillUpdateView, SkillDeleteView
+
+Every POST endpoint that is an auth action calls check_throttle() near the top
+and reset_throttle() on success. See throttle.py for the rate-limit policies.
+"""
 import logging
 
 from django.conf import settings
@@ -18,8 +33,13 @@ from django.views.decorators.http import require_POST
 from django.views import View
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
-from .forms import SignupForm, SkillForm, UserEditForm
+from .forms import SignupForm, SkillForm, UserCreateForm, UserEditForm
 from .models import Skill, User
+from .throttle import check_throttle, reset_throttle, format_retry
+# Centralised RBAC helper — replaces raw `is_superuser` checks (CLAUDE.md rule #6).
+from inventory.services import user_has_role, ROLE_SUPER_ADMIN
+
+security_logger = logging.getLogger("accounts.security")
 from .utils import (
     OTP_RESEND_COOLDOWN,
     can_resend_otp,
@@ -51,6 +71,12 @@ class LoginView(View):
 
         if not email:
             messages.error(request, "Please enter a valid email address.")
+            return render(request, "accounts/login.html")
+
+        blocked, retry = check_throttle(request, "otp_send", identifier=email)
+        if blocked:
+            security_logger.warning("login_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
             return render(request, "accounts/login.html")
 
         if not can_resend_otp(request, prefix="otp"):
@@ -86,6 +112,12 @@ class ResendOTPView(View):
         email = request.session.get("otp_email")
         if not email:
             return redirect("accounts:login")
+
+        blocked, retry = check_throttle(request, "otp_send", identifier=email)
+        if blocked:
+            security_logger.warning("resend_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
+            return redirect("accounts:verify_otp")
 
         if not can_resend_otp(request, prefix="otp"):
             messages.warning(request, f"Please wait {OTP_RESEND_COOLDOWN} seconds before resending.")
@@ -123,6 +155,12 @@ class VerifyOTPView(View):
             messages.error(request, "Session expired. Please login again.")
             return redirect("accounts:login")
 
+        blocked, retry = check_throttle(request, "otp_verify", identifier=email)
+        if blocked:
+            security_logger.warning("verify_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many attempts. Try again in {format_retry(retry)}.")
+            return redirect("accounts:verify_otp")
+
         is_valid, error_msg = check_otp_from_session(request, entered_otp, prefix="otp")
 
         if not is_valid:
@@ -141,6 +179,12 @@ class VerifyOTPView(View):
             return redirect("accounts:signup")
 
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+
+        # Reward successful auth: zero out the rate-limit counters so a
+        # legitimate user who eventually got it right is not punished.
+        reset_throttle("otp_send", identifier=email, request=request)
+        reset_throttle("otp_verify", identifier=email, request=request)
+        security_logger.info("login_success email=%s", email)
 
         clear_otp_session(request, prefix="otp")
         request.session.pop("otp_email", None)
@@ -178,8 +222,9 @@ class HomeView(View):
 # ─── User Management ──────────────────────────────────────────────────────────
 
 class SuperuserRequiredMixin(UserPassesTestMixin):
+    """Gate views to Super Admin role. Uses permission_service, not raw is_superuser."""
     def test_func(self):
-        return self.request.user.is_superuser
+        return user_has_role(self.request.user, {ROLE_SUPER_ADMIN})
 
 
 class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
@@ -212,15 +257,55 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
         return context
 
 
+class UserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    """Super Admin creates a new user and assigns a role at the same time."""
+    model = User
+    form_class = UserCreateForm
+    template_name = "accounts/user_create.html"
+    success_url = reverse_lazy("accounts:user_list")
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"User {self.object.email} created.")
+        return response
+
+
 class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
     model = User
     form_class = UserEditForm
     template_name = "accounts/user_form.html"
     success_url = reverse_lazy("accounts:user_list")
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["user_skill_ids"] = list(self.object.skills.values_list("id", flat=True))
+        return ctx
+
     def form_valid(self, form):
+        editing_self = self.object == self.request.user
+        # Self-lockout protection — a Super Admin must not be able to demote
+        # themselves or deactivate their own account in the same request.
+        # Doing so would orphan the system (no remaining admin to fix it).
+        if editing_self:
+            blockers = []
+            if not form.cleaned_data.get("is_superuser") and self.request.user.is_superuser:
+                blockers.append("revoke your own superuser flag")
+            if not form.cleaned_data.get("is_active"):
+                blockers.append("deactivate your own account")
+            new_role = form.cleaned_data.get("role")
+            current_role_code = getattr(self.request.user.role, "code", None)
+            if current_role_code == "super_admin" and (new_role is None or new_role.code != "super_admin"):
+                blockers.append("change your own RBAC role away from Super Admin")
+            if blockers:
+                messages.error(
+                    self.request,
+                    "Refused: you cannot " + " or ".join(blockers)
+                    + " while editing your own profile. Ask another Super Admin to do it.",
+                )
+                return self.form_invalid(form)
+
         response = super().form_valid(form)
-        if self.object == self.request.user and form.cleaned_data.get("new_password"):
+        if editing_self and form.cleaned_data.get("new_password"):
             update_session_auth_hash(self.request, self.object)
         messages.success(self.request, "User updated successfully.")
         return response
@@ -232,6 +317,18 @@ class UserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     success_url = reverse_lazy("accounts:user_list")
 
     def form_valid(self, form):
+        # Self-delete protection — leaving the system with zero Super Admins
+        # would require shell access to recover. Block at the view layer.
+        if self.object == self.request.user:
+            messages.error(self.request, "You cannot delete your own account.")
+            return redirect("accounts:user_edit", pk=self.object.pk)
+        # Last-superuser protection — refuse to remove the only remaining
+        # Super Admin so the platform is never left unmanageable.
+        if self.object.is_superuser:
+            remaining = User.objects.filter(is_superuser=True, is_active=True).exclude(pk=self.object.pk).count()
+            if remaining == 0:
+                messages.error(self.request, "Refused: this is the only active Super Admin. Promote another user first.")
+                return redirect("accounts:user_edit", pk=self.object.pk)
         messages.success(self.request, "User deleted successfully.")
         return super().form_valid(form)
 
@@ -251,9 +348,28 @@ class PasswordLoginView(DjangoLoginView):
         context["prefill_email"] = self.request.session.pop("login_prefill_email", "")
         return context
 
+    def post(self, request, *args, **kwargs):
+        # Throttle check happens BEFORE Django's auth so we never hash a
+        # password for a blocked source — denial-of-service hardening too.
+        email = (request.POST.get("username") or request.POST.get("email") or "").strip().lower()
+        blocked, retry = check_throttle(request, "pw_login", identifier=email or None)
+        if blocked:
+            security_logger.warning("pw_login_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many failed attempts. Try again in {format_retry(retry)}.")
+            return self.render_to_response(self.get_context_data(form=self.get_form()))
+        return super().post(request, *args, **kwargs)
+
     def form_invalid(self, form):
+        email = (self.request.POST.get("username") or "").strip().lower()
+        security_logger.warning("pw_login_failure email=%s", email)
         messages.error(self.request, "Incorrect email or password. Please try again.")
         return super().form_invalid(form)
+
+    def form_valid(self, form):
+        email = (form.cleaned_data.get("username") or "").strip().lower()
+        reset_throttle("pw_login", identifier=email, request=self.request)
+        security_logger.info("pw_login_success email=%s", email)
+        return super().form_valid(form)
 
 
 # ─── Signup ───────────────────────────────────────────────────────────────────
@@ -265,6 +381,13 @@ class SignupView(FormView):
 
     def form_valid(self, form):
         email = form.cleaned_data["email"]
+
+        blocked, retry = check_throttle(self.request, "signup", identifier=email)
+        if blocked:
+            security_logger.warning("signup_throttled email=%s retry=%ss", email, retry)
+            messages.error(self.request, f"Too many signup attempts. Try again in {format_retry(retry)}.")
+            return self.form_invalid(form)
+
         # Sign the password before storing in session so it is not stored as plain text.
         # django.core.signing uses the SECRET_KEY — reversible only by the server.
         signed_password = signing.dumps(form.cleaned_data["password"])
@@ -301,6 +424,12 @@ class SignupVerifyView(View):
             messages.error(request, "Session expired. Please sign up again.")
             return redirect("accounts:signup")
 
+        blocked, retry = check_throttle(request, "otp_verify", identifier=email)
+        if blocked:
+            security_logger.warning("signup_verify_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many attempts. Try again in {format_retry(retry)}.")
+            return redirect("accounts:signup_verify")
+
         is_valid, error_msg = check_otp_from_session(request, entered_otp, prefix="signup")
 
         if not is_valid:
@@ -319,8 +448,25 @@ class SignupVerifyView(View):
             messages.error(request, "Session tampered or expired. Please sign up again.")
             return redirect("accounts:signup")
 
-        user = User.objects.create_user(email=email, password=password)
+        # Anti-enumeration: clean_email no longer rejects existing addresses, so
+        # the race-condition + late-collision case must be handled here. Catch
+        # the unique-constraint violation and route the user to login with a
+        # neutral message — never reveal "this email is already registered".
+        from django.db import IntegrityError
+        try:
+            user = User.objects.create_user(email=email, password=password)
+        except IntegrityError:
+            clear_otp_session(request, prefix="signup")
+            request.session.pop("signup_email", None)
+            request.session.pop("signup_token", None)
+            request.session.modified = True
+            messages.info(request, "If this email is registered, please sign in.")
+            return redirect("accounts:login_password")
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+
+        reset_throttle("signup", identifier=email, request=request)
+        reset_throttle("otp_verify", identifier=email, request=request)
+        security_logger.info("signup_success email=%s", email)
 
         clear_otp_session(request, prefix="signup")
         request.session.pop("signup_email", None)
@@ -337,6 +483,12 @@ class ResendSignupOTPView(View):
         if not email:
             messages.error(request, "Session expired.")
             return redirect("accounts:signup")
+
+        blocked, retry = check_throttle(request, "otp_send", identifier=email)
+        if blocked:
+            security_logger.warning("signup_resend_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
+            return redirect("accounts:signup_verify")
 
         if not can_resend_otp(request, prefix="signup"):
             messages.warning(request, f"Please wait {OTP_RESEND_COOLDOWN} seconds before resending.")
@@ -364,6 +516,12 @@ class ForgotPasswordView(View):
 
     def post(self, request):
         email = request.POST.get("email", "").strip().lower()
+
+        blocked, retry = check_throttle(request, "otp_send", identifier=email)
+        if blocked:
+            security_logger.warning("forgot_pw_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
+            return redirect("accounts:forgot_password")
 
         # Don't reveal whether the email exists (prevents account enumeration)
         if User.objects.filter(email=email).exists():
@@ -396,6 +554,12 @@ class ResetPasswordVerifyView(View):
             messages.error(request, "Session expired. Please start again.")
             return redirect("accounts:forgot_password")
 
+        blocked, retry = check_throttle(request, "otp_verify", identifier=email)
+        if blocked:
+            security_logger.warning("reset_verify_throttled email=%s retry=%ss", email, retry)
+            messages.error(request, f"Too many attempts. Try again in {format_retry(retry)}.")
+            return redirect("accounts:reset_password_verify")
+
         is_valid, error_msg = check_otp_from_session(request, entered_otp, prefix="reset")
 
         if not is_valid:
@@ -407,8 +571,17 @@ class ResetPasswordVerifyView(View):
                 return redirect("accounts:forgot_password")
             return redirect("accounts:reset_password_verify")
 
+        # Defense in depth — even though reset_email is only set when the email
+        # exists, treat a missing user as a tampered session and bail.
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            request.session.pop("reset_email", None)
+            request.session.modified = True
+            messages.error(request, "Session expired. Please start again.")
+            return redirect("accounts:forgot_password")
+
         # Run ALL Django password validators (length, common, numeric, similarity)
-        user = User.objects.get(email=email)
         try:
             validate_password(password, user=user)
         except ValidationError as e:
@@ -418,6 +591,11 @@ class ResetPasswordVerifyView(View):
 
         user.set_password(password)
         user.save()
+
+        reset_throttle("otp_send", identifier=email, request=request)
+        reset_throttle("otp_verify", identifier=email, request=request)
+        reset_throttle("pw_login", identifier=email, request=request)
+        security_logger.info("password_reset email=%s", email)
 
         clear_otp_session(request, prefix="reset")
         request.session.pop("reset_email", None)

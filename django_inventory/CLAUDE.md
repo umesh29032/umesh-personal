@@ -13,7 +13,7 @@ Django 5.2 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 4. **Service layer owns all multi-row writes** (`config/inventory/services/`). Views call services. No signals.
 5. `StockService.log(...)` is the only writer to `StockLedger`.
 6. Permissions via `permission_service` (`user_has_perm` / `user_has_role`). No raw `is_superuser` checks in views.
-7. Stale shadows — package wins, .py files dead: `inventory/views.py`, `services.py`, `forms.py`, `config/settings.py`. Don't edit; flag.
+7. Shadow `.py` files (inventory views/services/forms + `config/settings.py`) were deleted 2026-05-16. Only package forms exist. If you ever see a duplicate `.py` next to a same-named package dir, flag it.
 8. gstack installed — route ship/review/qa/etc. to matching gstack skill. Don't auto-trigger.
 
 ## Run

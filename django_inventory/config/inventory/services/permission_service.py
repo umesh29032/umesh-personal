@@ -41,7 +41,9 @@ def user_role_code(user) -> str | None:
     if role:
         return role.code
     legacy = getattr(user, 'user_type', None)
-    legacy_map = {'admin': ROLE_SUPER_ADMIN, 'manager': ROLE_MANAGER, 'karigar': ROLE_KARIGAR, 'helper': ROLE_KARIGAR}
+    # 'normal' intentionally maps to None — no privileged role. Such users can
+    # log in and see Dashboard only; nothing else in the sidebar resolves.
+    legacy_map = {'admin': ROLE_SUPER_ADMIN, 'manager': ROLE_MANAGER, 'karigar': ROLE_KARIGAR, 'helper': ROLE_KARIGAR, 'normal': None}
     return legacy_map.get(legacy)
 
 
