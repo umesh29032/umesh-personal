@@ -1,9 +1,25 @@
+"""
+Inventory domain models — production lifecycle from cloth roll to payment.
+
+Django ORM primitives used heavily in this file:
+  - models.Model            → one Python class = one Postgres table.
+  - ForeignKey / M2M        → relational links; `on_delete=` rules cascade behavior.
+  - CharField(choices=...)  → enum-like column; choices live in `constants.py`.
+  - auto_now_add            → set on INSERT (created_at).
+  - auto_now                → set on every UPDATE (updated_at).
+  - GenericForeignKey       → "polymorphic" FK via (content_type, object_id);
+                              used by StockLedger to track ClothRoll / Product / future items.
+  - CheckConstraint         → enforced by Postgres; app cannot violate it.
+  - UniqueConstraint        → multi-column uniqueness (db-level).
+  - Meta.indexes            → composite B-tree indexes for dashboard queries.
+"""
 from django.db import models
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
+# All TextChoices enums live in one place so they can be reused by services + forms.
 from .constants import (
     StageType, StageCategory, BatchStatus, BatchStageStatus,
     MachineAssignmentStatus, DispatchStatus, PaymentStatus, PaymentMode,

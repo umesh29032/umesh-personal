@@ -1,4 +1,10 @@
-"""Template context processors for the inventory app."""
+"""
+Template context processors — values injected into every render() call.
+
+Registered in settings.TEMPLATES['OPTIONS']['context_processors']. Whatever
+this function returns is merged into the template context for every view,
+so the base layout can read {{ sidebar_menu }} without each view passing it.
+"""
 from .services import build_menu_for, user_role_code
 
 

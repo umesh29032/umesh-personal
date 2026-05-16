@@ -1,3 +1,14 @@
+"""
+BatchService — every multi-row Batch operation goes through here.
+
+Django/Postgres primitives in play:
+  - @transaction.atomic         → wraps the call in BEGIN/COMMIT; any raise rolls back.
+  - select_for_update()         → row-level lock (SELECT ... FOR UPDATE) to stop
+                                  two managers consuming the same cloth roll.
+  - ValidationError             → bubbled up to the view, which converts it
+                                  to a Django messages.error toast.
+  - bulk_create([...])          → single INSERT for many rows (fewer round-trips).
+"""
 import logging
 
 from django.core.exceptions import ValidationError

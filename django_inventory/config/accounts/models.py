@@ -1,3 +1,14 @@
+"""
+Custom user model + skills.
+
+Why a custom user? Django's default User uses `username` for login. We want
+email-only login, so we subclass `AbstractUser`, drop `username`, and make
+`email` the `USERNAME_FIELD`. AUTH_USER_MODEL='accounts.User' in settings
+tells Django to use this class everywhere `request.user` appears.
+
+`BaseUserManager` is required because `create_user` / `create_superuser`
+hard-code `username` upstream — we override both to use email instead.
+"""
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.core.validators import RegexValidator, MinValueValidator

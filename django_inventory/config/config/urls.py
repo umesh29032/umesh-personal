@@ -1,27 +1,17 @@
 """
-URL configuration for config project.
+Root URLConf — Django reads `urlpatterns` and matches request paths top-down.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+Primitives used here:
+  - path('prefix/', view)          → exact-prefix route
+  - include('app.urls')            → mount another URLConf under this prefix
+  - admin.site.urls                → Django's built-in /admin/ site
+  - static(MEDIA_URL, ...)         → DEV-ONLY: serve uploaded files; in prod
+                                     serve them via nginx/whitenoise instead.
 """
-# from django.contrib import admin
-# from django.urls import path
-
-# urlpatterns = [
-#     path('admin/', admin.site.urls),
-# ]
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
 
 from storefront.views import public_home
 
@@ -29,12 +19,11 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", public_home, name="public_home"),
     path("app/", include("accounts.urls")),
-    path("accounts/", include("allauth.urls")),
+    path("accounts/", include("allauth.urls")),       # django-allauth: Google OAuth, signup flow
     path("inventory/", include("inventory.urls")),
 ]
 
-from django.conf import settings
-from django.conf.urls.static import static
-
 if settings.DEBUG:
+    # /media/ is mounted only when DEBUG=True — production must serve it
+    # via the web server (whitenoise / nginx / S3) not Django.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

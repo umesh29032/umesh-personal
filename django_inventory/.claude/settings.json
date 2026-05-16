@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "Project-local Claude config for django_inventory (Kapil Enterprises). Skills/agents/CLAUDE.md scoped to this repo. settings.local.json + memory/ are gitignored.",
+  "permissions": {
+    "allow": [
+      "Bash(env/bin/python config/manage.py check)",
+      "Bash(env/bin/python config/manage.py check --deploy)",
+      "Bash(env/bin/python config/manage.py makemigrations --dry-run)",
+      "Bash(env/bin/python config/manage.py makemigrations:*)",
+      "Bash(env/bin/python config/manage.py migrate:*)",
+      "Bash(env/bin/python config/manage.py show_urls:*)",
+      "Bash(env/bin/python config/manage.py shell -c:*)",
+      "Bash(env/bin/python config/manage.py runserver:*)",
+      "Bash(env/bin/python config/manage.py createsuperuser:*)",
+      "Bash(env/bin/python config/manage.py seed_homepage:*)",
+      "Bash(env/bin/pip:*)",
+      "Bash(env/bin/python -c:*)",
+      "Bash(psql:*)",
+      "Bash(wc -l:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Read(./**)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(DROP DATABASE:*)",
+      "Read(.env)",
+      "Read(**/.env)"
+    ]
+  },
+  "env": {
+    "DJANGO_SETTINGS_MODULE": "config.settings.local"
+  }
+}
