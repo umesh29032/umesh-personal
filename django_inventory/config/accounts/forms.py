@@ -43,7 +43,8 @@ class UserEditForm(forms.ModelForm):
         model = User
         fields = [
             'email', 'first_name', 'last_name', 'phone_number',
-            'user_type', 'role', 'is_active', 'is_staff', 'is_superuser',
+            'user_type', 'role', 'extra_roles',
+            'is_active', 'is_staff', 'is_superuser',
             'bio', 'skills', 'salary', 'birth_date', 'profile_picture'
         ]
 
@@ -100,7 +101,8 @@ class UserCreateForm(forms.ModelForm):
         model = User
         fields = [
             'email', 'first_name', 'last_name', 'phone_number',
-            'user_type', 'role', 'is_active', 'is_staff', 'is_superuser',
+            'user_type', 'role', 'extra_roles',
+            'is_active', 'is_staff', 'is_superuser',
             'skills', 'salary',
         ]
 

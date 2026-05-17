@@ -1,0 +1,222 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ action }} Category{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   Category form mobile responsive styles
+   ────────────────────────────────────────────────────────────────── */
+
+/* Section cards — stronger shadow + tinted header to break white-wash */
+section {
+    box-shadow: 0 2px 12px rgba(14,11,9,0.10) !important;
+    border-color: #cfc0aa !important;
+}
+section header {
+    background: linear-gradient(180deg, var(--cream-2) 0%, var(--cream) 60%, transparent 100%) !important;
+}
+
+/* Hero strip — mobile pe stack layout */
+@media (max-width: 600px) {
+    .cat-form-hero {
+        flex-direction: column !important;
+        gap: 16px !important;
+        padding: 24px 20px !important;
+        border-radius: 12px !important;
+    }
+    .cat-form-hero a { width: 100%; text-align: center; }
+}
+
+/* 2-column grid (item count + display order) — mobile pe 1 col */
+.cat-inline-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 480px) {
+    .cat-inline-grid { grid-template-columns: 1fr; }
+}
+
+/* Reusable form input styles */
+.sf-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 9px;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--surface-input);
+    box-sizing: border-box;
+    font-family: inherit;
+    outline: none;
+    border: 1.5px solid #cfc0aa;
+    box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.15s;
+    -webkit-appearance: none;
+}
+.sf-input:focus {
+    border-color: var(--copper);
+    box-shadow: 0 0 0 3px rgba(184,115,51,0.1);
+    background: var(--white);
+}
+.sf-input::placeholder { color: var(--text-tertiary); }
+
+.sf-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.sf-field { display: flex; flex-direction: column; }
+.sf-error { font-size: 12px; color: var(--danger); margin-top: 4px; font-weight: 500; }
+.sf-hint  { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.sf-footer {
+    position: sticky; bottom: 0;
+    background: rgba(250,247,242,0.20);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-default);
+    padding: 16px 0; margin-top: 24px;
+    display: flex; justify-content: flex-end; gap: 12px; z-index: 10;
+}
+html[data-theme="dark"] .sf-footer {
+    background: rgba(28,28,30,0.20);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+html[data-theme="dark"] .sf-input {
+    box-shadow: inset 0 1.5px 4px rgba(0,0,0,0.15);
+    border-color: var(--cream-3);
+}
+html[data-theme="dark"] .sf-input:focus {
+    background: var(--cream-2);
+    box-shadow: 0 0 0 3px rgba(184,115,51,0.18);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 0 auto;">
+
+    <!-- ── Hero strip ──
+       Dark gradient background — storefront brand ka part.
+       Mobile pe cat-form-hero CSS class flex-direction:column karta hai. -->
+    <div class="cat-form-hero" style="background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%); border-radius: 16px; padding: 32px 36px; margin-bottom: 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+        <div>
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--copper-l); text-transform: uppercase; margin-bottom: 8px;">Storefront</div>
+            <h1 style="font-size: 26px; font-weight: 700; color: #fff; margin: 0;">{{ action }} Category</h1>
+            <p style="color: rgba(255,255,255,0.7); margin-top: 8px; font-size: 14px;">
+                {% if action == 'Create' %}New category shown in the shop-by-category grid.
+                {% else %}Editing: <strong style="color: #fff5e6;">{{ object.name }}</strong>{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'storefront:category_list' %}" style="padding: 10px 20px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; white-space: nowrap; flex-shrink: 0;">← Back to list</a>
+    </div>
+
+    <!-- Form-level validation errors -->
+    {% if form.non_field_errors %}
+        <div class="form-errors" style="margin-bottom: 24px;">
+            <p>Please fix the following errors:</p>
+            <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </div>
+    {% endif %}
+
+    <!-- enctype="multipart/form-data" — image upload ke liye zaroori -->
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- Section 01 — Category Details -->
+        <section style="background: var(--surface); border: 1px solid var(--border-default); border-radius: 14px; overflow: hidden; margin-bottom: 24px;">
+            <header style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+                <span style="width: 28px; height: 28px; background: var(--copper); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">01</span>
+                <div>
+                    <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Category Details</h2>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0;">Name, subtitle, and item count badge.</p>
+                </div>
+            </header>
+            <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+
+                <div class="sf-field">
+                    <label class="sf-label">Category Name *</label>
+                    <input type="text" name="name" value="{{ form.name.value|default:'' }}" required
+                        class="sf-input" placeholder="e.g. T-Shirts">
+                    {% if form.name.errors %}
+                        <span class="sf-error">{{ form.name.errors|join:" " }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="sf-field">
+                    <label class="sf-label">Subtitle</label>
+                    <input type="text" name="subtitle" value="{{ form.subtitle.value|default:'' }}"
+                        class="sf-input" placeholder="e.g. Round neck, V-neck, Polo — all styles">
+                    <span class="sf-hint">Category card ke neeche subtitle text dikhega.</span>
+                </div>
+
+                <!-- cat-inline-grid: mobile pe 1 column ho jata hai -->
+                <div class="cat-inline-grid">
+                    <div class="sf-field">
+                        <label class="sf-label">Item Count Badge</label>
+                        <input type="text" name="item_count_label"
+                            value="{{ form.item_count_label.value|default:'50+ Items' }}"
+                            class="sf-input" placeholder="50+ Items">
+                        <span class="sf-hint">Category card par badge text.</span>
+                    </div>
+                    <div class="sf-field">
+                        <label class="sf-label">Display Order</label>
+                        <input type="number" name="display_order"
+                            value="{{ form.display_order.value|default:'0' }}"
+                            class="sf-input">
+                        <span class="sf-hint">Lower = shown first.</span>
+                    </div>
+                </div>
+
+                <!-- Toggle checkbox — accent-color CSS property copper colour deta hai checkbox ko -->
+                <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer; padding: 14px 16px; border: 1.5px solid var(--border-default); border-radius: 9px; background: var(--surface); transition: border-color 0.2s;">
+                    <input type="checkbox" name="is_active" {% if form.is_active.value %}checked{% endif %}
+                        style="width: 16px; height: 16px; accent-color: var(--copper); flex-shrink: 0; margin-top: 2px;">
+                    <div>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">Active</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">Show this category on the storefront.</div>
+                    </div>
+                </label>
+
+            </div>
+        </section>
+
+        <!-- Section 02 — Image -->
+        <section style="background: var(--surface); border: 1px solid var(--border-default); border-radius: 14px; overflow: hidden; margin-bottom: 24px;">
+            <header style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+                <span style="width: 28px; height: 28px; background: var(--copper); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">02</span>
+                <div>
+                    <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Image</h2>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0;">Category card image. Recommended: 400×200px.</p>
+                </div>
+            </header>
+            <div style="padding: 20px 24px;">
+                <!-- Existing image preview — sirf edit mode mein dikhta hai -->
+                {% if object.image %}
+                    <div style="margin-bottom: 12px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-default);">
+                        <img src="{{ object.image.url }}" alt="{{ object.name }}"
+                            style="width: 100%; max-height: 150px; object-fit: cover; display: block;">
+                    </div>
+                {% endif %}
+                <!-- form.image — CroppableImageWidget (croppable_image.html) render karta hai -->
+                {{ form.image }}
+                <span class="sf-hint" style="margin-top: 8px; display: block;">Auto-cropped to 400×200px. Leave empty to use the SVG icon.</span>
+            </div>
+        </section>
+
+        <!-- ── Sticky footer actions ──
+           position:sticky + bottom:0 — scroll karne par bhi hamesha visible rahta hai. -->
+        <div class="sf-footer">
+            <a href="{% url 'storefront:category_list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary" style="padding: 12px 32px; font-size: 14px; font-weight: 700; letter-spacing: 0.02em;">
+                {% if action == 'Create' %}Create Category{% else %}Save Changes{% endif %}
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}

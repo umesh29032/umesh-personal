@@ -3,31 +3,132 @@
 {% block page_title %}{% if form.instance.pk %}Edit Skill{% else %}Add Skill{% endif %}{% endblock %}
 
 {% block content %}
-<div style="max-width: 500px; margin: 0 auto;">
+<div class="user-edit-shell" style="max-width: 640px;">
 
-    <div class="form-page-header">
-        <h1>{% if form.instance.pk %}Edit Skill{% else %}Add New Skill{% endif %}</h1>
-        <p>Define a skill that can be assigned to workers.</p>
+    {# ─── Hero strip ─── #}
+    <div class="user-hero">
+        <div class="user-hero-bg" style="background: linear-gradient(135deg, #0f1a2e 0%, #1a2840 40%, #2a1f0e 80%, #b87333 130%);"></div>
+        <div class="user-hero-inner">
+            <div class="user-hero-avatar">
+                {# Star / skill icon #}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                     style="width:44px;height:44px;color:rgba(255,255,255,0.75);">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+            </div>
+            <div class="user-hero-meta">
+                <h1 class="user-hero-name">
+                    {% if form.instance.pk %}Edit Skill Tag{% else %}New Skill Tag{% endif %}
+                </h1>
+                <div class="user-hero-sub">
+                    {% if form.instance.pk %}
+                        <span class="hero-chip hero-chip-copper">{{ form.instance.get_name_display }}</span>
+                        <span class="hero-chip hero-chip-muted">Editing existing tag</span>
+                    {% else %}
+                        <span class="hero-chip">Skill Library</span>
+                        <span class="hero-chip hero-chip-muted">Pick from defined choices</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="user-hero-actions">
+                <a href="{% url 'accounts:skill_list' %}" class="hero-btn hero-btn-ghost">← Back</a>
+            </div>
+        </div>
     </div>
 
-    <form method="post" class="form-card">
+    {% if form.non_field_errors %}
+        <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" id="skillForm">
         {% csrf_token %}
 
-        <div class="form-section">
-            {% for field in form %}
-            <div class="form-group" style="margin-bottom: 4px;">
-                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}{{ field.errors }}{% endif %}
-                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {# Single panel — skill has only one field (name select) #}
+        <section class="panel">
+            <header class="panel-head">
+                <span class="panel-num">01</span>
+                <div>
+                    <h2>Skill Name</h2>
+                    <p>Choose from the predefined skill catalogue.</p>
+                </div>
+            </header>
+
+            <div class="panel-body">
+                {# Render name field as chip-picker since it's a choice field #}
+                <div class="field">
+                    <label>Skill *</label>
+                    <div class="chip-picker chip-picker-single" id="skillChips"
+                         data-target="{{ form.name.id_for_label }}">
+                        {% for val, lbl in form.name.field.choices %}
+                            {% if val %}
+                            <span class="chip-pick {% if form.name.value == val %}is-on{% endif %}"
+                                  data-value="{{ val }}">{{ lbl }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    {# Hidden Django select — submits actual value #}
+                    <div style="display:none;">{{ form.name }}</div>
+                    {% if form.name.errors %}
+                        <small class="field-error">{{ form.name.errors|join:" " }}</small>
+                    {% endif %}
+                    <small>Each skill can only be added once (unique constraint).</small>
+                </div>
+
+                {# Live preview of how chip appears on Team Members list #}
+                <div id="skillPreviewWrap" style="display:none;margin-top:4px;">
+                    <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:8px;">
+                        Preview on user list
+                    </div>
+                    <span id="skillPreviewChip"
+                          style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.04em;background:var(--status-info-bg);color:var(--status-info-text);">
+                    </span>
+                </div>
             </div>
-            {% endfor %}
-        </div>
+        </section>
 
         <div class="form-actions">
-            <button type="submit" class="btn-primary">{% if form.instance.pk %}Update Skill{% else %}Create Skill{% endif %}</button>
-            <a href="{% url 'accounts:skill_list' %}" class="btn-cancel">Cancel</a>
+            <a href="{% url 'accounts:skill_list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                {% if form.instance.pk %}Update Skill{% else %}Add Skill{% endif %}
+            </button>
         </div>
     </form>
 </div>
+
+<script>
+/* ── Single-select chip picker — skill name ─────────────────────────────── */
+document.querySelectorAll('.chip-picker-single').forEach(function (picker) {
+    var targetId = picker.dataset.target;
+    var selectEl = document.getElementById(targetId);
+
+    picker.querySelectorAll('.chip-pick').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            picker.querySelectorAll('.chip-pick').forEach(c => c.classList.remove('is-on'));
+            chip.classList.add('is-on');
+            if (selectEl) selectEl.value = chip.dataset.value;
+            updatePreview(chip.textContent.trim());
+        });
+    });
+});
+
+/* ── Skill preview — shows how it looks as a tag on user list ── */
+function updatePreview(label) {
+    var wrap = document.getElementById('skillPreviewWrap');
+    var chip = document.getElementById('skillPreviewChip');
+    if (label) {
+        wrap.style.display = 'block';
+        chip.textContent = label;
+    } else {
+        wrap.style.display = 'none';
+    }
+}
+
+// Seed preview if editing an existing skill
+var onChip = document.querySelector('.chip-pick.is-on');
+if (onChip) updatePreview(onChip.textContent.trim());
+</script>
+
+<style>
+{% include 'accounts/_user_form_styles.html' %}
+</style>
 {% endblock %}

@@ -328,6 +328,34 @@
             color: var(--nav-text-muted);
             padding: 0 10px;
             margin-bottom: 6px;
+            /* Accordion trigger — click karo to collapse/expand items */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .nav-chevron {
+            flex-shrink: 0;
+            width: 11px;
+            height: 11px;
+            transition: transform 0.22s ease;
+            opacity: 0.6;
+        }
+        .nav-section.collapsed .nav-chevron {
+            transform: rotate(-90deg);
+        }
+        .nav-section-items {
+            overflow: hidden;
+            /* max-height transition: open → large value, closed → 0 */
+            max-height: 800px;
+            opacity: 1;
+            transition: max-height 0.28s ease-out, opacity 0.2s ease;
+        }
+        .nav-section.collapsed .nav-section-items {
+            max-height: 0;
+            opacity: 0;
         }
 
         .nav-link {
@@ -1008,11 +1036,26 @@
         .col-full { grid-column: 1 / -1; }
 
         .form-actions {
+            position: sticky;
+            bottom: 12px;
             display: flex;
             gap: 12px;
-            padding-top: 24px;
-            border-top: 1px solid var(--cream-3);
-            margin-top: 8px;
+            justify-content: flex-end;
+            padding: 14px 22px;
+            margin-top: 24px;
+            background: rgba(250, 247, 242, 0.20);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 213, 195, 0.25);
+            border-radius: 14px;
+            box-shadow: 0 10px 30px -8px rgba(14,11,9,0.14);
+            z-index: 10;
+        }
+        html[data-theme="dark"] .form-actions {
+            background: rgba(28, 28, 30, 0.20);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-color: rgba(58, 58, 62, 0.25);
         }
 
         /* Form errors block */
@@ -1523,17 +1566,24 @@
         <!-- Navigation — rendered from the permission-filtered sidebar registry -->
         <nav class="sidebar-nav">
             {% for section in sidebar_menu %}
-            <div class="nav-section">
-                <p class="nav-section-label">{{ section.label }}</p>
-                {% for item in section.items %}
-                    {% with url_name=item.url_name %}
-                    <a href="{{ item.url }}"
-                       class="nav-link{% for m in item.match %}{% if m in request.path %} active{% endif %}{% endfor %}">
-                        {% include 'inventory/_nav_icon.html' %}
-                        {{ item.label }}
-                    </a>
-                    {% endwith %}
-                {% endfor %}
+            <div class="nav-section" data-section="{{ section.label }}">
+                <p class="nav-section-label">
+                    {{ section.label }}
+                    <svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </p>
+                <div class="nav-section-items">
+                    {% for item in section.items %}
+                        {% with url_name=item.url_name %}
+                        <a href="{{ item.url }}"
+                           class="nav-link{% for m in item.match %}{% if m in request.path %} active{% endif %}{% endfor %}">
+                            {% include 'inventory/_nav_icon.html' %}
+                            {{ item.label }}
+                        </a>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
             </div>
             {% endfor %}
         </nav>
@@ -1670,7 +1720,45 @@
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') document.body.classList.remove('sidebar-open');
     });
+    /* Persist sidebar scroll position across page navigations */
+    (function () {
+        var nav = document.querySelector('.sidebar-nav');
+        if (!nav) return;
+        var saved = sessionStorage.getItem('ke-sidebar-scroll');
+        if (saved) nav.scrollTop = parseInt(saved, 10);
+        nav.addEventListener('scroll', function () {
+            sessionStorage.setItem('ke-sidebar-scroll', nav.scrollTop);
+        }, { passive: true });
+    })();
 
+    /* ── Collapsible nav sections ──────────────────────────────────────
+       Click on section label → toggle collapse. State persists in
+       sessionStorage. Section with an active link always stays open. */
+    (function () {
+        var STORE_KEY = 'ke-nav-collapsed';
+        var saved = {};
+        try { saved = JSON.parse(sessionStorage.getItem(STORE_KEY) || '{}'); } catch (e) {}
+
+        document.querySelectorAll('.nav-section').forEach(function (section) {
+            var key = section.dataset.section;
+            var items = section.querySelector('.nav-section-items');
+            var label = section.querySelector('.nav-section-label');
+            if (!label || !items) return;
+
+            var hasActive = items.querySelector('.nav-link.active');
+
+            // Collapse if user previously collapsed AND no active link inside
+            if (!hasActive && saved[key] === true) {
+                section.classList.add('collapsed');
+            }
+
+            label.addEventListener('click', function () {
+                section.classList.toggle('collapsed');
+                saved[key] = section.classList.contains('collapsed');
+                try { sessionStorage.setItem(STORE_KEY, JSON.stringify(saved)); } catch (e) {}
+            });
+        });
+    })();
     /* ── Back-button guard after logout ──────────────────────────── */
     /* Chrome's bfcache restores the old page from memory without a
        server hit. When event.persisted is true, force a real reload

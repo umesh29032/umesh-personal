@@ -21,6 +21,7 @@ urlpatterns = [
     path("app/", include("accounts.urls")),
     path("accounts/", include("allauth.urls")),       # django-allauth: Google OAuth, signup flow
     path("inventory/", include("inventory.urls")),
+    path("storefront/", include("storefront.urls")),  # authenticated storefront management
 ]
 
 if settings.DEBUG:

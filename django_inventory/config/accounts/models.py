@@ -140,7 +140,17 @@ class User(AbstractUser):
         blank=True,
         related_name='users',
         verbose_name="Role",
-        help_text="RBAC role — determines permissions and sidebar visibility.",
+        help_text="Primary RBAC role — determines main permissions and sidebar.",
+    )
+    # Extra roles allow granting additional access on top of the primary role.
+    # Example: a Manager who also needs listing_team access to manage storefront.
+    # permission_service.user_has_role() checks both role and extra_roles.
+    extra_roles = models.ManyToManyField(
+        'inventory.Role',
+        blank=True,
+        related_name='extra_users',
+        verbose_name="Extra Roles",
+        help_text="Additional access grants. Stack on top of the primary role.",
     )
 
     USERNAME_FIELD = "email"

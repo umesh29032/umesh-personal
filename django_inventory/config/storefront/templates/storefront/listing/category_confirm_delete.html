@@ -1,0 +1,61 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Category{% endblock %}
+
+{% block content %}
+<!-- confirm-card CSS class base.html mein hai — delete confirmation ka reusable pattern -->
+<div style="max-width: 480px; margin: 60px auto;">
+
+    <div class="confirm-card">
+
+        <!-- Header: danger icon + title -->
+        <div class="confirm-card-head">
+            <div class="confirm-icon confirm-icon-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                </svg>
+            </div>
+            <h2>Delete this category?</h2>
+        </div>
+
+        <!-- Body: category name + linked products warning -->
+        <div class="confirm-card-body">
+            <p>You are about to permanently delete:</p>
+            <p style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 10px 0 4px;">{{ object.name }}</p>
+
+            <!-- object.products.count — reverse FK query: Category se linked FeaturedProducts count karo -->
+            {% with product_count=object.products.count %}
+                {% if product_count > 0 %}
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+                        <strong style="color: var(--text-primary);">{{ product_count }} product{{ product_count|pluralize }}</strong>
+                        linked to this category — they will be <strong>unlinked (not deleted)</strong>.
+                    </p>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Warning box — status-danger tokens dark mode mein auto-flip karte hain -->
+            <p style="color: var(--status-danger-text); background: var(--status-danger-bg); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 8px;">
+                ⚠️ This cannot be undone. Products unlinked ho jaayenge, delete nahi.
+            </p>
+        </div>
+
+        <!-- Footer: Cancel + confirm delete ──
+           POST se Django DeleteView ka form_valid() trigger hota hai,
+           jo ListingService.delete_category() call karta hai. -->
+        <div class="confirm-card-foot">
+            <a href="{% url 'storefront:category_list' %}" class="btn btn-ghost">Cancel</a>
+            <form method="post" style="display: contents;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" style="background: #dc2626; color: white;">
+                    Yes, Delete Category
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

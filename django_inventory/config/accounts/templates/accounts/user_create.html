@@ -158,6 +158,21 @@
                             </select>
                             <small>Backward-compat. Keep matching the Role above.</small>
                         </div>
+
+                        <div class="field">
+                            <label>Extra Roles <span class="label-unit">(optional)</span></label>
+                            <div class="chip-picker">
+                                {% for value, label in form.extra_roles.field.choices %}
+                                    {% if value %}
+                                    <label class="chip-pick">
+                                        <input type="checkbox" name="extra_roles" value="{{ value }}">
+                                        <span>{{ label }}</span>
+                                    </label>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            <small>Stack additional access on top of the primary role (e.g. listing_team for storefront).</small>
+                        </div>
                     </div>
                 </section>
 

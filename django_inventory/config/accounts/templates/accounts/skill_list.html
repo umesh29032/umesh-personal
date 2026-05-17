@@ -1,50 +1,198 @@
 {% extends 'accounts/base.html' %}
 
-{% block title %}Skill Management{% endblock %}
+{% block title %}Skill Tags{% endblock %}
+{% block page_title %}Skill Tags{% endblock %}
+
+{% block extra_head %}
+<!-- DataTables CSS — table sort + pagination ke liye -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<style>
+.dt-search-row {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-2);
+}
+.dataTables_filter { display: flex; align-items: center; gap: 8px; width: 100%; }
+.dataTables_filter label {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-secondary); width: 100%;
+}
+.dataTables_filter input[type="search"] {
+    flex: 1; padding: 9px 14px;
+    border: 1.5px solid var(--border-default); border-radius: 8px;
+    background: var(--surface); font-family: inherit; font-size: 13px;
+    color: var(--text-primary); outline: none; min-width: 220px; min-height: 40px;
+    transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
+}
+.dataTables_filter input[type="search"]:focus { border-color: var(--copper); }
+.dataTables_filter input[type="search"]::placeholder { color: var(--text-tertiary); }
+
+.dt-bottom {
+    padding: 12px 24px; border-top: 1px solid var(--border-subtle);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px;
+}
+.dataTables_info { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.dataTables_paginate { display: flex; gap: 4px; align-items: center; }
+.dataTables_paginate .paginate_button {
+    display: inline-flex !important; align-items: center; justify-content: center;
+    min-width: 32px; height: 32px; padding: 0 8px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; color: var(--stone) !important;
+    border: 1.5px solid transparent !important; background: transparent !important;
+    box-shadow: none !important; cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.dataTables_paginate .paginate_button:hover:not(.disabled) {
+    background: var(--surface-2) !important; color: var(--text-primary) !important;
+}
+.dataTables_paginate .paginate_button.current,
+.dataTables_paginate .paginate_button.current:hover {
+    background: var(--copper) !important; color: #fff !important;
+}
+.dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
+.dataTables_length { display: none; }
+table.dataTable thead th, table.dataTable thead td {
+    border-bottom: 2px solid var(--border-default) !important;
+}
+table.dataTable thead .sorting::after,
+table.dataTable thead .sorting_asc::after,
+table.dataTable thead .sorting_desc::after { opacity: 0.55; }
+
+/* ── Skill preview chip ── */
+.skill-preview-chip {
+    display: inline-block; padding: 3px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: .04em;
+    background: var(--status-info-bg); color: var(--status-info-text);
+}
+
+html[data-theme="dark"] .dataTables_filter input[type="search"] {
+    background: var(--card-bg); color: var(--ink); border-color: var(--cream-3);
+}
+html[data-theme="dark"] .dataTables_paginate .paginate_button { color: var(--stone) !important; }
+html[data-theme="dark"] table.dataTable thead th,
+html[data-theme="dark"] table.dataTable thead td { border-bottom-color: var(--cream-3) !important; }
+
+@media (max-width: 600px) {
+    .dt-search-row { padding: 12px 16px; }
+    .dataTables_filter { flex-direction: column; align-items: stretch; }
+    .dataTables_filter input[type="search"] { min-width: 0; width: 100%; }
+    .dt-bottom { flex-direction: column; align-items: center; gap: 6px; }
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div style="max-width: 800px; margin: 0 auto;">
-    
-    <!-- Header -->
+
+    <!-- ── Page header ── -->
     <div class="page-header">
         <div class="page-header-text">
-            <h1>Skills</h1>
-            <p>Manage available skills for users.</p>
+            <h1>Skill Tags</h1>
+            <p>Define available skills that can be assigned to team members.</p>
         </div>
-        <a href="{% url 'accounts:skill_add' %}" class="btn-primary">+ Add Skill</a>
+        <a href="{% url 'accounts:skill_add' %}" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Skill
+        </a>
     </div>
 
-    <!-- Main Card -->
-    <div class="card" style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(14,11,9,0.06); border: 1px solid var(--cream-3);">
+    <!-- ── KPI card ── -->
+    <div class="kpis" style="margin-bottom: 24px;">
+        <div class="kpi">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Total Skills</div>
+            <div class="kpi-value">{{ skills|length }}</div>
+            <div class="kpi-sub">Available skill tags</div>
+        </div>
+    </div>
+
+    <div class="card card-clip">
+
+        {% if skills %}
+        <!-- ── Skills table — id="skills-dt" targets DataTables ── -->
         <div class="table-responsive">
-            <table class="table" style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background: var(--gray-50); border-bottom: 1px solid var(--gray-200);">
-                        <th style="padding: 16px 24px; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gray-500);">Skill Name</th>
-                        <th style="padding: 16px 24px; text-align: right; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--gray-500);">Actions</th>
+            <table id="skills-dt" style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead style="background: var(--surface-2);">
+                    <tr>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Skill Name</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Preview</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);text-align:right;" data-orderable="false">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for skill in skills %}
-                    <tr style="border-bottom: 1px solid var(--gray-100);">
-                        <td data-label="Skill Name" style="padding: 16px 24px; font-weight: 500; color: var(--gray-900);">
-                            {{ skill.name }}
+                    <tr style="border-bottom: 1px solid var(--border-subtle);">
+
+                        <td style="padding:16px 20px;font-weight:600;color:var(--text-primary);font-size:14px;" data-label="Skill Name">
+                            {{ skill.get_name_display }}
                         </td>
-                        <td data-label="Actions" class="td-actions" style="padding: 16px 24px; text-align: right;">
-                            <a href="{% url 'accounts:skill_edit' skill.pk %}" style="text-decoration: none; font-size: 14px; margin-right: 12px;" title="Edit">✏️</a>
-                            <a href="{% url 'accounts:skill_delete' skill.pk %}" style="text-decoration: none; font-size: 14px;" title="Delete">🗑️</a>
+
+                        <!-- Preview column — how chip looks on user list ── -->
+                        <td style="padding:16px 20px;" data-label="Preview">
+                            <span class="skill-preview-chip">{{ skill.get_name_display }}</span>
                         </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="2" style="text-align: center; padding: 48px;">
-                            <p style="color: var(--gray-500);">No skills found. Add your first skill!</p>
+
+                        <td style="padding:16px 20px;text-align:right;" class="td-actions" data-label="Actions">
+                            <a href="{% url 'accounts:skill_edit' skill.pk %}" class="action-link" title="Edit skill">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Edit
+                            </a>
+                            <a href="{% url 'accounts:skill_delete' skill.pk %}" class="action-link action-link-danger" title="Delete skill">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                                Delete
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </div>
+
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+            </div>
+            <h3>No skill tags yet</h3>
+            <p>Add your first skill tag so it can be assigned to team members.</p>
+            <a href="{% url 'accounts:skill_add' %}" class="btn btn-primary">+ Add Skill</a>
+        </div>
+        {% endif %}
+
+    </div><!-- end .card -->
+
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function () {
+    if (!$('#skills-dt').length) return;
+
+    $('#skills-dt').DataTable({
+        searching: true,
+        ordering: true,
+        paging: true,
+        pageLength: 25,
+        dom: '<"dt-search-row"f>rt<"dt-bottom"ip>',
+        language: {
+            search: 'Search:',
+            searchPlaceholder: 'Type to filter skills…',
+            info: 'Showing _START_–_END_ of _TOTAL_ skills',
+            infoEmpty: 'No skills found',
+            infoFiltered: '(filtered from _MAX_ total)',
+            emptyTable: 'No skills to display',
+            paginate: { previous: '←', next: '→' }
+        },
+        columnDefs: [{ orderable: false, targets: [1, 2] }]
+    });
+});
+</script>
 {% endblock %}

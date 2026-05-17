@@ -15,7 +15,8 @@ class ClothRollListView(LoginRequiredMixin, ListView):
     model = ClothRoll
     template_name = "inventory/clothroll_list.html"
     context_object_name = "cloth_rolls"
-    paginate_by = 10
+    # Disable Django pagination — DataTables handles client-side paging
+    paginate_by = None
     ordering = ['-created_at']
 
     def get_queryset(self):
@@ -42,6 +43,12 @@ class ClothRollListView(LoginRequiredMixin, ListView):
             ('EXHAUSTED', 'Exhausted'),
         ]
         context['type_choices'] = ClothType.choices
+        # KPI counts — full unfiltered queryset for accurate totals
+        all_rolls = ClothRoll.objects.all()
+        context['total_rolls'] = all_rolls.count()
+        context['available_count'] = all_rolls.filter(status='AVAILABLE').count()
+        context['partial_count'] = all_rolls.filter(status='PARTIALLY_USED').count()
+        context['exhausted_count'] = all_rolls.filter(status='EXHAUSTED').count()
         return context
 
 
