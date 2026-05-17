@@ -4,62 +4,10 @@
 {% block page_title %}Team Members{% endblock %}
 
 {% block extra_head %}
-<!-- DataTables CSS — table ko sort indicators aur default styling deta hai -->
+<!-- DataTables CSS only — overrides + filter-chip styles live in base.html now -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
 <style>
-/* ── DataTables overrides: design vars se replace karna ── */
-.dt-search-row {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border-default);
-    background: var(--surface-2);
-}
-.dataTables_filter { display: flex; align-items: center; gap: 8px; width: 100%; }
-.dataTables_filter label {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--text-secondary); width: 100%;
-}
-.dataTables_filter input[type="search"] {
-    flex: 1; padding: 9px 14px;
-    border: 1.5px solid var(--border-default); border-radius: 8px;
-    background: var(--surface); font-family: inherit; font-size: 13px;
-    color: var(--text-primary); outline: none; min-width: 220px; min-height: 40px;
-    transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
-}
-.dataTables_filter input[type="search"]:focus { border-color: var(--copper); }
-.dataTables_filter input[type="search"]::placeholder { color: var(--text-tertiary); }
-
-.dt-bottom {
-    padding: 12px 24px; border-top: 1px solid var(--border-subtle);
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 8px;
-}
-.dataTables_info { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-.dataTables_paginate { display: flex; gap: 4px; align-items: center; }
-.dataTables_paginate .paginate_button {
-    display: inline-flex !important; align-items: center; justify-content: center;
-    min-width: 32px; height: 32px; padding: 0 8px; border-radius: 6px;
-    font-size: 12px; font-weight: 600; color: var(--stone) !important;
-    border: 1.5px solid transparent !important; background: transparent !important;
-    box-shadow: none !important; cursor: pointer; transition: background 0.12s, color 0.12s;
-}
-.dataTables_paginate .paginate_button:hover:not(.disabled) {
-    background: var(--surface-2) !important; color: var(--text-primary) !important;
-}
-.dataTables_paginate .paginate_button.current,
-.dataTables_paginate .paginate_button.current:hover {
-    background: var(--copper) !important; color: #fff !important;
-}
-.dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
-.dataTables_length { display: none; }
-table.dataTable thead th, table.dataTable thead td {
-    border-bottom: 2px solid var(--border-default) !important;
-}
-table.dataTable thead .sorting::after,
-table.dataTable thead .sorting_asc::after,
-table.dataTable thead .sorting_desc::after { opacity: 0.55; }
-
-/* ── Skill chips inside table rows ── */
+/* ── Skill chips inside table rows (different from filter chips) ── */
 .skill-tag {
     display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px;
     font-weight: 600; letter-spacing: .04em; margin: 2px 2px 2px 0;
@@ -67,33 +15,7 @@ table.dataTable thead .sorting_desc::after { opacity: 0.55; }
     white-space: nowrap;
 }
 
-/* ── Skill filter chips in toolbar ── */
-.skill-filter-chip {
-    display: inline-flex; align-items: center; padding: 5px 13px; border-radius: 20px;
-    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
-    border: 1.5px solid var(--border-default); background: var(--surface);
-    color: var(--text-secondary); user-select: none; letter-spacing: .03em;
-}
-.skill-filter-chip:hover { border-color: var(--copper); color: var(--copper); }
-.skill-filter-chip.active {
-    background: var(--copper); border-color: var(--copper); color: #fff;
-}
-
-/* ── Dark mode overrides ── */
-html[data-theme="dark"] .dataTables_filter input[type="search"] {
-    background: var(--card-bg); color: var(--ink); border-color: var(--cream-3);
-}
-html[data-theme="dark"] .dataTables_paginate .paginate_button { color: var(--stone) !important; }
-html[data-theme="dark"] table.dataTable thead th,
-html[data-theme="dark"] table.dataTable thead td { border-bottom-color: var(--cream-3) !important; }
-html[data-theme="dark"] .skill-filter-chip { background: var(--surface-2); }
-
-@media (max-width: 600px) {
-    .dt-search-row { padding: 12px 16px; }
-    .dataTables_filter { flex-direction: column; align-items: stretch; }
-    .dataTables_filter input[type="search"] { min-width: 0; width: 100%; }
-    .dt-bottom { flex-direction: column; align-items: center; gap: 6px; }
-}
+/* Filter row styling lives in base.html as .dt-filter-row */
 </style>
 {% endblock %}
 
@@ -136,34 +58,32 @@ html[data-theme="dark"] .skill-filter-chip { background: var(--surface-2); }
         </div>
     </div>
 
-    <!-- ── Skills filter toolbar ── -->
-    {% if skills %}
-    <form method="get" class="ke-toolbar" style="flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
-        <label style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;">
-            Skills:
-        </label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-            {% for skill in skills %}
-                <label class="skill-filter-chip {% if skill.id in selected_skills %}active{% endif %}">
-                    <input type="checkbox" name="skills" value="{{ skill.id }}"
-                           {% if skill.id in selected_skills %}checked{% endif %}
-                           onchange="this.form.submit()" style="display:none;">
-                    {{ skill.get_name_display }}
-                </label>
-            {% endfor %}
-        </div>
-        {% if selected_skills %}
-            <a href="{% url 'accounts:user_list' %}" class="btn btn-ghost" style="font-size:11px;margin-left:auto;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                Clear
-            </a>
-        {% endif %}
-    </form>
-    {% endif %}
-
     <div class="card card-clip">
+
+        {% if skills %}
+        <!-- Skills filter row — JS moves this after dt-search-row on init. Single-row, horizontal scroll on narrow screens. -->
+        <div id="dt-skills-row" class="dt-filter-row" style="display:none;">
+            <form method="get" style="display:contents;">
+                <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);white-space:nowrap;">Filter by skill:</span>
+                {% for skill in skills %}
+                    <label class="skill-filter-chip {% if skill.id in selected_skills %}active{% endif %}">
+                        <input type="checkbox" name="skills" value="{{ skill.id }}"
+                               {% if skill.id in selected_skills %}checked{% endif %}
+                               onchange="this.form.submit()" style="display:none;">
+                        {{ skill.get_name_display }}
+                    </label>
+                {% endfor %}
+                {% if selected_skills %}
+                    <a href="{% url 'accounts:user_list' %}" class="btn btn-ghost" style="font-size:11px;margin-left:auto;white-space:nowrap;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Clear
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+        {% endif %}
 
         {% if users %}
         <!-- ── Users table — id="users-dt" targets DataTables init ── -->
@@ -292,27 +212,15 @@ html[data-theme="dark"] .skill-filter-chip { background: var(--surface-2); }
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script>
 $(document).ready(function () {
-    if (!$('#users-dt').length) return;
-
-    $('#users-dt').DataTable({
-        searching: true,
-        ordering: true,
-        paging: true,
+    // Empty-state path — no table, just show skills filter
+    if (!$('#users-dt').length) { $('#dt-skills-row').show(); return; }
+    // window.initFancyDataTable defined in base.html — handles init + DOM detach + filter injection
+    initFancyDataTable('#users-dt', {
         pageLength: 15,
-        dom: '<"dt-search-row"f>rt<"dt-bottom"ip>',
-        language: {
-            search: 'Search:',
-            searchPlaceholder: 'Type to filter members…',
-            info: 'Showing _START_–_END_ of _TOTAL_ members',
-            infoEmpty: 'No members found',
-            infoFiltered: '(filtered from _MAX_ total)',
-            emptyTable: 'No members to display',
-            paginate: { previous: '←', next: '→' }
-        },
-        // Skills column (index 2) has HTML chips — DataTables reads text, not HTML, so it's fine
-        columnDefs: [
-            { orderable: false, targets: [2, 5] }
-        ]
+        itemName: 'members',
+        searchPlaceholder: 'Type to filter members…',
+        filterRowId: 'dt-skills-row',
+        columnDefs: [{ orderable: false, targets: [2, 5] }]
     });
 });
 </script>

@@ -3,133 +3,8 @@
 {% block page_title %}Storefront Products{% endblock %}
 
 {% block extra_head %}
-<!-- DataTables CSS CDN — table ko sort indicators aur default styling deta hai -->
+<!-- DataTables CSS only — all overrides live in base.html now -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
-<style>
-/* ──────────────────────────────────────────────────────────────────
-   DataTables override: apne design vars se default DT styles replace
-   karna — taaki poora app ek jaisa dikhey (copper/cream/ink theme).
-   ────────────────────────────────────────────────────────────────── */
-
-/* Search input wrapper */
-.dt-search-row {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border-default);
-    background: var(--surface-2);
-}
-.dataTables_filter {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-}
-/* "Search:" label ke andar input hai — label ko flex row banao */
-.dataTables_filter label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    width: 100%;
-}
-/* Search input styling — .search-input class jaisa look */
-.dataTables_filter input[type="search"] {
-    flex: 1;
-    padding: 9px 14px;
-    border: 1.5px solid var(--border-default);
-    border-radius: 8px;
-    background: var(--surface);
-    font-family: inherit;
-    font-size: 13px;
-    color: var(--text-primary);
-    outline: none;
-    min-width: 220px;
-    min-height: 40px;
-    transition: border-color 0.2s;
-    -webkit-appearance: none;
-}
-.dataTables_filter input[type="search"]:focus { border-color: var(--copper); }
-.dataTables_filter input[type="search"]::placeholder { color: var(--text-tertiary); }
-
-/* Bottom bar: info text + pagination buttons */
-.dt-bottom {
-    padding: 12px 24px;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-.dataTables_info { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-
-/* Pagination buttons — .page-link class jaisa look */
-.dataTables_paginate { display: flex; gap: 4px; align-items: center; }
-.dataTables_paginate .paginate_button {
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--stone) !important;
-    border: 1.5px solid transparent !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-}
-.dataTables_paginate .paginate_button:hover:not(.disabled) {
-    background: var(--surface-2) !important;
-    color: var(--text-primary) !important;
-}
-/* Active/current page button — copper background */
-.dataTables_paginate .paginate_button.current,
-.dataTables_paginate .paginate_button.current:hover {
-    background: var(--copper) !important;
-    color: #fff !important;
-}
-.dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Length selector chhupao — hum pageLength fix karte hain */
-.dataTables_length { display: none; }
-
-/* Column header borders */
-table.dataTable thead th,
-table.dataTable thead td {
-    border-bottom: 2px solid var(--border-default) !important;
-}
-/* Sort arrow opacity */
-table.dataTable thead .sorting::after,
-table.dataTable thead .sorting_asc::after,
-table.dataTable thead .sorting_desc::after { opacity: 0.55; }
-
-/* ── Dark mode: DataTables elements ko dark-friendly banana ── */
-html[data-theme="dark"] .dataTables_filter input[type="search"] {
-    background: var(--card-bg);
-    color: var(--ink);
-    border-color: var(--cream-3);
-}
-html[data-theme="dark"] .dataTables_paginate .paginate_button { color: var(--stone) !important; }
-html[data-theme="dark"] table.dataTable thead th,
-html[data-theme="dark"] table.dataTable thead td {
-    border-bottom-color: var(--cream-3) !important;
-}
-
-/* Mobile: search input full-width stack */
-@media (max-width: 600px) {
-    .dt-search-row { padding: 12px 16px; }
-    .dataTables_filter { flex-direction: column; align-items: stretch; }
-    .dataTables_filter input[type="search"] { min-width: 0; width: 100%; }
-    .dt-bottom { flex-direction: column; align-items: center; gap: 6px; }
-}
-</style>
 {% endblock %}
 
 {% block content %}
@@ -347,38 +222,12 @@ html[data-theme="dark"] table.dataTable thead td {
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script>
 $(document).ready(function () {
-
-    // Sirf tab initialize karo jab table exist kare (empty state mein table nahi hota)
-    if (!$('#products-dt').length) return;
-
-    // ── DataTable initialize karo ──────────────────────────────────
-    // searching:true  → type karo, table rows filter ho jaati hain (client-side)
-    // ordering:true   → column header click = ascending/descending sort
-    // paging:true     → zyada rows hone par pages milte hain
-    // dom string explain:
-    //   '<"dt-search-row"f>' → search input ko "dt-search-row" div mein daalo
-    //   'r'                  → processing spinner (AJAX ke liye, yahan unnecessary)
-    //   't'                  → actual table
-    //   '<"dt-bottom"ip>'    → info + pagination ko "dt-bottom" div mein daalo
-    $('#products-dt').DataTable({
-        searching: true,
-        ordering: true,
-        paging: true,
+    // window.initFancyDataTable defined in base.html — DT init + DOM detach fix in one call
+    initFancyDataTable('#products-dt', {
         pageLength: 15,
-        dom: '<"dt-search-row"f>rt<"dt-bottom"ip>',
-        language: {
-            search: 'Search:',
-            searchPlaceholder: 'Type to filter products…',
-            info: 'Showing _START_–_END_ of _TOTAL_ products',
-            infoEmpty: 'No products found',
-            infoFiltered: '(filtered from _MAX_ total)',
-            emptyTable: 'No products to display',
-            paginate: { previous: '←', next: '→' }
-        },
-        // Actions column (index 6) pe sorting off karo — koi meaningful sort nahi
-        columnDefs: [
-            { orderable: false, targets: [0, 6] }
-        ]
+        itemName: 'products',
+        searchPlaceholder: 'Type to filter products…',
+        columnDefs: [{ orderable: false, targets: [0, 6] }]
     });
 });
 </script>

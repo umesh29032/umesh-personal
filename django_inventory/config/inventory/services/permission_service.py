@@ -60,14 +60,18 @@ def user_role_codes(user) -> set[str]:
         codes.add(primary)
     # extra_roles is a M2M; only available on the real User model (not in tests
     # that use the ORM directly), so guard with getattr.
+    # M2M descriptor only resolves on User instances saved with the real model;
+    # tests using bare ORM mocks may expose `extra_roles` as a plain attribute
+    # without `.all()`. Guard with AttributeError, not bare except.
     extra_roles_qs = getattr(user, 'extra_roles', None)
     if extra_roles_qs is not None:
         try:
-            for r in extra_roles_qs.all():
-                if r.code:
-                    codes.add(r.code)
-        except Exception:
-            pass
+            roles_iter = extra_roles_qs.all()
+        except (AttributeError, TypeError):
+            roles_iter = ()
+        for r in roles_iter:
+            if r.code:
+                codes.add(r.code)
     return codes
 
 
@@ -137,7 +141,7 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
         items=(
             MenuItem('Products', 'inventory:product_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('products',)),
+                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('inventory/products',)),
             MenuItem('Cloth Stock', 'inventory:cloth_roll_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('cloth',)),
         ),
@@ -147,7 +151,7 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
         items=(
             MenuItem('Batch Types', 'inventory:batch_type_list', match=('batch-types',)),
-            MenuItem('Stages', 'inventory:stage_list', match=('stages',)),
+            MenuItem('Stages', 'inventory:stage_list', match=('inventory/stages',)),
             MenuItem('Machines', 'inventory:machine_list', match=('machines',)),
         ),
     ),

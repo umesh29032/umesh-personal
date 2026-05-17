@@ -9,7 +9,7 @@ from .worker_service import WorkerService
 from .permission_service import (
     build_menu_for, user_has_perm, user_has_role, user_role_code, user_role_codes,
     ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR, ROLE_LISTING_TEAM,
-    STOREFRONT_ROLES,
+    MANAGEMENT_ROLES, STOREFRONT_ROLES,
     permissions_qs_by_app,
 )
 
@@ -34,5 +34,6 @@ __all__ = [
     'ROLE_MANAGER',
     'ROLE_KARIGAR',
     'ROLE_LISTING_TEAM',
+    'MANAGEMENT_ROLES',
     'STOREFRONT_ROLES',
 ]

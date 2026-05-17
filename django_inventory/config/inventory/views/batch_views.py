@@ -10,7 +10,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView, D
 from ..models import Batch, BatchClothAssignment, BatchUserAssignment, BatchOperation
 from ..forms import BatchForm, BatchClothAssignmentForm, BatchUserAssignmentForm, BatchOperationForm
 from ..constants import BatchStatus
-from ..services import BatchService, VALID_TRANSITIONS
+from ..services import BatchService, VALID_TRANSITIONS, MANAGEMENT_ROLES, user_has_role
 from .mixins import ManagerOrAdminMixin
 
 
@@ -126,8 +126,7 @@ class BatchDetailView(LoginRequiredMixin, DetailView):
         context['total_reserved'] = agg['total_reserved'] or 0
         context['total_consumed'] = agg['total_consumed'] or 0
         context['total_wastage'] = agg['total_wastage'] or 0
-        u = self.request.user
-        context['can_manage'] = u.is_superuser or getattr(u, 'user_type', '') in ('admin', 'manager')
+        context['can_manage'] = user_has_role(self.request.user, MANAGEMENT_ROLES)
         context['allowed_transitions'] = VALID_TRANSITIONS.get(batch.status, [])
         return context
 
