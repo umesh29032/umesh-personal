@@ -4,79 +4,14 @@
 {% block page_title %}Skill Tags{% endblock %}
 
 {% block extra_head %}
-<!-- DataTables CSS — table sort + pagination ke liye -->
+<!-- DataTables CSS only — all overrides live in base.html now -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
 <style>
-.dt-search-row {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border-default);
-    background: var(--surface-2);
-}
-.dataTables_filter { display: flex; align-items: center; gap: 8px; width: 100%; }
-.dataTables_filter label {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-    color: var(--text-secondary); width: 100%;
-}
-.dataTables_filter input[type="search"] {
-    flex: 1; padding: 9px 14px;
-    border: 1.5px solid var(--border-default); border-radius: 8px;
-    background: var(--surface); font-family: inherit; font-size: 13px;
-    color: var(--text-primary); outline: none; min-width: 220px; min-height: 40px;
-    transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
-}
-.dataTables_filter input[type="search"]:focus { border-color: var(--copper); }
-.dataTables_filter input[type="search"]::placeholder { color: var(--text-tertiary); }
-
-.dt-bottom {
-    padding: 12px 24px; border-top: 1px solid var(--border-subtle);
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 8px;
-}
-.dataTables_info { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-.dataTables_paginate { display: flex; gap: 4px; align-items: center; }
-.dataTables_paginate .paginate_button {
-    display: inline-flex !important; align-items: center; justify-content: center;
-    min-width: 32px; height: 32px; padding: 0 8px; border-radius: 6px;
-    font-size: 12px; font-weight: 600; color: var(--stone) !important;
-    border: 1.5px solid transparent !important; background: transparent !important;
-    box-shadow: none !important; cursor: pointer; transition: background 0.12s, color 0.12s;
-}
-.dataTables_paginate .paginate_button:hover:not(.disabled) {
-    background: var(--surface-2) !important; color: var(--text-primary) !important;
-}
-.dataTables_paginate .paginate_button.current,
-.dataTables_paginate .paginate_button.current:hover {
-    background: var(--copper) !important; color: #fff !important;
-}
-.dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
-.dataTables_length { display: none; }
-table.dataTable thead th, table.dataTable thead td {
-    border-bottom: 2px solid var(--border-default) !important;
-}
-table.dataTable thead .sorting::after,
-table.dataTable thead .sorting_asc::after,
-table.dataTable thead .sorting_desc::after { opacity: 0.55; }
-
-/* ── Skill preview chip ── */
+/* ── Skill preview chip (page-specific) ── */
 .skill-preview-chip {
     display: inline-block; padding: 3px 12px; border-radius: 20px;
     font-size: 12px; font-weight: 700; letter-spacing: .04em;
     background: var(--status-info-bg); color: var(--status-info-text);
-}
-
-html[data-theme="dark"] .dataTables_filter input[type="search"] {
-    background: var(--card-bg); color: var(--ink); border-color: var(--cream-3);
-}
-html[data-theme="dark"] .dataTables_paginate .paginate_button { color: var(--stone) !important; }
-html[data-theme="dark"] table.dataTable thead th,
-html[data-theme="dark"] table.dataTable thead td { border-bottom-color: var(--cream-3) !important; }
-
-@media (max-width: 600px) {
-    .dt-search-row { padding: 12px 16px; }
-    .dataTables_filter { flex-direction: column; align-items: stretch; }
-    .dataTables_filter input[type="search"] { min-width: 0; width: 100%; }
-    .dt-bottom { flex-direction: column; align-items: center; gap: 6px; }
 }
 </style>
 {% endblock %}
@@ -174,23 +109,10 @@ html[data-theme="dark"] table.dataTable thead td { border-bottom-color: var(--cr
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script>
 $(document).ready(function () {
-    if (!$('#skills-dt').length) return;
-
-    $('#skills-dt').DataTable({
-        searching: true,
-        ordering: true,
-        paging: true,
+    initFancyDataTable('#skills-dt', {
         pageLength: 25,
-        dom: '<"dt-search-row"f>rt<"dt-bottom"ip>',
-        language: {
-            search: 'Search:',
-            searchPlaceholder: 'Type to filter skills…',
-            info: 'Showing _START_–_END_ of _TOTAL_ skills',
-            infoEmpty: 'No skills found',
-            infoFiltered: '(filtered from _MAX_ total)',
-            emptyTable: 'No skills to display',
-            paginate: { previous: '←', next: '→' }
-        },
+        itemName: 'skills',
+        searchPlaceholder: 'Type to filter skills…',
         columnDefs: [{ orderable: false, targets: [1, 2] }]
     });
 });

@@ -26,13 +26,10 @@ def public_home(request):
     why_cards = WhyUsCard.objects.filter(is_active=True)
     nav_links = NavLink.objects.filter(is_active=True)
 
-    # Group footer links by column
-    footer_links_qs = FooterLink.objects.filter(is_active=True)
-    footer_links = {
-        'products': footer_links_qs.filter(column='products'),
-        'company': footer_links_qs.filter(column='company'),
-        'access': footer_links_qs.filter(column='access'),
-    }
+    # Group footer links by column — single query, group in Python
+    footer_links: dict[str, list] = {'products': [], 'company': [], 'access': []}
+    for link in FooterLink.objects.filter(is_active=True):
+        footer_links.setdefault(link.column, []).append(link)
 
     # Provide default SVGs for items missing custom icons
     for card in showcase_cards:

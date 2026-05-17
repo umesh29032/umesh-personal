@@ -14,6 +14,7 @@ log production mein DEBUG=True chhod dete hain galti se.
 
 from pathlib import Path
 from decouple import config, Csv  # python-decouple: .env file se values padhta hai — credentials code mein hard-code nahi hote
+import dj_database_url  # production mein single DATABASE_URL string parse karta hai (Neon/Render/Heroku style)
 
 # BASE_DIR: is file se 3 parent folders upar jaata hai → project ka root folder milta hai
 # Path(__file__) = yeh .py file ka path
@@ -128,19 +129,35 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-# DATABASES: PostgreSQL connection settings — sab .env se aate hain
+# DATABASES: do tarike se config hota hai
+#   1. Cloud hosts (Neon/Render/Heroku/Railway) ek single DATABASE_URL dete hain — usko parse karo
+#   2. Local dev mein 6 alag-alag DB_* vars from .env (purana tarika)
+# Production deploy time pe sirf .env mein DATABASE_URL=postgres://... daal do, baaki same code chalega
 # CONN_MAX_AGE: DB connection reuse hoti hai 10 minutes tak — har request pe naya connection nahi banana padta (performance)
-DATABASES = {
-    'default': {
-        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),  # PostgreSQL driver
-        'NAME': config('DB_NAME', default='inventory_db'),       # database ka naam
-        'USER': config('DB_USER', default='postgres'),           # DB user
-        'PASSWORD': config('DB_PASSWORD', default='postgres'),   # DB password — .env mein set karo
-        'HOST': config('DB_HOST', default='localhost'),          # DB server address
-        'PORT': config('DB_PORT', default='5432'),               # PostgreSQL default port
-        'CONN_MAX_AGE': 600,  # connection pool: 10 min tak reuse karo, naya connection mat banao
+DATABASE_URL = config('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    # Production path: single connection string. ssl_require=True production providers ke liye safe default
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
     }
-}
+else:
+    # Local dev path: separate vars, no SSL needed for localhost
+    DATABASES = {
+        'default': {
+            'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),  # PostgreSQL driver
+            'NAME': config('DB_NAME', default='inventory_db'),       # database ka naam
+            'USER': config('DB_USER', default='postgres'),           # DB user
+            'PASSWORD': config('DB_PASSWORD', default='postgres'),   # DB password — .env mein set karo
+            'HOST': config('DB_HOST', default='localhost'),          # DB server address
+            'PORT': config('DB_PORT', default='5432'),               # PostgreSQL default port
+            'CONN_MAX_AGE': 600,  # connection pool: 10 min tak reuse karo, naya connection mat banao
+        }
+    }
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain

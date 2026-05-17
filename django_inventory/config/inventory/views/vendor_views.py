@@ -89,7 +89,7 @@ class DispatchDeleteView(LoginRequiredMixin, ManagerOrAdminMixin, DeleteView):
 
 class SuperAdminOnlyMixin(UserPassesTestMixin):
     def test_func(self):
-        return self.request.user.is_superuser or user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
+        return user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
 
 
 class PaymentListView(LoginRequiredMixin, SuperAdminOnlyMixin, ListView):

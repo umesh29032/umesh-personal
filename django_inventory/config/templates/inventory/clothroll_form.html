@@ -307,7 +307,8 @@ updateLive(); // seed on page load (edit mode already has values)
 
 /* ── Cloth form extras ── */
 
-/* Override Django form-control / form-select widget classes inside .field */
+/* Override Django form-control / form-select widget classes inside .field
+   (.fancy-select-trigger inherits these classes so same rule covers it) */
 .field .form-control,
 .field .form-select {
     width: 100%; padding: 11px 14px;
@@ -318,6 +319,19 @@ updateLive(); // seed on page load (edit mode already has values)
     transition: border-color .15s, box-shadow .15s, background .15s;
     box-sizing: border-box;
     -webkit-appearance: none; appearance: none;
+}
+.field .fancy-select.open .fancy-select-trigger {
+    border-color: var(--copper);
+    background: var(--white);
+    box-shadow: 0 0 0 3px rgba(184,115,51,0.15);
+}
+.field select.form-control,
+.field select.form-select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 38px;
+    cursor: pointer;
 }
 .field .form-control:focus,
 .field .form-select:focus {
