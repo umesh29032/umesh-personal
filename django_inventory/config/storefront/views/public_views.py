@@ -1,6 +1,6 @@
 from django.shortcuts import render
 
-from .models import (
+from ..models import (
     HomePageConfig, Category, FeaturedProduct,
     HeroShowcaseCard, WhyUsCard, FooterLink, NavLink,
 )

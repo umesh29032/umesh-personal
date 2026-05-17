@@ -18,21 +18,23 @@ from django.contrib.auth.models import Permission
 from django.urls import NoReverseMatch, reverse
 
 
-# ── Role codes (must match the seed migration) ──────────────────────────────
+# ── Role codes (must match the seed migrations) ──────────────────────────────
 ROLE_SUPER_ADMIN = 'super_admin'
 ROLE_MANAGER = 'manager'
 ROLE_KARIGAR = 'karigar'
+ROLE_LISTING_TEAM = 'listing_team'  # can manage storefront product/category listings
 
 # Convenience sets
 ADMIN_ROLES = {ROLE_SUPER_ADMIN}
 MANAGEMENT_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER}
 ALL_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
+STOREFRONT_ROLES = {ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM}
 
 
 # ── Permission helpers ──────────────────────────────────────────────────────
 
 def user_role_code(user) -> str | None:
-    """Return the user's Role.code, falling back to the legacy user_type field."""
+    """Return the user's primary Role.code, falling back to the legacy user_type field."""
     if not user or not user.is_authenticated:
         return None
     if user.is_superuser:
@@ -47,9 +49,31 @@ def user_role_code(user) -> str | None:
     return legacy_map.get(legacy)
 
 
+def user_role_codes(user) -> set[str]:
+    """
+    Return ALL role codes for a user — primary role + any extra_roles.
+    Use this when checking access that can be granted via either path.
+    """
+    codes: set[str] = set()
+    primary = user_role_code(user)
+    if primary:
+        codes.add(primary)
+    # extra_roles is a M2M; only available on the real User model (not in tests
+    # that use the ORM directly), so guard with getattr.
+    extra_roles_qs = getattr(user, 'extra_roles', None)
+    if extra_roles_qs is not None:
+        try:
+            for r in extra_roles_qs.all():
+                if r.code:
+                    codes.add(r.code)
+        except Exception:
+            pass
+    return codes
+
+
 def user_has_role(user, codes: Iterable[str]) -> bool:
-    code = user_role_code(user)
-    return code is not None and code in set(codes)
+    """True if any of the user's roles (primary or extra) is in `codes`."""
+    return bool(user_role_codes(user) & set(codes))
 
 
 def user_has_perm(user, perm_codename: str) -> bool:
@@ -106,7 +130,13 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('My Work', 'inventory:my_work', predicate=_any_role(ROLE_KARIGAR), match=('my-work',)),
             MenuItem('Production Batches', 'inventory:batch_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('batches',)),
-            MenuItem('Inventory', 'inventory:product_list',
+        ),
+    ),
+    MenuSection(
+        label='Inventory',
+        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
+        items=(
+            MenuItem('Products', 'inventory:product_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('products',)),
             MenuItem('Cloth Stock', 'inventory:cloth_roll_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('cloth',)),
@@ -129,6 +159,14 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('Dispatches', 'inventory:dispatch_list', match=('dispatches',)),
             MenuItem('Payments', 'inventory:payment_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN), match=('payments',)),
+        ),
+    ),
+    MenuSection(
+        label='Storefront',
+        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM),
+        items=(
+            MenuItem('Featured Products', 'storefront:product_list', match=('storefront/products',)),
+            MenuItem('Categories', 'storefront:category_list', match=('storefront/categories',)),
         ),
     ),
     MenuSection(

@@ -1,0 +1,313 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Storefront Categories{% endblock %}
+
+{% block extra_head %}
+<!-- DataTables CSS CDN — table ko sort indicators aur default styling deta hai -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   DataTables override — apne design vars se match karna.
+   (Same styles product_list mein bhi hain — agar ek shared CSS file
+   ho toh yahan include kar sakte hain, abhi duplicate kar rahe hain.)
+   ────────────────────────────────────────────────────────────────── */
+.dt-search-row {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-2);
+}
+.dataTables_filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.dataTables_filter label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    width: 100%;
+}
+.dataTables_filter input[type="search"] {
+    flex: 1;
+    padding: 9px 14px;
+    border: 1.5px solid var(--border-default);
+    border-radius: 8px;
+    background: var(--surface);
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    min-width: 220px;
+    min-height: 40px;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+}
+.dataTables_filter input[type="search"]:focus { border-color: var(--copper); }
+.dataTables_filter input[type="search"]::placeholder { color: var(--text-tertiary); }
+
+.dt-bottom {
+    padding: 12px 24px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.dataTables_info { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+.dataTables_paginate { display: flex; gap: 4px; align-items: center; }
+.dataTables_paginate .paginate_button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--stone) !important;
+    border: 1.5px solid transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.dataTables_paginate .paginate_button:hover:not(.disabled) {
+    background: var(--surface-2) !important;
+    color: var(--text-primary) !important;
+}
+.dataTables_paginate .paginate_button.current,
+.dataTables_paginate .paginate_button.current:hover {
+    background: var(--copper) !important;
+    color: #fff !important;
+}
+.dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
+.dataTables_length { display: none; }
+
+table.dataTable thead th,
+table.dataTable thead td { border-bottom: 2px solid var(--border-default) !important; }
+table.dataTable thead .sorting::after,
+table.dataTable thead .sorting_asc::after,
+table.dataTable thead .sorting_desc::after { opacity: 0.55; }
+
+html[data-theme="dark"] .dataTables_filter input[type="search"] {
+    background: var(--card-bg); color: var(--ink); border-color: var(--cream-3);
+}
+html[data-theme="dark"] .dataTables_paginate .paginate_button { color: var(--stone) !important; }
+html[data-theme="dark"] table.dataTable thead th,
+html[data-theme="dark"] table.dataTable thead td { border-bottom-color: var(--cream-3) !important; }
+
+@media (max-width: 600px) {
+    .dt-search-row { padding: 12px 16px; }
+    .dataTables_filter { flex-direction: column; align-items: stretch; }
+    .dataTables_filter input[type="search"] { min-width: 0; width: 100%; }
+    .dt-bottom { flex-direction: column; align-items: center; gap: 6px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px; margin: 0 auto;">
+
+    <!-- ── Page header ── -->
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Product Categories</h1>
+            <p>Organise products into categories shown on the storefront homepage.</p>
+        </div>
+        <a href="{% url 'storefront:category_add' %}" class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Category
+        </a>
+    </div>
+
+    <!-- ── KPI Cards: view ke get_context_data se aaye counts ── -->
+    <div class="kpis" style="margin-bottom: 24px;">
+        <div class="kpi">
+            <div class="kpi-accent"></div>
+            <div class="kpi-label">Total Categories</div>
+            <div class="kpi-value">{{ total_count }}</div>
+            <div class="kpi-sub">All categories</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-accent" style="background: #059669;"></div>
+            <div class="kpi-label">Active</div>
+            <div class="kpi-value">{{ active_count }}</div>
+            <div class="kpi-sub">Shown on storefront</div>
+        </div>
+        <div class="kpi">
+            <div class="kpi-accent" style="background: var(--smoke);"></div>
+            <div class="kpi-label">Hidden</div>
+            <div class="kpi-value">{{ hidden_count }}</div>
+            <div class="kpi-sub">Not visible publicly</div>
+        </div>
+    </div>
+
+    <div class="card card-clip">
+
+        <!-- ── Server-side filter: Active status filter ──
+           Category list mein sirf active/hidden filter hai.
+           Text search DataTables handle karta hai. -->
+        <form class="ke-toolbar" method="get">
+            <label style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;">
+                Filter:
+            </label>
+            <select name="active" class="filter-select" onchange="this.form.submit()">
+                <option value="">All Status</option>
+                <option value="1" {% if filter_active == "1" %}selected{% endif %}>Active</option>
+                <option value="0" {% if filter_active == "0" %}selected{% endif %}>Hidden</option>
+            </select>
+            {% if filter_active %}
+                <a href="{% url 'storefront:category_list' %}" class="btn btn-ghost" style="font-size:11px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    Clear
+                </a>
+            {% endif %}
+        </form>
+
+        {% if categories %}
+            <!-- ── Main table ──
+               id="categories-dt" — DataTables yahi id use karta hai initialize karne ke liye.
+               data-label — mobile card view mein column name ke roop mein dikhta hai. -->
+            <div class="table-responsive">
+                <table id="categories-dt" style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead style="background: var(--surface-2);">
+                        <tr>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);">Category</th>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);">Subtitle</th>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);">Items Label</th>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);">Order</th>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary);">Status</th>
+                            <th style="padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); text-align: right;" data-orderable="false">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in categories %}
+                        <tr style="border-bottom: 1px solid var(--border-subtle);">
+
+                            <td style="padding: 16px 20px;" data-label="Category">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    {% if cat.image %}
+                                        <img src="{{ cat.image.url }}" alt="{{ cat.name }}"
+                                            style="width: 40px; height: 40px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-default); flex-shrink: 0;">
+                                    {% else %}
+                                        <div style="width: 40px; height: 40px; background: var(--surface-2); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">🏷️</div>
+                                    {% endif %}
+                                    <span style="font-weight: 600; color: var(--text-primary); font-size: 14px;">{{ cat.name }}</span>
+                                </div>
+                            </td>
+
+                            <td style="padding: 16px 20px; color: var(--text-secondary); font-size: 13px;" data-label="Subtitle">
+                                {{ cat.subtitle|default:"—"|truncatechars:50 }}
+                            </td>
+
+                            <td style="padding: 16px 20px;" data-label="Items Label">
+                                <span style="display: inline-block; padding: 3px 10px; background: var(--surface-2); border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--text-secondary);">
+                                    {{ cat.item_count_label }}
+                                </span>
+                            </td>
+
+                            <td style="padding: 16px 20px; color: var(--text-secondary); font-size: 13px; font-weight: 600;" data-label="Order">
+                                {{ cat.display_order }}
+                            </td>
+
+                            <td style="padding: 16px 20px;" data-label="Status">
+                                {% if cat.is_active %}
+                                    <span class="badge badge-active"><span class="badge-dot"></span>Active</span>
+                                {% else %}
+                                    <span class="badge badge-inactive"><span class="badge-dot"></span>Hidden</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- td-actions class: mobile mein ye full-width button row banta hai (base.html CSS) -->
+                            <td style="padding: 16px 20px; text-align: right;" class="td-actions" data-label="Actions">
+                                <a href="{% url 'storefront:category_edit' cat.pk %}"
+                                   class="action-link" title="Edit category">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Edit
+                                </a>
+                                <a href="{% url 'storefront:category_delete' cat.pk %}"
+                                   class="action-link action-link-danger" title="Delete category">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                                    Delete
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <!-- Empty state — filter active hai ya koi category nahi -->
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                </div>
+                <h3>No categories yet</h3>
+                {% if filter_active %}
+                    <p>No categories match this filter. <a href="{% url 'storefront:category_list' %}" style="color:var(--copper);">Clear filter</a></p>
+                {% else %}
+                    <p>Add categories to organise products on the storefront.</p>
+                    <a href="{% url 'storefront:category_add' %}" class="btn btn-primary">+ Add Category</a>
+                {% endif %}
+            </div>
+        {% endif %}
+
+    </div><!-- end .card -->
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- jQuery + DataTables CDN — live search, sort, pagination enable karta hai -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script>
+$(document).ready(function () {
+
+    // Sirf tab initialize karo jab table exist kare
+    if (!$('#categories-dt').length) return;
+
+    // ── DataTable initialize ──────────────────────────────────────
+    // dom: '<"dt-search-row"f>' → search box ko top mein dt-search-row div mein daalo
+    //       rt → table render karo
+    //      '<"dt-bottom"ip>' → info + pagination bottom mein dt-bottom div mein daalo
+    $('#categories-dt').DataTable({
+        searching: true,
+        ordering: true,
+        paging: true,
+        pageLength: 15,
+        dom: '<"dt-search-row"f>rt<"dt-bottom"ip>',
+        language: {
+            search: 'Search:',
+            searchPlaceholder: 'Type to filter categories…',
+            info: 'Showing _START_–_END_ of _TOTAL_ categories',
+            infoEmpty: 'No categories found',
+            infoFiltered: '(filtered from _MAX_ total)',
+            emptyTable: 'No categories to display',
+            paginate: { previous: '←', next: '→' }
+        },
+        // First column (image+name) aur last column (actions) pe sorting off karo
+        columnDefs: [
+            { orderable: false, targets: [0, 5] }
+        ]
+    });
+});
+</script>
+{% endblock %}

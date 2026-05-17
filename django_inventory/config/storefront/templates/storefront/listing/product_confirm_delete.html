@@ -1,0 +1,56 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Product{% endblock %}
+
+{% block content %}
+<!-- ── Confirm card layout ──
+   confirm-card CSS class base.html mein defined hai — centered card with header/body/footer.
+   Ye pattern poori app mein delete confirmation ke liye reuse hota hai. -->
+<div style="max-width: 480px; margin: 60px auto;">
+
+    <div class="confirm-card">
+
+        <!-- Card header: danger icon + title -->
+        <div class="confirm-card-head">
+            <div class="confirm-icon confirm-icon-danger">
+                <!-- Trash SVG icon — inline SVG, no external dependency -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                </svg>
+            </div>
+            <h2>Delete this product?</h2>
+        </div>
+
+        <!-- Card body: product info + warning message -->
+        <div class="confirm-card-body">
+            <p>You are about to permanently delete:</p>
+            <p style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 10px 0 4px;">{{ object.name }}</p>
+            {% if object.category %}
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">{{ object.display_category }}</p>
+            {% endif %}
+            <!-- Warning text — danger color (dark mode mein auto-flip hota hai via status token) -->
+            <p style="color: var(--status-danger-text); background: var(--status-danger-bg); padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 8px;">
+                ⚠️ This cannot be undone. Storefront pe yeh product remove ho jaayega.
+            </p>
+        </div>
+
+        <!-- Card footer: Cancel + Delete buttons ──
+           form method="post" — DELETE action ke liye POST use karna (HTML form limitation).
+           Django DeleteView form_valid() mein ListingService.delete_product() call hota hai. -->
+        <div class="confirm-card-foot">
+            <a href="{% url 'storefront:product_list' %}" class="btn btn-ghost">Cancel</a>
+            <form method="post" style="display: contents;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger" style="background: #dc2626; color: white;">
+                    Yes, Delete Product
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

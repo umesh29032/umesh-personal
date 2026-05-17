@@ -234,7 +234,7 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset().prefetch_related('skills')
+        qs = super().get_queryset().select_related('role').prefetch_related('skills')
         q = self.request.GET.get("q", "").strip()
         skills = self.request.GET.getlist("skills")
 
@@ -254,6 +254,11 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
         except ValueError:
             context["selected_skills"] = []
         context["search_query"] = self.request.GET.get("q", "")
+        # KPI counts — full queryset (unfiltered) for accurate totals
+        all_users = User.objects.all()
+        context["total_count"] = all_users.count()
+        context["active_count"] = all_users.filter(is_active=True).count()
+        context["inactive_count"] = all_users.filter(is_active=False).count()
         return context
 
 
@@ -279,6 +284,7 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["user_skill_ids"] = list(self.object.skills.values_list("id", flat=True))
+        ctx["user_extra_role_ids"] = list(self.object.extra_roles.values_list("id", flat=True))
         return ctx
 
     def form_valid(self, form):

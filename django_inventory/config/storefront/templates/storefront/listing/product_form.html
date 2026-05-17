@@ -1,0 +1,314 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ action }} Product{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ──────────────────────────────────────────────────────────────────
+   Product form mobile responsive — 2-column grid mobile pe collapse
+   ────────────────────────────────────────────────────────────────── */
+
+/* Section cards — stronger shadow + tinted header to break white-wash */
+section {
+    box-shadow: 0 2px 12px rgba(14,11,9,0.10) !important;
+    border-color: #cfc0aa !important;
+}
+section header {
+    background: linear-gradient(180deg, var(--cream-2) 0%, var(--cream) 60%, transparent 100%) !important;
+}
+
+/* Desktop pe 2 columns, mobile pe 1 column */
+.product-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+@media (max-width: 768px) {
+    /* Mobile pe 2 col grid ek column mein aa jata hai */
+    .product-form-grid { grid-template-columns: 1fr; }
+}
+
+/* Hero strip — mobile pe text wrap karo, back button neeche aaye */
+@media (max-width: 600px) {
+    .product-form-hero {
+        flex-direction: column !important;
+        gap: 16px !important;
+        padding: 24px 20px !important;
+    }
+    .product-form-hero a { width: 100%; text-align: center; }
+}
+
+/* Pricing grid — mobile pe 1 column */
+.pricing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 480px) {
+    .pricing-grid { grid-template-columns: 1fr; }
+}
+
+/* Form input focus style — copper border on focus */
+.sf-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 9px;
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--surface-input);
+    box-sizing: border-box;
+    font-family: inherit;
+    outline: none;
+    border: 1.5px solid #cfc0aa;
+    box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.15s;
+    -webkit-appearance: none;
+}
+.sf-input:focus {
+    border-color: var(--copper);
+    box-shadow: 0 0 0 3px rgba(184,115,51,0.1);
+    background: var(--white);
+}
+.sf-input::placeholder { color: var(--text-tertiary); }
+
+.sf-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.sf-field { display: flex; flex-direction: column; gap: 0; }
+.sf-error { font-size: 12px; color: var(--danger); margin-top: 4px; font-weight: 500; }
+.sf-hint  { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+.sf-footer {
+    position: sticky; bottom: 0;
+    background: rgba(250,247,242,0.20);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border-default);
+    padding: 16px 0; margin-top: 24px;
+    display: flex; justify-content: flex-end; gap: 12px; z-index: 10;
+}
+html[data-theme="dark"] .sf-footer {
+    background: rgba(28,28,30,0.20);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+html[data-theme="dark"] .sf-input {
+    box-shadow: inset 0 1.5px 4px rgba(0,0,0,0.15);
+    border-color: var(--cream-3);
+}
+html[data-theme="dark"] .sf-input:focus {
+    background: var(--cream-2);
+    box-shadow: 0 0 0 3px rgba(184,115,51,0.18);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 960px; margin: 0 auto;">
+
+    <!-- ── Hero strip ──
+       Linear gradient background — dark ink tones with copper accent.
+       Ye header sirf visual hierarchy ke liye hai — action (Create/Edit) dikhata hai. -->
+    <div class="product-form-hero" style="background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%); border-radius: 16px; padding: 32px 36px; margin-bottom: 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+        <div>
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--copper-l); text-transform: uppercase; margin-bottom: 8px;">Storefront</div>
+            <h1 style="font-size: 26px; font-weight: 700; color: #fff; margin: 0;">{{ action }} Featured Product</h1>
+            <p style="color: rgba(255,255,255,0.7); margin-top: 8px; font-size: 14px;">
+                {% if action == 'Create' %}New listing on the public homepage.
+                {% else %}Editing: <strong style="color: #fff5e6;">{{ object.name }}</strong>{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'storefront:product_list' %}" style="padding: 10px 20px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; color: rgba(255,255,255,0.7); text-decoration: none; font-size: 14px; white-space: nowrap; flex-shrink: 0;">← Back to list</a>
+    </div>
+
+    <!-- Form-level errors (field errors neeche dikhte hain) -->
+    {% if form.non_field_errors %}
+        <div class="form-errors" style="margin-bottom: 24px;">
+            <p>Please fix the following errors:</p>
+            <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        </div>
+    {% endif %}
+
+    <!-- enctype="multipart/form-data" — image upload ke liye zaroori, bina iske file POST nahi hoti -->
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- ── 2-column grid layout ──
+           Desktop: left=basic info+pricing, right=image+display options.
+           Mobile: product-form-grid CSS se 1 column ho jata hai. -->
+        <div class="product-form-grid">
+
+            <!-- ── Left column ── -->
+            <div>
+
+                <!-- Section 01 — Basic Info -->
+                <section style="background: var(--surface); border: 1px solid var(--border-default); border-radius: 14px; overflow: hidden; margin-bottom: 24px;">
+                    <header style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+                        <span style="width: 28px; height: 28px; background: var(--copper); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">01</span>
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Basic Info</h2>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0;">Name, category, and description.</p>
+                        </div>
+                    </header>
+                    <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+
+                        <div class="sf-field">
+                            <label class="sf-label">Product Name *</label>
+                            <input type="text" name="name" value="{{ form.name.value|default:'' }}" required
+                                class="sf-input" placeholder="e.g. Cotton Round Neck Tee — Multicolor">
+                            {% if form.name.errors %}
+                                <span class="sf-error">{{ form.name.errors|join:" " }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="sf-field">
+                            <label class="sf-label">Category</label>
+                            <!-- select element — Django ORM se aaye active categories -->
+                            <select name="category" class="sf-input">
+                                <option value="">— No category —</option>
+                                {% for cat in categories %}
+                                    <option value="{{ cat.pk }}" {% if form.category.value|stringformat:"s" == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="sf-field">
+                            <label class="sf-label">Category Label Override</label>
+                            <input type="text" name="category_label" value="{{ form.category_label.value|default:'' }}"
+                                class="sf-input" placeholder="e.g. Kids T-Shirt (overrides category name on card)">
+                            <span class="sf-hint">Storefront card pe category ke jagah ye text dikhega.</span>
+                        </div>
+
+                        <div class="sf-field">
+                            <label class="sf-label">Description</label>
+                            <textarea name="description" rows="3" class="sf-input"
+                                placeholder="Short product description (1-2 lines)…"
+                                style="resize: vertical;">{{ form.description.value|default:'' }}</textarea>
+                        </div>
+
+                        <div class="sf-field">
+                            <label class="sf-label">Sizes</label>
+                            <input type="text" name="sizes" value="{{ form.sizes.value|default:'' }}"
+                                class="sf-input" placeholder="2Y,4Y,6Y,8Y or S,M,L,XL (comma-separated)">
+                            <span class="sf-hint">Card ke neeche size chips dikhenge.</span>
+                        </div>
+
+                    </div>
+                </section>
+
+                <!-- Section 02 — Pricing -->
+                <section style="background: var(--surface); border: 1px solid var(--border-default); border-radius: 14px; overflow: hidden;">
+                    <header style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+                        <span style="width: 28px; height: 28px; background: var(--copper); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">02</span>
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Pricing</h2>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0;">Current price and optional original/MRP.</p>
+                        </div>
+                    </header>
+                    <div style="padding: 20px 24px;">
+                        <!-- pricing-grid: mobile pe 1 col ho jata hai -->
+                        <div class="pricing-grid">
+                            <div class="sf-field">
+                                <label class="sf-label">Price ₹ *</label>
+                                <input type="number" step="0.01" name="price" required
+                                    value="{{ form.price.value|default:'' }}"
+                                    class="sf-input" placeholder="149.00">
+                                {% if form.price.errors %}
+                                    <span class="sf-error">{{ form.price.errors|join:" " }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="sf-field">
+                                <label class="sf-label">Original Price ₹</label>
+                                <input type="number" step="0.01" name="original_price"
+                                    value="{{ form.original_price.value|default:'' }}"
+                                    class="sf-input" placeholder="199.00 (strikethrough price)">
+                                <span class="sf-hint">Strikethrough MRP dikhega.</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div><!-- end left column -->
+
+            <!-- ── Right column ── -->
+            <div>
+
+                <!-- Section 03 — Image & Display Options -->
+                <section style="background: var(--surface); border: 1px solid var(--border-default); border-radius: 14px; overflow: hidden; margin-bottom: 24px;">
+                    <header style="padding: 20px 24px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 14px;">
+                        <span style="width: 28px; height: 28px; background: var(--copper); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">03</span>
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Image &amp; Display</h2>
+                            <p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 0;">Product photo and display options.</p>
+                        </div>
+                    </header>
+                    <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+
+                        <div class="sf-field">
+                            <label class="sf-label">Product Image</label>
+                            <!-- Existing image preview — object.image check (None safe) -->
+                            {% if object.image %}
+                                <div style="margin-bottom: 10px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-default);">
+                                    <img src="{{ object.image.url }}" alt="{{ object.name }}"
+                                        style="width: 100%; max-height: 180px; object-fit: cover; display: block;">
+                                </div>
+                            {% endif %}
+                            <!-- form.image — CroppableImageWidget render karta hai (widgets/croppable_image.html) -->
+                            {{ form.image }}
+                            <span class="sf-hint">Recommended: 400×300px. Auto-cropped aur optimised on upload.</span>
+                        </div>
+
+                        <div class="sf-field">
+                            <label class="sf-label">Badge</label>
+                            <select name="badge" class="sf-input">
+                                <!-- badge choices model se aate hain: new, hot, bestseller, none -->
+                                {% for val, lbl in form.badge.field.choices %}
+                                    <option value="{{ val }}" {% if form.badge.value == val %}selected{% endif %}>{{ lbl }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="pricing-grid">
+                            <div class="sf-field">
+                                <label class="sf-label">Display Order</label>
+                                <input type="number" name="display_order"
+                                    value="{{ form.display_order.value|default:'0' }}"
+                                    class="sf-input">
+                                <span class="sf-hint">Lower = shown first.</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; justify-content: flex-end;">
+                                <!-- Custom checkbox toggle — accent-color CSS property -->
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 10px 14px; border: 1.5px solid var(--border-default); border-radius: 9px; background: var(--surface); transition: border-color 0.2s;">
+                                    <input type="checkbox" name="is_active"
+                                        {% if form.is_active.value %}checked{% endif %}
+                                        style="width: 16px; height: 16px; accent-color: var(--copper); flex-shrink: 0;">
+                                    <span style="font-size: 14px; font-weight: 600; color: var(--text-primary);">Active</span>
+                                </label>
+                                <span class="sf-hint" style="margin-top: 4px;">Visible on storefront.</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </section>
+
+            </div><!-- end right column -->
+
+        </div><!-- end .product-form-grid -->
+
+        <!-- ── Sticky action footer ──
+           position:sticky + bottom:0 — scroll karne par bhi yeh hamesha screen pe dikhta hai.
+           backdrop-filter: blur — frosted glass effect for depth. -->
+        <div class="sf-footer">
+            <a href="{% url 'storefront:product_list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary" style="padding: 12px 32px; font-size: 14px; font-weight: 700; letter-spacing: 0.02em;">
+                {% if action == 'Create' %}Create Product{% else %}Save Changes{% endif %}
+            </button>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
