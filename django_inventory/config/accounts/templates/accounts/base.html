@@ -54,11 +54,11 @@
             --info-bg:   #eff6ff;
 
             /* Sidebar (Indigo — matches login left panel) */
-            --sidebar-bg:      linear-gradient(160deg, #130428 0%, #240a52 45%, #190838 80%, #100324 100%);
+            --sidebar-bg:      linear-gradient(160deg, #1b1428 0%, #261e42 45%, #1f1535 80%, #161024 100%);
             --sidebar-border:  rgba(255,255,255,0.08);
             --sidebar-active:  rgba(184,115,51,0.18);
-            --nav-text:        rgba(255,255,255,0.70);
-            --nav-text-muted:  rgba(184,115,51,0.60);
+            --nav-text:        rgba(255,255,255,0.92);
+            --nav-text-muted:  rgba(184,115,51,0.85);
             --sidebar-text:    #faf7f2;
             --nav-text-hover:  rgba(255,255,255,0.95);
             --sidebar-shadow:  2px 0 24px rgba(10,3,30,0.55);
@@ -108,6 +108,9 @@
             --text-tertiary:      var(--smoke);        /* placeholder / hint */
             --border-default:     var(--cream-3);      /* standard border    */
             --border-subtle:      var(--cream-2);      /* subtle divider     */
+            --border-card:        #cfc0aa;             /* card/section border — use on all panels */
+            --shadow-card:        0 2px 12px rgba(14,11,9,0.10); /* card shadow */
+            --shadow-card-hover:  0 6px 20px -2px rgba(14,11,9,0.14);
 
             /* Semantic status tokens (dark-mode override below) */
             --status-success-bg:  #ecfdf5; --status-success-text: #15803d;
@@ -127,8 +130,8 @@
             --sidebar-bg:      #18181b;
             --sidebar-border:  rgba(255,255,255,0.07);
             --sidebar-active:  rgba(184,115,51,0.18);
-            --nav-text:        rgba(250,247,242,0.65);
-            --nav-text-muted:  rgba(184,115,51,0.55);
+            --nav-text:        rgba(250,247,242,0.92);
+            --nav-text-muted:  rgba(184,115,51,0.85);
             --sidebar-text:    #faf7f2;
             --nav-text-hover:  rgba(250,247,242,0.92);
             --sidebar-shadow:  4px 0 24px rgba(0,0,0,0.40);
@@ -317,45 +320,68 @@
         .sidebar-nav::-webkit-scrollbar-thumb { background: var(--ink-4); border-radius: 2px; }
 
         .nav-section {
-            margin-bottom: 24px;
+            margin-bottom: 2px;
         }
 
+        /* Parent nav item — looks like nav-link but acts as accordion trigger */
         .nav-section-label {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
-            color: var(--nav-text-muted);
-            padding: 0 10px;
-            margin-bottom: 6px;
-            /* Accordion trigger — click karo to collapse/expand items */
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: var(--nav-text);
+            padding: 9px 12px;
+            margin-bottom: 0;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 10px;
             cursor: pointer;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            border-radius: 7px;
+            min-height: 42px;
+            transition: background 0.15s, color 0.15s;
+            position: relative;
         }
+        .nav-section-label:hover {
+            background: var(--sidebar-active);
+            color: var(--nav-text-hover);
+        }
+        .nav-section-label:hover .nav-icon { color: var(--copper-l); }
+        .nav-section-label-text { flex: 1; min-width: 0; }
+        /* Light up parent when a child is active */
+        .nav-section.has-active > .nav-section-label {
+            color: var(--nav-text-hover);
+        }
+        .nav-section.has-active > .nav-section-label .nav-icon { color: var(--copper-l); }
+
         .nav-chevron {
             flex-shrink: 0;
-            width: 11px;
-            height: 11px;
-            transition: transform 0.22s ease;
-            opacity: 0.6;
+            width: 14px;
+            height: 14px;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.45;
+            margin-left: auto;
         }
         .nav-section.collapsed .nav-chevron {
             transform: rotate(-90deg);
         }
         .nav-section-items {
             overflow: hidden;
-            /* max-height transition: open → large value, closed → 0 */
             max-height: 800px;
             opacity: 1;
-            transition: max-height 0.28s ease-out, opacity 0.2s ease;
+            transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+            /* Indent children under parent icon + gap */
+            margin-left: 18px;
+            padding-left: 10px;
+            border-left: 1.5px solid rgba(184,115,51,0.15);
+            margin-bottom: 4px;
+            padding-top: 2px;
         }
         .nav-section.collapsed .nav-section-items {
             max-height: 0;
             opacity: 0;
+            margin-bottom: 0;
+            padding-top: 0;
         }
 
         .nav-link {
@@ -367,7 +393,7 @@
             text-decoration: none;
             border-radius: 7px;
             margin-bottom: 2px;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 500;
             transition: background 0.15s, color 0.15s;
             min-height: 44px;
@@ -603,8 +629,8 @@
             background: var(--card-bg);
             padding: 22px 24px;
             border-radius: 12px;
-            border: 1px solid var(--cream-3);
-            box-shadow: 0 2px 8px rgba(14,11,9,0.06), 0 1px 2px rgba(14,11,9,0.04);
+            border: 1px solid var(--border-card);
+            box-shadow: var(--shadow-card);
             transition: transform 0.2s, box-shadow 0.2s;
         }
         .kpi:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(14,11,9,0.1); }
@@ -629,16 +655,18 @@
         /* ── Card ───────────────────────────────────────────────────── */
         .card {
             background: var(--card-bg);
-            border-radius: 12px;
-            border: 1px solid var(--cream-3);
-            box-shadow: 0 2px 8px rgba(14,11,9,0.06), 0 1px 2px rgba(14,11,9,0.04);
+            border-radius: 14px;
+            border: 1px solid var(--border-card);
+            box-shadow: var(--shadow-card);
+            transition: box-shadow 0.2s;
             /* Note: no overflow:hidden here — use .card-clip when needed for rounded corners */
         }
+        .card:hover { box-shadow: var(--shadow-card-hover); }
         /* Use .card-clip when visual rounding of child backgrounds is needed */
         .card-clip { overflow: hidden; }
         .card-header {
             padding: 18px 24px;
-            border-bottom: 1px solid var(--cream-3);
+            border-bottom: 1px solid var(--border-card);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -971,11 +999,13 @@
         /* ── Form elements ──────────────────────────────────────────── */
         .form-card {
             background: var(--white);
-            border-radius: 10px;
-            border: 1px solid var(--cream-3);
-            box-shadow: 0 1px 3px rgba(14,11,9,0.05);
+            border-radius: 14px;
+            border: 1px solid var(--border-card);
+            box-shadow: var(--shadow-card);
             padding: 32px;
+            transition: box-shadow 0.2s;
         }
+        .form-card:hover { box-shadow: var(--shadow-card-hover); }
         .form-section { margin-bottom: 32px; }
         .form-section-title {
             display: flex;
@@ -988,7 +1018,7 @@
             color: var(--stone);
             margin-bottom: 20px;
             padding-bottom: 10px;
-            border-bottom: 1px solid var(--cream-3);
+            border-bottom: 1px solid var(--border-card);
         }
         .form-section-num {
             width: 22px;
@@ -1568,7 +1598,8 @@
             {% for section in sidebar_menu %}
             <div class="nav-section" data-section="{{ section.label }}">
                 <p class="nav-section-label">
-                    {{ section.label }}
+                    {% with section_label=section.label %}{% include 'inventory/_section_icon.html' %}{% endwith %}
+                    <span class="nav-section-label-text">{{ section.label }}</span>
                     <svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
@@ -1746,6 +1777,7 @@
             if (!label || !items) return;
 
             var hasActive = items.querySelector('.nav-link.active');
+            if (hasActive) section.classList.add('has-active');
 
             // Collapse if user previously collapsed AND no active link inside
             if (!hasActive && saved[key] === true) {

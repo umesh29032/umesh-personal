@@ -137,7 +137,7 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
         items=(
             MenuItem('Products', 'inventory:product_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('products',)),
+                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('inventory/products',)),
             MenuItem('Cloth Stock', 'inventory:cloth_roll_list',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('cloth',)),
         ),
@@ -147,7 +147,7 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
         items=(
             MenuItem('Batch Types', 'inventory:batch_type_list', match=('batch-types',)),
-            MenuItem('Stages', 'inventory:stage_list', match=('stages',)),
+            MenuItem('Stages', 'inventory:stage_list', match=('inventory/stages',)),
             MenuItem('Machines', 'inventory:machine_list', match=('machines',)),
         ),
     ),
