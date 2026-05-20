@@ -1,0 +1,125 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Barcode Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .bc-dash .filter-card {
+        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
+        padding: 14px 18px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card); margin-bottom: 18px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .bc-dash .filter-card > * { flex-shrink: 0; }
+    .bc-dash .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .bc-dash .filter-card label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .bc-dash .filter-card input {
+        padding: 9px 12px; min-width: 150px;
+        border: 1.5px solid #cfc0aa; border-radius: 10px;
+        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 13px;
+    }
+    .bc-dash .filter-card input:focus {
+        outline: none; border-color: var(--copper);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07), 0 0 0 3px rgba(184,115,51,0.15);
+    }
+    .bc-dash .action-link {
+        display: inline-block; padding: 5px 10px; margin-right: 4px;
+        font-size: 12px; font-weight: 600; border-radius: 8px;
+        border: 1px solid var(--border-default); background: var(--cream);
+        text-decoration: none; color: var(--ink);
+    }
+    .bc-dash .action-link:hover { border-color: var(--copper); color: var(--copper); }
+
+    @media (max-width: 600px) {
+        .bc-dash .table-responsive .td-actions { display: flex; flex-direction: column; gap: 6px; }
+    }
+</style>
+{# Shared accordion + time-log styles #}
+{% include 'inventory/_time_log_styles.html' %}
+{% endblock %}
+
+{% block content %}
+{# `addas` queryset with annotate(total/pending/packed/dispatched/missing) — barcode counts per Adda #}
+<div class="bc-dash">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Barcode Dashboard</h1>
+            <p>Every Adda with QR barcodes. Print sheet for factory + CSV export per Adda.{% if filter_from or filter_to %} <strong>Filtered.</strong>{% endif %}</p>
+        </div>
+    </div>
+
+    <form method="get" class="filter-card">
+        <div class="field"><label>From (Adda created)</label><input type="date" name="from" value="{{ filter_from }}"></div>
+        <div class="field"><label>To (Adda created)</label><input type="date" name="to" value="{{ filter_to }}"></div>
+        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="field"><label>&nbsp;</label><a href="{% url 'tracking:dashboard' %}" class="btn btn-ghost">Reset</a></div>
+    </form>
+
+    <div class="kpis">
+        <div class="kpi"><div class="kpi-accent"></div>
+            <div class="kpi-label">Total Barcodes</div>
+            <div class="kpi-value">{{ total_barcodes }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--stone);"></div>
+            <div class="kpi-label">Pending</div>
+            <div class="kpi-value" style="color:var(--stone);">{{ by_status.pending }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--info);"></div>
+            <div class="kpi-label">Packed</div>
+            <div class="kpi-value" style="color:var(--info);">{{ by_status.packed }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--success);"></div>
+            <div class="kpi-label">Dispatched</div>
+            <div class="kpi-value" style="color:var(--success);">{{ by_status.dispatched }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--danger);"></div>
+            <div class="kpi-label">Missing</div>
+            <div class="kpi-value" style="color:var(--danger);">{{ by_status.missing }}</div>
+        </div>
+    </div>
+
+    <div class="card card-clip">
+        <div class="card-header"><div class="card-title">Addas with Barcodes</div></div>
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Adda</th><th>Product</th><th>Created</th><th>Total</th>
+                        <th>Pending</th><th>Packed</th><th>Dispatched</th><th>Missing</th>
+                        <th data-orderable="false">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for a in addas %}
+                <tr>
+                    <td data-label="Adda"><a href="{% url 'production:adda-detail' a.code %}"><strong>{{ a.code }}</strong></a></td>
+                    <td data-label="Product">{{ a.product.name }}</td>
+                    <td data-label="Created">{{ a.created_at|date:"d M Y" }}</td>
+                    <td data-label="Total"><strong>{{ a.total }}</strong></td>
+                    <td data-label="Pending">{{ a.pending }}</td>
+                    <td data-label="Packed">{{ a.packed }}</td>
+                    <td data-label="Dispatched">{{ a.dispatched }}</td>
+                    <td data-label="Missing" style="color:{% if a.missing %}var(--danger){% else %}var(--stone){% endif %};">{{ a.missing }}</td>
+                    <td data-label="Actions" class="td-actions">
+                        <a href="{% url 'tracking:barcode-list' a.code %}" class="action-link">View</a>
+                        <a href="{% url 'tracking:barcode-print' a.code %}" target="_blank" class="action-link">Print QR</a>
+                        <a href="{% url 'tracking:barcode-export' a.code %}" class="action-link">Export CSV</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" style="padding:24px; text-align:center; color:var(--stone);">No barcodes yet. Complete a Cutting stage on any Adda to generate barcodes.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# Adda events accordion — barcodes ka lifecycle Adda events ke through hi flow karta hai #}
+    {% include 'inventory/_adda_events_accordion.html' %}
+</div>
+{% endblock %}

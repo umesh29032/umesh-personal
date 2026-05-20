@@ -1,0 +1,90 @@
+{% comment %}
+Layering stage card — used in Adda Detail tab pane.
+
+Inputs:
+  `adda`  — Adda obj
+  `sr`    — AddaStageRecord for Layering (may be None if not started — defensive)
+{% endcomment %}
+<div class="stage-card">
+    {% if sr %}
+        <div class="stage-stats">
+            <div class="stat-tile">
+                <div class="stat-label">Time Taken</div>
+                <div class="stat-value">
+                    {% if sr.layering %}{{ sr.layering.duration_minutes }} <span class="stat-unit">min</span>
+                    {% elif sr.started_at and sr.completed_at %}
+                        ~ <span class="stat-unit">in progress</span>
+                    {% else %}— <span class="stat-unit">running</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Lay Count</div>
+                <div class="stat-value">{% if sr.layering %}{{ sr.layering.lay_count }}{% else %}—{% endif %}</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Colors Used</div>
+                <div class="stat-value">
+                    {% if sr.layering %}{{ sr.layering.total_colors }}
+                    {% else %}{{ sr.layering_roll_entries.all|length|default:"—" }}{% endif %}
+                </div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Rolls Used</div>
+                <div class="stat-value">
+                    {% if sr.layering %}{{ sr.layering.rolls_used.count }}
+                    {% else %}{{ sr.layering_roll_entries.all|length }}{% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Roll ID chips — spec D7 explicit requirement #}
+        <div class="stage-roll-ids">
+            <div class="chips-label">Rolls Used</div>
+            <div class="chips-row">
+            {% if sr.layering %}
+                {% for r in sr.layering.rolls_used.all %}
+                    <a href="{% url 'tracking:roll-history' r.pk %}" class="roll-chip" title="View roll history">
+                        <strong>{{ r.roll_id }}</strong>
+                        · {{ r.cloth_type.name }} · {{ r.cloth_color.name }}
+                        {% if r.width_inch %} - {{ r.width_inch }} inch{% endif %}
+                    </a>
+                {% empty %}<span class="chip-empty">none</span>{% endfor %}
+            {% else %}
+                {% for e in sr.layering_roll_entries.all %}
+                    <a href="{% url 'tracking:roll-history' e.roll.pk %}" class="roll-chip" title="View roll history">
+                        <strong>{{ e.roll.roll_id }}</strong>
+                        · {{ e.roll.cloth_type.name }} · {{ e.roll.cloth_color.name }}
+                        {% if e.width_verified_inch %} - {{ e.width_verified_inch }} inch{% elif e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}
+                    </a>
+                {% empty %}<span class="chip-empty">none</span>{% endfor %}
+            {% endif %}
+            </div>
+        </div>
+
+        <div class="stage-workers">
+            <div class="chips-label">Workers Assigned</div>
+            <div class="chips-row">
+            {% for w in sr.workers.all %}
+                <span class="worker-chip">{{ w.email }}</span>
+            {% empty %}<span class="chip-empty">none</span>{% endfor %}
+            </div>
+        </div>
+
+        <div class="stage-actions">
+            {% if sr.completed_at %}
+                <div class="stage-status-line">
+                    ✓ Completed {{ sr.completed_at|date:"d M H:i" }}
+                    {% if sr.completed_by %}by <strong>{{ sr.completed_by.email }}</strong>{% endif %}
+                </div>
+            {% else %}
+                <div class="stage-status-line">
+                    ▸ Started {{ sr.started_at|date:"d M H:i" }} · In Progress
+                </div>
+                <a href="{% url 'production:layering-workspace' adda.code %}" class="btn btn-primary">Open Workspace →</a>
+            {% endif %}
+        </div>
+    {% else %}
+        <p class="chip-empty">Layering stage hasn't been started yet.</p>
+    {% endif %}
+</div>

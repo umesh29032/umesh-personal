@@ -22,6 +22,9 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),       # django-allauth: Google OAuth, signup flow
     path("inventory/", include("inventory.urls")),
     path("storefront/", include("storefront.urls")),  # authenticated storefront management
+    path("raw-materials/", include("raw_materials.urls")),  # cloth inventory + master data
+    path("production/", include("production.urls")),        # Adda batches + workflow stages
+    path("tracking/", include("tracking.urls")),            # barcodes + audit history
 ]
 
 if settings.DEBUG:

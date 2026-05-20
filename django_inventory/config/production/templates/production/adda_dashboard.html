@@ -1,0 +1,127 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Adda Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .adda-dash .filter-card {
+        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
+        padding: 14px 18px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card); margin-bottom: 18px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .adda-dash .filter-card > * { flex-shrink: 0; }
+    .adda-dash .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .adda-dash .filter-card label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .adda-dash .filter-card input {
+        padding: 9px 12px; min-width: 150px;
+        border: 1.5px solid #cfc0aa; border-radius: 10px;
+        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 13px;
+    }
+    .adda-dash .filter-card input:focus {
+        outline: none; border-color: var(--copper);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07), 0 0 0 3px rgba(184,115,51,0.15);
+    }
+    .adda-dash .stage-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+    .adda-dash .stage-chip {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 16px; background: var(--surface-2);
+        border: 1px solid var(--border-default); border-radius: 12px;
+        text-decoration: none; color: var(--ink); transition: all 0.15s;
+    }
+    .adda-dash .stage-chip:hover {
+        background: var(--cream); border-color: var(--copper); transform: translateY(-1px);
+    }
+    .adda-dash .stage-chip strong { font-size: 18px; color: var(--copper); line-height: 1; }
+    .adda-dash .stage-chip span { font-size: 13px; }
+</style>
+{# Shared accordion + time-log styles #}
+{% include 'inventory/_time_log_styles.html' %}
+{% endblock %}
+
+{% block content %}
+{# View ke context vars: in_progress/on_hold/completed counts + stage_breakdown + recent Adda queryset #}
+<div class="adda-dash">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Adda Dashboard</h1>
+            <p>Live snapshot of production batches.{% if filter_from or filter_to %} <strong>Filtered.</strong>{% endif %}</p>
+        </div>
+        <a href="{% url 'production:adda-create' %}" class="btn btn-primary">+ Start Adda</a>
+    </div>
+
+    <form method="get" class="filter-card">
+        <div class="field"><label>From (created)</label><input type="date" name="from" value="{{ filter_from }}"></div>
+        <div class="field"><label>To (created)</label><input type="date" name="to" value="{{ filter_to }}"></div>
+        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="field"><label>&nbsp;</label><a href="{% url 'production:dashboard' %}" class="btn btn-ghost">Reset</a></div>
+    </form>
+
+    <div class="kpis">
+        <div class="kpi"><div class="kpi-accent" style="background:var(--info);"></div>
+            <div class="kpi-label">In Progress</div>
+            <div class="kpi-value" style="color:var(--info);">{{ in_progress }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--warning);"></div>
+            <div class="kpi-label">On Hold</div>
+            <div class="kpi-value" style="color:var(--warning);">{{ on_hold }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--success);"></div>
+            <div class="kpi-label">Completed Today</div>
+            <div class="kpi-value" style="color:var(--success);">{{ completed_today }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent"></div>
+            <div class="kpi-label">All Completed</div>
+            <div class="kpi-value">{{ total_completed }}</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">In-Progress by Stage</div></div>
+        <div class="card-body">
+            <div class="stage-chips">
+                {% for s in stage_breakdown %}
+                    <a href="{% url 'production:adda-list' %}?status=in_progress&stage={{ s.label|lower }}" class="stage-chip">
+                        <strong>{{ s.count }}</strong>
+                        <span>at {{ s.label }}</span>
+                    </a>
+                {% empty %}
+                    <span style="color:var(--stone); font-size:13px;">No stages configured.</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-clip">
+        <div class="card-header"><div class="card-title">Recent Addas</div></div>
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead><tr><th>Code</th><th>Product</th><th>Stage</th><th>Layering</th><th>Status</th><th>Created</th><th>Updated</th></tr></thead>
+                <tbody>
+                {% for a in recent %}
+                <tr>
+                    <td data-label="Code"><a href="{% url 'production:adda-detail' a.code %}"><strong>{{ a.code }}</strong></a></td>
+                    <td data-label="Product">{{ a.product.name }}</td>
+                    <td data-label="Stage">{% if a.current_stage %}{{ a.current_stage.get_stage_type_display }}{% else %}—{% endif %}</td>
+                    <td data-label="Layering">{% include 'production/_layering_summary.html' with snap=a.layering_snap style='compact' %}</td>
+                    <td data-label="Status">{{ a.get_status_display }}</td>
+                    <td data-label="Created">{{ a.created_at|date:"d M Y H:i" }}</td>
+                    <td data-label="Updated">{{ a.updated_at|date:"d M Y H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" style="padding:18px; text-align:center; color:var(--stone);">No Addas yet. <a href="{% url 'production:adda-create' %}">Start one</a>.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# Adda lifecycle events accordion — partial uses `adda_events` context var #}
+    {% include 'inventory/_adda_events_accordion.html' %}
+</div>
+{% endblock %}

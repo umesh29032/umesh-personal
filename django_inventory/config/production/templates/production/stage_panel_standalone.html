@@ -1,0 +1,29 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ adda.code }} · {{ stage_type|capfirst }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{% comment %}
+Standalone stage panel page — full Django chrome (sidebar + nav). Same content
+as the embedded version. Use this when opening the stage URL directly in a tab.
+{% endcomment %}
+<div class="form-shell">
+    <div class="hero">
+        <h1>{{ adda.code }} — {{ stage_type|capfirst }}</h1>
+        <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
+        <span class="hero-chip">{{ stage_type|upper }} STAGE</span>
+    </div>
+
+    {% if stage_type == 'layering' %}
+        {% include 'production/_stage_panel_layering.html' %}
+    {% elif stage_type == 'cutting' %}
+        {% include 'production/_stage_panel_cutting.html' %}
+    {% endif %}
+
+    <div style="margin: 18px 0;">
+        <a href="{% url 'production:adda-detail' adda.code %}" class="btn btn-ghost">← Back to Adda</a>
+    </div>
+</div>
+{% endblock %}

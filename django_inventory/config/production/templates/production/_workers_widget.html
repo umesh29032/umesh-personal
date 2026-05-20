@@ -1,0 +1,11 @@
+{# ModelMultipleChoiceField checkbox grid — .form-shell ke andar style inherit hoti hai (_form_styles.html) #}
+<div class="workers-grid">
+{% for group, options, index in widget.optgroups %}
+    {% for option in options %}
+    <label class="worker-chip">
+        <input type="{{ option.type }}" name="{{ option.name }}" value="{{ option.value }}" {% if option.selected %}checked{% endif %}>
+        <span>{{ option.label }}</span>
+    </label>
+    {% endfor %}
+{% endfor %}
+</div>

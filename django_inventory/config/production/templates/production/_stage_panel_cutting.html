@@ -1,0 +1,92 @@
+{% comment %}
+Cutting stage panel — REUSABLE partial.
+
+Used by:
+  • stage_panel_standalone.html (full page /stage/cutting/)
+  • stage_panel_embedded.html (iframe embed on adda detail / user dashboard)
+  • cutting_form.html (existing complete-cutting URL)
+
+Required context:
+  adda, cutting_form (CuttingForm), can_complete_cutting (bool),
+  embedded (bool — adds hidden `embedded=1` to form for redirect handling)
+{% endcomment %}
+
+{% if messages %}
+<div class="messages-strip">
+    {% for m in messages %}
+        <div class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% with completed_sr=adda.stage_records.all|dictsort:"workflow_stage.order"|last %}
+    {% comment %}
+    For completed Cutting, show pieces + barcode count.
+    For pending Cutting (current stage), show form for manager.
+    For not-yet-Cutting, info only.
+    {% endcomment %}
+{% endwith %}
+
+{% if can_complete_cutting %}
+    {% comment %}Manager-only completion form (Adda at Cutting stage){% endcomment %}
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-num">01</div>
+            <div class="panel-title">Pieces Cut</div>
+        </div>
+        <div class="panel-body">
+            <p class="panel-sub">Pieces cut = number of barcodes generated. Cannot be changed later.</p>
+            <form method="post" action="{% url 'production:cutting-complete' adda.code %}" novalidate>
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                {% if cutting_form.non_field_errors %}<div class="field-error">{{ cutting_form.non_field_errors }}</div>{% endif %}
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Pieces cut *</label>
+                        {{ cutting_form.pieces_cut }}
+                    </div>
+                    <div class="field full">
+                        <label>Notes</label>
+                        {{ cutting_form.notes }}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <div class="panel-num">02</div>
+            <div class="panel-title">Workers</div>
+        </div>
+        <div class="panel-body">
+            <p class="panel-sub">Tick every worker who performed this cutting.</p>
+            <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-workers-form-{{ adda.code }}">
+                {{ cutting_form.workers }}
+            </form>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; padding: 10px 0;">
+        <a href="{% url 'production:adda-detail' adda.code %}" class="btn btn-ghost">← Back</a>
+        <button type="submit" form="cutting-workers-form-{{ adda.code }}" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
+    </div>
+{% else %}
+    <div class="panel">
+        <div class="panel-body">
+            {% if adda.current_stage and adda.current_stage.stage_type == 'cutting' %}
+                <p class="panel-sub">Only a manager can complete the Cutting stage.</p>
+            {% elif adda.status == 'completed' %}
+                <p class="panel-sub">Cutting complete. {{ adda.barcodes.count }} barcode{{ adda.barcodes.count|pluralize }} generated.</p>
+                {% if adda.barcodes.exists %}
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;">
+                    <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-primary">View Barcodes</a>
+                    <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-ghost">Print QR Sheet</a>
+                </div>
+                {% endif %}
+            {% else %}
+                <p class="panel-sub">Cutting stage not yet reached. Complete Layering first.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}

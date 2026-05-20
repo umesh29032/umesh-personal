@@ -6,6 +6,7 @@ Django 5.2 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — models, services, ER, security, perf
 - [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) — why + how + learning map
 - [UI_COMPONENTS.md](UI_COMPONENTS.md) — component vocabulary, design tokens, DataTables/fancy-select usage
+- [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md) — production tracking subsystem (raw_materials + production + tracking apps); load when touching cloth rolls, Adda batches, workflows, stage records, or barcodes
 
 ## Rules
 1. Terse. No greetings, no summaries unless asked.

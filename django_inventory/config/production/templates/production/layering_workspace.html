@@ -1,0 +1,84 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block page_title %}Layering · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+{% include 'production/_form_styles.html' %}
+<style>
+    /* Workspace page wrapper — delegates body to _stage_panel_layering.html partial.
+       Page-scoped CSS only for hero + pipeline + chip / row styles that the partial uses. */
+    .layering-ws { max-width: 1100px; margin: 0 auto; padding-bottom: 120px; }
+
+    .layering-ws .pipeline { display:flex; gap:8px; flex-wrap:wrap; margin: 0 0 18px; }
+    .layering-ws .wf-pill { padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+    .layering-ws .wf-pill.done    { background: var(--success-bg); color: var(--success); }
+    .layering-ws .wf-pill.current { background: var(--copper); color: #fff; box-shadow: 0 2px 8px rgba(184,115,51,0.35); }
+    .layering-ws .wf-pill.pending { background: var(--cream-2); color: var(--stone); }
+
+    .layering-ws .stage-stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 18px; }
+    .layering-ws .stat-tile { padding: 16px 18px; background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card, 0 2px 8px rgba(14,11,9,0.08)); }
+    .layering-ws .stat-tile .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--stone); }
+    .layering-ws .stat-tile .stat-value { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--ink); margin-top: 4px; }
+
+    .layering-ws .roll-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .layering-ws .roll-row { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 16px; }
+    .layering-ws .roll-row-head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size: 13px; }
+    .layering-ws .roll-row-head strong { font-family: monospace; font-size: 14px; color: var(--ink); }
+    .layering-ws .roll-row-meta { color: var(--stone); font-size: 12px; }
+    .layering-ws .roll-row details { margin-top: 8px; }
+    .layering-ws .roll-row summary { cursor: pointer; font-size: 12px; color: var(--copper); font-weight: 600; }
+    .layering-ws .inline-form { margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+    .layering-ws .inline-form .field { flex: 1 1 140px; min-width: 120px; }
+    .layering-ws .roll-row .row-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px; }
+
+    /* Roll info chip — pill with full identity (id · type · color · width). Wider than monospace-only. */
+    .layering-ws .roll-id-chip {
+        display:inline-block; padding: 5px 12px; margin: 2px;
+        background: var(--cream); border: 1px solid var(--border-subtle);
+        border-radius: 999px; font-size: 12px; color: var(--ink);
+    }
+    .layering-ws .roll-id-chip strong { font-family: monospace; font-size: 13px; }
+    .layering-ws .chips-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .layering-ws .panel-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 3px 10px; border-radius: 12px; margin-left: auto; }
+    .layering-ws .panel-state.not-started { background: var(--cream-2); color: var(--stone); }
+    .layering-ws .panel-state.in-progress { background: rgba(184,115,51,0.18); color: var(--copper); }
+    .layering-ws .panel-state.completed   { background: var(--success-bg); color: var(--success); }
+
+    @media (max-width: 600px) { .layering-ws .inline-form { flex-direction: column; align-items: stretch; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-shell layering-ws">
+
+    {# Hero — adda + stage state #}
+    <div class="hero">
+        <h1>Layering Workspace — {{ adda.code }}</h1>
+        <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
+        <span class="hero-chip">LAYERING STAGE</span>
+    </div>
+
+    {# Workflow pipeline — visual context, current stage highlighted #}
+    <div class="pipeline">
+        {% for s in stages %}
+            {% if adda.current_stage and adda.current_stage.order == s.order %}
+                <span class="wf-pill current">▸ {{ s.get_stage_type_display }}</span>
+            {% elif adda.current_stage and adda.current_stage.order > s.order %}
+                <span class="wf-pill done">✓ {{ s.get_stage_type_display }}</span>
+            {% else %}
+                <span class="wf-pill pending">{{ s.get_stage_type_display }}</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {% comment %}Delegate body to the shared partial — same panels as embedded/iframe surfaces.{% endcomment %}
+    {% include 'production/_stage_panel_layering.html' %}
+
+    {# Back link #}
+    <div style="margin: 18px 0;">
+        <a href="{% url 'production:adda-detail' adda.code %}" class="btn btn-ghost">← Back to Adda</a>
+    </div>
+</div>
+{% endblock %}

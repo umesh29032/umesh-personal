@@ -1,0 +1,77 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Edit {{ roll.roll_id }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="form-shell">
+    <div class="hero">
+        <h1>Edit Roll — {{ roll.roll_id }}</h1>
+        <p>{{ roll.cloth_type.name }} · {{ roll.cloth_color.name }} ·
+           intake {{ roll.purchased_date|date:"d M Y" }}</p>
+        <span class="hero-chip">STOCK EDIT</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">Physical Details</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">
+                    Width and weight typically captured at Layering attach time. Set them here
+                    so cloth stock shows accurate values. Edits only allowed while roll is NOT_USED.
+                </p>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Width *</label>
+                        {{ form.width_inch }}
+                        {% if form.width_inch.errors %}<div class="field-error">{{ form.width_inch.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label>Weight (KG)</label>
+                        {{ form.weight_kg }}
+                        {% if form.weight_kg.errors %}<div class="field-error">{{ form.weight_kg.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label>Storage Location *</label>
+                        {{ form.storage_location }}
+                        {% if form.storage_location.errors %}<div class="field-error">{{ form.storage_location.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label>Purchased Date *</label>
+                        {{ form.purchased_date }}
+                        {% if form.purchased_date.errors %}<div class="field-error">{{ form.purchased_date.errors|join:" " }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if form.supplier %}
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">02</div><div class="panel-title">Financial</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">Visible only to Accountant + Super Admin roles.</p>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Supplier</label>
+                        {{ form.supplier }}
+                    </div>
+                    <div class="field">
+                        <label>Cost per KG</label>
+                        {{ form.cost_per_kg }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="sticky-actions">
+            <a href="{% url 'raw_materials:roll-detail' roll.pk %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

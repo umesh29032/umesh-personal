@@ -1,62 +1,151 @@
+"""Dashboard views — unified for admin + non-admin.
+
+YEH FILE KYU HAI?
+─────────────────
+Pehle do alag dashboards the (admin ka khaali "WIP" page + user ka active-addas page).
+Ab dono same content render karte hain — single "Dashboard" har user role ke liye.
+
+Role-aware sections:
+  • Active Addas list      — sab logged-in users ko dikhta hai
+  • Skilled accordion       — sirf cutting_master / _helper / management → iframe inline panel
+  • Read-only status card   — non-skilled users ke liye (no buttons)
+  • Helper stats             — sirf cutting_master_helper users
+  • My Recent Activity       — cross-Adda timeline (sab users)
+  • is_admin_view flag       — future admin-only metrics ke liye reserved
+"""
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
+from django.db.models import Count, Sum
 from django.shortcuts import render
 
-from ..models import ClothRoll, Product, Batch, StockLedger, Stage
-from ..models import BatchClothAssignment
+from ..services import MANAGEMENT_ROLES, user_has_role
+
+
+def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
+    """Common context builder. Both admin + user dashboard URLs call this."""
+    my_active_stages = []
+    helper_data = None
+    my_activity = []
+    active_addas = []
+    is_skilled_user = False
+
+    try:
+        from production.models import Adda, AddaStageRecord, LayeringRecord, WorkflowStage
+        from production.services import user_activity_across_addas
+        from accounts.skills import (
+            SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
+        )
+
+        # "Skilled user" = layering skill OR management role.
+        # Drives accordion vs status-card decision in template.
+        is_skilled_user = (
+            user_has_skill(request.user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER])
+            or user_has_role(request.user, MANAGEMENT_ROLES)
+        )
+
+        # All in-progress Addas — annotated with rolls count + per-stage pipeline state.
+        active_addas = list(
+            Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+            .select_related('product', 'current_stage')
+            .prefetch_related('stage_records__workflow_stage', 'product__workflow_stages')
+            .annotate(rolls_count=Count('rolls'))
+            .order_by('-started_at')
+        )
+        from production.services import get_layering_snapshot
+        for a in active_addas:
+            pipeline = []
+            for s in a.product.workflow_stages.order_by('order'):
+                if a.current_stage and a.current_stage.order == s.order:
+                    state = 'current'
+                elif a.current_stage and a.current_stage.order > s.order:
+                    state = 'done'
+                else:
+                    state = 'pending'
+                pipeline.append({
+                    'label': s.get_stage_type_display(),
+                    'state': state,
+                    'stage_type': s.stage_type,
+                })
+            a.pipeline = pipeline
+            # Layering snapshot per Adda for per-stage info on user dashboard
+            a.layering_snap = get_layering_snapshot(a)
+
+        my_active_stages = (
+            AddaStageRecord.objects
+            .filter(workers=request.user,
+                    completed_at__isnull=True,
+                    adda__status=Adda.Status.IN_PROGRESS)
+            .select_related('adda', 'workflow_stage', 'adda__product')
+            .order_by('-created_at')
+        )
+        my_activity = user_activity_across_addas(request.user, limit=30)
+
+        if user_has_skill(request.user, SKILL_CUTTING_MASTER_HELPER):
+            active_layering = (
+                AddaStageRecord.objects
+                .filter(
+                    workflow_stage__stage_type=WorkflowStage.StageType.LAYERING,
+                    completed_at__isnull=True,
+                    started_at__isnull=False,
+                    adda__status=Adda.Status.IN_PROGRESS,
+                )
+                .select_related('adda', 'workflow_stage', 'adda__product')
+                .prefetch_related('workers')
+                .annotate(rolls_count=Count('layering_roll_entries'))
+                .order_by('-started_at')
+            )
+            completed_qs = LayeringRecord.objects.filter(
+                stage_record__completed_by=request.user,
+            )
+            active_assigned_qs = active_layering.filter(workers=request.user)
+            stats = completed_qs.aggregate(
+                total_layers=Sum('lay_count'),
+                total_minutes=Sum('duration_minutes'),
+            )
+            helper_data = {
+                'active_layering': active_layering,
+                'completed_count': completed_qs.count(),
+                'active_assigned_count': active_assigned_qs.count(),
+                'total_layers': stats.get('total_layers') or 0,
+                'total_minutes': stats.get('total_minutes') or 0,
+            }
+    except Exception:
+        # Production tables not migrated yet — hide panels gracefully
+        my_active_stages = []
+        helper_data = None
+        my_activity = []
+        active_addas = []
+        is_skilled_user = False
+
+    return {
+        'is_admin_view': is_admin_view,
+        'my_active_stages': my_active_stages,
+        'helper_data': helper_data,
+        'my_activity': my_activity,
+        'active_addas': active_addas,
+        'is_skilled_user': is_skilled_user,
+    }
 
 
 @login_required
 def dashboard(request):
+    """Unified dashboard URL for management roles.
+
+    Same content as user_dashboard — just flagged is_admin_view=True so the
+    template can show admin-only sections in the future. Both URLs are kept for
+    backward-compat (sidebar uses one canonical link).
     """
-    Inventory dashboard with high-level KPIs.
-    All queries use aggregation — no N+1 issues.
-    """
-    # KPI 1: Total cloth in stock (meters, excluding exhausted)
-    total_cloth_length = (
-        ClothRoll.objects.exclude(status='EXHAUSTED')
-        .aggregate(total=Sum('remaining_length'))['total'] or 0
+    ctx = _build_dashboard_context(
+        request,
+        is_admin_view=user_has_role(request.user, MANAGEMENT_ROLES),
     )
+    return render(request, 'inventory/user_dashboard.html', ctx)
 
-    # KPI 2: Total finished products
-    total_products = Product.objects.aggregate(total=Sum('quantity'))['total'] or 0
 
-    # KPI 3: Active (WIP) batches
-    active_batches = Batch.objects.filter(status='WIP').count()
-
-    # KPI 4: Total wastage
-    total_wastage = (
-        BatchClothAssignment.objects.aggregate(total=Sum('wastage_length'))['total'] or 0
+@login_required
+def user_dashboard(request):
+    """Non-management dashboard URL. Renders the same unified template + content."""
+    ctx = _build_dashboard_context(
+        request,
+        is_admin_view=user_has_role(request.user, MANAGEMENT_ROLES),
     )
-
-    # Section: Stock breakdown by cloth type
-    cloth_stock_by_type = (
-        ClothRoll.objects
-        .values('cloth_type')
-        .annotate(total_length=Sum('remaining_length'), roll_count=Count('id'))
-        .order_by('-total_length')
-    )
-
-    # Section: Recent ledger movements (last 10)
-    # select_related covers all FK fields used in templates to prevent N+1
-    recent_movements = (
-        StockLedger.objects
-        .select_related('from_stage', 'to_stage', 'batch', 'created_by', 'content_type')
-        .order_by('-date')[:10]
-    )
-
-    # Quick stats
-    total_cloth_rolls = ClothRoll.objects.count()
-    total_stages = Stage.objects.filter(is_active=True).count()
-
-    context = {
-        'total_cloth_length': total_cloth_length,
-        'total_products': total_products,
-        'active_batches': active_batches,
-        'total_wastage': total_wastage,
-        'cloth_stock_by_type': cloth_stock_by_type,
-        'recent_movements': recent_movements,
-        'total_cloth_rolls': total_cloth_rolls,
-        'total_stages': total_stages,
-    }
-    return render(request, 'inventory/dashboard.html', context)
+    return render(request, 'inventory/user_dashboard.html', ctx)

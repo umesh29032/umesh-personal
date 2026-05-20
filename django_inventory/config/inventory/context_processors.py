@@ -15,6 +15,6 @@ def sidebar(request):
     """
     user = getattr(request, 'user', None)
     return {
-        'sidebar_menu': build_menu_for(user) if user and user.is_authenticated else [],
+        'sidebar_menu': build_menu_for(user, request.path) if user and user.is_authenticated else [],
         'current_role_code': user_role_code(user),
     }

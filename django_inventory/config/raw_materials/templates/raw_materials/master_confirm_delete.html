@@ -1,0 +1,29 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete {{ title }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# Hard delete — PROTECT FK ho to ProtectedError → service ValidationError throw karta hai #}
+<div class="form-shell" style="max-width:600px;">
+    <div class="hero">
+        <h1>Delete {{ title }}</h1>
+        <p>This is permanent. If this row is referenced by any cloth roll the delete will fail — archive it instead.</p>
+        <span class="hero-chip" style="background:rgba(220,38,38,0.22); border-color:rgba(220,38,38,0.4); color:#fca5a5;">DESTRUCTIVE</span>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            <div class="panel-body">
+                <p style="margin:0; font-size:14px; color:var(--ink);">Permanently delete <strong>{{ object }}</strong>?</p>
+            </div>
+        </div>
+        <div class="sticky-actions">
+            <a href="{% url list_url_name %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn" style="background:var(--danger); color:#fff; border:0;">Delete Permanently</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

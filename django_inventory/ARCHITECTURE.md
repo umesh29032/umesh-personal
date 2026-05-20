@@ -7,6 +7,13 @@
 This document is the technical contract. If something here disagrees with the
 code, the **code wins** — please open a PR to update this doc.
 
+> ## ⚠️ Major restructure 2026-05-19
+>
+> The original `inventory` app's BatchType/Batch/Stage/Machine/StockLedger/Vendor/Payment system was **removed** and replaced with three new apps:
+> **`raw_materials`** (cloth + master data), **`production`** (Product/Adda/Workflow/Stage records), **`tracking`** (BatchBarcode QR + history). The `inventory` app now owns RBAC + dashboards only.
+>
+> **Canonical docs for the new flow live in [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md).** Sections below this banner describe the old architecture and are kept for historical context only; they DO NOT reflect the current code.
+
 ---
 
 ## 1. 10,000-foot view

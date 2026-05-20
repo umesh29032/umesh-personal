@@ -1,0 +1,46 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Complete Cutting · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# `adda` context var; CuttingForm submit pe complete_cutting service N barcodes bulk_create karta hai #}
+<div class="form-shell">
+    <div class="hero">
+        <h1>Complete Cutting — {{ adda.code }}</h1>
+        <p>Enter the number of pieces cut. The system auto-generates that many QR barcodes — one per piece, ready to print.</p>
+        <span class="hero-chip">CUTTING STAGE</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">Output</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">Pieces cut becomes the barcode count. Cannot be changed later — be precise.</p>
+                <div class="form-grid">
+                    <div class="field"><label>Pieces cut *</label>{{ form.pieces_cut }}{% if form.pieces_cut.errors %}<div class="field-error">{{ form.pieces_cut.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field full"><label>Notes</label>{{ form.notes }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">02</div><div class="panel-title">Workers</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">Tick every worker who performed this cutting.</p>
+                {{ form.workers }}
+                {% if form.workers.errors %}<div class="field-error">{{ form.workers.errors|join:" " }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'production:adda-detail' adda.code %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

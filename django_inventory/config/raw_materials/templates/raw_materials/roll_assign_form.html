@@ -1,0 +1,39 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Assign {{ roll.roll_id }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# `roll` URL pk se aaya; assign_roll_to_adda service Adda+weight+width capture karta hai #}
+<div class="form-shell">
+    <div class="hero">
+        <h1>Assign Roll {{ roll.roll_id }}</h1>
+        <p>{{ roll.cloth_type.name }} · {{ roll.cloth_color.name }} · {{ roll.storage_location.name }}</p>
+        <p>Weight + width get captured now (at use-time, not at intake).</p>
+        <span class="hero-chip">ASSIGN TO ADDA</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">Assignment</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">Only Addas currently at the Layering stage are eligible.</p>
+                <div class="form-grid">
+                    <div class="field full"><label>Adda *</label>{{ form.adda_code }}{% if form.adda_code.errors %}<div class="field-error">{{ form.adda_code.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field"><label>Weight (KG) *</label>{{ form.weight_kg }}{% if form.weight_kg.errors %}<div class="field-error">{{ form.weight_kg.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field"><label>Width *</label>{{ form.width_inch }}{% if form.width_inch.errors %}<div class="field-error">{{ form.width_inch.errors|join:" " }}</div>{% endif %}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'raw_materials:roll-detail' roll.pk %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Assign to Adda</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -23,12 +23,20 @@ ROLE_SUPER_ADMIN = 'super_admin'
 ROLE_MANAGER = 'manager'
 ROLE_KARIGAR = 'karigar'
 ROLE_LISTING_TEAM = 'listing_team'  # can manage storefront product/category listings
+ROLE_ACCOUNTANT = 'accountant'      # can view + edit Supplier and Cost Per KG on cloth rolls
 
 # Convenience sets
 ADMIN_ROLES = {ROLE_SUPER_ADMIN}
 MANAGEMENT_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER}
 ALL_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
 STOREFRONT_ROLES = {ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM}
+
+# Production lifecycle: who can touch cloth + Adda + stages.
+PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
+
+# Financial fields (Supplier, Cost Per KG): view + edit gated to these roles.
+# Super Admin is included so universal-view is preserved by every gate.
+FINANCIAL_ROLES = {ROLE_SUPER_ADMIN, ROLE_ACCOUNTANT}
 
 
 # ── Permission helpers ──────────────────────────────────────────────────────
@@ -78,6 +86,16 @@ def user_role_codes(user) -> set[str]:
 def user_has_role(user, codes: Iterable[str]) -> bool:
     """True if any of the user's roles (primary or extra) is in `codes`."""
     return bool(user_role_codes(user) & set(codes))
+
+
+def user_can_view_financials(user) -> bool:
+    """Gate for reading Supplier + Cost Per KG fields on cloth rolls."""
+    return user_has_role(user, FINANCIAL_ROLES)
+
+
+def user_can_edit_financials(user) -> bool:
+    """Gate for writing Supplier + Cost Per KG fields on cloth rolls."""
+    return user_has_role(user, FINANCIAL_ROLES)
 
 
 def user_has_perm(user, perm_codename: str) -> bool:
@@ -130,39 +148,16 @@ SIDEBAR: tuple[MenuSection, ...] = (
     MenuSection(
         label='Main',
         items=(
-            MenuItem('Dashboard', 'inventory:inventory_dashboard', match=('dashboard',)),
-            MenuItem('My Work', 'inventory:my_work', predicate=_any_role(ROLE_KARIGAR), match=('my-work',)),
-            MenuItem('Production Batches', 'inventory:batch_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('batches',)),
-        ),
-    ),
-    MenuSection(
-        label='Inventory',
-        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
-        items=(
-            MenuItem('Products', 'inventory:product_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('inventory/products',)),
-            MenuItem('Cloth Stock', 'inventory:cloth_roll_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER), match=('cloth',)),
-        ),
-    ),
-    MenuSection(
-        label='Production',
-        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
-        items=(
-            MenuItem('Batch Types', 'inventory:batch_type_list', match=('batch-types',)),
-            MenuItem('Stages', 'inventory:stage_list', match=('inventory/stages',)),
-            MenuItem('Machines', 'inventory:machine_list', match=('machines',)),
-        ),
-    ),
-    MenuSection(
-        label='Logistics & Finance',
-        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
-        items=(
-            MenuItem('Vendors', 'inventory:vendor_list', match=('vendors',)),
-            MenuItem('Dispatches', 'inventory:dispatch_list', match=('dispatches',)),
-            MenuItem('Payments', 'inventory:payment_list',
-                     predicate=_any_role(ROLE_SUPER_ADMIN), match=('payments',)),
+            # Single unified Dashboard entry — same template + content for everyone.
+            # Management role → inventory_dashboard URL. Others → user_dashboard URL.
+            # Both routes render the same view content; this just keeps URL semantics
+            # backward-compatible with existing bookmarks.
+            MenuItem('Dashboard', 'inventory:inventory_dashboard',
+                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
+                     match=('inventory/dashboard',)),
+            MenuItem('Dashboard', 'inventory:user_dashboard',
+                     predicate=lambda u: u and u.is_authenticated and not user_has_role(u, [ROLE_SUPER_ADMIN, ROLE_MANAGER]),
+                     match=('my-dashboard',)),
         ),
     ),
     MenuSection(
@@ -171,6 +166,34 @@ SIDEBAR: tuple[MenuSection, ...] = (
         items=(
             MenuItem('Featured Products', 'storefront:product_list', match=('storefront/products',)),
             MenuItem('Categories', 'storefront:category_list', match=('storefront/categories',)),
+        ),
+    ),
+    MenuSection(
+        label='Raw Materials',
+        predicate=_any_role(*PRODUCTION_ROLES),
+        items=(
+            MenuItem('Raw Material Dashboard', 'raw_materials:dashboard', match=('raw-materials/',)),
+            MenuItem('Cloth Dashboard', 'raw_materials:cloth-dashboard', match=('raw-materials/cloth/',)),
+            MenuItem('Cloth Rolls', 'raw_materials:roll-list', match=('raw-materials/rolls',)),
+            MenuItem('Cloth Types', 'raw_materials:cloth-type-list', match=('raw-materials/cloth-types',)),
+            MenuItem('Cloth Colors', 'raw_materials:cloth-color-list', match=('raw-materials/cloth-colors',)),
+            MenuItem('Storage Locations', 'raw_materials:storage-list', match=('raw-materials/storage-locations',)),
+        ),
+    ),
+    MenuSection(
+        label='Production',
+        predicate=_any_role(*PRODUCTION_ROLES),
+        items=(
+            MenuItem('Adda Dashboard', 'production:dashboard', match=('production/',)),
+            MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
+            MenuItem('Products', 'production:product-list', match=('production/products',)),
+        ),
+    ),
+    MenuSection(
+        label='Tracking',
+        predicate=_any_role(*PRODUCTION_ROLES),
+        items=(
+            MenuItem('Barcode Dashboard', 'tracking:dashboard', match=('tracking/',)),
         ),
     ),
     MenuSection(
@@ -185,13 +208,20 @@ SIDEBAR: tuple[MenuSection, ...] = (
 )
 
 
-def build_menu_for(user) -> list[dict]:
+def build_menu_for(user, current_path: str = '') -> list[dict]:
     """
     Return a list of sections with only the items the user may see.
     Each item also gets a resolved URL; unreachable URLs are dropped silently
     so the sidebar never breaks during partial rollouts.
+
+    Active-tab rule: only ONE item across the whole sidebar is marked
+    `is_active=True` — the one whose `match` substring has the longest
+    overlap with `current_path`. Avoids the bug where multiple items
+    light up simultaneously when their match strings share a prefix.
     """
     visible_sections: list[dict] = []
+    all_items: list[dict] = []  # flat list so we can pick a single winner
+
     for section in SIDEBAR:
         if not section.predicate(user):
             continue
@@ -202,14 +232,29 @@ def build_menu_for(user) -> list[dict]:
             url = item.resolved_url()
             if url is None:
                 continue
-            items.append({
+            entry = {
                 'label': item.label,
                 'url': url,
                 'url_name': item.url_name,
                 'match': item.match,
-            })
+                'is_active': False,
+            }
+            items.append(entry)
+            all_items.append(entry)
         if items:
             visible_sections.append({'label': section.label, 'items': items})
+
+    # Pick the single most-specific match (longest substring that appears in path).
+    if current_path:
+        best = None
+        best_len = 0
+        for entry in all_items:
+            for m in entry['match']:
+                if m and m in current_path and len(m) > best_len:
+                    best, best_len = entry, len(m)
+        if best is not None:
+            best['is_active'] = True
+
     return visible_sections
 
 

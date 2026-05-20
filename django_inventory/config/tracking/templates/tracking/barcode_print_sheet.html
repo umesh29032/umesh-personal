@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Sheet · {{ adda.code }}</title>
+    <style>
+        /* Standalone print template — does NOT extend accounts/base.html. */
+        @page { size: A4; margin: 6mm; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0; padding: 0; color: #0e0b09; background: #f3f4f6;
+        }
+
+        /* Toolbar — screen only. Sticky so user can change size while scrolling. */
+        .toolbar {
+            background: #fff; border-bottom: 1px solid #e5e7eb;
+            padding: 12px 18px;
+            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+            position: sticky; top: 0; z-index: 10;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .toolbar h1 { font-size: 16px; margin: 0; font-weight: 700; margin-right: auto; }
+        .toolbar h1 .sub { font-size: 12px; color: #6b7280; font-weight: 400; margin-left: 8px; }
+        .toolbar .meta {
+            font-size: 11px; color: #4b5563;
+            display: flex; gap: 6px; flex-wrap: wrap;
+        }
+        .toolbar .meta-pill {
+            padding: 3px 10px; background: #f5ede0; border-radius: 999px;
+            border: 1px solid #e2d5c3;
+        }
+        .toolbar form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .toolbar label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #6b7280;
+        }
+        .toolbar select {
+            padding: 7px 10px; font-size: 13px;
+            border: 1.5px solid #cfc0aa; border-radius: 8px;
+            background: #f5ede0; box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        }
+        .toolbar button, .toolbar .btn {
+            padding: 8px 14px; background: #b87333; color: #fff; border: 0;
+            border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+            text-decoration: none;
+        }
+        .toolbar button:hover, .toolbar .btn:hover { background: #8a5520; }
+        .toolbar .btn.secondary { background: #fff; color: #374151; border: 1.5px solid #e2d5c3; }
+
+        /* Sheet — A4 dimension. */
+        .sheet-wrap { padding: 14px; display: flex; justify-content: center; }
+        .sheet {
+            width: 210mm; min-height: 297mm; background: #fff;
+            padding: 6mm; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: grid;
+            grid-template-columns: repeat({{ spec.cols }}, 1fr);
+            grid-auto-rows: min-content;
+            gap: 2mm;
+            align-content: start;
+        }
+
+        .sticker {
+            border: 1px dashed #d1d5db; padding: 1.5mm 1mm 1mm;
+            text-align: center; page-break-inside: avoid;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .sticker img {
+            display: block;
+            width: {{ spec.qr_mm }}mm; height: {{ spec.qr_mm }}mm;
+            image-rendering: pixelated;
+        }
+        .sticker .code {
+            font-family: 'Courier New', monospace; font-weight: 700;
+            margin-top: 0.8mm; font-size: 7pt; line-height: 1.1;
+            word-break: break-all; color: #0e0b09;
+        }
+
+        .empty-msg { grid-column: 1 / -1; padding: 40px; text-align: center; color: #6b7280; font-size: 14px; }
+
+        /* Print — hide toolbar, drop guide lines, kill page-bg. */
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .sheet-wrap { padding: 0; }
+            .sheet { width: auto; min-height: 0; box-shadow: none; padding: 0; }
+            .sticker { border-color: transparent; }
+        }
+
+        /* Mobile preview — stack toolbar; sheet fills width. */
+        @media (max-width: 768px) {
+            .toolbar { flex-direction: column; align-items: stretch; }
+            .toolbar h1 { margin-right: 0; }
+            .toolbar form { justify-content: space-between; }
+            .toolbar button, .toolbar .btn { flex: 1 1 auto; text-align: center; }
+            .sheet-wrap { padding: 8px; }
+            .sheet { width: 100%; min-height: 0; padding: 4mm; }
+            .sticker img { width: 100%; height: auto; max-width: {{ spec.qr_mm }}mm; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <h1>{{ adda.code }} <span class="sub">{{ adda.product.name }}</span></h1>
+
+    <div class="meta">
+        <span class="meta-pill">{{ barcode_rows|length }} sticker{{ barcode_rows|length|pluralize }}</span>
+        <span class="meta-pill">~{{ per_page }} / page</span>
+        <span class="meta-pill">{{ total_pages }} page{{ total_pages|pluralize }}</span>
+        <span class="meta-pill">ECC Q · 25% damage tolerance</span>
+    </div>
+
+    <form method="get">
+        <label>Size</label>
+        <select name="size" onchange="this.form.submit()">
+            {% for val, label in size_options %}
+                <option value="{{ val }}" {% if val == size %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <label>Filter</label>
+        <select name="status" onchange="this.form.submit()">
+            {% for val, label in status_options %}
+                <option value="{{ val }}" {% if val == active_status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <button onclick="window.print()">Print</button>
+    <a class="btn secondary" href="{% url 'tracking:barcode-list' adda.code %}">← Back</a>
+</div>
+
+<div class="sheet-wrap">
+    <div class="sheet">
+        {% for row in barcode_rows %}
+            <div class="sticker">
+                <img src="{{ row.qr }}" alt="{{ row.bc.value }}">
+                <div class="code">{{ row.bc.value }}</div>
+            </div>
+        {% empty %}
+            <div class="empty-msg">No barcodes match the current filter.</div>
+        {% endfor %}
+    </div>
+</div>
+
+</body>
+</html>

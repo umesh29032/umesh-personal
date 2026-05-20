@@ -1,0 +1,33 @@
+{# Cloth-roll movements time-log accordion. Caller passes `roll_events` queryset (ClothRollHistory). #}
+<details class="time-log-accordion" style="margin-top: 18px;">
+    <summary>
+        <span class="acc-title">Time Logs — Cloth Rolls</span>
+        <span class="acc-sub">Latest {{ roll_events|length }} roll movement{{ roll_events|length|pluralize }}</span>
+        <span class="acc-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="acc-body">
+        {% if roll_events %}
+        <ul class="time-log">
+        {% for e in roll_events %}
+            <li>
+                <div class="ts">{{ e.created_at|date:"d M H:i" }}</div>
+                <div>
+                    <strong>{{ e.get_change_type_display }}</strong>
+                    {% if e.roll %} ·
+                        <a href="{% url 'raw_materials:roll-detail' e.roll.pk %}" style="font-family:monospace;">{{ e.roll.roll_id }}</a>
+                        <span style="color:var(--stone);"> · {{ e.roll.cloth_type.name }} · {{ e.roll.cloth_color.name }}{% if e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}</span>
+                    {% endif %}
+                    {% if e.field_name %}
+                        · <code style="background:var(--cream-2); padding:1px 6px; border-radius:4px; font-size:11px;">{{ e.field_name }}</code>: {{ e.old_value|default:"—" }} → {{ e.new_value|default:"—" }}
+                    {% endif %}
+                    {% if e.note %} · <em style="color:var(--stone);">{{ e.note }}</em>{% endif %}
+                    <div class="actor">by {{ e.actor.email }}</div>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+        {% else %}
+            <p style="margin:0; color:var(--stone); font-size:13px;">No roll movement events yet.</p>
+        {% endif %}
+    </div>
+</details>

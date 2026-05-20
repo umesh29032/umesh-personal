@@ -8,7 +8,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from ..forms import RoleForm
 from ..models import Role
 from ..services import permissions_qs_by_app
-from .vendor_views import SuperAdminOnlyMixin
+from .mixins import SuperAdminOnlyMixin
 
 
 class RoleListView(LoginRequiredMixin, SuperAdminOnlyMixin, ListView):
