@@ -1,0 +1,37 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if is_edit %}Edit{% else %}New{% endif %} Product{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# ProductForm — edit pe code field locked (Adda codes stable rakhne ke liye) #}
+<div class="form-shell">
+    <div class="hero">
+        <h1>{% if is_edit %}Edit Product{% else %}New Product{% endif %}</h1>
+        <p>Product code is the prefix used in Adda numbering (e.g. <code style="background:rgba(255,255,255,0.15); padding:1px 6px; border-radius:4px; color:#fff;">T-SHIRT-001</code>). Code locks on edit so existing Adda codes stay stable.</p>
+        <span class="hero-chip">SUPER ADMIN ONLY</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">Identity</div></div>
+            <div class="panel-body">
+                <div class="form-grid">
+                    <div class="field"><label>Code *</label>{{ form.code }}{% if form.code.errors %}<div class="field-error">{{ form.code.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field"><label>Name *</label>{{ form.name }}{% if form.name.errors %}<div class="field-error">{{ form.name.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field full"><label>Description</label>{{ form.description }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'production:product-list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if is_edit %}Save Changes{% else %}Create Product{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

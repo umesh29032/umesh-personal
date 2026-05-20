@@ -1,0 +1,296 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Adda Detail (Phase 4) — tabbed stage dashboard.
+       Page-scoped under `.adda-detail` so styles don't leak elsewhere (CLAUDE.md rule #10). */
+    .adda-detail { max-width: 1100px; margin: 0 auto; }
+
+    /* Hero — Adda code + status + product line */
+    .adda-detail .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position: relative; overflow: hidden;
+    }
+    .adda-detail .hero::before {
+        content:''; position:absolute; right:-100px; top:-100px;
+        width:280px; height:280px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+    }
+    .adda-detail .hero-row {
+        display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; position:relative;
+    }
+    .adda-detail .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 30px; font-weight: 600; color:#fff; margin:0; letter-spacing: -0.01em;
+    }
+    .adda-detail .hero p { margin:4px 0 0; color: rgba(255,255,255,0.72); font-size: 14px; }
+    .adda-detail .hero-badge {
+        padding: 5px 12px; border-radius: 12px; font-size: 11px; font-weight: 700;
+        letter-spacing: 0.1em; background: rgba(34,197,94,0.18); color: #4ade80;
+        border: 1px solid rgba(34,197,94,0.3);
+    }
+    .adda-detail .hero-badge.inprogress { background: rgba(37,99,235,0.18); color:#60a5fa; border-color: rgba(37,99,235,0.3); }
+    .adda-detail .hero-badge.onhold     { background: rgba(217,119,6,0.18); color:#fbbf24; border-color: rgba(217,119,6,0.3); }
+    .adda-detail .hero-badge.cancelled  { background: rgba(220,38,38,0.18); color:#fca5a5; border-color: rgba(220,38,38,0.3); }
+
+    /* Tab bar — full-width pills, clickable */
+    .adda-detail .tabbar {
+        display: flex; gap: 8px; flex-wrap: wrap;
+        padding: 12px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card);
+        margin-bottom: 18px;
+    }
+    .adda-detail .tab-btn {
+        padding: 10px 18px; border-radius: 999px;
+        font-size: 13px; font-weight: 600; cursor: pointer;
+        border: 1.5px solid transparent;
+        background: var(--cream-2); color: var(--stone);
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+        font-family: inherit;
+    }
+    .adda-detail .tab-btn:hover { border-color: var(--copper); color: var(--ink); }
+    .adda-detail .tab-btn.is-current {
+        background: var(--copper); color: #fff;
+        box-shadow: 0 2px 8px rgba(184,115,51,0.35);
+    }
+    .adda-detail .tab-btn.is-done {
+        background: var(--success-bg); color: var(--success);
+    }
+    .adda-detail .tab-btn[aria-selected="true"] {
+        outline: 2px solid var(--copper); outline-offset: 2px;
+    }
+
+    /* Tab panes — only the selected one visible. JS toggles `hidden` attr. */
+    .adda-detail .tabpane[hidden] { display: none !important; }
+    .adda-detail .tabpane {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; padding: 8px; box-shadow: var(--shadow-card);
+        margin-bottom: 18px;
+    }
+    .adda-detail .tab-toolbar {
+        display:flex; justify-content:flex-end; padding: 6px 10px 10px;
+    }
+    .adda-detail .open-new {
+        font-size: 12px; color: var(--copper); font-weight: 600;
+        text-decoration: none;
+    }
+    .adda-detail .open-new:hover { text-decoration: underline; }
+    .adda-detail .stage-iframe {
+        display:block; background: var(--cream); border-radius: 10px;
+    }
+
+    /* Stage Card layout (used by both layering + cutting partials) */
+    .adda-detail .stage-card { display: flex; flex-direction: column; gap: 16px; }
+    .adda-detail .stage-stats {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    .adda-detail .stat-tile {
+        padding: 14px 16px; background: var(--surface-2);
+        border: 1px solid var(--border-subtle); border-radius: 12px;
+    }
+    .adda-detail .stat-tile .stat-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .adda-detail .stat-tile .stat-value {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 24px; font-weight: 600; color: var(--ink); margin-top: 4px;
+    }
+    .adda-detail .stat-tile .stat-unit { font-size: 12px; color: var(--stone); }
+
+    .adda-detail .chips-label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone); margin-bottom: 6px;
+    }
+    .adda-detail .chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .adda-detail .roll-chip {
+        padding: 5px 12px; background: var(--cream);
+        border: 1px solid var(--border-subtle); border-radius: 999px;
+        font-size: 12px; color: var(--ink); text-decoration: none;
+    }
+    .adda-detail .roll-chip strong { font-family: monospace; font-size: 13px; }
+    .adda-detail .roll-chip:hover { border-color: var(--copper); }
+    .adda-detail .worker-chip {
+        padding: 3px 10px; background: var(--cream-2);
+        border: 1px solid var(--border-subtle); border-radius: 999px;
+        font-size: 11px; color: var(--ink);
+    }
+    .adda-detail .chip-empty {
+        font-size: 12px; color: var(--stone); font-style: italic;
+    }
+    .adda-detail .stage-status-line {
+        font-size: 13px; color: var(--stone); padding: 8px 0;
+    }
+    .adda-detail .stage-actions {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding-top: 8px; border-top: 1px solid var(--border-subtle);
+    }
+
+    /* Activity feed */
+    .adda-detail .activity-feed { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 480px; overflow-y: auto; }
+    .adda-detail .activity-row {
+        display: flex; gap: 12px; padding: 10px 12px;
+        background: var(--surface-2); border-radius: 10px;
+        border-left: 3px solid var(--copper);
+    }
+    .adda-detail .activity-time {
+        flex-shrink: 0; width: 90px; font-size: 11px; color: var(--stone);
+        font-family: 'Courier New', monospace;
+    }
+    .adda-detail .activity-body { font-size: 13px; color: var(--ink); flex: 1; }
+    .adda-detail .activity-verb { color: var(--copper); margin: 0 6px; }
+    .adda-detail .activity-target { font-family: monospace; }
+    .adda-detail .activity-adda { color: var(--stone); margin-left: 6px; font-size: 11px; }
+    .adda-detail .activity-note { font-size: 11px; color: var(--stone); margin-top: 2px; font-style: italic; }
+    .adda-detail .activity-empty { color: var(--stone); font-size: 13px; margin: 0; }
+
+    @media (max-width: 600px) {
+        .adda-detail .hero { padding: 22px 20px; border-radius: 12px; }
+        .adda-detail .hero h1 { font-size: 24px; }
+        .adda-detail .tabbar { padding: 8px; }
+        .adda-detail .tab-btn { padding: 8px 14px; font-size: 12px; }
+        .adda-detail .activity-row { flex-direction: column; gap: 4px; }
+        .adda-detail .activity-time { width: auto; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="adda-detail">
+    {# Hero — Adda code + status badge #}
+    <div class="hero">
+        <div class="hero-row">
+            <div>
+                <h1>{{ adda.code }}</h1>
+                <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
+            </div>
+            <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
+                ● {{ adda.get_status_display }}
+            </span>
+        </div>
+    </div>
+
+    {% comment %}Layering Summary — full card above tabs. Always-visible high-level view.{% endcomment %}
+    {% if layering_snap.state != 'absent' %}
+    <div style="margin-bottom: 18px;">
+        {% include 'production/_layering_summary.html' with snap=layering_snap style='full' %}
+    </div>
+    {% endif %}
+
+    {% comment %}Tab bar — one button per stage; default tab marked aria-selected. Done stages get green pill, current gets copper, future gets neutral.{% endcomment %}
+    <div class="tabbar" role="tablist" aria-label="Adda stages">
+        {% for s in stages %}
+            {% if adda.current_stage and adda.current_stage.order == s.order %}
+                <button type="button" class="tab-btn is-current"
+                        role="tab" aria-controls="tab-{{ s.stage_type }}"
+                        aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
+                        data-tab="{{ s.stage_type }}">▸ {{ s.get_stage_type_display }}</button>
+            {% elif adda.current_stage and adda.current_stage.order > s.order or not adda.current_stage and adda.status == 'completed' %}
+                <button type="button" class="tab-btn is-done"
+                        role="tab" aria-controls="tab-{{ s.stage_type }}"
+                        aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
+                        data-tab="{{ s.stage_type }}">✓ {{ s.get_stage_type_display }}</button>
+            {% else %}
+                <button type="button" class="tab-btn"
+                        role="tab" aria-controls="tab-{{ s.stage_type }}"
+                        aria-selected="false"
+                        data-tab="{{ s.stage_type }}">{{ s.get_stage_type_display }}</button>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {% comment %}
+    Tab panes — one per stage. Each pane is an iframe to the embedded stage panel
+    URL. Why iframe? User explicitly wanted "live stage dashboard" inline — iframe
+    isolates panel CSS and lets the same content render on user dashboard too.
+    iframe height auto-adjusts via postMessage from the child page.
+    Open-in-new-window link sits next to iframe for full standalone view.
+    {% endcomment %}
+    {% for s in stages %}
+        <section class="tabpane" id="tab-{{ s.stage_type }}"
+                 role="tabpanel" aria-labelledby="btn-{{ s.stage_type }}"
+                 {% if default_tab != s.stage_type %}hidden{% endif %}>
+            <div class="tab-toolbar">
+                <a href="{% url 'production:stage-panel' adda.code s.stage_type %}" target="_blank" rel="noopener" class="open-new">
+                    Open in new window ↗
+                </a>
+            </div>
+            <iframe class="stage-iframe"
+                    data-stage="{{ s.stage_type }}"
+                    src="{% url 'production:stage-panel' adda.code s.stage_type %}?embedded=1"
+                    title="{{ s.get_stage_type_display }} panel"
+                    loading="lazy"
+                    style="width:100%; border:none; min-height:400px;"></iframe>
+        </section>
+    {% endfor %}
+
+    {# Assigned rolls panel — combined across all stages (cloth roll ledger view) #}
+    <div class="tabpane" style="padding: 0;">
+        <details>
+            <summary style="cursor:pointer; padding: 16px 22px; font-weight: 600; font-size: 14px; color: var(--ink);">
+                All Assigned Rolls ({{ rolls|length }})
+            </summary>
+            <div style="padding: 0 22px 22px;">
+            {% if rolls %}
+                <div class="chips-row">
+                    {% for r in rolls %}
+                        <a href="{% url 'tracking:roll-history' r.pk %}" class="roll-chip">
+                            <strong>{{ r.roll_id }}</strong>
+                            · {{ r.cloth_type.name }} · {{ r.cloth_color.name }}
+                            {% if r.width_inch %} - {{ r.width_inch }} inch{% endif %}
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="chip-empty">No rolls assigned yet.</p>
+            {% endif %}
+            </div>
+        </details>
+    </div>
+
+    {# Activity feed — full Adda timeline; collapsible to save vertical space #}
+    <div class="tabpane">
+        <h3 style="margin: 0 0 14px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; color: var(--ink);">
+            Activity ({{ activity|length }})
+        </h3>
+        {% include 'production/_activity_feed.html' with activity=activity show_adda_code=False %}
+    </div>
+
+    <div style="margin: 18px 0;">
+        <a href="{% url 'production:adda-list' %}" class="btn btn-ghost">← Back to Addas</a>
+        <a href="{% url 'tracking:adda-history' adda.code %}" class="btn btn-ghost">View Full History</a>
+    </div>
+</div>
+
+<script>
+    // Tab switcher — vanilla JS, no dependencies. Toggles `hidden` + `aria-selected`.
+    (function() {
+        const tabs = document.querySelectorAll('.adda-detail .tab-btn');
+        const panes = document.querySelectorAll('.adda-detail .tabpane[id^="tab-"]');
+        function activate(name) {
+            tabs.forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+            panes.forEach(p => { p.hidden = (p.id !== 'tab-' + name); });
+        }
+        tabs.forEach(btn => btn.addEventListener('click', () => activate(btn.dataset.tab)));
+    })();
+
+    // Iframe auto-resize — receives `stage-panel-resize` postMessage from embedded
+    // stage panel and grows the iframe to fit its content (no inner scrollbars).
+    window.addEventListener('message', function(ev) {
+        if (!ev.data || ev.data.type !== 'stage-panel-resize') return;
+        const code = ev.data.code;
+        const h = ev.data.height;
+        document.querySelectorAll('.stage-iframe').forEach(f => {
+            if (f.src.indexOf('/' + code + '/') !== -1) {
+                f.style.height = (h + 20) + 'px';
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% comment %}
+Reusable Layering snapshot partial.
+
+Inputs (caller passes via `with` or context):
+  • snap  — dict from production.services.get_layering_snapshot(adda)
+  • style — 'compact' (single line, dashboard tables) | 'full' (card)
+
+Renders nothing if state == 'absent'.
+{% endcomment %}
+{% if snap.state == 'not_started' %}
+    {% if style == 'compact' %}
+        <span class="ls-pill ls-pending">Not started</span>
+    {% else %}
+        <div class="ls-card ls-pending-card">
+            <div class="ls-card-title">Layering — Not Started</div>
+            <div class="ls-card-sub">Manager assigns workers + worker attaches first roll to begin.</div>
+        </div>
+    {% endif %}
+{% elif snap.state == 'in_progress' %}
+    {% if style == 'compact' %}
+        <span class="ls-pill ls-progress">▸ {{ snap.rolls_count }} roll{{ snap.rolls_count|pluralize }}
+        {% if snap.lay_count %}· {{ snap.lay_count }} layers{% endif %}
+        {% if snap.leftover_length_sum %}· leftover {{ snap.leftover_length_sum|floatformat:2 }} m{% endif %}</span>
+    {% else %}
+        <div class="ls-card ls-progress-card">
+            <div class="ls-card-title">Layering — In Progress</div>
+            <div class="ls-card-grid">
+                <div><span class="lbl">Rolls Attached</span><span class="val">{{ snap.rolls_count }}</span></div>
+                <div><span class="lbl">Total Layers (so far)</span><span class="val">{{ snap.lay_count|default:"—" }}</span></div>
+                <div><span class="lbl">Layer Length (draft)</span><span class="val">{% if snap.layer_length %}{{ snap.layer_length }} m{% else %}—{% endif %}</span></div>
+                <div><span class="lbl">Duration (draft)</span><span class="val">{% if snap.duration_min %}{{ snap.duration_min }} min{% else %}—{% endif %}</span></div>
+                <div><span class="lbl">Leftover Length</span><span class="val">{{ snap.leftover_length_sum|floatformat:2 }} m</span></div>
+                <div><span class="lbl">Leftover Weight</span><span class="val">{{ snap.leftover_weight_sum|floatformat:2 }} KG</span></div>
+                <div><span class="lbl">Started</span><span class="val">{{ snap.started_at|date:"d M H:i"|default:"—" }}</span></div>
+                <div><span class="lbl">Workers</span><span class="val">{{ snap.workers.count }} assigned</span></div>
+            </div>
+        </div>
+    {% endif %}
+{% elif snap.state == 'completed' %}
+    {% if style == 'compact' %}
+        <span class="ls-pill ls-done">✓ {{ snap.lay_count }} layers · {{ snap.layer_length }} m · {{ snap.duration_min }} min{% if snap.total_fabric_used %} · {{ snap.total_fabric_used|floatformat:2 }} m fabric{% endif %}</span>
+    {% else %}
+        <div class="ls-card ls-done-card">
+            <div class="ls-card-title">Layering — Completed {{ snap.completed_at|date:"d M Y H:i" }}{% if snap.completed_by %} by {{ snap.completed_by.email }}{% endif %}</div>
+            <div class="ls-card-grid">
+                <div><span class="lbl">Lay Count</span><span class="val">{{ snap.lay_count }}</span></div>
+                <div><span class="lbl">Layer Length</span><span class="val">{{ snap.layer_length }} m</span></div>
+                <div><span class="lbl">Duration</span><span class="val">{{ snap.duration_min }} min</span></div>
+                <div><span class="lbl">Total Colors</span><span class="val">{{ snap.total_colors }}</span></div>
+                <div><span class="lbl">Rolls Used</span><span class="val">{{ snap.rolls_count }}</span></div>
+                <div><span class="lbl">Total Fabric Used</span><span class="val">{% if snap.total_fabric_used %}{{ snap.total_fabric_used|floatformat:2 }} m{% else %}—{% endif %}</span></div>
+                <div><span class="lbl">Leftover Length</span><span class="val">{{ snap.leftover_length_sum|floatformat:2 }} m</span></div>
+                <div><span class="lbl">Leftover Weight</span><span class="val">{{ snap.leftover_weight_sum|floatformat:2 }} KG</span></div>
+            </div>
+            {% if snap.record.notes %}<div class="ls-card-notes">{{ snap.record.notes }}</div>{% endif %}
+        </div>
+    {% endif %}
+{% endif %}

@@ -1,0 +1,138 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Roll {{ roll.roll_id }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .roll-detail { max-width: 800px; margin: 0 auto; }
+    .roll-detail .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position:relative; overflow:hidden;
+    }
+    .roll-detail .hero::before {
+        content:''; position:absolute; right:-100px; top:-100px;
+        width:280px; height:280px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+    }
+    .roll-detail .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 32px; font-weight: 600; color:#fff; margin: 0 0 6px; letter-spacing: -0.01em;
+        position: relative;
+    }
+    .roll-detail .hero p { margin:0; color:rgba(255,255,255,0.72); font-size:14px; position: relative; }
+
+    .roll-detail dl {
+        display: grid; grid-template-columns: max-content 1fr; gap: 10px 22px; margin: 0;
+    }
+    .roll-detail dt {
+        color: var(--stone); font-size: 11px; text-transform: uppercase;
+        letter-spacing: 0.08em; font-weight: 700; padding-top: 4px;
+    }
+    .roll-detail dd { color: var(--ink); font-size: 14px; margin: 0; }
+
+    @media (max-width: 600px) {
+        .roll-detail .hero { padding: 22px 20px; border-radius: 12px; }
+        .roll-detail .hero h1 { font-size: 26px; }
+        .roll-detail dl { grid-template-columns: 1fr; gap: 2px 0; }
+        .roll-detail dt { padding-top: 12px; }
+        .roll-detail dd { padding-bottom: 6px; border-bottom: 1px solid var(--border-subtle); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{# `roll` ClothRoll instance (DetailView); financial fields role-gated via can_view_financials #}
+<div class="roll-detail">
+    <div class="hero">
+        <h1>{{ roll.roll_id }}</h1>
+        <p>{{ roll.cloth_type.name }} · {{ roll.cloth_color.name }} · {{ roll.storage_location.name }}</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <dl>
+                <dt>Type</dt><dd>{{ roll.cloth_type.name }}</dd>
+                <dt>Color</dt><dd>
+                    {% if roll.cloth_color.hex_code %}<span style="display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; background:{{ roll.cloth_color.hex_code }}; border:1px solid rgba(0,0,0,0.1);"></span>{% endif %}
+                    {{ roll.cloth_color.name }}
+                </dd>
+                <dt>Width</dt><dd>{% if roll.width_inch %}{{ roll.width_inch }} inch{% else %}<em style="color:var(--stone);">— set at use time</em>{% endif %}</dd>
+                <dt>Weight</dt><dd>{% if roll.weight_kg %}{{ roll.weight_kg }} KG{% else %}<em style="color:var(--stone);">— set at use time</em>{% endif %}</dd>
+                <dt>Storage</dt><dd>{{ roll.storage_location.name }} <code style="font-size:12px; background:var(--cream-2); padding:1px 6px; border-radius:4px;">{{ roll.storage_location.code }}</code></dd>
+                <dt>Status</dt><dd>
+                    {% if roll.status == 'used' %}
+                        <span class="badge badge-inactive">Used</span>
+                    {% else %}
+                        <span class="badge badge-active">● Available</span>
+                    {% endif %}
+                </dd>
+                <dt>Purchased</dt><dd>{{ roll.purchased_date|date:"d M Y" }}</dd>
+                <dt>Created</dt><dd>{{ roll.created_at|date:"d M Y H:i" }}</dd>
+                <dt>Updated</dt><dd>{{ roll.updated_at|date:"d M Y H:i" }}</dd>
+                {% if can_view_financials %}
+                    <dt>Supplier</dt><dd>{{ roll.supplier|default:"—" }}</dd>
+                    <dt>Cost/KG</dt><dd>{% if roll.cost_per_kg %}₹{{ roll.cost_per_kg }}{% else %}—{% endif %}</dd>
+                {% endif %}
+                {% if roll.adda %}
+                    <dt>Adda</dt><dd><a href="{% url 'production:adda-detail' roll.adda.code %}">{{ roll.adda.code }}</a> · {{ roll.adda.product.name }}</dd>
+                    <dt>Used by</dt><dd>{{ roll.used_by.email|default:"—" }}</dd>
+                    <dt>Used at</dt><dd>{{ roll.used_at|date:"d M Y H:i"|default:"—" }}</dd>
+                {% endif %}
+                {% if roll.layers_on_roll or roll.layer_length_meters %}
+                    <dt>Layers on Roll</dt><dd>{{ roll.layers_on_roll|default:"—" }}</dd>
+                    <dt>Layer Length</dt><dd>{% if roll.layer_length_meters %}{{ roll.layer_length_meters }} m{% else %}—{% endif %}</dd>
+                {% endif %}
+                {% if roll.remaining_length_meters or roll.remaining_weight_kg %}
+                    <dt>Leftover</dt><dd><strong>{{ roll.remaining_length_meters|default:"0" }} m / {{ roll.remaining_weight_kg|default:"0" }} KG</strong></dd>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    {% comment %}Leftover cloth section (Phase 6). Lists all RemainingClothOfClothRoll
+    entries for this roll. Shows total available leftover length + weight.
+    Future use: feed into pieces-prediction algorithm.{% endcomment %}
+    {% with leftovers=roll.remaining_pieces.all %}
+    {% if leftovers %}
+    <div class="card" style="margin-top: 18px;">
+        <div class="card-header">
+            <div class="card-title">Leftover Cloth Pieces ({{ leftovers|length }})</div>
+        </div>
+        <div class="card-body">
+            <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px;">
+            {% for lo in leftovers %}
+                <li style="padding: 10px 12px; background: var(--cream-2); border-radius: 8px; font-size: 13px;">
+                    <strong>{{ lo.remaining_length_meters }} m</strong> · <strong>{{ lo.remaining_weight_kg }} KG</strong>
+                    {% if lo.is_consumed %}
+                        <span style="color: var(--stone); font-size: 11px;">· consumed in {{ lo.consumed_in_adda.code }}</span>
+                    {% else %}
+                        <span style="color: var(--success); font-size: 11px;">· available</span>
+                    {% endif %}
+                    <div style="font-size: 11px; color: var(--stone); margin-top: 2px;">
+                        from Adda <a href="{% url 'production:adda-detail' lo.source_adda.code %}">{{ lo.source_adda.code }}</a>
+                        · recorded {{ lo.created_at|date:"d M Y H:i" }}
+                        {% if lo.created_by %} by {{ lo.created_by.email }}{% endif %}
+                        {% if lo.notes %} · <em>{{ lo.notes }}</em>{% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">← Back to rolls</a>
+        {% if can_edit %}
+            <a href="{% url 'raw_materials:roll-edit' roll.pk %}" class="btn btn-primary">Edit Details</a>
+        {% endif %}
+        {% if roll.status == 'not_used' %}
+            <a href="{% url 'raw_materials:roll-assign' roll.pk %}" class="btn btn-ghost">Assign to Adda</a>
+        {% endif %}
+        <a href="{% url 'tracking:roll-history' roll.pk %}" class="btn btn-ghost">View History</a>
+    </div>
+</div>
+{% endblock %}

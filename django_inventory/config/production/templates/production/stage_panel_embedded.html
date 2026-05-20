@@ -1,0 +1,218 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ adda.code }} · {{ stage_type|capfirst }}</title>
+{% comment %}
+Chromeless template — meant for iframe embed. No sidebar, no global nav.
+Only the design tokens + form-shell CSS + page-scoped panel CSS.
+
+Auto-resize: parent windows can listen for postMessage `stage-panel-resize`
+to fit iframe height. Implemented in script at bottom.
+{% endcomment %}
+<style>
+    :root {
+        --ink: #1c1c1e;
+        --stone: #6e6259;
+        --cream: #faf7f2;
+        --cream-2: #f1ece2;
+        --copper: #b87333;
+        --surface-2: #f5f1ea;
+        --card-bg: #ffffff;
+        --border-card: #cfc0aa;
+        --border-subtle: #e6dcc9;
+        --shadow-card: 0 2px 12px rgba(14,11,9,0.08);
+        --danger: #b91c1c;
+        --danger-bg: rgba(220,38,38,0.10);
+        --success: #15803d;
+        --success-bg: rgba(34,197,94,0.10);
+        --white: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 12px;
+        background: var(--cream); color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 14px;
+    }
+    /* Messages strip */
+    .messages-strip { margin-bottom: 12px; display:flex; flex-direction:column; gap:6px; }
+    .msg { padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+    .msg-success { background: var(--success-bg); color: var(--success); }
+    .msg-error   { background: var(--danger-bg); color: var(--danger); }
+    .msg-info, .msg- { background: var(--cream-2); color: var(--stone); }
+
+    /* Buttons */
+    .btn {
+        display: inline-block; padding: 10px 16px; border-radius: 10px;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        border: 1.5px solid transparent; cursor: pointer;
+        font-family: inherit;
+    }
+    .btn-primary { background: var(--copper); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost { background: transparent; color: var(--ink); border-color: var(--border-subtle); }
+    .btn-ghost:hover { border-color: var(--copper); }
+
+    /* Panel */
+    .panel {
+        background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 12px;
+        box-shadow: var(--shadow-card); margin-bottom: 14px;
+    }
+    .panel-head { display:flex; align-items:center; gap:10px; padding: 14px 16px 0; }
+    .panel-num {
+        width:28px; height:28px; background: var(--copper); color: #fff;
+        font-weight: 700; font-size: 12px;
+        display:flex; align-items:center; justify-content:center;
+        border-radius: 7px;
+    }
+    .panel-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+    .panel-body { padding: 12px 16px 16px; }
+    .panel-sub { font-size: 12px; color: var(--stone); margin: 0 0 10px; }
+    .panel-state {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; padding: 3px 8px; border-radius: 10px;
+        margin-left: auto;
+    }
+    .panel-state.not-started { background: var(--cream-2); color: var(--stone); }
+    .panel-state.in-progress { background: rgba(184,115,51,0.18); color: var(--copper); }
+    .panel-state.completed   { background: var(--success-bg); color: var(--success); }
+
+    /* Forms */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.full { grid-column: 1/-1; }
+    .field label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .field-error { color: var(--danger); font-size: 11px; }
+    input, select, textarea, .sf-input {
+        width: 100%; padding: 9px 12px;
+        background: var(--cream); border: 1.5px solid var(--border-card); border-radius: 8px;
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 13px; color: var(--ink); font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none; border-color: var(--copper); background: var(--white);
+    }
+
+    /* Stage stats */
+    .stage-stats {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px; margin-bottom: 14px;
+    }
+    .stat-tile {
+        padding: 10px 12px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 10px;
+    }
+    .stat-tile .stat-label {
+        font-size: 9px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .stat-tile .stat-value {
+        font-size: 22px; font-weight: 600; color: var(--ink); margin-top: 2px;
+    }
+
+    /* Roll list */
+    .roll-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .roll-row { background: var(--surface-2); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px 12px; }
+    .roll-row-head { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size: 12px; }
+    .roll-row-head strong { font-family: monospace; font-size: 13px; }
+    .roll-row-meta { color: var(--stone); font-size: 11px; }
+    .roll-row details { margin-top: 6px; }
+    .roll-row summary { cursor: pointer; font-size: 11px; color: var(--copper); font-weight: 600; }
+    .inline-form { margin-top: 8px; display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; }
+    .inline-form .field { flex: 1 1 100px; min-width: 100px; }
+    .row-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top: 8px; }
+
+    .roll-id-chip {
+        display:inline-block; padding: 4px 10px; margin: 2px;
+        background: var(--cream); border: 1px solid var(--border-subtle);
+        border-radius: 999px; font-size: 11px; color: var(--ink);
+    }
+    .roll-id-chip strong { font-family: monospace; font-size: 12px; }
+    .chips-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    /* Worker chip widget (for {{ start_form.workers }}) */
+    .workers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+    .worker-chip {
+        display:flex; align-items:center; gap:6px;
+        padding: 8px 10px; background: var(--cream);
+        border: 1.5px solid var(--border-card); border-radius: 8px;
+        cursor:pointer; font-size: 12px;
+    }
+    .worker-chip:has(input:checked) { background: rgba(184,115,51,0.10); border-color: var(--copper); }
+    .worker-chip input { width: auto; padding: 0; margin: 0; box-shadow: none; border: none; }
+
+    /* Filter row + quick-create panel */
+    .roll-filters { padding: 10px 12px; background: var(--cream-2); border-radius: 10px; margin-bottom: 6px; }
+    details.quick-create { background: var(--surface-2); border: 1px dashed var(--border-card); border-radius: 10px; padding: 10px 12px; }
+    details.quick-create summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--copper); list-style: none; }
+    details.quick-create summary::after { content: ' ▾'; font-weight: 400; }
+    details.quick-create[open] summary::after { content: ' ▴'; }
+
+    /* Section 04 breakup table + summary card */
+    .breakup-table-wrap { overflow-x: auto; margin-bottom: 14px; border: 1px solid var(--border-card); border-radius: 10px; }
+    .breakup-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+    .breakup-table thead tr { background: var(--cream-2); }
+    .breakup-table th { text-align: left; padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--stone); }
+    .breakup-table td { padding: 8px 12px; border-top: 1px solid var(--border-subtle); vertical-align: middle; }
+    .breakup-table .cell-mono { font-family: monospace; font-weight: 700; color: var(--ink); }
+    .breakup-table input { width: 95px; padding: 6px 8px; font-size: 12px; }
+    .stage-summary { background: var(--cream); border: 1px solid var(--border-card); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+    .stage-summary-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--stone); margin-bottom: 8px; }
+    .stage-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+    .stage-summary-grid > div { display: flex; flex-direction: column; }
+    .stage-summary-grid .lbl { font-size: 10px; color: var(--stone); text-transform: uppercase; }
+    .stage-summary-grid .val { font-size: 18px; font-weight: 700; color: var(--ink); }
+    .stage-actions-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
+    .stage-actions-row .btn { padding: 8px 14px; font-size: 13px; }
+
+    @media (max-width: 600px) {
+        /* Mobile: stack breakup table cells */
+        .breakup-table { min-width: 0; }
+        .breakup-table thead { display: none; }
+        .breakup-table tr { display: block; margin-bottom: 12px; border: 1px solid var(--border-card); border-radius: 10px; overflow: hidden; }
+        .breakup-table td { display: flex; justify-content: space-between; padding: 6px 12px; border-top: none; border-bottom: 1px solid var(--border-subtle); }
+        .breakup-table td:last-child { border-bottom: none; }
+        .breakup-table td::before { content: attr(data-label); font-size: 10px; text-transform: uppercase; color: var(--stone); margin-right: 8px; align-self: center; }
+        .breakup-table input { width: 110px; }
+    }
+
+    /* Mobile-first: single column at narrow widths */
+    @media (max-width: 480px) {
+        .form-grid { grid-template-columns: 1fr; }
+        body { padding: 8px; }
+        .stage-stats { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+</head>
+<body>
+    {% if stage_type == 'layering' %}
+        {% include 'production/_stage_panel_layering.html' %}
+    {% elif stage_type == 'cutting' %}
+        {% include 'production/_stage_panel_cutting.html' %}
+    {% else %}
+        <p>Unknown stage: {{ stage_type }}</p>
+    {% endif %}
+
+    <script>
+        // postMessage parent to auto-resize iframe.
+        // Parent listens for `stage-panel-resize` and sets iframe.height.
+        (function() {
+            function reportSize() {
+                const h = document.documentElement.scrollHeight;
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({type: 'stage-panel-resize', height: h, code: '{{ adda.code }}'}, '*');
+                }
+            }
+            window.addEventListener('load', reportSize);
+            // Re-measure on details toggle / form expand
+            document.addEventListener('toggle', reportSize, true);
+            new ResizeObserver(reportSize).observe(document.body);
+        })();
+    </script>
+</body>
+</html>

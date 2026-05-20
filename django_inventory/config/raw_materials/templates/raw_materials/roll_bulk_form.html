@@ -1,0 +1,309 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Add Cloth Rolls{% endblock %}
+
+{% block extra_head %}
+{# form-shell CSS .bulk-roll-create ke andar scoped — dusre pages pe leak nahi hoga #}
+<style>
+    .bulk-roll-create { max-width: 1100px; margin: 0 auto; padding-bottom: 120px; }
+
+    /* Hero strip — hardcoded dark gradient per form-shell rule (CSS vars flip in dark mode). */
+    .bulk-roll-create .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position: relative; overflow: hidden;
+    }
+    .bulk-roll-create .hero::before {
+        content: ''; position: absolute; right: -100px; top: -100px;
+        width: 280px; height: 280px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+        pointer-events: none;
+    }
+    .bulk-roll-create .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 32px; font-weight: 600; margin: 0 0 6px; color: #fff;
+        letter-spacing: -0.01em; position: relative;
+    }
+    .bulk-roll-create .hero p {
+        margin: 0; color: rgba(255,255,255,0.72); font-size: 14px; max-width: 640px;
+        position: relative;
+    }
+    .bulk-roll-create .hero .hero-chip {
+        display: inline-block; padding: 3px 10px; margin-top: 12px;
+        background: rgba(184,115,51,0.22); border: 1px solid rgba(184,115,51,0.4);
+        color: #d4924a; border-radius: 12px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.12em; position: relative;
+    }
+
+    /* Numbered panel cards */
+    .bulk-roll-create .panel {
+        background: var(--card-bg); border: 1px solid #cfc0aa; border-radius: 14px;
+        box-shadow: 0 2px 12px rgba(14,11,9,0.10);
+        margin-bottom: 18px;
+    }
+    .bulk-roll-create .panel-head {
+        display: flex; align-items: center; gap: 12px;
+        padding: 18px 22px 0;
+    }
+    .bulk-roll-create .panel-num {
+        width: 32px; height: 32px; flex-shrink: 0;
+        background: var(--copper); color: #fff;
+        font-weight: 700; font-size: 14px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 8px; box-shadow: 0 2px 6px rgba(184,115,51,0.35);
+    }
+    .bulk-roll-create .panel-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+    }
+    .bulk-roll-create .panel-body { padding: 18px 22px 22px; }
+    .bulk-roll-create .panel-sub { font-size: 13px; color: var(--stone); margin: 0 0 14px; }
+
+    /* Form grid — 2 col desktop, 1 col mobile. */
+    .bulk-roll-create .form-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    .bulk-roll-create .field {
+        display: flex; flex-direction: column; gap: 6px;
+    }
+    .bulk-roll-create .field label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .bulk-roll-create .field .muted { color: var(--stone); font-weight: 400; }
+    .bulk-roll-create .field-error {
+        color: var(--danger); font-size: 12px; margin-top: 2px;
+    }
+    .bulk-roll-create input,
+    .bulk-roll-create select {
+        width: 100%; padding: 11px 14px;
+        background: var(--cream); border: 1.5px solid #cfc0aa; border-radius: 10px;
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 14px; color: var(--ink);
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .bulk-roll-create input:focus,
+    .bulk-roll-create select:focus {
+        outline: none; border-color: var(--copper); background: var(--white);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07), 0 0 0 3px rgba(184,115,51,0.15);
+    }
+    html[data-theme="dark"] .bulk-roll-create input:focus,
+    html[data-theme="dark"] .bulk-roll-create select:focus { background: var(--cream-2); }
+
+    /* Breakup rows */
+    .bulk-roll-create .breakup-row {
+        display: grid; grid-template-columns: 2fr 1fr auto;
+        gap: 12px; margin-bottom: 10px; align-items: center;
+    }
+    .bulk-roll-create .breakup-row .remove-row {
+        background: transparent; border: 1.5px solid var(--cream-3); color: var(--danger);
+        padding: 9px 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+        cursor: pointer;
+    }
+    .bulk-roll-create .breakup-row .remove-row:hover {
+        border-color: var(--danger); background: var(--danger-bg);
+    }
+
+    .bulk-roll-create .bulk-summary {
+        margin-top: 16px; padding: 14px 18px;
+        background: var(--cream-2); border: 1px solid var(--border-default);
+        border-radius: 12px; font-size: 13px; color: var(--ink);
+    }
+    .bulk-roll-create .bulk-summary .total-pill {
+        display: inline-block; padding: 4px 14px; margin-right: 8px;
+        background: var(--copper); color: #fff; border-radius: 999px;
+        font-weight: 700; font-size: 16px;
+    }
+    .bulk-roll-create .bulk-summary .breakdown { margin-top: 8px; font-size: 12px; color: var(--stone); }
+
+    .bulk-roll-create .add-row-btn {
+        background: transparent; border: 1.5px dashed var(--copper); color: var(--copper);
+        padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+        cursor: pointer; transition: background 0.15s;
+    }
+    .bulk-roll-create .add-row-btn:hover { background: rgba(184,115,51,0.08); }
+
+    /* Sticky action bar */
+    .bulk-roll-create .sticky-actions {
+        position: sticky; bottom: 14px; z-index: 5;
+        margin: 22px 0 0; padding: 14px 18px;
+        background: rgba(250,247,242,0.78); backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(14,11,9,0.10);
+        display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+    }
+    html[data-theme="dark"] .bulk-roll-create .sticky-actions {
+        background: rgba(28,28,30,0.85);
+    }
+
+    .bulk-roll-create .form-error {
+        padding: 12px 16px; background: var(--danger-bg); color: var(--danger);
+        border-radius: 10px; margin-bottom: 18px; font-size: 13px;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+        .bulk-roll-create .form-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+        .bulk-roll-create .hero { padding: 22px 20px; border-radius: 12px; }
+        .bulk-roll-create .hero h1 { font-size: 26px; }
+        .bulk-roll-create .panel-head { padding: 16px 18px 0; }
+        .bulk-roll-create .panel-body { padding: 14px 18px 18px; }
+        .bulk-roll-create .breakup-row { grid-template-columns: 1fr; gap: 8px; }
+        .bulk-roll-create .breakup-row .remove-row { width: 100%; }
+        .bulk-roll-create .sticky-actions {
+            position: sticky; bottom: 8px; flex-direction: column-reverse;
+        }
+        .bulk-roll-create .sticky-actions .btn { width: 100%; justify-content: center; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bulk-roll-create">
+
+    {# Hero strip — hardcoded dark gradient (CSS vars dark mode mein flip ho jaate hain) #}
+    <div class="hero">
+        <h1>Add Cloth Rolls</h1>
+        <p>Add many rolls in one go. Pick the cloth type, then break the total down by color. Each row creates that many individual rolls — every roll gets its own auto-generated Roll ID.</p>
+        <span class="hero-chip">SUPER ADMIN ONLY</span>
+    </div>
+
+    <form method="post" novalidate id="bulk-roll-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="form-error">{{ form.non_field_errors|join:" " }}</div>
+        {% endif %}
+
+        {# Panel 1 — shared metadata for whole bulk batch. csrf_token form ke andar mandatory #}
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-num">01</div>
+                <div class="panel-title">Roll Metadata</div>
+            </div>
+            <div class="panel-body">
+                <p class="panel-sub">Shared properties for every roll in this bulk batch. Weight + width get filled in later when each roll is assigned to an Adda.</p>
+                <div class="form-grid">
+                    <div class="field"><label>Cloth Type *</label>{{ form.cloth_type }}{% if form.cloth_type.errors %}<div class="field-error">{{ form.cloth_type.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field"><label>Storage Location *</label>{{ form.storage_location }}{% if form.storage_location.errors %}<div class="field-error">{{ form.storage_location.errors|join:" " }}</div>{% endif %}</div>
+                    <div class="field"><label>Purchased Date *</label>{{ form.purchased_date }}{% if form.purchased_date.errors %}<div class="field-error">{{ form.purchased_date.errors|join:" " }}</div>{% endif %}</div>
+                    {% if form.supplier %}
+                        <div class="field"><label>Supplier <span class="muted">(Finance)</span></label>{{ form.supplier }}{% if form.supplier.errors %}<div class="field-error">{{ form.supplier.errors|join:" " }}</div>{% endif %}</div>
+                    {% endif %}
+                    {% if form.cost_per_kg %}
+                        <div class="field"><label>Cost per KG <span class="muted">(Finance)</span></label>{{ form.cost_per_kg }}{% if form.cost_per_kg.errors %}<div class="field-error">{{ form.cost_per_kg.errors|join:" " }}</div>{% endif %}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Panel 2 — color breakup. `breakup_color[]`+`breakup_qty[]` parallel arrays POST hote hain #}
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-num">02</div>
+                <div class="panel-title">Color Breakup</div>
+            </div>
+            <div class="panel-body">
+                <p class="panel-sub">Add one row per color. Example: 80 Red, 70 Blue, 50 Green = 200 rolls created.</p>
+
+                <template id="breakup-row-template">
+                    <div class="breakup-row">
+                        <select name="breakup_color" required data-no-fancy>
+                            <option value="">— pick color —</option>
+                            {% for c in active_colors %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+                        </select>
+                        <input type="number" name="breakup_qty" min="1" placeholder="qty" required>
+                        <button type="button" class="remove-row" title="Remove row">✕</button>
+                    </div>
+                </template>
+
+                <div id="breakup-rows">
+                    {% if submitted_breakup %}
+                        {% for row in submitted_breakup %}
+                            <div class="breakup-row">
+                                <select name="breakup_color" required data-no-fancy>
+                                    <option value="">— pick color —</option>
+                                    {% for c in active_colors %}
+                                        <option value="{{ c.pk }}" {% if row.color_pk == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="number" name="breakup_qty" min="1" placeholder="qty" value="{{ row.qty }}" required>
+                                <button type="button" class="remove-row" title="Remove row">✕</button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+
+                <button type="button" class="add-row-btn" id="add-row-btn">+ Add color row</button>
+
+                <div class="bulk-summary">
+                    <span class="total-pill" id="total-count">0</span>
+                    <span>total rolls</span>
+                    <div class="breakdown" id="breakdown-text"></div>
+                </div>
+            </div>
+        </div>
+
+        {# sticky-actions — bottom pe stick rehta hai, scroll karte time bhi visible #}
+        <div class="sticky-actions">
+            <a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Create Rolls</button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function () {
+    const wrap     = document.getElementById('breakup-rows');
+    const tpl      = document.getElementById('breakup-row-template');
+    const totalEl  = document.getElementById('total-count');
+    const breakEl  = document.getElementById('breakdown-text');
+    const addBtn   = document.getElementById('add-row-btn');
+    const submitBt = document.getElementById('submit-btn');
+    const formEl   = document.getElementById('bulk-roll-form');
+
+    function makeRow() { return tpl.content.firstElementChild.cloneNode(true); }
+    function ensureOneRow() { if (!wrap.querySelector('.breakup-row')) wrap.appendChild(makeRow()); }
+    function recompute() {
+        let total = 0; const parts = [];
+        wrap.querySelectorAll('.breakup-row').forEach(row => {
+            const select = row.querySelector('select');
+            const qtyInp = row.querySelector('input[type=number]');
+            const qty = parseInt(qtyInp.value, 10);
+            if (!isNaN(qty) && qty > 0) {
+                total += qty;
+                if (select.value && select.selectedOptions[0]) {
+                    parts.push(qty + ' × ' + select.selectedOptions[0].text);
+                }
+            }
+        });
+        totalEl.textContent = total;
+        breakEl.textContent = parts.length ? parts.join('  ·  ') : '';
+        submitBt.disabled = total < 1;
+        submitBt.style.opacity = total < 1 ? '0.5' : '1';
+    }
+    wrap.addEventListener('input',  recompute);
+    wrap.addEventListener('change', recompute);
+    wrap.addEventListener('click', e => {
+        const btn = e.target.closest('.remove-row'); if (!btn) return;
+        const rows = wrap.querySelectorAll('.breakup-row');
+        if (rows.length === 1) {
+            rows[0].querySelector('select').value = '';
+            rows[0].querySelector('input[type=number]').value = '';
+        } else { btn.closest('.breakup-row').remove(); }
+        ensureOneRow(); recompute();
+    });
+    addBtn.addEventListener('click', () => {
+        const node = makeRow(); wrap.appendChild(node); node.querySelector('select').focus(); recompute();
+    });
+    formEl.addEventListener('submit', e => {
+        recompute();
+        if (parseInt(totalEl.textContent, 10) < 1) { e.preventDefault(); alert('Add at least one color row with quantity ≥ 1.'); }
+    });
+    ensureOneRow(); recompute();
+})();
+</script>
+{% endblock %}

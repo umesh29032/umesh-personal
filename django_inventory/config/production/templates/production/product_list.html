@@ -1,0 +1,49 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Products{% endblock %}
+
+{% block content %}
+{# `products` queryset; workflow_stages reverse FK se har Product ki stages list #}
+<div class="product-list">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Products</h1>
+            <p>Factory products. Each has its own workflow + Adda code prefix.</p>
+        </div>
+        {% if request.user.is_superuser or current_role_code == 'super_admin' %}
+            <a href="{% url 'production:product-create' %}" class="btn btn-primary">+ Add Product</a>
+        {% endif %}
+    </div>
+
+    {% if messages %}{% for m in messages %}<div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>{% endfor %}{% endif %}
+
+    <div class="card card-clip">
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead>
+                    <tr><th>Code</th><th>Name</th><th>Workflow</th><th>Addas</th><th>Status</th><th data-orderable="false">Actions</th></tr>
+                </thead>
+                <tbody>
+                {% for p in products %}
+                    <tr>
+                        <td data-label="Code"><code><strong>{{ p.code }}</strong></code></td>
+                        <td data-label="Name">{{ p.name }}</td>
+                        <td data-label="Workflow" style="font-size:12px; color:var(--stone);">
+                            {% for s in p.workflow_stages.all %}{{ s.get_stage_type_display }}{% if not forloop.last %} → {% endif %}{% endfor %}
+                        </td>
+                        <td data-label="Addas">{{ p.adda_counter }}</td>
+                        <td data-label="Status">{% if p.is_active %}<span class="badge badge-active">● Active</span>{% else %}<span class="badge badge-inactive">Archived</span>{% endif %}</td>
+                        <td data-label="Actions" class="td-actions">
+                            <a href="{% url 'production:product-update' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Edit</a>
+                            <a href="{% url 'production:product-archive' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Archive</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" style="padding:24px; text-align:center; color:var(--stone);">No products yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

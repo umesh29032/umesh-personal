@@ -1,0 +1,30 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object.is_active %}Archive{% else %}Restore{% endif %} {{ title }}{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# Archive/restore — service ne is_active flip kiya. CSRF token mandatory for POST #}
+<div class="form-shell" style="max-width:600px;">
+    <div class="hero">
+        <h1>{% if object.is_active %}Archive{% else %}Restore{% endif %} {{ title }}</h1>
+        <p>{% if object.is_active %}Archived rows are hidden from roll-entry dropdowns but still appear on historical rolls.{% else %}Restoring makes this row available again in roll-entry forms.{% endif %}</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            <div class="panel-body">
+                <p style="margin:0; font-size:14px; color:var(--ink);">
+                    {% if object.is_active %}Archive{% else %}Restore{% endif %} <strong>{{ object }}</strong>?
+                </p>
+            </div>
+        </div>
+        <div class="sticky-actions">
+            <a href="{% url list_url_name %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if object.is_active %}Archive{% else %}Restore{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

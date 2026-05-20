@@ -1,0 +1,184 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Raw Materials{% endblock %}
+
+{% block extra_head %}
+{# CSS .rm-dash ke andar scoped — dusre pages pe leak nahi hoga #}
+<style>
+    .rm-dash .page-header { margin-bottom: 18px; }
+    .rm-dash .rm-section-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--stone);
+        margin: 28px 0 14px;
+    }
+
+    /* Hero "Cloth" live tile */
+    .rm-dash .rm-cloth-card {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff;
+        border-radius: 18px;
+        padding: 28px 32px;
+        border: 1px solid rgba(255,255,255,0.06);
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position: relative;
+        overflow: hidden;
+    }
+    .rm-dash .rm-cloth-card::before {
+        content: '';
+        position: absolute;
+        right: -120px; top: -120px;
+        width: 320px; height: 320px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+        pointer-events: none;
+    }
+    .rm-dash .rm-cloth-head {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 14px; flex-wrap: wrap; position: relative;
+    }
+    .rm-dash .rm-cloth-name {
+        font-size: 26px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px;
+    }
+    .rm-dash .rm-cloth-desc { font-size: 13px; color: rgba(255,255,255,0.72); max-width: 520px; }
+    .rm-dash .rm-cloth-badge {
+        padding: 4px 12px; border-radius: 12px; font-size: 10px; font-weight: 700;
+        letter-spacing: 0.12em; background: rgba(34,197,94,0.18); color: #4ade80;
+        border: 1px solid rgba(34,197,94,0.3);
+    }
+    .rm-dash .rm-cloth-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 20px;
+        margin-top: 22px;
+        position: relative;
+    }
+    .rm-dash .rm-cloth-stats .stat-num {
+        font-size: 30px; font-weight: 700; line-height: 1; color: #fff;
+    }
+    .rm-dash .rm-cloth-stats .stat-num.available { color: #4ade80; }
+    .rm-dash .rm-cloth-stats .stat-num.used      { color: #d4924a; }
+    .rm-dash .rm-cloth-stats .stat-lbl {
+        font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+        color: rgba(255,255,255,0.6); margin-top: 6px; font-weight: 600;
+    }
+    .rm-dash .rm-cloth-actions {
+        display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; position: relative;
+    }
+    .rm-dash .rm-cloth-btn {
+        padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
+        text-decoration: none; border: 1px solid rgba(255,255,255,0.18);
+        background: rgba(255,255,255,0.08); color: #fff; transition: background 0.15s;
+    }
+    .rm-dash .rm-cloth-btn:hover { background: rgba(255,255,255,0.15); }
+    .rm-dash .rm-cloth-btn-primary {
+        background: var(--copper); border-color: var(--copper);
+    }
+    .rm-dash .rm-cloth-btn-primary:hover { background: var(--copper-d); }
+
+    /* Coming soon tiles */
+    .rm-dash .rm-soon-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+    }
+    .rm-dash .rm-soon {
+        background: var(--card-bg);
+        border: 1px solid var(--border-card);
+        border-radius: 14px;
+        padding: 18px 20px;
+        box-shadow: var(--shadow-card);
+        opacity: 0.78;
+        transition: opacity 0.15s, transform 0.15s;
+    }
+    .rm-dash .rm-soon:hover { opacity: 1; transform: translateY(-2px); }
+    .rm-dash .rm-soon-head {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 10px; margin-bottom: 8px;
+    }
+    .rm-dash .rm-soon-name { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .rm-dash .rm-soon-desc { font-size: 12px; color: var(--stone); }
+    .rm-dash .rm-soon-badge {
+        padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 700;
+        letter-spacing: 0.12em; background: var(--cream-2); color: var(--stone);
+        flex-shrink: 0;
+    }
+
+    /* Mobile */
+    @media (max-width: 600px) {
+        .rm-dash .rm-cloth-card { padding: 22px 20px; border-radius: 14px; }
+        .rm-dash .rm-cloth-name { font-size: 22px; }
+        .rm-dash .rm-cloth-stats { gap: 14px; }
+        .rm-dash .rm-cloth-stats .stat-num { font-size: 24px; }
+        .rm-dash .rm-cloth-actions .rm-cloth-btn { flex: 1 1 calc(50% - 4px); text-align: center; }
+    }
+</style>
+{# Shared accordion + time-log styles #}
+{% include 'inventory/_time_log_styles.html' %}
+{% endblock %}
+
+{% block content %}
+{# `cloth` aur `future` context vars view se aaye — Cloth live, baaki placeholder #}
+<div class="rm-dash">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Raw Materials</h1>
+            <p>Every raw material required to manufacture a product. Cloth is live; other materials ship next.</p>
+        </div>
+        {% if can_add_rolls %}
+            <a href="{% url 'raw_materials:roll-bulk-create' %}" class="btn btn-primary">+ Add Cloth Rolls</a>
+        {% endif %}
+    </div>
+
+    {# Cloth ka live tile — dark hero gradient (form-shell rule, dark mode flip nahi hota) #}
+    <div class="rm-cloth-card">
+        <div class="rm-cloth-head">
+            <div>
+                <div class="rm-cloth-name">Cloth</div>
+                <div class="rm-cloth-desc">Rolls of fabric — primary raw material today. Tracked by type, color, and location across factories.</div>
+            </div>
+            <span class="rm-cloth-badge">● LIVE</span>
+        </div>
+
+        <div class="rm-cloth-stats">
+            <div><div class="stat-num">{{ cloth.total }}</div><div class="stat-lbl">Total Rolls</div></div>
+            <div><div class="stat-num available">{{ cloth.available }}</div><div class="stat-lbl">Available</div></div>
+            <div><div class="stat-num used">{{ cloth.used }}</div><div class="stat-lbl">Used</div></div>
+            <div><div class="stat-num">{{ cloth.types }}</div><div class="stat-lbl">Types</div></div>
+            <div><div class="stat-num">{{ cloth.colors }}</div><div class="stat-lbl">Colors</div></div>
+        </div>
+
+        <div class="rm-cloth-actions">
+            <a href="{% url 'raw_materials:cloth-dashboard' %}" class="rm-cloth-btn rm-cloth-btn-primary">Open Cloth Dashboard →</a>
+            <a href="{% url 'raw_materials:roll-list' %}" class="rm-cloth-btn">Rolls</a>
+            <a href="{% url 'raw_materials:cloth-type-list' %}" class="rm-cloth-btn">Types</a>
+            <a href="{% url 'raw_materials:cloth-color-list' %}" class="rm-cloth-btn">Colors</a>
+            <a href="{% url 'raw_materials:storage-list' %}" class="rm-cloth-btn">Storage</a>
+        </div>
+    </div>
+
+    {# Coming-soon list — view ke FUTURE_MATERIALS dict mein naya entry add karo #}
+    <div class="rm-section-label">Coming Soon</div>
+    <div class="rm-soon-grid">
+        {% for m in future %}
+            <div class="rm-soon">
+                <div class="rm-soon-head">
+                    <div>
+                        <div class="rm-soon-name">{{ m.name }}</div>
+                        <div class="rm-soon-desc">{{ m.desc }}</div>
+                    </div>
+                    <span class="rm-soon-badge">SOON</span>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <p style="margin-top: 22px; font-size: 12px; color: var(--stone);">
+        Each material gets its own dashboard once the matching model lands. Schema lives in <code style="background:var(--cream-2); padding:1px 6px; border-radius:4px;">raw_materials/</code>.
+    </p>
+
+    {# Cloth-roll movements accordion — overall top-level view #}
+    {% include 'inventory/_roll_events_accordion.html' %}
+</div>
+{% endblock %}

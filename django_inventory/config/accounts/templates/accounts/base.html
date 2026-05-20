@@ -1846,6 +1846,38 @@
         .action-icon:hover { background: var(--cream-2); color: var(--copper); }
         .action-icon-danger:hover { background: #fee2e2; color: #ef4444; }
         html[data-theme="dark"] .action-icon-danger:hover { background: rgba(239,68,68,0.15); color: #fca5a5; }
+
+        /* Layering summary partial — production/_layering_summary.html. Used on
+           Adda dashboard, Adda detail, User dashboard. */
+        .ls-pill {
+            display:inline-block; padding: 3px 10px; border-radius: 999px;
+            font-size: 11px; font-weight: 600; line-height: 1.5;
+        }
+        .ls-pill.ls-pending  { background: var(--cream-2); color: var(--stone); }
+        .ls-pill.ls-progress { background: rgba(184,115,51,0.15); color: var(--copper); }
+        .ls-pill.ls-done     { background: rgba(34,197,94,0.15); color: var(--success); }
+
+        .ls-card {
+            padding: 14px 16px; background: var(--card-bg);
+            border: 1px solid var(--border-card); border-radius: 12px;
+            box-shadow: var(--shadow-card, 0 2px 8px rgba(14,11,9,0.08));
+        }
+        .ls-card.ls-pending-card  { border-left: 4px solid var(--stone); }
+        .ls-card.ls-progress-card { border-left: 4px solid var(--copper); }
+        .ls-card.ls-done-card     { border-left: 4px solid var(--success); }
+        .ls-card-title {
+            font-size: 13px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--ink); margin-bottom: 10px;
+        }
+        .ls-card-sub { font-size: 13px; color: var(--stone); }
+        .ls-card-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+        }
+        .ls-card-grid > div { display: flex; flex-direction: column; }
+        .ls-card-grid .lbl { font-size: 10px; color: var(--stone); text-transform: uppercase; letter-spacing: 0.06em; }
+        .ls-card-grid .val { font-size: 18px; font-weight: 700; color: var(--ink); }
+        .ls-card-notes { font-size: 12px; color: var(--stone); margin-top: 8px; font-style: italic; }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -1896,7 +1928,7 @@
                     {% for item in section.items %}
                         {% with url_name=item.url_name %}
                         <a href="{{ item.url }}"
-                           class="nav-link{% for m in item.match %}{% if m in request.path %} active{% endif %}{% endfor %}">
+                           class="nav-link{% if item.is_active %} active{% endif %}">
                             {% include 'inventory/_nav_icon.html' %}
                             {{ item.label }}
                         </a>

@@ -1,0 +1,35 @@
+{# Adda lifecycle time-log accordion. Caller passes `adda_events` queryset (AddaHistory). #}
+<details class="time-log-accordion" style="margin-top: 18px;">
+    <summary>
+        <span class="acc-title">Time Logs — Addas</span>
+        <span class="acc-sub">Latest {{ adda_events|length }} Adda event{{ adda_events|length|pluralize }}</span>
+        <span class="acc-chevron" aria-hidden="true">▾</span>
+    </summary>
+    <div class="acc-body">
+        {% if adda_events %}
+        <ul class="time-log">
+        {% for e in adda_events %}
+            <li>
+                <div class="ts">{{ e.created_at|date:"d M H:i" }}</div>
+                <div>
+                    <strong>{{ e.get_change_type_display }}</strong>
+                    {% if e.adda %} ·
+                        <a href="{% url 'production:adda-detail' e.adda.code %}" style="font-family:monospace;">{{ e.adda.code }}</a>
+                        <span style="color:var(--stone);">({{ e.adda.product.name }})</span>
+                    {% endif %}
+                    {% if e.stage_from or e.stage_to %} ·
+                        {% if e.stage_from %}{{ e.stage_from.get_stage_type_display }}{% else %}—{% endif %}
+                        → {% if e.stage_to %}{{ e.stage_to.get_stage_type_display }}{% else %}done{% endif %}
+                    {% endif %}
+                    {% if e.roll %} · roll <code style="font-family:monospace;">{{ e.roll.roll_id }}</code><span style="color:var(--stone);"> · {{ e.roll.cloth_type.name }} · {{ e.roll.cloth_color.name }}{% if e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}</span>{% endif %}
+                    {% if e.note %} · <em style="color:var(--stone);">{{ e.note }}</em>{% endif %}
+                    <div class="actor">by {{ e.actor.email }}</div>
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+        {% else %}
+            <p style="margin:0; color:var(--stone); font-size:13px;">No Adda events yet.</p>
+        {% endif %}
+    </div>
+</details>

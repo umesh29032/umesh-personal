@@ -1,0 +1,36 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Start Adda{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# AddaCreateForm POST karta hai — view me create_adda service per-product counter increment karta hai #}
+<div class="form-shell">
+    <div class="hero">
+        <h1>Start New Adda</h1>
+        <p>Pick a product. The next per-product Adda code will be allocated automatically — concurrent inserts are race-safe.</p>
+        <span class="hero-chip">PRODUCTION BATCH</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">Product</div></div>
+            <div class="panel-body">
+                <p class="panel-sub">Choose which factory product this Adda will run. Adda code = <code style="background:var(--cream-2); padding:1px 6px; border-radius:4px;">{PRODUCT_CODE}-001</code> (auto-incremented per product).</p>
+                <div class="form-grid cols-1">
+                    <div class="field"><label>Product *</label>{{ form.product }}{% if form.product.errors %}<div class="field-error">{{ form.product.errors|join:" " }}</div>{% endif %}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'production:adda-list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Start Adda</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

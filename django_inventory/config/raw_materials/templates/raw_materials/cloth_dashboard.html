@@ -1,0 +1,251 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Cloth Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .cloth-dash .breadcrumb { font-size: 13px; margin-bottom: 14px; }
+    .cloth-dash .breadcrumb a { color: var(--stone); text-decoration: none; }
+    .cloth-dash .breadcrumb a:hover { color: var(--copper); }
+
+    /* Filter card — single row + horizontal scroll on mobile. Per dt-filter-row rule. */
+    .cloth-dash .filter-card {
+        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
+        padding: 14px 18px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card);
+        margin-bottom: 18px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .cloth-dash .filter-card > * { flex-shrink: 0; }
+    .cloth-dash .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .cloth-dash .filter-card label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .cloth-dash .filter-card input,
+    .cloth-dash .filter-card select {
+        padding: 9px 12px; min-width: 150px;
+        border: 1.5px solid #cfc0aa; border-radius: 10px;
+        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 13px; color: var(--ink);
+    }
+    .cloth-dash .filter-card input:focus,
+    .cloth-dash .filter-card select:focus {
+        outline: none; border-color: var(--copper);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07), 0 0 0 3px rgba(184,115,51,0.15);
+    }
+    .cloth-dash .filter-card::-webkit-scrollbar { height: 4px; }
+    .cloth-dash .filter-card::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 2px; }
+
+    /* Type × Color matrix — clean card per cloth type with chip row of colors. */
+    .cloth-dash .type-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+    .cloth-dash .type-row {
+        padding: 16px 18px;
+        background: var(--surface-2); border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+    }
+    .cloth-dash .type-row-head {
+        display: flex; justify-content: space-between; align-items: baseline;
+        flex-wrap: wrap; gap: 10px; margin-bottom: 10px;
+    }
+    .cloth-dash .type-name {
+        font-size: 17px; font-weight: 600; color: var(--ink);
+        font-family: 'Cormorant Garamond', Georgia, serif; letter-spacing: -0.01em;
+    }
+    .cloth-dash .type-counts { font-size: 12px; color: var(--stone); }
+    .cloth-dash .type-counts strong.tot { color: var(--ink); font-size: 14px; }
+    .cloth-dash .type-counts strong.avl { color: var(--success); }
+    .cloth-dash .color-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cloth-dash .color-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 5px 10px; background: var(--card-bg);
+        border: 1px solid var(--border-default); border-radius: 999px;
+        font-size: 12px; color: var(--ink);
+    }
+    .cloth-dash .color-chip .swatch {
+        width: 10px; height: 10px; border-radius: 999px;
+        border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;
+    }
+    .cloth-dash .color-chip .chip-name { font-weight: 500; }
+    .cloth-dash .color-chip .chip-count { font-weight: 700; color: var(--copper); }
+    .cloth-dash .color-chip .chip-avail { color: var(--success); font-weight: 600; font-size: 11px; }
+
+    @media (max-width: 600px) {
+        .cloth-dash .filter-card { padding: 12px 14px; }
+        .cloth-dash .type-name { font-size: 16px; }
+        .cloth-dash .type-row { padding: 14px; }
+    }
+</style>
+{# Shared accordion + time-log styles — saare dashboards same look use karte hain #}
+{% include 'inventory/_time_log_styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cloth-dash">
+    {# breadcrumb — parent raw_materials:dashboard URL pe wapas le jaata hai #}
+    <div class="breadcrumb">
+        <a href="{% url 'raw_materials:dashboard' %}">← All Raw Materials</a>
+    </div>
+
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Cloth Dashboard</h1>
+            <p>Cloth-specific inventory. Type, color, location at a glance.{% if filter_from or filter_to or filter_color %} <strong>Filter active.</strong>{% endif %}</p>
+        </div>
+        {% if can_add_rolls %}
+            <a href="{% url 'raw_materials:roll-bulk-create' %}" class="btn btn-primary">+ Add Cloth Rolls</a>
+        {% endif %}
+    </div>
+
+    {# GET form — querystring mein from/to/color bhejta hai; view get_queryset apply karta hai #}
+    <form method="get" class="filter-card">
+        <div class="field">
+            <label>From</label>
+            <input type="date" name="from" value="{{ filter_from }}">
+        </div>
+        <div class="field">
+            <label>To</label>
+            <input type="date" name="to" value="{{ filter_to }}">
+        </div>
+        <div class="field">
+            <label>Color</label>
+            <select name="color" data-no-fancy>
+                <option value="">All colors</option>
+                {% for c in active_colors %}
+                    <option value="{{ c.pk }}" {% if filter_color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label>&nbsp;</label>
+            <button type="submit" class="btn btn-primary">Apply</button>
+        </div>
+        <div class="field">
+            <label>&nbsp;</label>
+            <a href="{% url 'raw_materials:cloth-dashboard' %}" class="btn btn-ghost">Reset</a>
+        </div>
+    </form>
+
+    {# KPIs — base.html ke `.kpis`/`.kpi` classes auto-fit grid banate hain #}
+    <div class="kpis">
+        <div class="kpi"><div class="kpi-accent"></div>
+            <div class="kpi-label">Total Rolls</div>
+            <div class="kpi-value">{{ total_rolls }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--success);"></div>
+            <div class="kpi-label">Available</div>
+            <div class="kpi-value" style="color:var(--success);">{{ available_rolls }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--copper);"></div>
+            <div class="kpi-label">Used</div>
+            <div class="kpi-value" style="color:var(--copper);">{{ used_rolls }}</div>
+        </div>
+        <div class="kpi"><div class="kpi-accent"></div>
+            <div class="kpi-label">Cloth Types</div>
+            <div class="kpi-value">{{ type_breakup|length }}</div>
+        </div>
+    </div>
+
+    {# `type_breakup` context var — view ne ClothType × ClothColor pivot kiya (values+annotate) #}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">By Cloth Type · with Color Breakup</div></div>
+        <div class="card-body">
+            {% if type_breakup %}
+                <ul class="type-list">
+                {% for t in type_breakup %}
+                    <li class="type-row">
+                        <div class="type-row-head">
+                            <span class="type-name">{{ t.name }}</span>
+                            <span class="type-counts">
+                                <strong class="tot">{{ t.total }}</strong> roll{{ t.total|pluralize }} ·
+                                <strong class="avl">{{ t.available }}</strong> available
+                            </span>
+                        </div>
+                        <div class="color-chips">
+                            {% for c in t.colors %}
+                                <span class="color-chip" title="{{ c.name }}: {{ c.total }} ({{ c.available }} available)">
+                                    <span class="swatch" style="background:{{ c.hex_code|default:'#cfc0aa' }};"></span>
+                                    <span class="chip-name">{{ c.name }}</span>
+                                    <span class="chip-count">{{ c.total }}</span>
+                                    {% if c.available != c.total %}<span class="chip-avail">· {{ c.available }} avl</span>{% endif %}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <div class="empty-state">
+                    <h3>No rolls in this filter range</h3>
+                    <p>Try resetting the filter, or add some cloth rolls.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# StorageLocation queryset annotate() se filtered counts ke saath aaya #}
+    <div class="card card-clip" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">By Location</div></div>
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead><tr><th>Location</th><th>Code</th><th>Total</th><th>Available</th></tr></thead>
+                <tbody>
+                {% for loc in by_location %}
+                <tr>
+                    <td data-label="Location">{{ loc.name }}</td>
+                    <td data-label="Code"><code>{{ loc.code }}</code></td>
+                    <td data-label="Total">{{ loc.roll_count }}</td>
+                    <td data-label="Available"><strong style="color:var(--success);">{{ loc.available }}</strong></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="padding:18px; text-align:center; color:var(--stone);">No storage locations yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# `recent_rolls` — top 15 by -created_at; select_related se N+1 query bachi #}
+    <div class="card card-clip">
+        <div class="card-header"><div class="card-title">Recent Rolls</div></div>
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead><tr><th>Roll ID</th><th>Type</th><th>Color</th><th>Width</th><th>Location</th><th>Status</th><th>Leftover</th><th>Created</th></tr></thead>
+                <tbody>
+                {% for r in recent_rolls %}
+                <tr>
+                    <td data-label="Roll ID"><a href="{% url 'raw_materials:roll-detail' r.pk %}"><strong>{{ r.roll_id }}</strong></a></td>
+                    <td data-label="Type">{{ r.cloth_type.name }}</td>
+                    <td data-label="Color">{{ r.cloth_color.name }}</td>
+                    <td data-label="Width">{% if r.width_inch %}{{ r.width_inch }} inch{% else %}—{% endif %}</td>
+                    <td data-label="Location">{{ r.storage_location.name }}</td>
+                    <td data-label="Status">
+                        {% if r.status == 'used' %}
+                            <span class="badge badge-inactive">Used</span>
+                        {% else %}
+                            <span class="badge badge-active">● Available</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Leftover">{% if r.remaining_length_meters or r.remaining_weight_kg %}{{ r.remaining_length_meters|default:"0" }} m / {{ r.remaining_weight_kg|default:"0" }} KG{% else %}—{% endif %}</td>
+                    <td data-label="Created">{{ r.created_at|date:"d M Y H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" style="padding:18px; text-align:center; color:var(--stone);">No rolls in this range.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{% url 'raw_materials:roll-list' %}" class="btn btn-primary">View all rolls →</a>
+        {% if can_add_rolls %}
+            <a href="{% url 'raw_materials:roll-bulk-create' %}" class="btn btn-ghost">+ Bulk Add Rolls</a>
+        {% endif %}
+    </div>
+
+    {# Cloth-roll movements accordion — partial uses `roll_events` context var #}
+    {% include 'inventory/_roll_events_accordion.html' %}
+</div>
+{% endblock %}

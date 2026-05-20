@@ -1,0 +1,247 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Cloth Rolls{% endblock %}
+
+{% block extra_head %}
+<style>
+    .roll-list .filter-card {
+        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
+        padding: 14px 18px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card); margin-bottom: 18px;
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .roll-list .filter-card > * { flex-shrink: 0; }
+    .roll-list .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .roll-list .filter-card label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .roll-list .filter-card select {
+        padding: 9px 12px; min-width: 150px;
+        border: 1.5px solid #cfc0aa; border-radius: 10px;
+        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: 13px;
+    }
+
+    /* Active-filter summary strip — shows under filter card when any filter is on. */
+    .roll-list .filter-info {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding: 12px 16px; margin-bottom: 18px;
+        background: var(--surface-2);
+        border: 1px solid var(--border-default); border-radius: 12px;
+    }
+    .roll-list .filter-info .lbl {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .roll-list .filter-info .count {
+        font-size: 13px; color: var(--ink);
+    }
+    .roll-list .filter-info .count strong { color: var(--copper); font-size: 16px; }
+    .roll-list .filter-info .chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 4px 4px 12px; background: var(--card-bg);
+        border: 1px solid var(--copper); border-radius: 999px;
+        font-size: 12px; color: var(--ink);
+    }
+    .roll-list .filter-info .chip .group {
+        font-size: 10px; color: var(--stone);
+        text-transform: uppercase; letter-spacing: 0.06em; margin-right: 2px;
+    }
+    .roll-list .filter-info .chip .x {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 20px; height: 20px; margin-left: 4px;
+        background: var(--cream); border-radius: 999px;
+        text-decoration: none; color: var(--stone); font-size: 13px; line-height: 1;
+        transition: background 0.15s, color 0.15s;
+    }
+    .roll-list .filter-info .chip .x:hover { background: var(--danger-bg); color: var(--danger); }
+    .roll-list .filter-info .clear-all {
+        margin-left: auto;
+        font-size: 12px; color: var(--stone); text-decoration: none;
+        padding: 4px 10px; border-radius: 8px;
+    }
+    .roll-list .filter-info .clear-all:hover { color: var(--danger); background: var(--danger-bg); }
+
+    @media (max-width: 600px) {
+        .roll-list .filter-info { padding: 10px 12px; }
+        .roll-list .filter-info .clear-all { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
+    }
+
+    /* Time-log styling shared partial mein move ho gayi (inventory/_time_log_styles.html) */
+</style>
+{# Shared time-log accordion styles — saare dashboards same look use karte hain #}
+{% include 'inventory/_time_log_styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="roll-list">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Cloth Rolls</h1>
+            <p>Inventory of every cloth roll. Filter by status, type, or location.</p>
+        </div>
+        {% if can_add_rolls %}<a href="{% url 'raw_materials:roll-bulk-create' %}" class="btn btn-primary">+ Bulk Add Rolls</a>{% endif %}
+    </div>
+
+    {% if messages %}
+        {% for m in messages %}
+            <div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {# GET form — status/cloth_type/location querystring mein bhejta hai, view filter karta hai #}
+    <form method="get" class="filter-card">
+        <div class="field">
+            <label>Status</label>
+            <select name="status" data-no-fancy>
+                <option value="">All</option>
+                <option value="not_used" {% if filters.status == 'not_used' %}selected{% endif %}>Not Used</option>
+                <option value="used" {% if filters.status == 'used' %}selected{% endif %}>Used</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Cloth Type</label>
+            <select name="cloth_type" data-no-fancy>
+                <option value="">All</option>
+                {% for t in cloth_types %}<option value="{{ t.pk }}" {% if filters.cloth_type == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label>Location</label>
+            <select name="location" data-no-fancy>
+                <option value="">All</option>
+                {% for l in locations %}<option value="{{ l.pk }}" {% if filters.location == l.pk|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label>Color</label>
+            <select name="color" data-no-fancy>
+                <option value="">All</option>
+                {% for c in colors %}<option value="{{ c.pk }}" {% if filters.color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="field"><label>&nbsp;</label><a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Reset</a></div>
+    </form>
+
+    {# `active_filter_chips` context var — har chip mein `remove_url` already built hai (view side) #}
+    {% if active_filter_chips %}
+    <div class="filter-info">
+        <span class="lbl">Active:</span>
+        {% for chip in active_filter_chips %}
+            <span class="chip">
+                <span class="group">{{ chip.group }}</span>
+                {{ chip.label }}
+                <a href="{{ chip.remove_url }}" class="x" title="Remove this filter">✕</a>
+            </span>
+        {% endfor %}
+        <span class="count">· <strong>{{ filtered_count }}</strong> roll{{ filtered_count|pluralize }} match</span>
+        <a href="{% url 'raw_materials:roll-list' %}" class="clear-all">Clear all ×</a>
+    </div>
+    {% endif %}
+
+    {# `rolls` queryset — data-label attr har <td> pe, mobile pe stack ho ke card banta hai (base.html CSS) #}
+    <div class="card card-clip">
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Roll ID</th>
+                        <th>Type</th>
+                        <th>Color</th>
+                        <th>Width</th>
+                        <th>Weight (KG)</th>
+                        <th>Location</th>
+                        {% if can_view_financials %}<th>Supplier</th><th>Cost/KG</th>{% endif %}
+                        <th>Status</th>
+                        <th>Leftover</th>
+                        <th>Purchased</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in rolls %}
+                <tr>
+                    <td data-label="Roll ID"><a href="{% url 'raw_materials:roll-detail' r.pk %}"><strong>{{ r.roll_id }}</strong></a></td>
+                    <td data-label="Type">{{ r.cloth_type.name }}</td>
+                    <td data-label="Color">
+                        {% if r.cloth_color.hex_code %}<span style="display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; background:{{ r.cloth_color.hex_code }}; border:1px solid rgba(0,0,0,0.1);"></span>{% endif %}
+                        {{ r.cloth_color.name }}
+                    </td>
+                    <td data-label="Width">{% if r.width_inch %}{{ r.width_inch }} inch{% else %}—{% endif %}</td>
+                    <td data-label="Weight (KG)">{% if r.weight_kg %}{{ r.weight_kg }}{% else %}—{% endif %}</td>
+                    <td data-label="Location">{{ r.storage_location.name }}</td>
+                    {% if can_view_financials %}
+                        <td data-label="Supplier">{{ r.supplier|default:"—" }}</td>
+                        <td data-label="Cost/KG">{% if r.cost_per_kg %}₹{{ r.cost_per_kg }}{% else %}—{% endif %}</td>
+                    {% endif %}
+                    <td data-label="Status">
+                        {% if r.status == 'used' %}
+                            <span class="badge badge-inactive">Used</span>
+                        {% else %}
+                            <span class="badge badge-active">● Available</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Leftover">{% if r.remaining_length_meters or r.remaining_weight_kg %}{{ r.remaining_length_meters|default:"0" }} m / {{ r.remaining_weight_kg|default:"0" }} KG{% else %}—{% endif %}</td>
+                    <td data-label="Purchased">{{ r.purchased_date|date:"d M Y" }}</td>
+                    <td data-label="Created">{{ r.created_at|date:"d M H:i" }}</td>
+                    <td data-label="Actions">
+                        {% if r.status == 'not_used' %}
+                            <a href="{% url 'raw_materials:roll-edit' r.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:11px;">Edit</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="{% if can_view_financials %}13{% else %}11{% endif %}" style="padding:24px; text-align:center; color:var(--stone);">No rolls yet. {% if can_add_rolls %}<a href="{% url 'raw_materials:roll-bulk-create' %}">Bulk add rolls</a> to get started.{% endif %}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if is_paginated %}
+        <div style="display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--border-card); align-items:center; flex-wrap:wrap;">
+            {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" class="btn btn-ghost">← Previous</a>{% endif %}
+            <span style="color:var(--stone); font-size:13px;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" class="btn btn-ghost">Next →</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    {# `roll_events` — ClothRollHistory ke latest 50; <details>=native accordion (no JS) #}
+    <details class="time-log-accordion" style="margin-top: 18px;">
+        <summary>
+            <span class="acc-title">Time Logs</span>
+            <span class="acc-sub">Latest 50 roll movements</span>
+            <span class="acc-chevron" aria-hidden="true">▾</span>
+        </summary>
+        <div class="acc-body">
+            {% if roll_events %}
+            <ul class="time-log">
+            {% for e in roll_events %}
+                <li>
+                    <div class="ts">{{ e.created_at|date:"d M H:i" }}</div>
+                    <div>
+                        <strong>{{ e.get_change_type_display }}</strong>
+                        {% if e.roll %} ·
+                            <a href="{% url 'raw_materials:roll-detail' e.roll.pk %}" style="font-family:monospace;">{{ e.roll.roll_id }}</a>
+                            <span style="color:var(--stone);"> · {{ e.roll.cloth_type.name }} · {{ e.roll.cloth_color.name }}{% if e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}</span>
+                        {% endif %}
+                        {% if e.field_name %}
+                            · <code style="background:var(--cream-2); padding:1px 6px; border-radius:4px; font-size:11px;">{{ e.field_name }}</code>: {{ e.old_value|default:"—" }} → {{ e.new_value|default:"—" }}
+                        {% endif %}
+                        {% if e.note %} · <em style="color:var(--stone);">{{ e.note }}</em>{% endif %}
+                        <div class="actor">by {{ e.actor.email }}</div>
+                    </div>
+                </li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                <p style="margin:0; color:var(--stone); font-size:13px;">No movement events yet.</p>
+            {% endif %}
+        </div>
+    </details>
+</div>
+{% endblock %}

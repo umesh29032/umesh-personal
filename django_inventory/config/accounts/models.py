@@ -23,6 +23,9 @@ from django.utils import timezone
 class Skill(models.Model):
     SKILL_TYPE_CHOICES = (
         ("cutting_master", "Cutting Master"),
+        # cutting_master_helper = layering stage assistant. cutting_master ke under kaam karta hai.
+        # Sirf yehi skill holder layering stage complete kar ke Cutting stage pe transition trigger kar sakta hai.
+        ("cutting_master_helper", "Cutting Master Helper"),
         ("dhage_katne_wala", "Dhage Katne Wala"),
         ("embroidery", "Embroidery"),
         ("tailoring", "Tailoring"),

@@ -1,0 +1,52 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Barcodes · {{ adda.code }}{% endblock %}
+
+{% block content %}
+{# `barcodes` paginated queryset (adda ki sari barcodes); print sheet alag standalone HTML hai #}
+<div class="bc-list">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>{{ adda.code }} <span style="color:var(--stone); font-size:14px; font-weight:400;">— Piece Barcodes</span></h1>
+            <p>{{ adda.barcodes.count }} pieces. Each QR encodes a scan URL — phone camera reads it natively.</p>
+        </div>
+        <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-primary">Open Print Sheet →</a>
+    </div>
+
+    <div class="card card-clip">
+        <div class="card-header">
+            <div class="card-title">Barcodes</div>
+            <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Export CSV</a>
+        </div>
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead><tr><th>Seq</th><th>Barcode value</th><th>Status</th><th>Last scanned</th></tr></thead>
+                <tbody>
+                {% for bc in barcodes %}
+                <tr>
+                    <td data-label="Seq">{{ bc.piece_seq }}</td>
+                    <td data-label="Barcode value"><code>{{ bc.value }}</code></td>
+                    <td data-label="Status">
+                        {% if bc.status == 'packed' %}<span class="badge" style="padding:2px 8px; border-radius:10px; font-size:11px; background:var(--info-bg); color:var(--info);">Packed</span>
+                        {% elif bc.status == 'dispatched' %}<span class="badge badge-active">Dispatched</span>
+                        {% elif bc.status == 'missing' %}<span class="badge" style="padding:2px 8px; border-radius:10px; font-size:11px; background:var(--danger-bg); color:var(--danger);">Missing</span>
+                        {% else %}<span class="badge badge-inactive">Pending</span>{% endif %}
+                    </td>
+                    <td data-label="Last scanned">{% if bc.last_scanned_at %}{{ bc.last_scanned_at|date:"d M Y H:i" }}{% else %}—{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" style="padding:24px; text-align:center; color:var(--stone);">No barcodes yet. Complete Cutting to generate.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if is_paginated %}
+        <div style="display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--border-card); align-items:center; flex-wrap:wrap;">
+            {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" class="btn btn-ghost">← Previous</a>{% endif %}
+            <span style="font-size:13px; color:var(--stone);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" class="btn btn-ghost">Next →</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

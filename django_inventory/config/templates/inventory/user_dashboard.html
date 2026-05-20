@@ -1,0 +1,367 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}My Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+    .user-dash { max-width: 1100px; margin: 0 auto; }
+
+    /* Hero greeting — soft dark gradient, matches form-shell elsewhere. */
+    .user-dash .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position: relative; overflow: hidden;
+    }
+    .user-dash .hero::before {
+        content:''; position:absolute; right:-100px; top:-100px;
+        width:280px; height:280px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+        pointer-events: none;
+    }
+    .user-dash .hero-greeting {
+        font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+        text-transform: uppercase; color: rgba(255,255,255,0.6);
+        position: relative;
+    }
+    .user-dash .hero-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 30px; font-weight: 600; color: #fff; margin-top: 4px;
+        letter-spacing: -0.01em; position: relative;
+    }
+
+    .user-dash .stage-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .user-dash .stage-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap;
+        padding: 14px 16px; background: var(--surface-2);
+        border-radius: 12px; border: 1px solid var(--border-subtle);
+        transition: border-color 0.15s;
+    }
+    .user-dash .stage-row:hover { border-color: var(--copper); }
+    .user-dash .stage-row .adda-link {
+        font-weight: 700; color: var(--ink); text-decoration: none; font-size: 14px;
+    }
+    .user-dash .stage-row .stage-pill {
+        display: inline-block; padding: 4px 12px;
+        background: var(--copper); color: #fff;
+        border-radius: 999px; font-size: 12px; font-weight: 600;
+        margin-left: 4px;
+    }
+    .user-dash .stage-row .since {
+        font-size: 11px; color: var(--stone);
+        font-family: 'Courier New', monospace;
+    }
+
+    .user-dash .empty {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; padding: 40px 28px; text-align: center;
+        box-shadow: var(--shadow-card);
+    }
+    .user-dash .empty h2 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 22px; font-weight: 600; color: var(--ink); margin: 0 0 6px;
+    }
+    .user-dash .empty p { color: var(--stone); font-size: 14px; max-width: 480px; margin: 0 auto; }
+
+    /* Active Addas section — shown to all logged-in users. */
+    .user-dash .addas-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .user-dash .adda-card {
+        background: var(--surface-2); border: 1px solid var(--border-subtle);
+        border-radius: 12px; padding: 14px 16px;
+    }
+    .user-dash .adda-card-head {
+        display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+        align-items: center; margin-bottom: 8px;
+    }
+    .user-dash .adda-code-link {
+        font-weight: 700; color: var(--ink); text-decoration: none;
+        font-family: monospace; font-size: 14px;
+    }
+    .user-dash .adda-code-link:hover { color: var(--copper); }
+    .user-dash .adda-product { color: var(--stone); font-size: 13px; }
+    .user-dash .adda-meta { font-size: 11px; color: var(--stone); font-family: 'Courier New', monospace; }
+    .user-dash .adda-pipeline { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+    .user-dash .pipe-pill {
+        padding: 4px 10px; border-radius: 999px;
+        font-size: 11px; font-weight: 600;
+    }
+    .user-dash .pipe-pill.pipe-current { background: var(--copper); color: #fff; }
+    .user-dash .pipe-pill.pipe-done    { background: var(--success-bg); color: var(--success); }
+    .user-dash .pipe-pill.pipe-pending { background: var(--cream-2); color: var(--stone); }
+    .user-dash .adda-stage-acc { margin-top: 8px; }
+    .user-dash .adda-stage-acc summary {
+        cursor: pointer; font-size: 12px; color: var(--copper); font-weight: 600;
+        padding: 6px 0;
+    }
+    .user-dash .adda-stage-acc summary::after { content: ' ▾'; }
+    .user-dash .adda-stage-acc[open] summary::after { content: ' ▴'; }
+    .user-dash .iframe-wrap { margin-top: 8px; }
+    .user-dash .adda-stage-iframe {
+        background: var(--cream); border-radius: 10px;
+        display: block; box-shadow: inset 0 0 0 1px var(--border-subtle);
+    }
+    .user-dash .open-new {
+        display: inline-block; margin-top: 6px;
+        font-size: 11px; color: var(--copper); font-weight: 600; text-decoration: none;
+    }
+    .user-dash .open-new:hover { text-decoration: underline; }
+
+    /* Helper-skill section — only rendered when user has cutting_master_helper skill. */
+    .user-dash .stats-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 14px; margin-bottom: 18px;
+    }
+    .user-dash .stat-tile {
+        padding: 16px 18px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card);
+    }
+    .user-dash .stat-tile .stat-label {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .user-dash .stat-tile .stat-value {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: var(--ink); margin-top: 4px;
+    }
+    .user-dash .stat-tile .stat-unit { font-size: 14px; color: var(--stone); }
+
+    .user-dash .helper-tag {
+        display: inline-block; padding: 3px 10px; margin-top: 8px;
+        background: rgba(184,115,51,0.18); border: 1px solid rgba(184,115,51,0.4);
+        color: #d4924a; border-radius: 12px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+        position: relative;
+    }
+
+    .user-dash .layering-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap;
+        padding: 14px 16px; background: var(--surface-2);
+        border-radius: 12px; border: 1px solid var(--border-subtle);
+    }
+    .user-dash .layering-row:hover { border-color: var(--copper); }
+    .user-dash .layering-row .row-meta {
+        font-size: 11px; color: var(--stone);
+        font-family: 'Courier New', monospace;
+    }
+    .user-dash .layering-row .row-actions { display:flex; gap:8px; flex-wrap: wrap; }
+    .user-dash .mine-pill {
+        display:inline-block; padding: 3px 9px; margin-left: 6px;
+        background: var(--success-bg); color: var(--success);
+        border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    }
+    .user-dash .workers-mini {
+        display:flex; gap:4px; flex-wrap: wrap;
+    }
+    .user-dash .worker-chip {
+        padding: 2px 8px; background: var(--cream); border: 1px solid var(--border-subtle);
+        border-radius: 999px; font-size: 10px; color: var(--ink);
+    }
+
+    @media (max-width: 600px) {
+        .user-dash .hero { padding: 22px 20px; border-radius: 12px; }
+        .user-dash .hero-title { font-size: 24px; }
+        .user-dash .stage-row, .user-dash .layering-row { padding: 12px 14px; }
+        .user-dash .stage-row .since, .user-dash .layering-row .row-meta { width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="user-dash">
+    <div class="hero">
+        <div class="hero-greeting">My Dashboard</div>
+        <div class="hero-title">Welcome, {{ request.user.get_full_name|default:request.user.email }}</div>
+        {% if helper_data %}<span class="helper-tag">CUTTING MASTER HELPER</span>{% endif %}
+    </div>
+
+    {% comment %}
+    Active Addas list — shown to everyone.
+    Skilled users (cutting_master / cutting_master_helper / management) → accordion
+      with iframe to the live stage panel (can attach/detach rolls inline).
+    Non-skilled users → status-only card (code, product, pipeline, rolls count, status).
+    {% endcomment %}
+    {% if active_addas %}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">Active Addas ({{ active_addas|length }})</div></div>
+        <div class="card-body">
+            <ul class="addas-list">
+            {% for a in active_addas %}
+                <li class="adda-card">
+                    <div class="adda-card-head">
+                        <div>
+                            <a href="{% url 'production:adda-detail' a.code %}" class="adda-code-link">{{ a.code }}</a>
+                            <span class="adda-product">· {{ a.product.name }}</span>
+                        </div>
+                        <div class="adda-meta">
+                            {{ a.rolls_count }} roll{{ a.rolls_count|pluralize }} ·
+                            started {{ a.started_at|date:"d M H:i" }}
+                        </div>
+                    </div>
+                    <div class="adda-pipeline">
+                        {% for p in a.pipeline %}
+                            <span class="pipe-pill pipe-{{ p.state }}">{% if p.state == 'done' %}✓ {% elif p.state == 'current' %}▸ {% endif %}{{ p.label }}</span>
+                        {% endfor %}
+                    </div>
+                    {% comment %}Per-Adda Layering snapshot (compact) — visible to ALL users.{% endcomment %}
+                    {% if a.layering_snap.state != 'absent' %}
+                    <div style="margin-top: 6px;">
+                        <span style="font-size: 10px; text-transform: uppercase; color: var(--stone); letter-spacing: 0.06em; margin-right: 6px;">Layering:</span>
+                        {% include 'production/_layering_summary.html' with snap=a.layering_snap style='compact' %}
+                    </div>
+                    {% endif %}
+                    {% if is_skilled_user and a.current_stage %}
+                        {% comment %}Accordion: tap to expand inline iframe of the current stage panel.{% endcomment %}
+                        <details class="adda-stage-acc">
+                            <summary>Open {{ a.current_stage.get_stage_type_display }} workspace</summary>
+                            <div class="iframe-wrap">
+                                <iframe class="adda-stage-iframe"
+                                        data-stage="{{ a.current_stage.stage_type }}"
+                                        data-code="{{ a.code }}"
+                                        src="{% url 'production:stage-panel' a.code a.current_stage.stage_type %}?embedded=1"
+                                        title="{{ a.current_stage.get_stage_type_display }} for {{ a.code }}"
+                                        loading="lazy"
+                                        style="width:100%; border:none; min-height:300px;"></iframe>
+                                <a href="{% url 'production:stage-panel' a.code a.current_stage.stage_type %}" target="_blank" rel="noopener" class="open-new">Open in new window ↗</a>
+                            </div>
+                        </details>
+                    {% endif %}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% comment %}Helper section — only rendered for users with cutting_master_helper skill. Spec: helpers see every active Layering across the factory, plus their stats.{% endcomment %}
+    {% if helper_data %}
+    <div class="stats-grid">
+        <div class="stat-tile">
+            <div class="stat-label">Layerings Completed</div>
+            <div class="stat-value">{{ helper_data.completed_count }}</div>
+        </div>
+        <div class="stat-tile">
+            <div class="stat-label">My Active Tasks</div>
+            <div class="stat-value">{{ helper_data.active_assigned_count }}</div>
+        </div>
+        <div class="stat-tile">
+            <div class="stat-label">Total Layers Recorded</div>
+            <div class="stat-value">{{ helper_data.total_layers }}</div>
+        </div>
+        <div class="stat-tile">
+            <div class="stat-label">Total Time</div>
+            <div class="stat-value">{{ helper_data.total_minutes }} <span class="stat-unit">min</span></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header">
+            <div class="card-title">Active Layering Stages ({{ helper_data.active_layering|length }})</div>
+        </div>
+        <div class="card-body">
+            {% if helper_data.active_layering %}
+                <ul class="stage-list">
+                {% for sr in helper_data.active_layering %}
+                    <li class="layering-row">
+                        <div>
+                            <a href="{% url 'production:layering-workspace' sr.adda.code %}" class="adda-link">{{ sr.adda.code }}</a>
+                            · {{ sr.adda.product.name }}
+                            {% if request.user in sr.workers.all %}<span class="mine-pill">ASSIGNED</span>{% endif %}
+                            <div class="workers-mini" style="margin-top: 6px;">
+                            {% for w in sr.workers.all %}
+                                <span class="worker-chip">{{ w.email }}</span>
+                            {% endfor %}
+                            </div>
+                        </div>
+                        <div class="row-actions">
+                            <span class="row-meta">{{ sr.rolls_count }} roll{{ sr.rolls_count|pluralize }} · started {{ sr.started_at|date:"d M H:i" }}</span>
+                            <a href="{% url 'production:layering-workspace' sr.adda.code %}" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;">Open →</a>
+                        </div>
+                    </li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <p style="color: var(--stone); font-size: 14px; margin: 0;">No active Layering stages right now. They'll appear here as soon as a manager starts one.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# `my_active_stages` — AddaStageRecord queryset (workers M2M=current user, completed_at NULL) #}
+    {% if my_active_stages %}
+    <div class="card">
+        <div class="card-header"><div class="card-title">My Active Stages</div></div>
+        <div class="card-body">
+            <ul class="stage-list">
+            {% for sr in my_active_stages %}
+                <li class="stage-row">
+                    <div>
+                        <a href="{% url 'production:adda-detail' sr.adda.code %}" class="adda-link">{{ sr.adda.code }}</a>
+                        · {{ sr.adda.product.name }}
+                        <span class="stage-pill">{{ sr.workflow_stage.get_stage_type_display }}</span>
+                    </div>
+                    <span class="since">since {{ sr.created_at|date:"d M H:i" }}</span>
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty">
+        <h2>No active tasks</h2>
+        <p>When a manager assigns you to a Layering or Cutting stage, it'll appear here.</p>
+    </div>
+    {% endif %}
+
+    {# My Recent Activity — per-user timeline across all Addas (spec D14). #}
+    {% if my_activity %}
+    <div class="card" style="margin-top: 18px;">
+        <div class="card-header"><div class="card-title">My Recent Activity</div></div>
+        <div class="card-body">
+            {% include 'production/_activity_feed.html' with activity=my_activity show_adda_code=True %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% comment %}Activity feed styles reused from adda_detail page-scoped CSS. Inline here so user_dashboard doesn't depend on adda_detail being loaded.{% endcomment %}
+<style>
+    .user-dash .activity-feed { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; max-height: 480px; overflow-y: auto; }
+    .user-dash .activity-row {
+        display: flex; gap: 12px; padding: 10px 12px;
+        background: var(--surface-2); border-radius: 10px;
+        border-left: 3px solid var(--copper);
+    }
+    .user-dash .activity-time {
+        flex-shrink: 0; width: 90px; font-size: 11px; color: var(--stone);
+        font-family: 'Courier New', monospace;
+    }
+    .user-dash .activity-body { font-size: 13px; color: var(--ink); flex: 1; }
+    .user-dash .activity-verb { color: var(--copper); margin: 0 6px; }
+    .user-dash .activity-target { font-family: monospace; }
+    .user-dash .activity-adda { color: var(--stone); margin-left: 6px; font-size: 11px; }
+    .user-dash .activity-note { font-size: 11px; color: var(--stone); margin-top: 2px; font-style: italic; }
+    .user-dash .activity-empty { color: var(--stone); font-size: 13px; margin: 0; }
+    @media (max-width: 600px) {
+        .user-dash .activity-row { flex-direction: column; gap: 4px; }
+        .user-dash .activity-time { width: auto; }
+    }
+</style>
+
+<script>
+    // Iframe auto-resize — embedded stage panels postMessage their content height
+    // on load / details-toggle / resize. Listener grows the matching iframe so the
+    // panel doesn't show an inner scrollbar.
+    window.addEventListener('message', function(ev) {
+        if (!ev.data || ev.data.type !== 'stage-panel-resize') return;
+        const code = ev.data.code, h = ev.data.height;
+        document.querySelectorAll('.adda-stage-iframe').forEach(f => {
+            if (f.dataset.code === code) {
+                f.style.height = (h + 20) + 'px';
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Scan · {{ barcode.value }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .scan-detail { max-width: 600px; margin: 0 auto; }
+    .scan-detail .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position:relative; overflow:hidden;
+    }
+    .scan-detail .hero h1 {
+        font-family: 'Courier New', monospace;
+        font-size: 24px; font-weight: 700; color:#fff; margin: 0 0 6px;
+        word-break: break-all;
+    }
+    .scan-detail .hero p { margin:0; color:rgba(255,255,255,0.72); font-size:14px; }
+    .scan-detail dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 22px; margin: 0; }
+    .scan-detail dt { color: var(--stone); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; padding-top: 4px; }
+    .scan-detail dd { color: var(--ink); font-size: 14px; margin: 0; }
+
+    @media (max-width: 600px) {
+        .scan-detail .hero { padding: 22px 20px; }
+        .scan-detail .hero h1 { font-size: 20px; }
+        .scan-detail dl { grid-template-columns: 1fr; }
+        .scan-detail dt { padding-top: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{# `barcode` URL value se lookup; scan_piece view ne last_scanned_at/by update kar diya #}
+<div class="scan-detail">
+    <div class="hero">
+        <h1>{{ barcode.value }}</h1>
+        <p>Piece scanned from QR sticker.</p>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <dl>
+                <dt>Adda</dt><dd><a href="{% url 'production:adda-detail' barcode.adda.code %}">{{ barcode.adda.code }}</a></dd>
+                <dt>Product</dt><dd>{{ barcode.adda.product.name }}</dd>
+                <dt>Piece</dt><dd>#{{ barcode.piece_seq }}</dd>
+                <dt>Status</dt><dd>{{ barcode.get_status_display }}</dd>
+                <dt>First scan</dt><dd>{{ barcode.last_scanned_at|date:"d M Y H:i" }}</dd>
+                <dt>Scanned by</dt><dd>{{ barcode.last_scanned_by.email }}</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div style="margin-top: 18px;">
+        <a href="{% url 'tracking:barcode-list' barcode.adda.code %}" class="btn btn-ghost">← All barcodes for this Adda</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% comment %}
+Activity feed partial.
+
+Inputs: `activity` (list of production.services.activity_service.ActivityEvent),
+        `show_adda_code` (bool — true on user dashboard, false on adda detail)
+
+Caller wraps this in a <details>/<section> as desired. No outer markup here.
+{% endcomment %}
+{% if activity %}
+<ul class="activity-feed">
+{% for e in activity %}
+    <li class="activity-row">
+        <div class="activity-time">{{ e.at|date:"d M H:i" }}</div>
+        <div class="activity-body">
+            <strong>{{ e.actor.email|default:"system" }}</strong>
+            <span class="activity-verb">{{ e.verb }}</span>
+            <span class="activity-target">{{ e.target }}</span>
+            {% if show_adda_code %}<span class="activity-adda">· {{ e.adda_code }}</span>{% endif %}
+            {% if e.note %}<div class="activity-note">{{ e.note }}</div>{% endif %}
+        </div>
+    </li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="activity-empty">No activity yet.</p>
+{% endif %}

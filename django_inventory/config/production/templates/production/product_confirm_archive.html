@@ -1,0 +1,28 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Archive Product{% endblock %}
+
+{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+
+{% block content %}
+{# Archive = is_active=False (soft-delete); existing Addas intact rehte hain (PROTECT FK) #}
+<div class="form-shell" style="max-width:600px;">
+    <div class="hero">
+        <h1>Archive Product</h1>
+        <p>Archived products won't appear in the Start-Adda dropdown but existing Addas stay intact.</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            <div class="panel-body">
+                <p style="margin:0; font-size:14px;">Archive <strong>{{ object.name }}</strong> (<code>{{ object.code }}</code>)?</p>
+            </div>
+        </div>
+        <div class="sticky-actions">
+            <a href="{% url 'production:product-list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">Archive</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

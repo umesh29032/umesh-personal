@@ -68,9 +68,12 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  # specifically Google OAuth
 
     # local apps — hamara apna code
-    'accounts',    # custom User model, RBAC roles
-    'inventory',   # stock, batches, vendors
-    'storefront',  # customer-facing pages
+    'accounts',       # custom User model, RBAC roles
+    'inventory',      # RBAC roles + dashboards (production lifecycle moved out 2026-05-19)
+    'storefront',     # customer-facing pages
+    'raw_materials',  # cloth rolls, types, colors, storage locations
+    'production',     # products, Adda batches, workflow stages, stage records
+    'tracking',       # piece-level barcodes (QR) + per-domain audit history
 ]
 
 # AUTHENTICATION_BACKENDS: Django kaise verify karta hai ki user valid hai
