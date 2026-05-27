@@ -34,6 +34,7 @@ from django.utils import timezone
 
 from django.db.models import Count, Sum
 
+from production.constants import STAGE_LAYERING
 from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
     RemainingClothOfClothRoll, WorkflowStage,
@@ -103,7 +104,7 @@ def get_layering_snapshot(adda) -> dict:
     # Locate the Layering stage_record (if any). If product has no layering stage,
     # snapshot stays 'absent' — defensive for future workflow variants.
     layering_stage = adda.product.workflow_stages.filter(
-        stage_type=WorkflowStage.StageType.LAYERING
+        stage__code=STAGE_LAYERING
     ).first()
     if layering_stage is None:
         return snap
@@ -196,7 +197,7 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
     """
     _ensure_management(user)
     stage = adda.current_stage
-    if stage is None or stage.stage_type != WorkflowStage.StageType.LAYERING:
+    if stage is None or stage.stage_type != STAGE_LAYERING:
         raise ValidationError("Adda is not at Layering stage")
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
@@ -234,7 +235,7 @@ def sync_layering_workers_for_skill(user) -> int:
         return 0
 
     active_srs = AddaStageRecord.objects.filter(
-        workflow_stage__stage_type=WorkflowStage.StageType.LAYERING,
+        workflow_stage__stage__code=STAGE_LAYERING,
         started_at__isnull=False,
         completed_at__isnull=True,
         adda__status=Adda.Status.IN_PROGRESS,
@@ -266,7 +267,7 @@ def attach_roll_to_layering(
     stage_record.refresh_from_db(fields=['completed_at'])
     if stage_record.completed_at is not None:
         raise ValidationError("Layering stage already completed — cannot attach more rolls")
-    if stage_record.workflow_stage.stage_type != WorkflowStage.StageType.LAYERING:
+    if stage_record.workflow_stage.stage_type != STAGE_LAYERING:
         raise ValidationError("Stage record is not a layering stage")
     if width_verified_inch is None or width_verified_inch < 1:
         raise ValidationError("Verified width is required")
@@ -454,7 +455,7 @@ def save_layering_draft(
     _ensure_can_manage(user)
 
     stage = adda.current_stage
-    if stage is None or stage.stage_type != WorkflowStage.StageType.LAYERING:
+    if stage is None or stage.stage_type != STAGE_LAYERING:
         raise ValidationError("Adda is not at Layering stage")
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
@@ -591,7 +592,7 @@ def complete_layering(
     _ensure_can_complete_layering(user)
 
     stage = adda.current_stage
-    if stage is None or stage.stage_type != WorkflowStage.StageType.LAYERING:
+    if stage is None or stage.stage_type != STAGE_LAYERING:
         raise ValidationError("Adda is not at Layering stage")
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")

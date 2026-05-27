@@ -1,7 +1,7 @@
 """Admin registration for production app."""
 from django.contrib import admin
 
-from production.models import Adda, Product, WorkflowStage
+from production.models import Adda, Product, Stage, WorkflowStage
 
 
 @admin.register(Product)
@@ -11,10 +11,17 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ('code', 'name')
 
 
+@admin.register(Stage)
+class StageAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('code', 'name')
+
+
 @admin.register(WorkflowStage)
 class WorkflowStageAdmin(admin.ModelAdmin):
-    list_display = ('product', 'order', 'stage_type')
-    list_filter = ('stage_type', 'product')
+    list_display = ('product', 'order', 'stage')
+    list_filter = ('stage', 'product')
 
 
 @admin.register(Adda)

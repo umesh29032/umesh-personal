@@ -13,6 +13,7 @@ urlpatterns = [
     path('products/add/',                 views.ProductCreateView.as_view(),   name='product-create'),
     path('products/<int:pk>/edit/',       views.ProductUpdateView.as_view(),   name='product-update'),
     path('products/<int:pk>/archive/',    views.ProductArchiveView.as_view(),  name='product-archive'),
+    path('products/<int:pk>/flow/',       views.ProductFlowEditView.as_view(), name='product-flow'),
 
     # Addas
     path('addas/',                  views.AddaListView.as_view(),    name='adda-list'),
@@ -36,4 +37,11 @@ urlpatterns = [
 
     # Cutting stage (single submit)
     path('addas/<str:code>/cutting/',  views.CuttingCompleteView.as_view(),  name='cutting-complete'),
+
+    # Stage library CRUD (Super Admin only). Replaces old /stage-access/ page —
+    # access controls now live on the Stage model itself.
+    path('stages/',                views.StageListView.as_view(),   name='stage-list'),
+    path('stages/add/',            views.StageCreateView.as_view(), name='stage-add'),
+    path('stages/<int:pk>/edit/',  views.StageUpdateView.as_view(), name='stage-edit'),
+    path('stages/<int:pk>/delete/', views.StageDeleteView.as_view(), name='stage-delete'),
 ]

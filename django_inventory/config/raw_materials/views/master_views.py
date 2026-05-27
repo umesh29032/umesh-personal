@@ -40,6 +40,7 @@ class _MasterListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
     extra_columns = ()                   # tuples of (header, attr_name)
 
     def get_queryset(self):
+        # Meta.ordering=['name'] on each master model gives stable order.
         return self.model.objects.all()
 
     def get_context_data(self, **kwargs):

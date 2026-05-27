@@ -37,9 +37,10 @@ from production.forms import (
     AttachRollForm, CompleteLayeringForm, CuttingForm,
     EditRollEntryForm, StartLayeringForm,
 )
+from production.constants import STAGE_CUTTING, STAGE_LAYERING
 from production.models import (
     Adda, AddaStageRecord, LayeringRollEntry,
-    RemainingClothOfClothRoll, WorkflowStage,
+    RemainingClothOfClothRoll,
 )
 from production.services import (
     attach_roll_to_layering, complete_cutting, complete_layering,
@@ -62,7 +63,7 @@ def _get_adda(code: str) -> Adda:
 def _get_layering_stage_record(adda: Adda) -> AddaStageRecord | None:
     """Adda ki Layering stage ka record return karta hai (yet started ho to)."""
     stage = adda.product.workflow_stages.filter(
-        stage_type=WorkflowStage.StageType.LAYERING
+        stage__code=STAGE_LAYERING
     ).first()
     if stage is None:
         return None
@@ -138,8 +139,10 @@ def _build_layering_context(request, adda: Adda) -> dict:
     # Anyone who can attach can also Save Draft — draft = same surface as attach,
     # just persists Section 04 inputs. Complete remains strict helper-skill gate.
     can_draft = can_attach
+    # Gate via permission_service (CLAUDE.md rule #6) — no raw is_superuser.
+    # MANAGEMENT_ROLES includes super_admin + manager, so Super Admin still wins.
     can_complete = sr is not None and sr.completed_at is None and (
-        user.is_superuser or has_helper_skill
+        is_management or has_helper_skill
     )
 
     entries = (
@@ -247,15 +250,15 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         ctx['adda'] = adda
         ctx['stage_type'] = stage_type
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
-        if stage_type == WorkflowStage.StageType.LAYERING:
+        if stage_type == STAGE_LAYERING:
             ctx.update(_build_layering_context(self.request, adda))
-        elif stage_type == WorkflowStage.StageType.CUTTING:
+        elif stage_type == STAGE_CUTTING:
             # Cutting needs current Adda + management gate + CuttingForm
             ctx['cutting_form'] = CuttingForm()
             ctx['can_complete_cutting'] = (
                 user_has_role(self.request.user, MANAGEMENT_ROLES)
                 and adda.current_stage is not None
-                and adda.current_stage.stage_type == WorkflowStage.StageType.CUTTING
+                and adda.current_stage.stage_type == STAGE_CUTTING
             )
         return ctx
 

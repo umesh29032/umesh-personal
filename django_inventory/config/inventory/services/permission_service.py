@@ -203,9 +203,50 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('Team Members', 'accounts:user_list', match=('users',)),
             MenuItem('User Skills', 'accounts:skill_list', match=('skills',)),
             MenuItem('Roles & Permissions', 'inventory:role_list', match=('roles',)),
+            MenuItem('Stages', 'production:stage-list', match=('stages',)),
+            MenuItem('Sidebar Access', 'inventory:sidebar-access', match=('sidebar-access',)),
         ),
     ),
 )
+
+
+def _db_visible_url_names(user) -> set[str] | None:
+    """Resolve SidebarItemRule rows into a set of url_names visible to `user`.
+
+    Returns None when the table is empty (no rules seeded yet) — caller should
+    fall back to the in-code predicate. Returns a (possibly empty) set when
+    DB rules exist, even if the user has no matching rule.
+
+    Super Admin always sees everything — handled at caller.
+    """
+    if not user or not user.is_authenticated:
+        return set()
+
+    # Lazy import — permission_service is imported very early in app startup.
+    from inventory.models import SidebarItemRule
+
+    rules = list(
+        SidebarItemRule.objects.prefetch_related('allowed_roles', 'allowed_skills').all()
+    )
+    if not rules:
+        return None  # table empty → fall back to hardcoded predicate
+
+    user_role_ids: set[int] = set()
+    if getattr(user, 'role_id', None):
+        user_role_ids.add(user.role_id)
+    user_role_ids.update(user.extra_roles.values_list('id', flat=True))
+    user_skill_ids: set[int] = set(user.skills.values_list('id', flat=True))
+
+    visible: set[str] = set()
+    for rule in rules:
+        allowed_role_ids = set(rule.allowed_roles.values_list('id', flat=True))
+        if allowed_role_ids & user_role_ids:
+            visible.add(rule.url_name)
+            continue
+        allowed_skill_ids = set(rule.allowed_skills.values_list('id', flat=True))
+        if allowed_skill_ids & user_skill_ids:
+            visible.add(rule.url_name)
+    return visible
 
 
 def build_menu_for(user, current_path: str = '') -> list[dict]:
@@ -213,6 +254,12 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
     Return a list of sections with only the items the user may see.
     Each item also gets a resolved URL; unreachable URLs are dropped silently
     so the sidebar never breaks during partial rollouts.
+
+    Visibility precedence per item:
+      1. Super Admin → always visible (built-in, never gated).
+      2. SidebarItemRule (DB) → if seeded, role overlap decides.
+      3. Hardcoded MenuItem.predicate / MenuSection.predicate → final fallback
+         when the DB table is empty (e.g., fresh install before migrations).
 
     Active-tab rule: only ONE item across the whole sidebar is marked
     `is_active=True` — the one whose `match` substring has the longest
@@ -222,16 +269,30 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
     visible_sections: list[dict] = []
     all_items: list[dict] = []  # flat list so we can pick a single winner
 
+    is_super_admin = user_has_role(user, {ROLE_SUPER_ADMIN}) if user else False
+    db_visible = None if is_super_admin else _db_visible_url_names(user)
+    # `db_visible is None` → no DB rules at all, use hardcoded predicate.
+
     for section in SIDEBAR:
-        if not section.predicate(user):
-            continue
         items: list[dict] = []
         for item in section.items:
-            if not item.predicate(user):
-                continue
+            # Skip items that don't resolve (typo, removed URL) — sidebar must
+            # never crash on a missing reverse().
             url = item.resolved_url()
             if url is None:
                 continue
+
+            # Visibility decision
+            if is_super_admin:
+                allowed = True
+            elif db_visible is not None:
+                allowed = item.url_name in db_visible
+            else:
+                allowed = section.predicate(user) and item.predicate(user)
+
+            if not allowed:
+                continue
+
             entry = {
                 'label': item.label,
                 'url': url,

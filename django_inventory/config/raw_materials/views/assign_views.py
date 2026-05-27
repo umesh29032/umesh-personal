@@ -33,10 +33,11 @@ class RollAssignView(LoginRequiredMixin, ProductionRoleMixin, FormView):
         kw = super().get_form_kwargs()
         # Build the (code, "code – product") options from in-progress Addas at Layering stage.
         # Local import: avoid circular at module load.
-        from production.models import Adda, WorkflowStage
+        from production.constants import STAGE_LAYERING
+        from production.models import Adda
         in_progress = Adda.objects.filter(
             status=Adda.Status.IN_PROGRESS,
-            current_stage__stage_type=WorkflowStage.StageType.LAYERING,
+            current_stage__stage__code=STAGE_LAYERING,
         ).select_related('product')
         kw['adda_choices'] = [
             ('', '— pick an Adda —'),

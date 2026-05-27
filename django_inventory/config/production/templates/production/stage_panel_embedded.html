@@ -213,6 +213,23 @@ to fit iframe height. Implemented in script at bottom.
             document.addEventListener('toggle', reportSize, true);
             new ResizeObserver(reportSize).observe(document.body);
         })();
+
+        // Parent's "Jump to form" button asks iframe to scroll its primary action form
+        // into view. We pick the last POST form whose action contains "-start" or
+        // "-complete" (those are the stage advancement endpoints).
+        window.addEventListener('message', function(ev) {
+            if (!ev.data || ev.data.type !== 'stage-panel-focus-form') return;
+            const forms = document.querySelectorAll('form[method="post"], form:not([method])');
+            let target = null;
+            forms.forEach(f => {
+                const action = f.getAttribute('action') || '';
+                if (action.indexOf('-complete') !== -1 || action.indexOf('-start') !== -1) {
+                    target = f;
+                }
+            });
+            if (!target && forms.length) target = forms[forms.length - 1];
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
     </script>
 </body>
 </html>

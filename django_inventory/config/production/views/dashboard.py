@@ -13,7 +13,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from production.models import Adda, WorkflowStage
+from production.models import Adda, Stage
 
 from .mixins import ProductionRoleMixin
 
@@ -53,13 +53,14 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         ).count()
         ctx['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
 
+        # Iterate Stage rows (Stage table replaced hardcoded StageType enum).
         stage_breakdown = []
-        for stage_value, stage_label in WorkflowStage.StageType.choices:
+        for stage in Stage.objects.filter(is_active=True).order_by('name'):
             stage_breakdown.append({
-                'label': stage_label,
+                'label': stage.name,
                 'count': addas.filter(
                     status=Adda.Status.IN_PROGRESS,
-                    current_stage__stage_type=stage_value,
+                    current_stage__stage=stage,
                 ).count(),
             })
         ctx['stage_breakdown'] = stage_breakdown

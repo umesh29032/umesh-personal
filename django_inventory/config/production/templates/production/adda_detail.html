@@ -37,32 +37,241 @@
     .adda-detail .hero-badge.onhold     { background: rgba(217,119,6,0.18); color:#fbbf24; border-color: rgba(217,119,6,0.3); }
     .adda-detail .hero-badge.cancelled  { background: rgba(220,38,38,0.18); color:#fca5a5; border-color: rgba(220,38,38,0.3); }
 
-    /* Tab bar — full-width pills, clickable */
-    .adda-detail .tabbar {
-        display: flex; gap: 8px; flex-wrap: wrap;
-        padding: 12px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
+    /* Production Flow — connected pipeline (replaces old tab bar). */
+    .adda-detail .flow-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-card);
+        border-radius: 14px;
         box-shadow: var(--shadow-card);
-        margin-bottom: 18px;
+        padding: 14px 16px 16px;
+        margin-bottom: 16px;
+        position: relative;
+        overflow: hidden;
     }
-    .adda-detail .tab-btn {
-        padding: 10px 18px; border-radius: 999px;
-        font-size: 13px; font-weight: 600; cursor: pointer;
-        border: 1.5px solid transparent;
-        background: var(--cream-2); color: var(--stone);
-        transition: background 0.15s, color 0.15s, border-color 0.15s;
-        font-family: inherit;
+    /* Bottom progress hairline — width driven by --progress CSS var set in JS. */
+    .adda-detail .flow-card::after {
+        content: '';
+        position: absolute;
+        left: 0; bottom: 0;
+        height: 3px;
+        width: var(--progress, 0%);
+        background: linear-gradient(90deg, var(--copper), #d49355);
+        box-shadow: 0 0 6px rgba(184,115,51,0.45);
+        border-radius: 0 3px 3px 0;
+        transition: width 0.5s ease;
     }
-    .adda-detail .tab-btn:hover { border-color: var(--copper); color: var(--ink); }
-    .adda-detail .tab-btn.is-current {
-        background: var(--copper); color: #fff;
-        box-shadow: 0 2px 8px rgba(184,115,51,0.35);
+    .adda-detail .flow-track {
+        display: grid; gap: 0; position: relative;
+        max-width: 720px; margin: 0 auto;
     }
-    .adda-detail .tab-btn.is-done {
-        background: var(--success-bg); color: var(--success);
+    .adda-detail .flow-node {
+        text-align: center; cursor: pointer;
+        background: none; border: none;
+        font-family: inherit; padding: 2px 2px 0;
+        position: relative;
+        -webkit-tap-highlight-color: transparent;
     }
-    .adda-detail .tab-btn[aria-selected="true"] {
-        outline: 2px solid var(--copper); outline-offset: 2px;
+    .adda-detail .flow-node::before {
+        content: ''; position: absolute;
+        top: 18px; left: -50%; right: 50%;
+        height: 3px; background: var(--border-subtle);
+        border-radius: 999px; z-index: 0;
+    }
+    .adda-detail .flow-node:first-child::before { display: none; }
+    .adda-detail .flow-node.done::before,
+    .adda-detail .flow-node.current::before {
+        background: linear-gradient(90deg, #d49355, var(--copper));
+        box-shadow: 0 0 6px rgba(184,115,51,0.5);
+    }
+    .adda-detail .flow-dot {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: var(--card-bg);
+        border: 2px solid var(--border-subtle);
+        color: var(--stone);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-weight: 700; font-size: 13px;
+        position: relative; z-index: 1;
+        transition: all 0.2s;
+    }
+    .adda-detail .flow-node.done .flow-dot {
+        background: var(--success); border-color: var(--success); color: #fff;
+        box-shadow: 0 4px 12px rgba(16,185,129,0.35);
+    }
+    .adda-detail .flow-node.current .flow-dot {
+        background: var(--copper); border-color: var(--copper); color: #fff;
+        box-shadow: 0 0 0 4px rgba(184,115,51,0.08), 0 4px 12px rgba(184,115,51,0.35);
+        transform: scale(1.06);
+    }
+    .adda-detail .flow-node.current .flow-dot::after {
+        content: ''; position: absolute; inset: -4px;
+        border: 2px solid var(--copper); border-radius: 50%;
+        animation: addaFlowRing 2s ease-out infinite;
+    }
+    @keyframes addaFlowRing {
+        0% { transform: scale(1); opacity: 0.7; }
+        100% { transform: scale(1.4); opacity: 0; }
+    }
+    .adda-detail .flow-dot svg { width: 16px; height: 16px; stroke-width: 2.5; }
+    .adda-detail .flow-node:hover:not(.locked) .flow-dot { transform: translateY(-1px) scale(1.04); }
+    .adda-detail .flow-node.current:hover .flow-dot { transform: scale(1.08); }
+    .adda-detail .flow-label {
+        margin-top: 6px; font-size: 10px; font-weight: 700;
+        color: var(--ink); letter-spacing: -0.005em;
+        line-height: 1.2;
+    }
+    .adda-detail .flow-node.locked .flow-label { color: var(--stone); font-weight: 500; }
+    .adda-detail .flow-meta { display: none; }
+    .adda-detail .flow-node.done .flow-meta { color: var(--success); }
+    .adda-detail .flow-node.current .flow-meta { color: var(--copper); }
+    .adda-detail .flow-node[aria-selected="true"] .flow-label {
+        color: var(--copper); font-weight: 800;
+    }
+    .adda-detail .flow-node[aria-selected="true"]::after {
+        content: ''; position: absolute; left: 50%; bottom: -8px;
+        width: 18px; height: 2px;
+        background: var(--copper); border-radius: 2px;
+        transform: translateX(-50%);
+    }
+    /* Next-up CTA banner — drives user to current stage pane. */
+    .adda-detail .next-up {
+        display: flex; align-items: center; gap: 14px;
+        padding: 18px 22px;
+        background: linear-gradient(135deg, var(--copper) 0%, #8a5520 100%);
+        color: #fff;
+        border-radius: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 16px -4px rgba(184,115,51,0.40);
+        position: relative; overflow: hidden;
+    }
+    .adda-detail .next-up::before {
+        content: ''; position: absolute;
+        right: -40px; top: -40px;
+        width: 160px; height: 160px;
+        background: radial-gradient(circle, rgba(255,255,255,0.10), transparent 60%);
+        pointer-events: none;
+    }
+    .adda-detail .next-up-icon {
+        width: 42px; height: 42px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        backdrop-filter: blur(4px);
+    }
+    .adda-detail .next-up-icon svg { width: 20px; height: 20px; stroke-width: 2; }
+    .adda-detail .next-up-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
+    .adda-detail .next-up-eyebrow {
+        font-size: 10px; font-weight: 700;
+        letter-spacing: 0.18em; text-transform: uppercase;
+        color: rgba(255,255,255,0.70);
+    }
+    .adda-detail .next-up-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 700;
+        margin-top: 2px; letter-spacing: -0.005em;
+    }
+    .adda-detail .next-up-action {
+        background: #fff; color: #8a5520;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 13px; font-weight: 700;
+        text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+        flex-shrink: 0;
+        transition: transform 0.12s;
+        position: relative; z-index: 1;
+        border: none; cursor: pointer; font-family: inherit;
+    }
+    .adda-detail .next-up-action:hover { transform: scale(1.04); }
+    .adda-detail .next-up-action svg { width: 14px; height: 14px; stroke-width: 2.5; }
+
+    @media (max-width: 720px) {
+        /* Mobile = horizontal scrollable pill bar (tab style). Keeps same labels,
+           drops vertical bloat. User swipes through stages. */
+        .adda-detail .flow-track {
+            display: flex !important;
+            flex-direction: row;
+            gap: 6px;
+            grid-template-columns: none !important;
+            max-width: none;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 4px 2px 6px;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .adda-detail .flow-track::-webkit-scrollbar { display: none; }
+        /* Pill base — locked default. Border kept on all states so contrast survives
+           even when bg fills are light. */
+        .adda-detail .flow-node {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px 6px 6px;
+            border-radius: 999px;
+            background: var(--cream-2);
+            border: 1.5px solid var(--border-subtle) !important;
+            scroll-snap-align: start;
+        }
+        .adda-detail .flow-node::before { display: none; }
+
+        /* State backgrounds — !important to beat desktop hover/state rules that
+           share specificity. Each state owns bg + border + label + dot. */
+        .adda-detail .flow-node.locked {
+            background: var(--cream-2) !important;
+            border-color: var(--border-subtle) !important;
+        }
+        .adda-detail .flow-node.done {
+            background: rgba(5,150,105,0.14) !important;
+            border-color: rgba(5,150,105,0.55) !important;
+        }
+        .adda-detail .flow-node.current {
+            background: var(--copper) !important;
+            border-color: var(--copper) !important;
+            box-shadow: 0 2px 8px rgba(184,115,51,0.35);
+        }
+        .adda-detail .flow-node[aria-selected="true"]:not(.current) {
+            outline: 2px solid var(--copper); outline-offset: 1px;
+        }
+        .adda-detail .flow-node[aria-selected="true"]::after { display: none; }
+
+        /* Dots — flat, no shadows on mobile. */
+        .adda-detail .flow-dot {
+            width: 22px; height: 22px;
+            font-size: 11px;
+            border: 0 !important;
+            background: #fff;
+            color: var(--stone);
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        .adda-detail .flow-node.done .flow-dot {
+            background: var(--success) !important;
+            color: #fff !important;
+        }
+        .adda-detail .flow-node.current .flow-dot {
+            background: #fff !important;
+            color: var(--copper) !important;
+        }
+        .adda-detail .flow-node.current .flow-dot::after { display: none; }
+        .adda-detail .flow-dot svg { width: 12px; height: 12px; }
+
+        /* Labels — state-driven color. */
+        .adda-detail .flow-label {
+            margin-top: 0;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            color: var(--ink);
+        }
+        .adda-detail .flow-node.locked .flow-label { color: var(--stone); font-weight: 500; }
+        .adda-detail .flow-node.done .flow-label { color: var(--success); font-weight: 700; }
+        .adda-detail .flow-node.current .flow-label { color: #fff; font-weight: 700; }
+        .adda-detail .flow-meta { display: none; }
     }
 
     /* Tab panes — only the selected one visible. JS toggles `hidden` attr. */
@@ -82,6 +291,29 @@
     .adda-detail .open-new:hover { text-decoration: underline; }
     .adda-detail .stage-iframe {
         display:block; background: var(--cream); border-radius: 10px;
+    }
+    /* Restricted-stage placeholder — shown when user lacks skill/role for stage. */
+    .adda-detail .stage-restricted {
+        padding: 36px 24px; text-align: center;
+        background: var(--cream); border-radius: 10px;
+        border: 1px dashed var(--border-subtle);
+    }
+    .adda-detail .stage-restricted-icon {
+        width: 44px; height: 44px;
+        margin: 0 auto 12px;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(184,115,51,0.10); color: var(--copper);
+        border-radius: 50%;
+    }
+    .adda-detail .stage-restricted-icon svg { width: 22px; height: 22px; }
+    .adda-detail .stage-restricted h3 {
+        margin: 0 0 6px;
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink);
+    }
+    .adda-detail .stage-restricted p {
+        margin: 0; font-size: 13px; color: var(--stone);
+        max-width: 380px; margin-inline: auto; line-height: 1.5;
     }
 
     /* Stage Card layout (used by both layering + cutting partials) */
@@ -153,8 +385,9 @@
     @media (max-width: 600px) {
         .adda-detail .hero { padding: 22px 20px; border-radius: 12px; }
         .adda-detail .hero h1 { font-size: 24px; }
-        .adda-detail .tabbar { padding: 8px; }
-        .adda-detail .tab-btn { padding: 8px 14px; font-size: 12px; }
+        .adda-detail .flow-card { padding: 18px 16px 20px; border-radius: 16px; }
+        .adda-detail .next-up { padding: 16px 18px; flex-wrap: wrap; border-radius: 14px; }
+        .adda-detail .next-up-title { font-size: 16px; }
         .adda-detail .activity-row { flex-direction: column; gap: 4px; }
         .adda-detail .activity-time { width: auto; }
     }
@@ -176,34 +409,76 @@
         </div>
     </div>
 
-    {% comment %}Layering Summary — full card above tabs. Always-visible high-level view.{% endcomment %}
-    {% if layering_snap.state != 'absent' %}
+    {% comment %}Layering Summary — confidential roll/layer/leftover counts.
+    Hidden unless user has layering skill or sits in management.{% endcomment %}
+    {% if has_layering_access and layering_snap.state != 'absent' %}
     <div style="margin-bottom: 18px;">
         {% include 'production/_layering_summary.html' with snap=layering_snap style='full' %}
     </div>
     {% endif %}
 
-    {% comment %}Tab bar — one button per stage; default tab marked aria-selected. Done stages get green pill, current gets copper, future gets neutral.{% endcomment %}
-    <div class="tabbar" role="tablist" aria-label="Adda stages">
-        {% for s in stages %}
-            {% if adda.current_stage and adda.current_stage.order == s.order %}
-                <button type="button" class="tab-btn is-current"
-                        role="tab" aria-controls="tab-{{ s.stage_type }}"
-                        aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
-                        data-tab="{{ s.stage_type }}">▸ {{ s.get_stage_type_display }}</button>
-            {% elif adda.current_stage and adda.current_stage.order > s.order or not adda.current_stage and adda.status == 'completed' %}
-                <button type="button" class="tab-btn is-done"
-                        role="tab" aria-controls="tab-{{ s.stage_type }}"
-                        aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
-                        data-tab="{{ s.stage_type }}">✓ {{ s.get_stage_type_display }}</button>
-            {% else %}
-                <button type="button" class="tab-btn"
-                        role="tab" aria-controls="tab-{{ s.stage_type }}"
-                        aria-selected="false"
-                        data-tab="{{ s.stage_type }}">{{ s.get_stage_type_display }}</button>
-            {% endif %}
-        {% endfor %}
+    {% comment %}Production Flow — connected pipeline. Each stage is a node; click to switch pane. Done = green check, current = copper pulsing, locked = neutral.{% endcomment %}
+    <div class="flow-card" id="flow-card">
+        <div class="flow-track" role="tablist" aria-label="Adda stages"
+             style="grid-template-columns: repeat({{ stages|length }}, minmax(0, 1fr));">
+            {% for s in stages %}
+                {% if adda.current_stage and adda.current_stage.order == s.order %}
+                    <button type="button" class="flow-node current"
+                            role="tab" aria-controls="tab-{{ s.stage_type }}"
+                            aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
+                            data-tab="{{ s.stage_type }}">
+                        <span class="flow-dot">{{ forloop.counter }}</span>
+                        <div class="flow-node-body">
+                            <div class="flow-label">{{ s.get_stage_type_display }}</div>
+                            <div class="flow-meta">In Progress</div>
+                        </div>
+                    </button>
+                {% elif adda.current_stage and adda.current_stage.order > s.order or not adda.current_stage and adda.status == 'completed' %}
+                    <button type="button" class="flow-node done"
+                            role="tab" aria-controls="tab-{{ s.stage_type }}"
+                            aria-selected="{% if default_tab == s.stage_type %}true{% else %}false{% endif %}"
+                            data-tab="{{ s.stage_type }}">
+                        <span class="flow-dot">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </span>
+                        <div class="flow-node-body">
+                            <div class="flow-label">{{ s.get_stage_type_display }}</div>
+                            <div class="flow-meta">Completed</div>
+                        </div>
+                    </button>
+                {% else %}
+                    <button type="button" class="flow-node locked"
+                            role="tab" aria-controls="tab-{{ s.stage_type }}"
+                            aria-selected="false"
+                            data-tab="{{ s.stage_type }}">
+                        <span class="flow-dot">{{ forloop.counter }}</span>
+                        <div class="flow-node-body">
+                            <div class="flow-label">{{ s.get_stage_type_display }}</div>
+                            <div class="flow-meta">Pending</div>
+                        </div>
+                    </button>
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
+
+    {% comment %}Next-up CTA — only when active stage exists AND user can act on it.
+    Non-skilled users see the pipeline progress only.{% endcomment %}
+    {% if adda.current_stage and can_act_on_current %}
+    <div class="next-up">
+        <div class="next-up-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        </div>
+        <div class="next-up-text">
+            <div class="next-up-eyebrow">Next step</div>
+            <div class="next-up-title">{{ adda.current_stage.get_stage_type_display }} · take action</div>
+        </div>
+        <button type="button" class="next-up-action" data-jump="{{ adda.current_stage.stage_type }}">
+            Jump to form
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+    </div>
+    {% endif %}
 
     {% comment %}
     Tab panes — one per stage. Each pane is an iframe to the embedded stage panel
@@ -216,21 +491,35 @@
         <section class="tabpane" id="tab-{{ s.stage_type }}"
                  role="tabpanel" aria-labelledby="btn-{{ s.stage_type }}"
                  {% if default_tab != s.stage_type %}hidden{% endif %}>
-            <div class="tab-toolbar">
-                <a href="{% url 'production:stage-panel' adda.code s.stage_type %}" target="_blank" rel="noopener" class="open-new">
-                    Open in new window ↗
-                </a>
-            </div>
-            <iframe class="stage-iframe"
-                    data-stage="{{ s.stage_type }}"
-                    src="{% url 'production:stage-panel' adda.code s.stage_type %}?embedded=1"
-                    title="{{ s.get_stage_type_display }} panel"
-                    loading="lazy"
-                    style="width:100%; border:none; min-height:400px;"></iframe>
+            {% if s.has_access %}
+                <div class="tab-toolbar">
+                    <a href="{% url 'production:stage-panel' adda.code s.stage_type %}" target="_blank" rel="noopener" class="open-new">
+                        Open in new window ↗
+                    </a>
+                </div>
+                <iframe class="stage-iframe"
+                        data-stage="{{ s.stage_type }}"
+                        src="{% url 'production:stage-panel' adda.code s.stage_type %}?embedded=1"
+                        title="{{ s.get_stage_type_display }} panel"
+                        loading="lazy"
+                        style="width:100%; border:none; min-height:400px;"></iframe>
+            {% else %}
+                <div class="stage-restricted">
+                    <div class="stage-restricted-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                    </div>
+                    <h3>{{ s.get_stage_type_display }} — Restricted</h3>
+                    <p>You don't have the skill or role required to view this stage. Track progress via the pipeline above.</p>
+                </div>
+            {% endif %}
         </section>
     {% endfor %}
 
-    {# Assigned rolls panel — combined across all stages (cloth roll ledger view) #}
+    {% comment %}Assigned rolls + activity feed — management-only. Confidential roll IDs
+    + per-user action trail must not leak to skill-restricted users.{% endcomment %}
+    {% if is_management %}
     <div class="tabpane" style="padding: 0;">
         <details>
             <summary style="cursor:pointer; padding: 16px 22px; font-weight: 600; font-size: 14px; color: var(--ink);">
@@ -254,13 +543,13 @@
         </details>
     </div>
 
-    {# Activity feed — full Adda timeline; collapsible to save vertical space #}
     <div class="tabpane">
         <h3 style="margin: 0 0 14px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; color: var(--ink);">
             Activity ({{ activity|length }})
         </h3>
         {% include 'production/_activity_feed.html' with activity=activity show_adda_code=False %}
     </div>
+    {% endif %}
 
     <div style="margin: 18px 0;">
         <a href="{% url 'production:adda-list' %}" class="btn btn-ghost">← Back to Addas</a>
@@ -269,15 +558,45 @@
 </div>
 
 <script>
-    // Tab switcher — vanilla JS, no dependencies. Toggles `hidden` + `aria-selected`.
+    // Flow-node switcher + progress bar. Vanilla JS, no deps.
     (function() {
-        const tabs = document.querySelectorAll('.adda-detail .tab-btn');
+        const tabs = document.querySelectorAll('.adda-detail .flow-node');
         const panes = document.querySelectorAll('.adda-detail .tabpane[id^="tab-"]');
         function activate(name) {
             tabs.forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
             panes.forEach(p => { p.hidden = (p.id !== 'tab-' + name); });
         }
         tabs.forEach(btn => btn.addEventListener('click', () => activate(btn.dataset.tab)));
+
+        // Jump-to-form: activate pane → scroll iframe into view → ask iframe to
+        // focus its action form (the actual form lives inside the stage-panel iframe,
+        // so scrolling the parent alone leaves user at top of an empty-looking pane).
+        document.querySelectorAll('.adda-detail [data-jump]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const name = btn.dataset.jump;
+                activate(name);
+                const pane = document.getElementById('tab-' + name);
+                if (!pane) return;
+                const iframe = pane.querySelector('iframe.stage-iframe');
+                const target = iframe || pane;
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                if (iframe && iframe.contentWindow) {
+                    try {
+                        iframe.contentWindow.postMessage({ type: 'stage-panel-focus-form' }, '*');
+                    } catch (e) { /* cross-origin or not loaded yet */ }
+                    iframe.focus();
+                }
+            });
+        });
+
+        // Progress = (done + current) / total → drives --progress on flow-card.
+        // The card's ::after pseudo paints a hairline along the bottom border.
+        const total = tabs.length;
+        const done = document.querySelectorAll('.adda-detail .flow-node.done').length;
+        const current = document.querySelectorAll('.adda-detail .flow-node.current').length;
+        const pct = total ? Math.round((done + current) / total * 100) : 0;
+        const card = document.getElementById('flow-card');
+        if (card) card.style.setProperty('--progress', pct + '%');
     })();
 
     // Iframe auto-resize — receives `stage-panel-resize` postMessage from embedded

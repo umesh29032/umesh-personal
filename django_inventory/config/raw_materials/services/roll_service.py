@@ -239,14 +239,15 @@ def assign_roll_to_adda(user, *, roll: ClothRoll, adda, weight_kg: Decimal, widt
     Saare guards ValidationError throw karte hain — form upar pe message dikhaata hai.
     """
     # Lazy import — production app ke models import yahan, taa-ke top-level circular na ho
-    from production.models import Adda as AddaModel, WorkflowStage
+    from production.constants import STAGE_LAYERING
+    from production.models import Adda as AddaModel
 
     if roll.status != ClothRoll.Status.NOT_USED:
         raise ValidationError(f"Roll {roll.roll_id} is already used")
     if adda.status != AddaModel.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
     # Rolls sirf Layering stage pe assign hote hain — Cutting/baaki stages pe nahi
-    if adda.current_stage is None or adda.current_stage.stage_type != WorkflowStage.StageType.LAYERING:
+    if adda.current_stage is None or adda.current_stage.stage_type != STAGE_LAYERING:
         raise ValidationError("Rolls can only be assigned during the Layering stage")
 
     # Saare fields ek hi save() mein update — update_fields se sirf ye columns hit hote hain

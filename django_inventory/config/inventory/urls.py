@@ -13,4 +13,7 @@ urlpatterns = [
     path('roles/add/', views.RoleCreateView.as_view(), name='role_add'),
     path('roles/<int:pk>/edit/', views.RoleUpdateView.as_view(), name='role_edit'),
     path('roles/<int:pk>/delete/', views.RoleDeleteView.as_view(), name='role_delete'),
+
+    # Sidebar Access Control (Super Admin only) — edits SidebarItemRule rows.
+    path('sidebar-access/', views.SidebarAccessListView.as_view(), name='sidebar-access'),
 ]

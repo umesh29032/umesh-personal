@@ -1,0 +1,20 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Stage{% endblock %}
+
+{% block content %}
+<div style="max-width: 540px; margin: 40px auto; background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; padding: 32px; box-shadow: var(--shadow-card); text-align: center;">
+    <div style="font-size: 44px; margin-bottom: 16px;">⚠️</div>
+    <h1 style="font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; color: #b91c1c; margin: 0 0 10px;">Delete Stage?</h1>
+    <p>You're about to delete <strong>{{ object.name }}</strong> (code: <code>{{ object.code }}</code>).</p>
+    <p style="color: var(--stone); font-size: 13px;">Stages already in use by Products can't be deleted — remove them from those flows first.</p>
+
+    <form method="post" style="margin-top: 24px;">
+        {% csrf_token %}
+        <div style="display: flex; gap: 12px;">
+            <a href="{% url 'production:stage-list' %}" style="flex:1; padding: 12px 16px; border-radius: 10px; background: var(--cream-2); color: var(--ink); font-weight: 600; text-decoration: none; text-align: center;">Cancel</a>
+            <button type="submit" style="flex:1; padding: 12px 16px; border-radius: 10px; background: #b91c1c; color: #fff; font-weight: 700; border: none; cursor: pointer;">Confirm Delete</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
