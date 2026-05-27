@@ -27,6 +27,7 @@ from django.utils import timezone
 
 from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
 from inventory.services import PRODUCTION_ROLES, user_has_role
+from production.constants import STAGE_LAYERING
 from production.models import Adda, AddaStageRecord, Product, WorkflowStage
 
 
@@ -101,7 +102,7 @@ def create_adda(user, *, product: Product) -> Adda:
 
     # Auto-create stage_record + tag skilled workers if first_stage is Layering.
     # Future stages (cutting, etc.) ke liye legacy "manager-driven start" flow rehta hai.
-    if first_stage.stage_type == WorkflowStage.StageType.LAYERING:
+    if first_stage.stage_type == STAGE_LAYERING:
         sr = AddaStageRecord.objects.create(
             adda=adda, workflow_stage=first_stage,
             started_at=timezone.now(),

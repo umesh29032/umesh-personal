@@ -1,6 +1,10 @@
 from .dashboard import AddaDashboardView
 from .product_views import ProductListView, ProductCreateView, ProductUpdateView, ProductArchiveView
 from .adda_views import AddaListView, AddaCreateView, AddaDetailView
+from .access_views import (
+    StageListView, StageCreateView, StageUpdateView, StageDeleteView,
+)
+from .flow_views import ProductFlowEditView
 from .stage_views import (
     CuttingCompleteView,
     LayeringAttachRollView,
@@ -30,4 +34,6 @@ __all__ = [
     'LayeringEntryRemoveView',
     'LayeringCompleteView',
     'CuttingCompleteView',
+    'StageListView', 'StageCreateView', 'StageUpdateView', 'StageDeleteView',
+    'ProductFlowEditView',
 ]

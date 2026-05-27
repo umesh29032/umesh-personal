@@ -205,8 +205,10 @@
                             <span class="pipe-pill pipe-{{ p.state }}">{% if p.state == 'done' %}✓ {% elif p.state == 'current' %}▸ {% endif %}{{ p.label }}</span>
                         {% endfor %}
                     </div>
-                    {% comment %}Per-Adda Layering snapshot (compact) — visible to ALL users.{% endcomment %}
-                    {% if a.layering_snap.state != 'absent' %}
+                    {% comment %}Per-Adda Layering snapshot — confidential (roll/layer/leftover counts).
+                    Restricted to skilled users (Cutting Master / Helper) + management. Other roles
+                    must not see internal production metrics.{% endcomment %}
+                    {% if is_skilled_user and a.layering_snap.state != 'absent' %}
                     <div style="margin-top: 6px;">
                         <span style="font-size: 10px; text-transform: uppercase; color: var(--stone); letter-spacing: 0.06em; margin-right: 6px;">Layering:</span>
                         {% include 'production/_layering_summary.html' with snap=a.layering_snap style='compact' %}

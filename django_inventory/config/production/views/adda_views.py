@@ -14,7 +14,7 @@ from django.urls import reverse_lazy
 from django.views.generic import DetailView, FormView, ListView
 
 from production.forms import AddaCreateForm
-from production.models import Adda, WorkflowStage
+from production.models import Adda
 from production.services import create_adda
 
 from .mixins import ProductionRoleMixin
@@ -33,7 +33,7 @@ class AddaListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         if status:
             qs = qs.filter(status=status)
         if stage_type:
-            qs = qs.filter(current_stage__stage_type=stage_type)
+            qs = qs.filter(current_stage__stage__code=stage_type)
         return qs
 
     def get_context_data(self, **kwargs):
@@ -42,7 +42,11 @@ class AddaListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
             'status': self.request.GET.get('status', ''),
             'stage': self.request.GET.get('stage', ''),
         }
-        ctx['stage_types'] = WorkflowStage.StageType.choices
+        # Use Stage rows as filter options (replaces hardcoded StageType enum).
+        from production.models import Stage
+        ctx['stage_types'] = list(
+            Stage.objects.filter(is_active=True).values_list('code', 'name').order_by('name')
+        )
         ctx['status_choices'] = Adda.Status.choices
         return ctx
 
@@ -85,6 +89,28 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         adda = self.object
         stages = list(adda.product.workflow_stages.order_by('order'))
 
+        # ── Per-stage RBAC gate (DB-driven via StageAccessRule) ──────────────
+        # access_service.stage_access_map reads StageAccessRule rows; super_admin
+        # + manager always pass (built-in defense). Admins edit rules at
+        # /production/stage-access/.
+        from inventory.services import MANAGEMENT_ROLES, user_has_role
+        from production.services import stage_access_map
+
+        user = self.request.user
+        is_management = user_has_role(user, MANAGEMENT_ROLES)
+        access_by_type = stage_access_map(user, [s.stage_type for s in stages])
+        has_layering_access = access_by_type.get('layering', False)
+
+        # Annotate each WorkflowStage with .has_access so the template can gate
+        # iframes per-stage without redoing the skill check in Django templates.
+        for s in stages:
+            s.has_access = access_by_type.get(s.stage_type, False)
+
+        can_act_on_current = (
+            adda.current_stage is not None
+            and access_by_type.get(adda.current_stage.stage_type, False)
+        )
+
         # Stage records keyed by stage_type for template lookup.
         # select_related = forward + reverse OneToOne (single FK join).
         # prefetch_related = M2M + reverse FK (separate query, joined in Python).
@@ -126,5 +152,8 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
             'default_tab': default_tab,
             'activity': activity,
             'layering_snap': layering_snap,
+            'is_management': is_management,
+            'has_layering_access': has_layering_access,
+            'can_act_on_current': can_act_on_current,
         })
         return ctx

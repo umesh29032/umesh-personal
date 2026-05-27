@@ -9,7 +9,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from production.models import Adda, AddaStageRecord, CuttingRecord, WorkflowStage
+from production.constants import STAGE_CUTTING
+from production.models import Adda, AddaStageRecord, CuttingRecord
 from production.services.adda_service import advance_to_next_stage
 
 from ._shared import _ensure_can_manage
@@ -27,7 +28,7 @@ def complete_cutting(
     """Cutting stage finalize → N BatchBarcode rows auto-generate."""
     _ensure_can_manage(user)
     stage = adda.current_stage
-    if stage is None or stage.stage_type != WorkflowStage.StageType.CUTTING:
+    if stage is None or stage.stage_type != STAGE_CUTTING:
         raise ValidationError("Adda is not at Cutting stage")
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")

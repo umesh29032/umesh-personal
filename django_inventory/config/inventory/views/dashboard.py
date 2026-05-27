@@ -29,7 +29,8 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
     is_skilled_user = False
 
     try:
-        from production.models import Adda, AddaStageRecord, LayeringRecord, WorkflowStage
+        from production.constants import STAGE_LAYERING
+        from production.models import Adda, AddaStageRecord, LayeringRecord
         from production.services import user_activity_across_addas
         from accounts.skills import (
             SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
@@ -83,7 +84,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             active_layering = (
                 AddaStageRecord.objects
                 .filter(
-                    workflow_stage__stage_type=WorkflowStage.StageType.LAYERING,
+                    workflow_stage__stage__code=STAGE_LAYERING,
                     completed_at__isnull=True,
                     started_at__isnull=False,
                     adda__status=Adda.Status.IN_PROGRESS,

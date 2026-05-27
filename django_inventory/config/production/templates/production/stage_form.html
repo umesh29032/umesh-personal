@@ -1,0 +1,239 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ action }} Stage{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stage-form { max-width: 900px; margin: 0 auto; }
+    .stage-form .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px;
+        padding: 26px 30px; margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+    }
+    .stage-form .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: #fff; margin: 0;
+    }
+    .stage-form .hero p { margin: 4px 0 0; color: rgba(255,255,255,0.72); font-size: 14px; }
+
+    .stage-form .panel {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        margin-bottom: 16px; overflow: hidden;
+    }
+    .stage-form .panel-head {
+        padding: 14px 22px;
+        background: var(--cream);
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex; align-items: center; gap: 12px;
+    }
+    .stage-form .panel-num {
+        width: 30px; height: 30px;
+        background: var(--copper); color: #fff;
+        border-radius: 8px;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 14px; font-weight: 700;
+    }
+    .stage-form .panel-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink);
+    }
+    .stage-form .panel-body { padding: 20px 22px 22px; }
+
+    .stage-form .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .stage-form label {
+        font-size: 12px; font-weight: 600; color: var(--ink);
+        letter-spacing: 0.02em;
+    }
+    .stage-form .help-text {
+        font-size: 12px; color: var(--stone); margin-top: 4px;
+    }
+    .stage-form input[type="text"],
+    .stage-form input[type="email"],
+    .stage-form textarea {
+        background: var(--cream); border: 1.5px solid var(--border-subtle);
+        border-radius: 10px; padding: 10px 12px;
+        font-size: 14px; color: var(--ink);
+        font-family: inherit;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .stage-form input[type="text"]:focus,
+    .stage-form textarea:focus {
+        outline: none; border-color: var(--copper);
+        box-shadow: 0 0 0 3px rgba(184,115,51,0.15);
+    }
+    .stage-form .field-grid-2 {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    }
+    .stage-form .switch-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 0;
+    }
+    .stage-form .chip-grid {
+        display: flex; flex-wrap: wrap; gap: 8px;
+        margin-top: 6px;
+    }
+    .stage-form .chip-pick {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 14px;
+        background: var(--cream-2);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 999px;
+        cursor: pointer; user-select: none;
+        font-size: 13px; color: var(--ink);
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .stage-form .chip-pick:hover { border-color: var(--copper); }
+    .stage-form .chip-pick.is-on {
+        background: var(--copper); color: #fff;
+        border-color: var(--copper);
+    }
+    .stage-form .chip-pick.skill-chip.is-on {
+        background: var(--success); border-color: var(--success);
+    }
+    .stage-form .chip-pick input { display: none; }
+    .stage-form .errors { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+
+    .stage-form .builtin-notice {
+        margin: 4px 0 14px;
+        padding: 10px 14px;
+        background: rgba(59,130,246,0.08);
+        border: 1px solid rgba(59,130,246,0.18);
+        border-radius: 10px;
+        font-size: 12px; color: var(--ink);
+        display: flex; align-items: flex-start; gap: 8px;
+    }
+    .stage-form .builtin-notice strong { color: var(--copper); }
+
+    .stage-form .sticky-actions {
+        position: sticky; bottom: 18px;
+        margin-top: 18px;
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border-card);
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 8px 24px -8px rgba(14,11,9,0.18);
+        display: flex; gap: 10px; justify-content: flex-end;
+    }
+    .stage-form .btn-copper, .stage-form .btn-ghost {
+        padding: 12px 22px; border-radius: 10px;
+        font-weight: 700; font-size: 13px; cursor: pointer;
+        border: none; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .stage-form .btn-copper { background: var(--copper); color: #fff; }
+    .stage-form .btn-copper:hover { background: #8a5520; }
+    .stage-form .btn-ghost {
+        background: var(--card-bg); color: var(--ink);
+        border: 1.5px solid var(--border-subtle);
+    }
+    .stage-form .btn-ghost:hover { border-color: var(--copper); color: var(--copper); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stage-form">
+    <div class="hero">
+        <h1>{{ action }} Stage</h1>
+        <p>Define stage identity + access controls. Skills + roles selected here
+        gate which users can view + act on this stage system-wide.</p>
+    </div>
+
+    {% if form.non_field_errors %}
+        <div class="form-alert form-alert-error" style="margin-bottom:14px;">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <section class="panel">
+            <div class="panel-head">
+                <div class="panel-num">01</div>
+                <div class="panel-title">Identity</div>
+            </div>
+            <div class="panel-body">
+                <div class="field-grid-2">
+                    <div class="field">
+                        <label for="id_code">Code *</label>
+                        <input type="text" name="code" id="id_code"
+                               value="{{ form.code.value|default:'' }}" required maxlength="32">
+                        <div class="help-text">Stable slug used in URLs + services (e.g. <code>layering</code>).</div>
+                        {% if form.code.errors %}<div class="errors">{{ form.code.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label for="id_name">Display Name *</label>
+                        <input type="text" name="name" id="id_name"
+                               value="{{ form.name.value|default:'' }}" required maxlength="64">
+                        <div class="help-text">Shown in pipeline + tab labels.</div>
+                        {% if form.name.errors %}<div class="errors">{{ form.name.errors|join:" " }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="id_description">Description</label>
+                    <textarea name="description" id="id_description" rows="3">{{ form.description.value|default:'' }}</textarea>
+                </div>
+                <div class="switch-row">
+                    <input type="checkbox" name="is_active" id="id_is_active"
+                           {% if form.is_active.value %}checked{% endif %} value="True">
+                    <label for="id_is_active" style="margin: 0;">Active</label>
+                    <span class="help-text" style="margin: 0;">Inactive stages are hidden from new Product flows + access checks.</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-head">
+                <div class="panel-num">02</div>
+                <div class="panel-title">Access Controls</div>
+            </div>
+            <div class="panel-body">
+                <div class="builtin-notice">
+                    <span><strong>Super Admin</strong> and <strong>Manager</strong> always have access (built-in). Use chips below to grant additional access by skill or role.</span>
+                </div>
+                <div class="field">
+                    <label>Allowed Skills</label>
+                    <div class="chip-grid">
+                        {% for box in form.access_by_skill %}
+                            <label class="chip-pick skill-chip {% if box.data.selected %}is-on{% endif %}">
+                                {{ box.tag }}
+                                <span>{{ box.choice_label }}</span>
+                            </label>
+                        {% empty %}
+                            <span class="help-text" style="font-style:italic;">No skills defined. Add via Administration → User Skills.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Allowed Roles</label>
+                    <div class="chip-grid">
+                        {% for box in form.access_by_role %}
+                            <label class="chip-pick {% if box.data.selected %}is-on{% endif %}">
+                                {{ box.tag }}
+                                <span>{{ box.choice_label }}</span>
+                            </label>
+                        {% empty %}
+                            <span class="help-text" style="font-style:italic;">No additional roles available.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="sticky-actions">
+            <a href="{% url 'production:stage-list' %}" class="btn-ghost">Cancel</a>
+            <button type="submit" class="btn-copper">{{ action }} Stage</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.querySelectorAll('.stage-form .chip-pick input').forEach(cb => {
+        cb.addEventListener('change', e => {
+            e.target.closest('.chip-pick').classList.toggle('is-on', e.target.checked);
+        });
+    });
+</script>
+{% endblock %}

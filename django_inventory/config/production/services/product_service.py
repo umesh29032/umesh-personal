@@ -53,7 +53,12 @@ def _normalise_code(code: str) -> str:
 
 @transaction.atomic
 def create_product(user, *, code: str, name: str, description: str = '') -> Product:
-    """Naya Product banata hai. Note: workflow stages alag se seed karne padenge."""
+    """Naya Product banata hai + Layering stage auto-attach karta hai.
+
+    Production flow mandatory hai (CLAUDE.md user spec) — har Product mein
+    kam-se-kam ek stage hona chahiye. Default = Layering, admin baad mein
+    Product Flow page se reorder/add kar sakta hai.
+    """
     _ensure_can_manage(user)
     code = _normalise_code(code)
     # Duplicate check — unique constraint bhi DB level pe hai, but service-side
@@ -61,6 +66,15 @@ def create_product(user, *, code: str, name: str, description: str = '') -> Prod
     if Product.objects.filter(code=code).exists():
         raise ValidationError(f"Product code '{code}' already exists")
     p = Product.objects.create(code=code, name=name, description=description)
+
+    # Auto-seed Layering as the default first stage. Without this the Product
+    # would be unusable — create_adda would crash on missing first_stage.
+    from production.constants import STAGE_LAYERING
+    from production.models import Stage, WorkflowStage
+    layering = Stage.objects.filter(code=STAGE_LAYERING, is_active=True).first()
+    if layering is not None:
+        WorkflowStage.objects.create(product=p, stage=layering, order=1)
+
     # History log — tracking app lazy-imported (production pe ulta depend karta hai)
     from tracking.services import log_product
     from tracking.models import ProductHistory

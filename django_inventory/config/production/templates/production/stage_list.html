@@ -1,0 +1,169 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Stages{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stage-list { max-width: 1100px; margin: 0 auto; }
+    .stage-list .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px;
+        padding: 26px 30px; margin-bottom: 22px;
+        position: relative; overflow: hidden;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 14px;
+    }
+    .stage-list .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: #fff; margin: 0;
+    }
+    .stage-list .hero p { margin: 4px 0 0; color: rgba(255,255,255,0.72); font-size: 14px; }
+    .stage-list .add-btn {
+        background: var(--copper); color: #fff;
+        padding: 10px 18px; border-radius: 10px;
+        font-weight: 700; font-size: 13px; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .stage-list .add-btn:hover { background: #d4924a; }
+
+    .stage-list .stage-card {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        padding: 18px 22px; margin-bottom: 14px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 18px;
+        align-items: start;
+    }
+    .stage-list .stage-card-main { min-width: 0; }
+    .stage-list .stage-card-name {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 22px; font-weight: 600; color: var(--ink);
+        letter-spacing: -0.005em;
+    }
+    .stage-list .stage-card-code {
+        margin-left: 8px;
+        font-family: 'Courier New', monospace; font-size: 12px;
+        color: var(--stone); padding: 2px 8px;
+        background: var(--cream-2); border-radius: 6px;
+    }
+    .stage-list .stage-card-meta {
+        margin-top: 8px; font-size: 13px; color: var(--stone);
+    }
+    .stage-list .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .stage-list .pill {
+        padding: 4px 10px; border-radius: 999px;
+        font-size: 11px; font-weight: 600;
+        background: var(--cream-2); color: var(--ink);
+        border: 1px solid var(--border-subtle);
+    }
+    .stage-list .pill.skill { background: var(--success-bg); color: var(--success); border-color: rgba(5,150,105,0.30); }
+    .stage-list .pill.role  { background: rgba(184,115,51,0.10); color: var(--copper); border-color: rgba(184,115,51,0.30); }
+    .stage-list .pill.empty { font-style: italic; color: var(--stone); background: transparent; }
+    .stage-list .pill.section-label {
+        font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+        background: transparent; border: none; color: var(--stone); padding: 4px 0;
+    }
+    .stage-list .stage-card-actions {
+        display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+    }
+    .stage-list .btn-inline {
+        padding: 6px 14px; border-radius: 8px;
+        font-size: 12px; font-weight: 600;
+        text-align: center; text-decoration: none;
+        border: 1px solid var(--border-subtle);
+    }
+    .stage-list .btn-edit  { background: var(--copper); color: #fff; border-color: var(--copper); }
+    .stage-list .btn-delete { background: var(--card-bg); color: #b91c1c; border-color: rgba(185,28,28,0.35); }
+    .stage-list .btn-edit:hover  { background: #d4924a; }
+    .stage-list .btn-delete:hover { background: rgba(185,28,28,0.08); }
+
+    .stage-list .inactive-tag {
+        margin-left: 6px;
+        font-size: 10px; padding: 2px 8px;
+        background: #fee2e2; color: #991b1b; border-radius: 6px;
+        font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+
+    .stage-list .empty {
+        background: var(--card-bg); border: 1px dashed var(--border-card);
+        border-radius: 14px; padding: 40px 24px; text-align: center;
+        color: var(--stone);
+    }
+
+    @media (max-width: 640px) {
+        .stage-list .stage-card { grid-template-columns: 1fr; }
+        .stage-list .stage-card-actions { flex-direction: row; }
+        .stage-list .btn-inline { flex: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stage-list">
+    <div class="hero">
+        <div>
+            <h1>Stages</h1>
+            <p>Global library of production stages. Each stage carries its own
+            skill + role access rules. Drag into a Product flow on the Product page.</p>
+        </div>
+        <a href="{% url 'production:stage-add' %}" class="add-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            New Stage
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for m in messages %}
+            <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:14px;">{{ m }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {% for stage in stages %}
+        <div class="stage-card">
+            <div class="stage-card-main">
+                <div>
+                    <span class="stage-card-name">{{ stage.name }}</span>
+                    <span class="stage-card-code">{{ stage.code }}</span>
+                    {% if not stage.is_active %}<span class="inactive-tag">Inactive</span>{% endif %}
+                </div>
+                {% if stage.description %}
+                    <div class="stage-card-meta">{{ stage.description }}</div>
+                {% endif %}
+                <div class="pill-row">
+                    <span class="pill section-label">Skills:</span>
+                    {% for sk in stage.access_by_skill.all %}
+                        <span class="pill skill">{{ sk.get_name_display }}</span>
+                    {% empty %}
+                        <span class="pill empty">none</span>
+                    {% endfor %}
+                </div>
+                <div class="pill-row">
+                    <span class="pill section-label">Roles:</span>
+                    {% for r in stage.access_by_role.all %}
+                        <span class="pill role">{{ r.name }}</span>
+                    {% empty %}
+                        <span class="pill empty">none</span>
+                    {% endfor %}
+                </div>
+                {% with usage_count=stage.workflow_stages.count %}
+                {% if usage_count %}
+                    <div class="stage-card-meta">
+                        Used in <strong>{{ usage_count }}</strong> product flow{{ usage_count|pluralize }}.
+                    </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+            <div class="stage-card-actions">
+                <a href="{% url 'production:stage-edit' stage.pk %}" class="btn-inline btn-edit">Edit</a>
+                <a href="{% url 'production:stage-delete' stage.pk %}" class="btn-inline btn-delete">Delete</a>
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty">
+            No stages yet. <a href="{% url 'production:stage-add' %}" style="color:var(--copper);font-weight:600;">Create the first one</a>.
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

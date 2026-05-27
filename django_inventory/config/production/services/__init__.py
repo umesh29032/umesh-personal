@@ -28,6 +28,12 @@ from .layering_service import (
 )
 from .cutting_service import complete_cutting
 from .activity_service import adda_activity, user_activity_across_addas
+from .access_service import user_can_access_stage, stage_access_map
+from .flow_service import (
+    add_stage_to_product_flow,
+    move_stage_in_product_flow,
+    remove_stage_from_product_flow,
+)
 
 __all__ = [
     'create_adda',
@@ -52,4 +58,11 @@ __all__ = [
     # Activity
     'adda_activity',
     'user_activity_across_addas',
+    # Stage access control (DB-driven)
+    'user_can_access_stage',
+    'stage_access_map',
+    # Product flow management
+    'add_stage_to_product_flow',
+    'remove_stage_from_product_flow',
+    'move_stage_in_product_flow',
 ]

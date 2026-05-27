@@ -1,0 +1,229 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Sidebar Access Control{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Sidebar Access Control — single page, one section per sidebar group,
+       items rendered as rows with role checkbox chips. Scoped under
+       `.sidebar-access` (CLAUDE.md rule 10). */
+    .sidebar-access { max-width: 1100px; margin: 0 auto; }
+
+    .sidebar-access .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px;
+        padding: 26px 30px; margin-bottom: 18px;
+        position: relative; overflow: hidden;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+    }
+    .sidebar-access .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: #fff; margin: 0;
+    }
+    .sidebar-access .hero p {
+        margin: 4px 0 0; color: rgba(255,255,255,0.72);
+        font-size: 14px; max-width: 760px;
+    }
+
+    .sidebar-access .builtin-notice {
+        margin: 14px 0 18px;
+        padding: 12px 16px;
+        background: rgba(59,130,246,0.08);
+        border: 1px solid rgba(59,130,246,0.18);
+        border-radius: 10px;
+        font-size: 13px; color: var(--ink);
+        display: flex; align-items: flex-start; gap: 10px;
+    }
+    .sidebar-access .builtin-notice svg {
+        width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px;
+        color: #3b82f6;
+    }
+    .sidebar-access .builtin-notice strong { color: var(--copper); }
+
+    .sidebar-access .section-card {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        margin-bottom: 18px; overflow: hidden;
+    }
+    .sidebar-access .section-head {
+        padding: 14px 22px;
+        background: var(--cream);
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex; align-items: center; gap: 10px;
+    }
+    .sidebar-access .section-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink);
+    }
+    .sidebar-access .item-row {
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--border-subtle);
+        display: grid;
+        grid-template-columns: minmax(220px, 260px) 1fr;
+        gap: 22px;
+        align-items: start;
+    }
+    .sidebar-access .item-row:last-child { border-bottom: none; }
+    .sidebar-access .item-meta { min-width: 0; padding-top: 4px; }
+    .sidebar-access .item-label {
+        font-size: 14px; font-weight: 600; color: var(--ink);
+    }
+    .sidebar-access .item-urlname {
+        margin-top: 2px;
+        font-size: 11px; color: var(--stone);
+        font-family: 'Courier New', monospace;
+    }
+    /* Nested controls — Roles + Skills stacked per item */
+    .sidebar-access .access-stack {
+        display: flex; flex-direction: column; gap: 12px;
+    }
+    .sidebar-access .access-group { min-width: 0; }
+    .sidebar-access .group-label {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--stone);
+        margin-bottom: 6px;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .sidebar-access .group-label::before {
+        content: ''; width: 14px; height: 2px;
+        background: var(--copper); display: inline-block;
+        border-radius: 2px;
+    }
+    .sidebar-access .group-label.is-skills::before { background: var(--success); }
+    .sidebar-access .role-chips,
+    .sidebar-access .skill-chips {
+        display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .sidebar-access .chip-pick.skill-chip { border-style: dashed; }
+    .sidebar-access .chip-pick.skill-chip.is-on {
+        background: var(--success); border-color: var(--success);
+        border-style: solid;
+    }
+    .sidebar-access .chip-pick {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 12px;
+        background: var(--cream-2);
+        border: 1.5px solid var(--border-subtle);
+        border-radius: 999px;
+        cursor: pointer; user-select: none;
+        font-size: 12px; color: var(--ink);
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .sidebar-access .chip-pick:hover { border-color: var(--copper); }
+    .sidebar-access .chip-pick.is-on {
+        background: var(--copper); color: #fff;
+        border-color: var(--copper);
+    }
+    .sidebar-access .chip-pick input { display: none; }
+
+    .sidebar-access .sticky-actions {
+        position: sticky; bottom: 18px;
+        margin-top: 20px;
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border-card);
+        border-radius: 14px;
+        padding: 14px 18px;
+        box-shadow: 0 8px 24px -8px rgba(14,11,9,0.18);
+        display: flex; gap: 10px; justify-content: flex-end;
+    }
+    .sidebar-access .btn-copper {
+        background: var(--copper); color: #fff; border: none;
+        padding: 12px 24px; border-radius: 10px;
+        font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    .sidebar-access .btn-copper:hover { background: #8a5520; }
+
+    @media (max-width: 720px) {
+        .sidebar-access .item-row { grid-template-columns: 1fr; gap: 10px; padding: 14px 16px; }
+        .sidebar-access .section-head { padding: 12px 16px; }
+        .sidebar-access .hero { padding: 22px 20px; }
+        .sidebar-access .hero h1 { font-size: 22px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sidebar-access">
+    <div class="hero">
+        <h1>Sidebar Access Control</h1>
+        <p>Choose which roles see each sidebar menu item. Settings apply
+        immediately on next page load for every user.</p>
+    </div>
+
+    {% if messages %}
+        {% for m in messages %}
+            <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:14px;">{{ m }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="builtin-notice">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><strong>Super Admin</strong> sees every sidebar item regardless of the selections below — built-in so an admin can never lock themselves out. Visibility uses OR semantics: any role match <em>or</em> any skill match shows the item.</span>
+    </div>
+
+    <form method="post" id="sidebarAccessForm">
+        {% csrf_token %}
+
+        {% for section in sections %}
+        <section class="section-card">
+            <div class="section-head">
+                <h2 class="section-title">{{ section.label }}</h2>
+            </div>
+            {% for item in section.items %}
+                <div class="item-row">
+                    <div class="item-meta">
+                        <div class="item-label">{{ item.label }}</div>
+                        <div class="item-urlname">{{ item.url_name }}</div>
+                    </div>
+                    <div class="access-stack">
+                        <div class="access-group">
+                            <div class="group-label">Allowed Roles</div>
+                            <div class="role-chips">
+                                {% for r in item.roles %}
+                                    <label class="chip-pick {% if r.selected %}is-on{% endif %}">
+                                        <input type="checkbox" name="roles_{{ item.id }}" value="{{ r.id }}" {% if r.selected %}checked{% endif %}>
+                                        <span>{{ r.name }}</span>
+                                    </label>
+                                {% empty %}
+                                    <span style="font-size:12px;color:var(--stone);font-style:italic;">No additional roles available.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="access-group">
+                            <div class="group-label is-skills">Allowed Skills</div>
+                            <div class="skill-chips">
+                                {% for s in item.skills %}
+                                    <label class="chip-pick skill-chip {% if s.selected %}is-on{% endif %}">
+                                        <input type="checkbox" name="skills_{{ item.id }}" value="{{ s.id }}" {% if s.selected %}checked{% endif %}>
+                                        <span>{{ s.label }}</span>
+                                    </label>
+                                {% empty %}
+                                    <span style="font-size:12px;color:var(--stone);font-style:italic;">No skills defined yet. Add via Administration → User Skills.</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </section>
+        {% empty %}
+            <div class="section-card" style="padding: 22px;">
+                <p style="color:var(--stone);font-size:13px;">No sidebar items registered yet. Run migrations to seed the registry.</p>
+            </div>
+        {% endfor %}
+
+        <div class="sticky-actions">
+            <button type="submit" class="btn-copper">Save Sidebar Access</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.querySelectorAll('.sidebar-access .chip-pick input').forEach(cb => {
+        cb.addEventListener('change', e => {
+            e.target.closest('.chip-pick').classList.toggle('is-on', e.target.checked);
+        });
+    });
+</script>
+{% endblock %}

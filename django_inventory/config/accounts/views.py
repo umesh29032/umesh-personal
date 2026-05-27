@@ -231,10 +231,20 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
     model = User
     template_name = "accounts/user_list.html"
     context_object_name = "users"
-    paginate_by = 10
+    # No server-side pagination — DataTables handles paging client-side. Server-side
+    # paginate_by combined with no ORDER BY caused edited users to "vanish":
+    # PostgreSQL MVCC writes an UPDATE as a new tuple version, which can shift
+    # the row out of the first-N window after save (issue reported 2026-05-20).
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('role').prefetch_related('skills')
+        # order_by required — without it, PostgreSQL row order is undefined and
+        # changes after UPDATE, making any client-side pagination unstable too.
+        qs = (
+            super().get_queryset()
+            .select_related('role')
+            .prefetch_related('skills')
+            .order_by('-date_joined', 'email')
+        )
         q = self.request.GET.get("q", "").strip()
         skills = self.request.GET.getlist("skills")
 

@@ -18,7 +18,7 @@ from django.test import TestCase
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.forms._shared import _layering_worker_queryset
-from production.models import Adda, AddaStageRecord, Product, WorkflowStage
+from production.models import Adda, AddaStageRecord, Product
 from production.services import (
     adda_activity, attach_roll_to_layering, complete_layering,
     create_adda, record_remaining_cloth, start_layering,
@@ -47,7 +47,7 @@ class CreateAddaAutoTagTests(TestCase):
         adda = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
         sr = AddaStageRecord.objects.get(
             adda=adda,
-            workflow_stage__stage_type=WorkflowStage.StageType.LAYERING,
+            workflow_stage__stage__code='layering',
         )
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
@@ -76,7 +76,7 @@ class RetroTagSignalTests(TestCase):
         adda = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
         sr = AddaStageRecord.objects.get(
             adda=adda,
-            workflow_stage__stage_type=WorkflowStage.StageType.LAYERING,
+            workflow_stage__stage__code='layering',
         )
         # New helper user added AFTER adda exists — signal should retro-tag them.
         late = _user('late@retro.test', role_code='karigar', is_super=False)
@@ -99,7 +99,7 @@ class RetroTagSignalTests(TestCase):
             breakup=[{'color': red, 'qty': 1}],
         )
         sr1 = AddaStageRecord.objects.get(
-            adda=adda1, workflow_stage__stage_type='layering',
+            adda=adda1, workflow_stage__stage__code='layering',
         )
         entry = attach_roll_to_layering(
             stage_record=sr1, roll=rolls[0],
@@ -164,7 +164,7 @@ class ActivityTimelineTests(TestCase):
             purchased_date=date.today(),
             breakup=[{'color': red, 'qty': 1}],
         )
-        sr = AddaStageRecord.objects.get(adda=self.adda, workflow_stage__stage_type='layering')
+        sr = AddaStageRecord.objects.get(adda=self.adda, workflow_stage__stage__code='layering')
         attach_roll_to_layering(
             stage_record=sr, roll=self.rolls[0],
             width_verified_inch=42, weight_verified_kg=Decimal('25'),

@@ -53,35 +53,90 @@ class Product(TimeStampedModel):
         return self.name
 
 
-class WorkflowStage(TimeStampedModel):
-    """Product ke production flow mein ek ordered stage.
+class Stage(TimeStampedModel):
+    """Global library of stages — admin-managed, reusable across Products.
 
-    Har Product ka apna ordered list of stages hota hai. Naya stage type add karna ho to:
-      1. StageType enum mein entry add
-      2. Typed record model define (jaise LayeringRecord/CuttingRecord)
-      3. stage_service.complete_<stage>() helper banao
+    Pehle stages WorkflowStage.StageType ka hardcoded enum tha. Ab Stage model
+    ek table hai — admin CRUD karta hai (add/edit/delete) aur access controls
+    (skills + roles) yahan store hote hain. Product ki flow define karte
+    waqt WorkflowStage ke through Product → Stage mapping aur order set
+    hoti hai.
+
+    Access rule (OR semantics):
+      Super Admin / Manager  → always (built-in defense, not in DB)
+      Else                   → user role overlap with access_by_role OR
+                               user skill overlap with access_by_skill
     """
 
-    class StageType(models.TextChoices):
-        # TextChoices = Django enum. DB mein 'layering'/'cutting' string store hota hai.
-        LAYERING = 'layering', 'Layering'
-        CUTTING = 'cutting', 'Cutting'
-        # Future: PACKING, DELIVERY, ...
+    code = models.SlugField(
+        max_length=32, unique=True,
+        help_text="Stable identifier used in URLs + services (e.g. 'layering').",
+    )
+    name = models.CharField(
+        max_length=64,
+        help_text="Display label shown in flow pipeline (e.g. 'Layering').",
+    )
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    access_by_skill = models.ManyToManyField(
+        'accounts.Skill', blank=True, related_name='accessible_stages',
+        help_text="Users with ANY of these skills can access this stage.",
+    )
+    access_by_role = models.ManyToManyField(
+        'inventory.Role', blank=True, related_name='accessible_stages',
+        help_text="Users whose role (or extra_roles) matches any of these.",
+    )
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class WorkflowStage(TimeStampedModel):
+    """Per-Product stage in its production flow — join table linking
+    Product → Stage with an ordering position.
+
+    Pehle yahan stage_type CharField tha. Ab `stage` FK Stage library
+    ko point karta hai — admin Stage library mein naya stage add karta hai
+    aur per-product flow page se attach karta hai.
+
+    Back-compat: stage_type / get_stage_type_display() Python-level alias
+    properties hain (Stage.code aur Stage.name return karte hain) — taaki
+    purani templates aur URLs (`/stage-panel/<stage_type>/`) bina change ke
+    chalti rahein.
+    """
 
     # CASCADE = product delete hote hi stages bhi delete (rare event — usually archive hota hai)
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name='workflow_stages',
     )
     order = models.PositiveIntegerField()
-    stage_type = models.CharField(max_length=32, choices=StageType.choices)
+    # PROTECT = stage record delete na ho jab tak koi product use kar raha ho
+    stage = models.ForeignKey(
+        Stage, on_delete=models.PROTECT, related_name='workflow_stages',
+    )
 
     class Meta:
-        # Same product mein 2 stages same order ya same stage_type na ho
-        unique_together = [('product', 'order'), ('product', 'stage_type')]
+        # Same product mein 2 stages same order ya same stage na ho
+        unique_together = [('product', 'order'), ('product', 'stage')]
         ordering = ['product', 'order']
 
     def __str__(self):
-        return f"{self.product.code} · {self.get_stage_type_display()} (order {self.order})"
+        return f"{self.product.code} · {self.stage.name} (order {self.order})"
+
+    # ── Back-compat shim ────────────────────────────────────────────────
+    # Old code reads `s.stage_type` (string) + `s.get_stage_type_display()`.
+    # Stage FK arrived in migration 0011; both reads keep working via these
+    # properties so templates/URLs don't break.
+
+    @property
+    def stage_type(self) -> str:
+        return self.stage.code if self.stage_id else ''
+
+    def get_stage_type_display(self) -> str:
+        return self.stage.name if self.stage_id else ''
 
 
 class Adda(TimeStampedModel):
@@ -354,3 +409,7 @@ class CuttingRecord(TimeStampedModel):
     # pieces_cut = barcode count trigger; cutting form submit pe set hota hai
     pieces_cut = models.PositiveIntegerField()
     notes = models.TextField(blank=True)
+
+
+# StageAccessRule deleted in migration 0011 — superseded by Stage model.
+# Access rules now live on Stage.access_by_skill + Stage.access_by_role.
