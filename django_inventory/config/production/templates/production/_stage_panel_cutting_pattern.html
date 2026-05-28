@@ -1,0 +1,265 @@
+{% comment %}
+Cutting-pattern stage panel — reusable partial.
+
+Used by:
+  • pattern_workspace.html       (full-page workspace)
+  • stage_panel_embedded.html    (iframe embed via /stage/cutting_pattern/)
+  • adda detail page (via iframe)
+  • user dashboard accordion     (via iframe)
+
+Required context (from _build_pattern_context):
+  adda, stage_record, workflow_stage, record, photos, assignments,
+  is_management, can_assign, can_upload, can_complete, next_stage,
+  start_form, embedded (bool)
+{% endcomment %}
+
+{% if messages %}
+<div class="messages-strip">
+    {% for m in messages %}
+        <div class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="stage-stats">
+    <div class="stat-tile">
+        <div class="stat-label">Patterns Required</div>
+        <div class="stat-value">{{ assignments|length }}</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Photos</div>
+        <div class="stat-value">{{ photos|length }}</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Video</div>
+        <div class="stat-value" style="font-size: 16px;">{% if record.video %}✓ Uploaded{% else %}—{% endif %}</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Status</div>
+        <div class="stat-value" style="font-size: 18px;">
+            {% if stage_record %}
+                {% if stage_record.completed_at %}Completed{% else %}In Progress{% endif %}
+            {% else %}Not Started{% endif %}
+        </div>
+    </div>
+</div>
+
+{% comment %}Section 01: Pattern checklist — drawn from Product.patterns{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">01</div>
+        <div class="panel-title">Pattern Checklist ({{ adda.product.name }})</div>
+    </div>
+    <div class="panel-body">
+        {% if assignments %}
+            <p class="panel-sub">Draw these patterns on the layered cloth before cutting.</p>
+            <table class="breakup-table">
+                <thead><tr><th>Pattern</th><th>Pieces per Adda</th><th>Notes</th></tr></thead>
+                <tbody>
+                {% for a in assignments %}
+                    <tr>
+                        <td data-label="Pattern"><strong>{{ a.pattern.name }}</strong> <small style="color:var(--stone);font-family:monospace;">{{ a.pattern.code }}</small></td>
+                        <td data-label="Pieces">{{ a.pieces_count }}</td>
+                        <td data-label="Notes">{{ a.notes|default:"—" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">No patterns assigned for {{ adda.product.name }} yet. Admin must configure them on the Product page.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}Section 02: Start stage — manager assigns workers{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">02</div>
+        <div class="panel-title">Assigned Workers</div>
+        <span class="panel-state {% if stage_record %}in-progress{% else %}not-started{% endif %}">
+            {% if stage_record %}Started {{ stage_record.started_at|date:"d M H:i" }}{% else %}Not Started{% endif %}
+        </span>
+    </div>
+    <div class="panel-body">
+        {% if can_assign %}
+            <p class="panel-sub">Pick the cutting master(s) who'll draw the pattern.</p>
+            <form method="post" action="{% url 'production:pattern-start' adda.code %}">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                {{ start_form.workers }}
+                <div style="margin-top: 14px;">
+                    <button type="submit" class="btn btn-primary">{% if stage_record %}Update Assignment{% else %}Start Pattern Stage{% endif %}</button>
+                </div>
+            </form>
+        {% elif stage_record %}
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                {% for w in stage_record.workers.all %}
+                    <span class="roll-id-chip">{{ w.email }}</span>
+                {% empty %}
+                    <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">Only a manager can assign workers and start this stage.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if stage_record %}
+{% comment %}Section 03: Video upload — single mandatory video{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">03</div>
+        <div class="panel-title">Pattern Video</div>
+    </div>
+    <div class="panel-body">
+        {% if record.video %}
+            <video controls preload="metadata" style="max-width:100%;max-height:380px;border-radius:10px;background:#000;">
+                <source src="{{ record.video.url }}">
+            </video>
+            <div style="margin-top:8px; font-size:12px; color:var(--stone);">{{ record.video.name|cut:"cutting_pattern/" }}</div>
+        {% endif %}
+
+        {% if can_upload %}
+            <form method="post" enctype="multipart/form-data" action="{% url 'production:pattern-save' adda.code %}" style="margin-top:14px;" id="pp-video-form-{{ adda.code }}">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <div class="form-grid">
+                    <div class="field full">
+                        <label>{% if record.video %}Replace{% else %}Upload{% endif %} Pattern Video (auto-uploads on selection)</label>
+                        <input type="file" name="video" accept="video/mp4,video/webm,video/quicktime" class="sf-input" data-pp-video>
+                        <div data-pp-video-status style="margin-top:6px;font-size:11px;color:var(--stone);"></div>
+                    </div>
+                    <div class="field full">
+                        <label>Notes</label>
+                        <textarea name="notes" rows="2" class="sf-input">{{ record.notes|default:'' }}</textarea>
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <button type="submit" class="btn btn-primary">{% if record.video %}Replace Video{% else %}Save Video{% endif %}</button>
+                </div>
+            </form>
+            <script>
+                (function(){
+                    var form = document.getElementById('pp-video-form-{{ adda.code }}');
+                    if (!form) return;
+                    var input = form.querySelector('[data-pp-video]');
+                    var status = form.querySelector('[data-pp-video-status]');
+                    var btn = form.querySelector('button[type=submit]');
+                    if (!input) return;
+                    input.addEventListener('change', function(){
+                        if (!input.files || !input.files.length) return;
+                        var size = (input.files[0].size / (1024*1024)).toFixed(1);
+                        status.textContent = 'Uploading video (' + size + ' MB)…';
+                        if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+                        form.submit();
+                    });
+                })();
+            </script>
+        {% elif not record.video %}
+            <p class="panel-sub" style="margin:0;">Waiting for assigned cutting master to upload the pattern video.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}Section 04: Photos — multi-upload{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">04</div>
+        <div class="panel-title">Layered-Pattern Photos ({{ photos|length }})</div>
+    </div>
+    <div class="panel-body">
+        {% if photos %}
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px;">
+                {% for ph in photos %}
+                    <div style="background:var(--surface-2); border-radius:10px; padding:8px;">
+                        <a href="{{ ph.image.url }}" target="_blank">
+                            <img src="{{ ph.image.url }}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px;">
+                        </a>
+                        {% if ph.caption %}<div style="font-size:11px; color:var(--stone); margin-top:4px;">{{ ph.caption }}</div>{% endif %}
+                        <div style="font-size:10px; color:var(--stone); margin-top:2px;">
+                            {{ ph.uploaded_by.email|default:"—" }} · {{ ph.created_at|date:"d M H:i" }}
+                        </div>
+                        {% if can_upload %}
+                        <form method="post" action="{% url 'production:pattern-photo-remove' adda.code ph.pk %}" onsubmit="return confirm('Remove this photo?');" style="margin-top:4px;">
+                            {% csrf_token %}
+                            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                            <button type="submit" class="btn btn-ghost" style="padding:3px 8px; font-size:10px; color:var(--danger);">Remove</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if can_upload %}
+            <form method="post" enctype="multipart/form-data" action="{% url 'production:pattern-photos-add' adda.code %}" style="margin-top:14px;" id="pp-photo-form-{{ adda.code }}">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <div class="form-grid">
+                    <div class="field full">
+                        <label>Add Photos (auto-uploads on selection)</label>
+                        <input type="file" name="photos" accept="image/*" multiple required class="sf-input" data-pp-photos>
+                        <div data-pp-status style="margin-top:6px;font-size:11px;color:var(--stone);"></div>
+                    </div>
+                    <div class="field full">
+                        <label>Caption (applies to all in this upload)</label>
+                        <input type="text" name="caption" class="sf-input" maxlength="200">
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <button type="submit" class="btn btn-primary">+ Upload Photos</button>
+                </div>
+            </form>
+            <script>
+                // Auto-submit when files picked — many users miss the button click
+                // step and assume picking the file is the upload. Status line gives
+                // visible confirmation while the multipart POST is in flight.
+                (function(){
+                    var form = document.getElementById('pp-photo-form-{{ adda.code }}');
+                    if (!form) return;
+                    var input = form.querySelector('[data-pp-photos]');
+                    var status = form.querySelector('[data-pp-status]');
+                    var btn = form.querySelector('button[type=submit]');
+                    if (!input) return;
+                    input.addEventListener('change', function(){
+                        if (!input.files || !input.files.length) return;
+                        status.textContent = 'Uploading ' + input.files.length + ' photo(s)…';
+                        if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+                        form.submit();
+                    });
+                })();
+            </script>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}Section 05: Complete + advance — gated to helper skill / super_admin{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">05</div>
+        <div class="panel-title">Mark Pattern Complete</div>
+        {% if stage_record.completed_at %}<span class="panel-state completed">Completed {{ stage_record.completed_at|date:"d M H:i" }}</span>{% endif %}
+    </div>
+    <div class="panel-body">
+        {% if stage_record.completed_at %}
+            <p class="panel-sub" style="margin:0;">Stage finalized. Adda moved to the next stage.</p>
+        {% elif can_complete %}
+            <p class="panel-sub">
+                At least one photo OR a video required (either works). Completing locks the record and advances{% if next_stage %} to {{ next_stage.get_stage_type_display }}{% endif %}.
+            </p>
+            <form method="post" action="{% url 'production:pattern-complete' adda.code %}"
+                  data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
+                  onsubmit="return confirm('Mark cutting-pattern complete and advance to ' + (this.dataset.nextStage || 'next stage') + '?\n\nUploaded photos and video will lock for editing.');">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <div class="stage-actions-row">
+                    <button type="submit" class="btn btn-primary">Complete Pattern{% if next_stage %} → Advance to {{ next_stage.get_stage_type_display }}{% endif %}</button>
+                </div>
+            </form>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">Completion requires a <code>cutting_master_helper</code> user or super admin.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

@@ -108,10 +108,12 @@
             <p>Global library of production stages. Each stage carries its own
             skill + role access rules. Drag into a Product flow on the Product page.</p>
         </div>
+        {% if can_add_stage %}
         <a href="{% url 'production:stage-add' %}" class="add-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
             New Stage
         </a>
+        {% endif %}
     </div>
 
     {% if messages %}
@@ -156,13 +158,20 @@
                 {% endwith %}
             </div>
             <div class="stage-card-actions">
-                <a href="{% url 'production:stage-edit' stage.pk %}" class="btn-inline btn-edit">Edit</a>
-                <a href="{% url 'production:stage-delete' stage.pk %}" class="btn-inline btn-delete">Delete</a>
+                {% if can_change_stage %}
+                    <a href="{% url 'production:stage-edit' stage.pk %}" class="btn-inline btn-edit">Edit</a>
+                {% endif %}
+                {% if can_delete_stage %}
+                    <a href="{% url 'production:stage-delete' stage.pk %}" class="btn-inline btn-delete">Delete</a>
+                {% endif %}
             </div>
         </div>
     {% empty %}
         <div class="empty">
-            No stages yet. <a href="{% url 'production:stage-add' %}" style="color:var(--copper);font-weight:600;">Create the first one</a>.
+            No stages yet.
+            {% if can_add_stage %}
+                <a href="{% url 'production:stage-add' %}" style="color:var(--copper);font-weight:600;">Create the first one</a>.
+            {% endif %}
         </div>
     {% endfor %}
 </div>

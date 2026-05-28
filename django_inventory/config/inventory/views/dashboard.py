@@ -54,6 +54,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         from production.services import get_layering_snapshot
         for a in active_addas:
             pipeline = []
+            done_stages = []  # (label, stage_type) for revisit links — dashboard accordion
             for s in a.product.workflow_stages.order_by('order'):
                 if a.current_stage and a.current_stage.order == s.order:
                     state = 'current'
@@ -66,7 +67,13 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     'state': state,
                     'stage_type': s.stage_type,
                 })
+                if state == 'done':
+                    done_stages.append({
+                        'label': s.get_stage_type_display(),
+                        'stage_type': s.stage_type,
+                    })
             a.pipeline = pipeline
+            a.done_stages = done_stages
             # Layering snapshot per Adda for per-stage info on user dashboard
             a.layering_snap = get_layering_snapshot(a)
 

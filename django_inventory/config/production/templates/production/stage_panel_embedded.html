@@ -192,6 +192,8 @@ to fit iframe height. Implemented in script at bottom.
 <body>
     {% if stage_type == 'layering' %}
         {% include 'production/_stage_panel_layering.html' %}
+    {% elif stage_type == 'cutting_pattern' %}
+        {% include 'production/_stage_panel_cutting_pattern.html' %}
     {% elif stage_type == 'cutting' %}
         {% include 'production/_stage_panel_cutting.html' %}
     {% else %}
@@ -212,6 +214,19 @@ to fit iframe height. Implemented in script at bottom.
             // Re-measure on details toggle / form expand
             document.addEventListener('toggle', reportSize, true);
             new ResizeObserver(reportSize).observe(document.body);
+        })();
+
+        // Stage advanced — embedded panel loaded with ?advanced=1 means a complete
+        // action just succeeded server-side and the redirect landed us on the NEW
+        // current stage's embedded panel. Ping parent to reload itself so the
+        // flow pipeline + tabs reflect the advance.
+        (function() {
+            try {
+                if (window.location.search.indexOf('advanced=1') !== -1
+                    && window.parent && window.parent !== window) {
+                    window.parent.postMessage({type: 'stage-advanced', code: '{{ adda.code }}'}, '*');
+                }
+            } catch (e) { /* swallow — non-fatal */ }
         })();
 
         // Parent's "Jump to form" button asks iframe to scroll its primary action form

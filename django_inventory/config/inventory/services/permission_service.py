@@ -102,6 +102,7 @@ def user_has_perm(user, perm_codename: str) -> bool:
     """
     Check a Django-style permission. Looks at:
       - superuser flag
+      - ROLE_SUPER_ADMIN (implicit bypass — admin role always wins)
       - user's Role.permissions
       - Django's built-in user.has_perm (groups / direct perms)
     """
@@ -109,7 +110,11 @@ def user_has_perm(user, perm_codename: str) -> bool:
         return False
     if user.is_superuser:
         return True
+    # Super Admin role bypasses every perm gate by design — they manage
+    # roles + permissions, so they must transitively own every page.
     role = getattr(user, 'role', None)
+    if role and role.code == ROLE_SUPER_ADMIN:
+        return True
     if role and role.permissions.filter(codename=perm_codename.split('.')[-1]).exists():
         return True
     return user.has_perm(perm_codename)
@@ -141,6 +146,14 @@ class MenuSection:
 
 def _any_role(*codes):
     return lambda user: user_has_role(user, codes)
+
+
+def _any_perm(*codenames):
+    """Sidebar predicate: visible if user holds any of these Django perms.
+
+    Super Admin bypass + role-perm lookup live in user_has_perm.
+    """
+    return lambda user: any(user_has_perm(user, c) for c in codenames)
 
 
 # Sidebar definition. Order here is the order the user sees.
@@ -187,6 +200,8 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('Adda Dashboard', 'production:dashboard', match=('production/',)),
             MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
             MenuItem('Products', 'production:product-list', match=('production/products',)),
+            MenuItem('Product Patterns', 'production:pattern-list', match=('production/patterns',),
+                     predicate=_any_perm('production.view_productpattern', 'production.change_productpattern')),
         ),
     ),
     MenuSection(
@@ -198,13 +213,25 @@ SIDEBAR: tuple[MenuSection, ...] = (
     ),
     MenuSection(
         label='Administration',
-        predicate=_any_role(ROLE_SUPER_ADMIN),
+        # Section visible to Super Admin OR anyone holding a stage-management perm
+        # (delegated via the Role editor) — they need the Stages entry to land here.
+        # Per-item predicates still gate individual links.
+        predicate=lambda u: (
+            user_has_role(u, {ROLE_SUPER_ADMIN})
+            or user_has_perm(u, 'production.view_stage')
+            or user_has_perm(u, 'production.change_stage')
+        ),
         items=(
-            MenuItem('Team Members', 'accounts:user_list', match=('users',)),
-            MenuItem('User Skills', 'accounts:skill_list', match=('skills',)),
-            MenuItem('Roles & Permissions', 'inventory:role_list', match=('roles',)),
-            MenuItem('Stages', 'production:stage-list', match=('stages',)),
-            MenuItem('Sidebar Access', 'inventory:sidebar-access', match=('sidebar-access',)),
+            MenuItem('Team Members', 'accounts:user_list', match=('users',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('User Skills', 'accounts:skill_list', match=('skills',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('Roles & Permissions', 'inventory:role_list', match=('roles',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('Stages', 'production:stage-list', match=('stages',),
+                     predicate=_any_perm('production.view_stage', 'production.change_stage')),
+            MenuItem('Sidebar Access', 'inventory:sidebar-access', match=('sidebar-access',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
         ),
     ),
 )
@@ -321,11 +348,125 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
 
 # ── View-layer helpers ──────────────────────────────────────────────────────
 
-def permissions_qs_by_app(app_labels: tuple[str, ...] = ('inventory', 'accounts')):
-    """For the role editor — list permissions grouped by app / model."""
-    return (
+# Curated sections for the role editor — group only the models a non-developer
+# admin should grant access to. Internal join tables (AddaStageRecord,
+# LayeringRollEntry, RemainingClothOfClothRoll, *Record, *History) are written
+# by services on behalf of users — exposing their perms would be noise + foot-gun.
+# Each section: (label, description, [(app_label, model), ...]).
+ROLE_EDITOR_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        'Production Flow',
+        'Products, stages, workflows, and live Adda batches.',
+        (
+            ('production', 'product'),
+            ('production', 'productpattern'),
+            ('production', 'stage'),
+            ('production', 'workflowstage'),
+            ('production', 'adda'),
+        ),
+    ),
+    (
+        'Raw Materials',
+        'Cloth inventory + master data (types, colors, storage).',
+        (
+            ('raw_materials', 'clothroll'),
+            ('raw_materials', 'clothtype'),
+            ('raw_materials', 'clothcolor'),
+            ('raw_materials', 'storagelocation'),
+        ),
+    ),
+    (
+        'Tracking',
+        'Per-piece barcodes generated after cutting.',
+        (
+            ('tracking', 'batchbarcode'),
+        ),
+    ),
+    (
+        'Storefront',
+        'Public homepage content — categories, hero cards, featured products.',
+        (
+            ('storefront', 'homepageconfig'),
+            ('storefront', 'category'),
+            ('storefront', 'featuredproduct'),
+            ('storefront', 'heroshowcasecard'),
+            ('storefront', 'whyuscard'),
+            ('storefront', 'footerlink'),
+            ('storefront', 'navlink'),
+        ),
+    ),
+    (
+        'Administration',
+        'Roles, sidebar visibility rules, and reusable Skills.',
+        (
+            ('inventory', 'role'),
+            ('inventory', 'sidebaritemrule'),
+            ('accounts', 'skill'),
+        ),
+    ),
+)
+
+# Flattened (app_label, model) allowlist derived from the section map.
+ROLE_EDITABLE_CONTENT_TYPES: frozenset[tuple[str, str]] = frozenset(
+    ct for _, _, cts in ROLE_EDITOR_SECTIONS for ct in cts
+)
+# Distinct app labels used by the editor — kept for backward compat callers.
+ROLE_EDITABLE_APPS: tuple[str, ...] = tuple(
+    sorted({app for app, _ in ROLE_EDITABLE_CONTENT_TYPES})
+)
+# Legacy alias — earlier code referenced an excluded set. Empty now because
+# the allowlist above is positive. Kept so existing imports don't break.
+ROLE_EDITABLE_MODELS_EXCLUDED: frozenset[tuple[str, str]] = frozenset()
+
+
+def permissions_qs_by_app(app_labels: tuple[str, ...] = ROLE_EDITABLE_APPS):
+    """Role editor perm list — restricted to curated content types.
+
+    Reads ROLE_EDITOR_SECTIONS to decide which perms surface. Internal models
+    (history tables, stage records, join tables) stay invisible because they're
+    only ever written by services. `app_labels` is honored as a final narrowing
+    filter for callers that want a subset.
+    """
+    qs = (
         Permission.objects
         .filter(content_type__app_label__in=app_labels)
         .select_related('content_type')
         .order_by('content_type__app_label', 'content_type__model', 'codename')
     )
+    return [
+        p for p in qs
+        if (p.content_type.app_label, p.content_type.model)
+        in ROLE_EDITABLE_CONTENT_TYPES
+    ]
+
+
+def permissions_sectioned_for_role_editor():
+    """Return [(section_label, section_desc, [(model_label, [perm, ...]), ...]), ...].
+
+    Drives the role-edit form's section-by-section layout. Each inner tuple is
+    a model with its 4 standard CRUD perms (view/add/change/delete) — sorted so
+    the UI is predictable.
+    """
+    perms = list(permissions_qs_by_app())
+    by_ct: dict[tuple[str, str], list] = {}
+    for p in perms:
+        by_ct.setdefault((p.content_type.app_label, p.content_type.model), []).append(p)
+    # Sort each model's perms in conventional CRUD order.
+    crud_order = {'view': 0, 'add': 1, 'change': 2, 'delete': 3}
+    for k in by_ct:
+        by_ct[k].sort(key=lambda p: (crud_order.get(p.codename.split('_', 1)[0], 9), p.codename))
+
+    sections = []
+    for label, desc, cts in ROLE_EDITOR_SECTIONS:
+        models = []
+        for app, model in cts:
+            plist = by_ct.get((app, model), [])
+            if not plist:
+                continue
+            # Friendly model label — first matching perm's content_type.name
+            # ("cloth roll" → "Cloth Roll").
+            model_label = plist[0].content_type.name.title()
+            models.append((model_label, plist))
+        if models:
+            sections.append((label, desc, models))
+    return sections

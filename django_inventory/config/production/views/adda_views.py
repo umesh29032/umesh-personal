@@ -11,6 +11,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.generic import DetailView, FormView, ListView
 
 from production.forms import AddaCreateForm
@@ -66,6 +68,7 @@ class AddaCreateView(LoginRequiredMixin, ProductionRoleMixin, FormView):
         return redirect('production:adda-detail', code=adda.code)
 
 
+@method_decorator(xframe_options_sameorigin, name='dispatch')
 class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
     """Adda detail = tabbed dashboard (Phase 4).
 
@@ -73,6 +76,11 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
     completed, default = last stage. Activity feed at bottom (all users on this Adda).
 
     All tab content is pre-rendered server-side; JS toggles visibility (decision D12).
+
+    @xframe_options_sameorigin: defense-in-depth — when a stage-panel iframe POSTs
+    Complete and its redirect somehow lands here (legacy or fallback path), the
+    iframe should be allowed to render the parent page rather than break with
+    a "refused to connect" browser error.
     """
 
     template_name = 'production/adda_detail.html'

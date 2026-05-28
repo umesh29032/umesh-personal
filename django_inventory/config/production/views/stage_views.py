@@ -44,7 +44,7 @@ from production.models import (
 )
 from production.services import (
     attach_roll_to_layering, complete_cutting, complete_layering,
-    detach_roll_from_layering, remove_remaining_cloth,
+    detach_roll_from_layering, remove_remaining_cloth, reopen_layering,
     save_layering_draft, start_layering,
     update_layering_roll_entry,
 )
@@ -152,6 +152,17 @@ def _build_layering_context(request, adda: Adda) -> dict:
         .order_by('attached_at')
         if sr else []
     )
+
+    # Next stage in product flow (used for "Advance to {next}" labels).
+    # current_stage may be None on completed Addas — falls back to None safely.
+    next_stage = None
+    if adda.current_stage is not None:
+        next_stage = (
+            adda.product.workflow_stages
+            .filter(order__gt=adda.current_stage.order)
+            .order_by('order')
+            .first()
+        )
     total_weight = sum((e.weight_verified_kg or 0) for e in entries)
     distinct_colors = {e.roll.cloth_color_id for e in entries} if sr else set()
 
@@ -197,6 +208,10 @@ def _build_layering_context(request, adda: Adda) -> dict:
         'can_attach': can_attach,
         'can_draft': can_draft,
         'can_complete': can_complete,
+        # Management-only "Edit Layering" button on the completed-state panel —
+        # invokes reopen_layering to unlock corrections.
+        'can_reopen': is_management and sr is not None and sr.completed_at is not None,
+        'next_stage': next_stage,
         'stages': adda.product.workflow_stages.order_by('order'),
         # Filter state — template uses to preselect dropdowns + toggle "no match" UX
         'filter_color': filter_color,
@@ -252,6 +267,11 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
         if stage_type == STAGE_LAYERING:
             ctx.update(_build_layering_context(self.request, adda))
+        elif stage_type == 'cutting_pattern':
+            # Lazy import — pattern_stage_views depends on services that
+            # touch Pillow / FileField storage; only loaded when this branch hits.
+            from production.views.pattern_stage_views import _build_pattern_context
+            ctx.update(_build_pattern_context(self.request, adda))
         elif stage_type == STAGE_CUTTING:
             # Cutting needs current Adda + management gate + CuttingForm
             ctx['cutting_form'] = CuttingForm()
@@ -288,6 +308,33 @@ class _LayeringActionBase(LoginRequiredMixin, ProductionRoleMixin, View):
         # ValidationError aata hai list mein kabhi-kabhi — get a flat string
         msg = getattr(exc, 'messages', None)
         return ' '.join(msg) if msg else str(exc)
+
+
+class LayeringReopenView(_LayeringActionBase):
+    """Management-only: unlock a completed Layering stage for correction.
+
+    UX: Admin clicks "Edit / Reopen" on the completed Layering panel, confirms
+    (handled in template), POST hits here. Service refuses if any downstream
+    stage has started — see reopen_layering.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            reopen_layering(adda=adda, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"Layering reopened for {adda.code}. Make corrections then Complete again.")
+        # On embedded reopen, ping parent to reload — fresh flow state shows
+        # Layering as current again, downstream tabs locked.
+        if request.POST.get('embedded') == '1':
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code, 'stage_type': STAGE_LAYERING,
+                }) + '?embedded=1&advanced=1'
+            )
+        return redirect('production:adda-detail', code=adda.code)
 
 
 class LayeringStartView(_LayeringActionBase):
@@ -748,7 +795,27 @@ class LayeringCompleteView(_LayeringActionBase):
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
-        messages.success(request, f"Layering complete for {adda.code}. Advanced to Cutting.")
+
+        # Refresh to read the newly-advanced current_stage from DB.
+        adda.refresh_from_db()
+        next_label = (
+            adda.current_stage.get_stage_type_display() if adda.current_stage else "next stage"
+        )
+        messages.success(request, f"Layering complete for {adda.code}. Advanced to {next_label}.")
+
+        # When complete was POSTed from inside an iframe (embedded mode), the
+        # default 'production:adda-detail' redirect would load adda-detail INSIDE
+        # the iframe — and Django's default X-Frame-Options blocks that ("refused
+        # to connect" error). Instead, redirect the iframe to the new current
+        # stage's embedded panel with ?advanced=1 so the embedded JS can postMessage
+        # the parent window to reload itself with fresh flow state.
+        if request.POST.get('embedded') == '1' and adda.current_stage is not None:
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code,
+                    'stage_type': adda.current_stage.stage_type,
+                }) + '?embedded=1&advanced=1'
+            )
         return redirect('production:adda-detail', code=adda.code)
 
 

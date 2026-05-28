@@ -1,0 +1,15 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Delete Pattern{% endblock %}
+
+{% block content %}
+<div style="max-width: 560px; margin: 60px auto; padding: 30px; background: var(--card-bg); border-radius: 14px; box-shadow: var(--shadow-card);">
+    <h2 style="font-family: 'Cormorant Garamond', Georgia, serif;">Delete "{{ object.name }}"?</h2>
+    <p>This action cannot be undone. The pattern must not be assigned to any product.</p>
+    <form method="post" style="display:flex; gap:12px; justify-content:flex-end; margin-top: 20px;">
+        {% csrf_token %}
+        <a href="{% url 'production:pattern-list' %}" class="btn btn-clear">Cancel</a>
+        <button type="submit" class="btn" style="background:#b91c1c;color:#fff;">Delete</button>
+    </form>
+</div>
+{% endblock %}

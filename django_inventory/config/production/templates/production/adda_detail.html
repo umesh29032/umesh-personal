@@ -602,7 +602,15 @@
     // Iframe auto-resize — receives `stage-panel-resize` postMessage from embedded
     // stage panel and grows the iframe to fit its content (no inner scrollbars).
     window.addEventListener('message', function(ev) {
-        if (!ev.data || ev.data.type !== 'stage-panel-resize') return;
+        if (!ev.data) return;
+        // Stage just advanced inside an iframe (complete handler redirected the
+        // iframe to the next stage's embedded panel). Reload parent so the flow
+        // pipeline + tabs reflect the new current_stage.
+        if (ev.data.type === 'stage-advanced') {
+            window.location.reload();
+            return;
+        }
+        if (ev.data.type !== 'stage-panel-resize') return;
         const code = ev.data.code;
         const h = ev.data.height;
         document.querySelectorAll('.stage-iframe').forEach(f => {

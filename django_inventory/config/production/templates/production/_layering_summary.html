@@ -41,7 +41,7 @@ Renders nothing if state == 'absent'.
         <span class="ls-pill ls-done">✓ {{ snap.lay_count }} layers · {{ snap.layer_length }} m · {{ snap.duration_min }} min{% if snap.total_fabric_used %} · {{ snap.total_fabric_used|floatformat:2 }} m fabric{% endif %}</span>
     {% else %}
         <div class="ls-card ls-done-card">
-            <div class="ls-card-title">Layering — Completed {{ snap.completed_at|date:"d M Y H:i" }}{% if snap.completed_by %} by {{ snap.completed_by.email }}{% endif %}</div>
+            <div class="ls-card-title">Layering — Completed {{ snap.completed_at|date:"d M Y H:i" }}{% if snap.completed_by %} by {{ snap.completed_by.get_full_name|default:snap.completed_by.email }}{% endif %}</div>
             <div class="ls-card-grid">
                 <div><span class="lbl">Lay Count</span><span class="val">{{ snap.lay_count }}</span></div>
                 <div><span class="lbl">Layer Length</span><span class="val">{{ snap.layer_length }} m</span></div>

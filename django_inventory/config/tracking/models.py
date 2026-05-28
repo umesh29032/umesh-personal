@@ -111,6 +111,7 @@ class AddaHistory(TimeStampedModel):
     class ChangeType(models.TextChoices):
         CREATED = 'created', 'Created'
         STAGE_ADVANCED = 'stage_advanced', 'Stage Advanced'
+        STAGE_REOPENED = 'stage_reopened', 'Stage Reopened'
         STATUS_CHANGED = 'status_changed', 'Status Changed'
         ROLL_ASSIGNED = 'roll_assigned', 'Roll Assigned'
         COMPLETED = 'completed', 'Completed'

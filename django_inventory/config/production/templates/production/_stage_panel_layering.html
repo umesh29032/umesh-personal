@@ -391,14 +391,66 @@ Three sub-sections:
     </div>
 </div>
 
-{% comment %}Section 03: Listing of rolls — entries list with inline edit/remove{% endcomment %}
+{% comment %}Section 03: Listing of rolls — entries list with inline edit/remove.
+
+Two modes:
+  • In-progress (or pre-start): ul/li rows with collapsible "Correct/remove" form.
+  • Completed: read-only table — clearer scan of layers/leftover/notes for revisit.
+{% endcomment %}
 <div class="panel">
     <div class="panel-head">
         <div class="panel-num">03</div>
         <div class="panel-title">Rolls in this Layering ({{ entries|length }})</div>
     </div>
     <div class="panel-body">
-        {% if entries %}
+        {% if entries and stage_record.completed_at %}
+            {# Read-only table — completed stage revisit. Mobile stacks via data-label. #}
+            <div class="breakup-table-wrap">
+            <table class="breakup-table rolls-readonly">
+                <thead>
+                    <tr>
+                        <th>Roll</th>
+                        <th>Color · Type</th>
+                        <th>Width</th>
+                        <th>Weight</th>
+                        <th>Layers</th>
+                        <th>Leftover (L / Wt)</th>
+                        <th>Attached</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for e in entries %}
+                    {% with primary_leftover=e.remaining_pieces.first %}
+                    <tr>
+                        <td data-label="Roll" class="cell-mono">{{ e.roll.roll_id }}</td>
+                        <td data-label="Cloth">{{ e.roll.cloth_color.name }} · {{ e.roll.cloth_type.name }}</td>
+                        <td data-label="Width">{% if e.width_verified_inch %}{{ e.width_verified_inch }} inch{% else %}—{% endif %}</td>
+                        <td data-label="Weight">{{ e.weight_verified_kg|default:"—" }} KG</td>
+                        <td data-label="Layers">{{ e.layers_on_roll|default:"—" }}</td>
+                        <td data-label="Leftover">
+                            {% if primary_leftover %}
+                                {{ primary_leftover.remaining_length_meters|default:"—" }} m /
+                                {{ primary_leftover.remaining_weight_kg|default:"—" }} KG
+                            {% else %}—{% endif %}
+                        </td>
+                        <td data-label="Attached">
+                            {{ e.attached_by.email|default:"—" }}<br>
+                            <span style="color:var(--stone); font-size:11px;">{{ e.attached_at|date:"d M H:i" }}</span>
+                        </td>
+                    </tr>
+                    {% if e.notes %}
+                    <tr>
+                        <td colspan="7" data-label="Notes" style="background:var(--cream-2); color:var(--stone); font-style:italic;">
+                            Notes — {{ e.notes }}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endwith %}
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        {% elif entries %}
             <ul class="roll-list">
             {% for e in entries %}
                 <li class="roll-row">
@@ -506,7 +558,7 @@ JS sums them live into the readonly "Total Lay Count" cell.
             <p class="panel-sub">
                 Fill <strong>overall layer length</strong> + <strong>duration</strong>
                 and the <strong>per-roll breakup</strong>. Save Draft anytime;
-                {% if can_complete %}Complete to advance to Cutting.{% else %}Completion requires a <code>cutting_master_helper</code> user.{% endif %}
+                {% if can_complete %}Complete to advance{% if next_stage %} to {{ next_stage.get_stage_type_display }}{% endif %}.{% else %}Completion requires a <code>cutting_master_helper</code> user.{% endif %}
                 <em>Layers + leftover required for every roll before completing.</em>
             </p>
 
@@ -521,7 +573,9 @@ JS sums them live into the readonly "Total Lay Count" cell.
               • stage_record draft_* fields (header)
             {% endcomment %}
             <form method="post" action="{% url 'production:layering-complete' adda.code %}"
-                  id="layering-complete-form-{{ adda.code }}" class="layering-section04">
+                  id="layering-complete-form-{{ adda.code }}" class="layering-section04"
+                  data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
+                  onsubmit="return window.__confirmLayeringSubmit ? window.__confirmLayeringSubmit(event) : true;">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
 
@@ -599,12 +653,23 @@ JS sums them live into the readonly "Total Lay Count" cell.
                 <div class="stage-actions-row">
                     <button type="submit" name="action" value="draft" class="btn btn-ghost">💾 Save Draft</button>
                     {% if can_complete %}
-                    <button type="submit" name="action" value="complete" class="btn btn-primary">Complete Layering → Advance to Cutting</button>
+                    <button type="submit" name="action" value="complete" class="btn btn-primary">Complete Layering{% if next_stage %} → Advance to {{ next_stage.get_stage_type_display }}{% endif %}</button>
                     {% endif %}
                 </div>
             </form>
 
             <script>
+                // Native confirm before advancing — guards against accidental click.
+                // submitter resolves to the actual button clicked; only Complete asks.
+                window.__confirmLayeringSubmit = function(ev) {
+                    var btn = ev.submitter || document.activeElement;
+                    if (!btn || btn.value !== 'complete') return true;
+                    var next = ev.target.dataset.nextStage || 'next stage';
+                    return window.confirm(
+                        'Mark Layering complete and advance to ' + next + '?\n\n' +
+                        'This locks all rolls and per-roll layer counts. You will not be able to edit this stage afterwards.'
+                    );
+                };
                 (function() {
                     var addaCode = '{{ adda.code }}';
                     var sumLayers = document.getElementById('sum-layers-' + addaCode);
@@ -628,11 +693,23 @@ JS sums them live into the readonly "Total Lay Count" cell.
                 })();
             </script>
         {% elif stage_record.completed_at %}
-            <p class="panel-sub" style="margin:0;">
-                Stage finalized. Lay count {{ stage_record.layering.lay_count }} ·
-                Layer length {{ stage_record.layering.layer_length_meters }} m ·
-                Duration {{ stage_record.layering.duration_minutes }} min.
-            </p>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;">
+                <p class="panel-sub" style="margin:0; flex:1;">
+                    Stage finalized. Lay count {{ stage_record.layering.lay_count }} ·
+                    Layer length {{ stage_record.layering.layer_length_meters }} m ·
+                    Duration {{ stage_record.layering.duration_minutes }} min.
+                </p>
+                {% if can_reopen %}
+                <form method="post" action="{% url 'production:layering-reopen' adda.code %}"
+                      onsubmit="return confirm('Reopen Layering for corrections?\n\nThe completed summary will be cleared and the Adda will roll back to the Layering stage. Downstream stages must not have been started.');">
+                    {% csrf_token %}
+                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                    <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper);">
+                        ✎ Edit / Reopen
+                    </button>
+                </form>
+                {% endif %}
+            </div>
         {% else %}
             <p class="panel-sub" style="margin:0;">You need <code>cutting_master_helper</code> skill to complete this stage.</p>
         {% endif %}

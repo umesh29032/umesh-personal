@@ -7,7 +7,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from ..forms import RoleForm
 from ..models import Role
-from ..services import permissions_qs_by_app
+from ..services import permissions_sectioned_for_role_editor
 from .mixins import SuperAdminOnlyMixin
 
 
@@ -29,7 +29,7 @@ class RoleCreateView(LoginRequiredMixin, SuperAdminOnlyMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['grouped_permissions'] = _group_permissions(permissions_qs_by_app())
+        ctx['perm_sections'] = permissions_sectioned_for_role_editor()
         return ctx
 
 
@@ -41,7 +41,9 @@ class RoleUpdateView(LoginRequiredMixin, SuperAdminOnlyMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['grouped_permissions'] = _group_permissions(permissions_qs_by_app())
+        ctx['perm_sections'] = permissions_sectioned_for_role_editor()
+        # Set of selected perm pks for fast template lookup ("perm.pk in selected_perm_ids").
+        ctx['selected_perm_ids'] = set(self.object.permissions.values_list('pk', flat=True))
         return ctx
 
 
@@ -60,10 +62,3 @@ class RoleDeleteView(LoginRequiredMixin, SuperAdminOnlyMixin, DeleteView):
         return super().form_valid(form)
 
 
-def _group_permissions(qs):
-    """Group permissions by app + model for a cleaner checkbox layout in the form."""
-    groups: dict[str, list] = {}
-    for perm in qs:
-        key = f"{perm.content_type.app_label} · {perm.content_type.model}"
-        groups.setdefault(key, []).append(perm)
-    return sorted(groups.items())

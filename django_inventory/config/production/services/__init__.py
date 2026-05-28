@@ -20,6 +20,7 @@ from .layering_service import (
     get_layering_snapshot,
     record_remaining_cloth,
     remove_remaining_cloth,
+    reopen_layering,
     save_layering_breakup,
     save_layering_draft,
     start_layering,
@@ -27,6 +28,14 @@ from .layering_service import (
     update_layering_roll_entry,
 )
 from .cutting_service import complete_cutting
+from .cutting_pattern_service import (
+    attach_photo as attach_pattern_photo,
+    complete_pattern_stage,
+    get_or_create_pattern_stage_record,
+    get_pattern_snapshot,
+    save_pattern_record,
+    start_pattern_stage,
+)
 from .activity_service import adda_activity, user_activity_across_addas
 from .access_service import user_can_access_stage, stage_access_map
 from .flow_service import (
@@ -52,9 +61,17 @@ __all__ = [
     'record_remaining_cloth',
     'remove_remaining_cloth',
     'complete_layering',
+    'reopen_layering',
     'get_layering_snapshot',
     # Cutting stage
     'complete_cutting',
+    # Cutting-pattern stage
+    'start_pattern_stage',
+    'attach_pattern_photo',
+    'save_pattern_record',
+    'complete_pattern_stage',
+    'get_or_create_pattern_stage_record',
+    'get_pattern_snapshot',
     # Activity
     'adda_activity',
     'user_activity_across_addas',

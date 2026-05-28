@@ -14,6 +14,13 @@ urlpatterns = [
     path('products/<int:pk>/edit/',       views.ProductUpdateView.as_view(),   name='product-update'),
     path('products/<int:pk>/archive/',    views.ProductArchiveView.as_view(),  name='product-archive'),
     path('products/<int:pk>/flow/',       views.ProductFlowEditView.as_view(), name='product-flow'),
+    path('products/<int:pk>/patterns/',   views.ProductPatternsEditView.as_view(), name='product-patterns'),
+
+    # Product pattern library — admin manages reusable patterns.
+    path('patterns/',                     views.ProductPatternListView.as_view(),   name='pattern-list'),
+    path('patterns/add/',                 views.ProductPatternCreateView.as_view(), name='pattern-add'),
+    path('patterns/<int:pk>/edit/',       views.ProductPatternUpdateView.as_view(), name='pattern-edit'),
+    path('patterns/<int:pk>/delete/',     views.ProductPatternDeleteView.as_view(), name='pattern-delete'),
 
     # Addas
     path('addas/',                  views.AddaListView.as_view(),    name='adda-list'),
@@ -34,6 +41,15 @@ urlpatterns = [
     path('addas/<str:code>/layering/entries/<int:pk>/remove/', views.LayeringEntryRemoveView.as_view(), name='layering-entry-remove'),
     path('addas/<str:code>/layering/remaining/<int:pk>/remove/', views.LayeringRemoveRemainingClothView.as_view(), name='layering-remove-remaining'),
     path('addas/<str:code>/layering/complete/',         views.LayeringCompleteView.as_view(),   name='layering-complete'),
+    path('addas/<str:code>/layering/reopen/',           views.LayeringReopenView.as_view(),     name='layering-reopen'),
+
+    # Cutting-pattern stage
+    path('addas/<str:code>/pattern/',                       views.PatternWorkspaceView.as_view(),  name='pattern-workspace'),
+    path('addas/<str:code>/pattern/start/',                 views.PatternStartView.as_view(),      name='pattern-start'),
+    path('addas/<str:code>/pattern/save/',                  views.PatternSaveVideoView.as_view(),  name='pattern-save'),
+    path('addas/<str:code>/pattern/photos/add/',            views.PatternAddPhotoView.as_view(),   name='pattern-photos-add'),
+    path('addas/<str:code>/pattern/photos/<int:pk>/remove/', views.PatternRemovePhotoView.as_view(), name='pattern-photo-remove'),
+    path('addas/<str:code>/pattern/complete/',              views.PatternCompleteView.as_view(),   name='pattern-complete'),
 
     # Cutting stage (single submit)
     path('addas/<str:code>/cutting/',  views.CuttingCompleteView.as_view(),  name='cutting-complete'),

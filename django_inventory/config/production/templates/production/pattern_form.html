@@ -1,0 +1,47 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{% if object %}Edit{% else %}New{% endif %} Pattern{% endblock %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>{% if object %}Edit Pattern{% else %}New Pattern{% endif %}</h1>
+            <p>Reusable design shape used across products (e.g. Sleeve, Collar, Front Panel).</p>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="form-card" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-section">
+            <div class="form-section-title"><span class="form-section-num">1</span> Identity</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div class="form-group"><label class="form-label">Name *</label>{{ form.name }}</div>
+                <div class="form-group"><label class="form-label">Code *</label>{{ form.code }}
+                    {% if form.code.help_text %}<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">{{ form.code.help_text }}</div>{% endif %}
+                </div>
+                <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Description</label>{{ form.description }}</div>
+                <div class="form-group"><label class="form-label">Reference Image</label>{{ form.reference_image }}
+                    {% if object.reference_image %}<div style="margin-top:6px;"><img src="{{ object.reference_image.url }}" style="max-width:140px;border-radius:8px;"></div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Active</label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        {{ form.is_active }}
+                        <span style="font-size:13px;color:var(--text-secondary);">Available for assignment</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end;">
+            <a href="{% url 'production:pattern-list' %}" class="btn btn-clear">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if object %}Save Changes{% else %}Create Pattern{% endif %}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

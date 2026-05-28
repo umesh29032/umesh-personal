@@ -45,6 +45,15 @@ class Product(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     # adda_counter = ab tak kitne Addas iss product ke ban chuke. Sirf service increment kare.
     adda_counter = models.PositiveIntegerField(default=0)
+    # Patterns required to cut one Adda of this product. Through-model carries
+    # pieces_count (e.g. 2 sleeves per T-Shirt). Empty = no cutting_pattern stage
+    # data needed for this product even if its workflow includes the stage.
+    patterns = models.ManyToManyField(
+        'ProductPattern',
+        through='ProductPatternAssignment',
+        related_name='products',
+        blank=True,
+    )
 
     class Meta:
         ordering = ['name']
@@ -409,6 +418,122 @@ class CuttingRecord(TimeStampedModel):
     # pieces_cut = barcode count trigger; cutting form submit pe set hota hai
     pieces_cut = models.PositiveIntegerField()
     notes = models.TextField(blank=True)
+
+
+# ── Cutting-Pattern stage models ────────────────────────────────────────────
+# A ProductPattern is a reusable design "shape" (front panel, back panel,
+# sleeve, ...). Each Product has a curated list of these via the explicit
+# through-model `ProductPatternAssignment` which also carries `pieces_count`
+# (e.g. T-Shirt = 1 Front + 1 Back + 2 Sleeve). Cutting master uses this
+# during the cutting_pattern stage to draw the layout, then records a video
+# + photos of the layered cloth.
+
+class ProductPattern(TimeStampedModel):
+    """Reusable pattern definition — a single design shape used across products.
+
+    Examples: 'Front Panel', 'Back Panel', 'Sleeve', 'Collar'. Admin maintains
+    this library; Products reference patterns via ProductPatternAssignment.
+    """
+
+    code = models.SlugField(
+        max_length=48, unique=True,
+        help_text="Stable identifier used in URLs/services (e.g. 'sleeve').",
+    )
+    name = models.CharField(max_length=80)
+    description = models.TextField(blank=True)
+    # Optional reference image — admin uploads a sample drawing so the cutting
+    # master has a visual on the workspace page.
+    reference_image = models.ImageField(
+        upload_to='product_patterns/', blank=True, null=True,
+    )
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProductPatternAssignment(TimeStampedModel):
+    """Through-model: how many of `pattern` does `product` need per Adda.
+
+    Existence of any assignment for a product == that product needs the
+    cutting_pattern stage. Service layer can read these to derive total
+    expected pieces before cutting begins.
+    """
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='pattern_assignments',
+    )
+    pattern = models.ForeignKey(
+        ProductPattern, on_delete=models.PROTECT, related_name='product_assignments',
+    )
+    # pieces_count = how many cut pieces of this pattern per layered Adda (e.g.
+    # T-Shirt uses 2 sleeves → pieces_count=2 for the Sleeve pattern row).
+    pieces_count = models.PositiveSmallIntegerField(default=1)
+    notes = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        unique_together = [('product', 'pattern')]
+        ordering = ['product', 'pattern__name']
+
+    def __str__(self):
+        return f"{self.product.code} · {self.pattern.name} × {self.pieces_count}"
+
+
+def _cutting_pattern_video_path(instance, filename):
+    """Per-Adda video storage path. Slug-safe code keeps OS-friendly filenames."""
+    return f"cutting_pattern/{instance.stage_record.adda.code}/video_{filename}"
+
+
+def _cutting_pattern_photo_path(instance, filename):
+    return f"cutting_pattern/{instance.record.stage_record.adda.code}/photos/{filename}"
+
+
+class CuttingPatternRecord(TimeStampedModel):
+    """Cutting-pattern stage typed record. One per Adda's pattern-stage.
+
+    Hosts the single mandatory video (drawn pattern on the layered cloth) +
+    free-form notes. Multiple photos hang off via CuttingPatternPhoto FK so
+    a master can attach as many shots as needed.
+    """
+
+    stage_record = models.OneToOneField(
+        AddaStageRecord, on_delete=models.CASCADE, related_name='cutting_pattern',
+    )
+    # video = mp4/webm/mov; Django doesn't validate codec — we trust UI accept=.
+    # blank/null so cutting master can submit photos OR video alone (at least one
+    # required at complete-time — enforced in service layer, not at the DB).
+    video = models.FileField(upload_to=_cutting_pattern_video_path, blank=True, null=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"CuttingPattern · {self.stage_record.adda.code}"
+
+
+class CuttingPatternPhoto(TimeStampedModel):
+    """One photo of the layered cloth with pattern drawn. Many-per-record.
+
+    Compressed to JPEG via Pillow on save (see production/services/cutting_pattern_service.py)
+    to keep disk + future-cloud-egress costs sane.
+    """
+
+    record = models.ForeignKey(
+        CuttingPatternRecord, on_delete=models.CASCADE, related_name='photos',
+    )
+    image = models.ImageField(upload_to=_cutting_pattern_photo_path)
+    caption = models.CharField(max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Photo for {self.record.stage_record.adda.code}"
 
 
 # StageAccessRule deleted in migration 0011 — superseded by Stage model.

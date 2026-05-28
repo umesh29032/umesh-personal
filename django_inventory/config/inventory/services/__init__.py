@@ -3,7 +3,7 @@ from .permission_service import (
     user_can_view_financials, user_can_edit_financials,
     ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR, ROLE_LISTING_TEAM, ROLE_ACCOUNTANT,
     ADMIN_ROLES, MANAGEMENT_ROLES, STOREFRONT_ROLES, PRODUCTION_ROLES, FINANCIAL_ROLES,
-    permissions_qs_by_app,
+    permissions_qs_by_app, permissions_sectioned_for_role_editor,
 )
 
 __all__ = [
@@ -15,6 +15,7 @@ __all__ = [
     'user_can_view_financials',
     'user_can_edit_financials',
     'permissions_qs_by_app',
+    'permissions_sectioned_for_role_editor',
     'ROLE_SUPER_ADMIN',
     'ROLE_MANAGER',
     'ROLE_KARIGAR',

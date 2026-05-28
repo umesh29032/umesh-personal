@@ -675,3 +675,83 @@ def complete_layering(
 
     advance_to_next_stage(adda, user)
     return lr
+
+
+@transaction.atomic
+def reopen_layering(*, adda: Adda, user) -> AddaStageRecord:
+    """Admin-only: unlock a completed Layering stage for correction.
+
+    Rolls back:
+      • adda.current_stage  → the Layering WorkflowStage
+      • stage_record.completed_at / completed_by → cleared
+      • LayeringRecord summary → deleted (will be recreated on next complete)
+      • adda.status → IN_PROGRESS (in case it had reached COMPLETED)
+
+    Refused if any DOWNSTREAM stage already has data (workers assigned,
+    cutting started, barcodes generated) — that would be a partial rollback.
+
+    Why this matters: every layered roll's layers_on_roll + layer_length_meters
+    were stamped onto the ClothRoll itself. Those stay — the admin re-completes
+    with corrected values which overwrite them.
+    """
+    _ensure_management(user)  # super_admin or manager
+
+    # Find the layering WorkflowStage for this Adda's product.
+    layering_wf = adda.product.workflow_stages.filter(stage__code=STAGE_LAYERING).first()
+    if layering_wf is None:
+        raise ValidationError("This product has no Layering stage configured.")
+
+    try:
+        sr = AddaStageRecord.objects.select_for_update().get(
+            adda=adda, workflow_stage=layering_wf,
+        )
+    except AddaStageRecord.DoesNotExist:
+        raise ValidationError("Layering stage has never been started.")
+    if sr.completed_at is None:
+        raise ValidationError("Layering is already open for edits.")
+
+    # Refuse if any later stage has a record with started_at set — that would
+    # require unwinding cutting/etc which is out of scope for this action.
+    downstream = (
+        AddaStageRecord.objects
+        .filter(adda=adda, workflow_stage__order__gt=layering_wf.order)
+        .exclude(started_at__isnull=True)
+        .exists()
+    )
+    if downstream:
+        raise ValidationError(
+            "Cannot reopen Layering — a downstream stage has already started. "
+            "Reopen requires no later stages to have been touched."
+        )
+
+    # Preserve header values BEFORE tearing down LayeringRecord. Without this,
+    # the reopened editor renders blank layer_length / duration / notes and the
+    # next Complete submit fails strict validation ("duration_minutes must be
+    # >= 1"). Copy the prior values back into the stage_record.draft_* fields
+    # so the form pre-fills them on re-render.
+    lr = LayeringRecord.objects.filter(stage_record=sr).first()
+    if lr is not None:
+        sr.draft_layer_length_meters = lr.layer_length_meters
+        sr.draft_duration_minutes = lr.duration_minutes
+        sr.draft_notes = lr.notes or ''
+        lr.delete()
+
+    sr.completed_at = None
+    sr.completed_by = None
+    sr.save(update_fields=[
+        'completed_at', 'completed_by',
+        'draft_layer_length_meters', 'draft_duration_minutes', 'draft_notes',
+        'updated_at',
+    ])
+
+    adda.current_stage = layering_wf
+    adda.status = Adda.Status.IN_PROGRESS
+    adda.completed_at = None
+    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
+
+    # Audit
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=layering_wf)
+
+    return sr
