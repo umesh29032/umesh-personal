@@ -71,7 +71,7 @@ def create_product(user, *, code: str, name: str, description: str = '') -> Prod
     # would be unusable — create_adda would crash on missing first_stage.
     from production.constants import STAGE_LAYERING
     from production.models import Stage, WorkflowStage
-    layering = Stage.objects.filter(code=STAGE_LAYERING, is_active=True).first()
+    layering = Stage.active.filter(code=STAGE_LAYERING).first()
     if layering is not None:
         WorkflowStage.objects.create(product=p, stage=layering, order=1)
 

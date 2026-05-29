@@ -53,7 +53,7 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
         used_stage_ids = {ws.stage_id for ws in flow_rows}
         # Library — only ACTIVE stages NOT already in this product's flow.
         available_stages = (
-            Stage.objects.filter(is_active=True)
+            Stage.active
             .exclude(id__in=used_stage_ids)
             .order_by('name')
         )

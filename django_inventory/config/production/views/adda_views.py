@@ -47,7 +47,7 @@ class AddaListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         # Use Stage rows as filter options (replaces hardcoded StageType enum).
         from production.models import Stage
         ctx['stage_types'] = list(
-            Stage.objects.filter(is_active=True).values_list('code', 'name').order_by('name')
+            Stage.active.values_list('code', 'name').order_by('name')
         )
         ctx['status_choices'] = Adda.Status.choices
         return ctx

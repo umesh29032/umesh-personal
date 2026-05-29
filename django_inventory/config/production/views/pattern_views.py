@@ -179,7 +179,7 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
         # assignment prevent (unique_together(product, pattern) constraint).
         assigned_ids = set(product.pattern_assignments.values_list('pattern_id', flat=True))
         ctx['available_patterns'] = (
-            ProductPattern.objects.filter(is_active=True)
+            ProductPattern.active
             .exclude(pk__in=assigned_ids)
             .order_by('name')
         )

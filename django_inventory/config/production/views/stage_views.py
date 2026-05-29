@@ -185,9 +185,9 @@ def _build_layering_context(request, adda: Adda) -> dict:
     # Master data for filter dropdowns + quick-create form pre-fill
     from raw_materials.models import ClothColor, ClothType, StorageLocation
     from inventory.services import user_can_edit_financials
-    cloth_colors = ClothColor.objects.filter(is_active=True).order_by('name')
-    cloth_types = ClothType.objects.filter(is_active=True).order_by('name')
-    storage_locations = StorageLocation.objects.filter(is_active=True).order_by('name')
+    cloth_colors = ClothColor.active.order_by('name')
+    cloth_types = ClothType.active.order_by('name')
+    storage_locations = StorageLocation.active.order_by('name')
     width_choices = list(range(36, 45))
     can_edit_financials = user_can_edit_financials(user)
 

@@ -55,7 +55,7 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
 
         # Iterate Stage rows (Stage table replaced hardcoded StageType enum).
         stage_breakdown = []
-        for stage in Stage.objects.filter(is_active=True).order_by('name'):
+        for stage in Stage.active.order_by('name'):
             stage_breakdown.append({
                 'label': stage.name,
                 'count': addas.filter(

@@ -58,8 +58,8 @@ class RawMaterialDashboardView(LoginRequiredMixin, ProductionRoleMixin, Template
         ctx = super().get_context_data(**kwargs)
         cloth_total = ClothRoll.objects.count()
         cloth_available = ClothRoll.objects.filter(status=ClothRoll.Status.NOT_USED).count()
-        cloth_types = ClothType.objects.filter(is_active=True).count()
-        cloth_colors = ClothColor.objects.filter(is_active=True).count()
+        cloth_types = ClothType.active.count()
+        cloth_colors = ClothColor.active.count()
         ctx['cloth'] = {
             'total': cloth_total,
             'available': cloth_available,
@@ -141,7 +141,7 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
 
         # ── By location ───────────────────────────────────────────────────
         ctx['by_location'] = (
-            StorageLocation.objects.filter(is_active=True)
+            StorageLocation.active
             .annotate(
                 roll_count=Count('rolls', filter=(
                     (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
@@ -169,7 +169,7 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
             .order_by('-created_at')[:30]
         )
-        ctx['active_colors'] = ClothColor.objects.filter(is_active=True).order_by('name')
+        ctx['active_colors'] = ClothColor.active.order_by('name')
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')
         ctx['filter_color'] = color_id

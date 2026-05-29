@@ -15,6 +15,7 @@ karna padta hai:
 """
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db import transaction
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.generic import ListView, TemplateView
@@ -158,15 +159,27 @@ class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVi
 
 
 @login_required
+@transaction.atomic
 def scan_piece(request, value):
     """Public-after-login QR landing. Resolves via BarcodeBatch, lazy-creates
-    BatchBarcode scan-state row, stamps last_scanned_at/by."""
+    BatchBarcode scan-state row, stamps last_scanned_at/by.
+
+    @transaction.atomic wrap (audit follow-up 2026-05-29): get_or_create_piece
+    apne andar atomic hai, par uske baad ka last_scanned_at/by update
+    separate SQL tha — race window mein concurrent scan ka stamp + concurrent
+    status update interleave kar sakta tha. Ab dono ek transaction ke andar.
+    SELECT FOR UPDATE bhi lagaya gaya hai BatchBarcode row pe taaki
+    parallel scans serialize ho jaayen.
+    """
     hit = resolve_value(value)
     if hit is None:
         from django.http import Http404
         raise Http404(f"barcode '{value}' not recognized")
     batch, seq = hit
     bc = get_or_create_piece(batch, seq)
+    # select_for_update lock — same piece ka concurrent scan/status-change
+    # serialise. last write wins on stamp, but no interleaved corruption.
+    bc = BatchBarcode.objects.select_for_update().get(pk=bc.pk)
     bc.last_scanned_at = timezone.now()
     bc.last_scanned_by = request.user
     bc.save(update_fields=['last_scanned_at', 'last_scanned_by'])

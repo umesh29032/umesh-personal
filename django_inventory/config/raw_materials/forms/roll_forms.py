@@ -38,11 +38,11 @@ class BulkRollForm(forms.Form):
     """
 
     cloth_type = forms.ModelChoiceField(
-        queryset=ClothType.objects.filter(is_active=True),   # archived hide
+        queryset=ClothType.active.all(),   # archived hide via ActiveManager
         widget=forms.Select(attrs=_BASE_INPUT_ATTRS),
     )
     storage_location = forms.ModelChoiceField(
-        queryset=StorageLocation.objects.filter(is_active=True),
+        queryset=StorageLocation.active.all(),
         widget=forms.Select(attrs=_BASE_INPUT_ATTRS),
     )
     purchased_date = forms.DateField(
@@ -86,8 +86,8 @@ class BulkRollForm(forms.Form):
             if qty < 1:
                 raise forms.ValidationError("Each breakup qty must be at least 1")
             try:
-                # is_active=True filter — archived color reject
-                color = ClothColor.objects.get(pk=color_id, is_active=True)
+                # ActiveManager — archived color reject (raises DoesNotExist)
+                color = ClothColor.active.get(pk=color_id)
             except ClothColor.DoesNotExist:
                 raise forms.ValidationError("Selected cloth color is invalid or archived")
             breakup.append({'color': color, 'qty': qty})
@@ -131,8 +131,8 @@ class RollEditForm(forms.ModelForm):
     def __init__(self, *args, user, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
-        # Filter dropdowns to active master data
-        self.fields['storage_location'].queryset = StorageLocation.objects.filter(is_active=True)
+        # Filter dropdowns to active master data via ActiveManager
+        self.fields['storage_location'].queryset = StorageLocation.active.all()
         # Role gate financial fields — non-finance users ko form set se nikalo
         if not user_can_edit_financials(user):
             self.fields.pop('supplier', None)
