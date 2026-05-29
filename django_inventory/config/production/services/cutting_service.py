@@ -41,12 +41,14 @@ from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
 from inventory.services import MANAGEMENT_ROLES, user_has_role
-from production.constants import STAGE_CUTTING, STAGE_CUTTING_PATTERN
+from production.constants import (
+    STAGE_BARCODE_GENERATION, STAGE_CUTTING, STAGE_CUTTING_PATTERN,
+)
 from production.models import (
-    Adda, AddaStageRecord, CuttingBundle, CuttingBundleItem,
-    CuttingPatternRecord, CuttingPatternSizeAllocation, CuttingPieceBreakup,
-    CuttingRecord, ProductPattern, ProductPatternAssignment, ProductSize,
-    WorkflowStage,
+    Adda, AddaProductSizeColorPieceBreakdown, AddaStageRecord, CuttingBundle,
+    CuttingBundleItem, CuttingPatternRecord, CuttingPatternSizeAllocation,
+    CuttingPieceBreakup, CuttingRecord, ProductPattern,
+    ProductPatternAssignment, ProductSize, WorkflowStage,
 )
 from production.services.adda_service import advance_to_next_stage
 
@@ -124,6 +126,72 @@ def _get_or_create_cutting_record(adda: Adda) -> CuttingRecord:
         stage_record=sr, defaults={'pieces_cut': 0, 'notes': ''},
     )
     return cr
+
+
+def _product_has_barcode_gen_stage(adda: Adda) -> bool:
+    """Iss Adda ke product workflow mein barcode_generation stage hai ya nahi?
+
+    Determines whether cutting completion should inline-generate barcodes
+    (back-compat for legacy products) or defer to the barcode_generation
+    stage. Per BARCODE_STAGE_PLAN.md D3.
+    """
+    return adda.product.workflow_stages.filter(
+        stage__code=STAGE_BARCODE_GENERATION,
+    ).exists()
+
+
+def _materialize_breakdown(cr: CuttingRecord, user) -> int:
+    """Cutting bundles ko per-(size, color) aggregate karke
+    AddaProductSizeColorPieceBreakdown rows freeze karta hai.
+
+    Aggregation: SUM(CuttingBundleItem.count) GROUP BY (bundle.size_id, color_id).
+    Pattern dimension collapse hota — barcode generation patterns mein
+    interested nahi (sticker pe sirf size + color print hota).
+
+    Idempotent: get_or_create ensures re-run pe duplicate row nahi banta
+    (unique_together cutting_record + size + color).
+
+    Returns: total breakdown rows materialised.
+    """
+    from collections import defaultdict
+    adda = cr.stage_record.adda
+    product = adda.product
+    items = list(
+        CuttingBundleItem.objects
+        .filter(bundle__cutting_record=cr)
+        .select_related('bundle')
+    )
+    if items:
+        # Per (size, color) sum + remember first bundle FK for each key
+        agg: dict[tuple[int, int], int] = defaultdict(int)
+        bundle_by_key: dict[tuple[int, int], int] = {}
+        for it in items:
+            key = (it.bundle.size_id, it.color_id)
+            agg[key] += it.count
+            bundle_by_key.setdefault(key, it.bundle_id)
+        for (size_id, color_id), count in agg.items():
+            AddaProductSizeColorPieceBreakdown.objects.get_or_create(
+                cutting_record=cr, size_id=size_id, color_id=color_id,
+                defaults={
+                    'adda': adda, 'product': product,
+                    'bundle_id': bundle_by_key[(size_id, color_id)],
+                    'verified_piece_count': count,
+                    'created_by': user,
+                },
+            )
+        return len(agg)
+    # Legacy: no bundle items → single (NULL, NULL) row from pieces_cut.
+    if cr.pieces_cut > 0:
+        AddaProductSizeColorPieceBreakdown.objects.get_or_create(
+            cutting_record=cr, size=None, color=None,
+            defaults={
+                'adda': adda, 'product': product, 'bundle': None,
+                'verified_piece_count': cr.pieces_cut,
+                'created_by': user,
+            },
+        )
+        return 1
+    return 0
 
 
 # ── Snapshot + suggestion (read-only) ──────────────────────────────────────
@@ -768,8 +836,16 @@ def _complete_cutting_legacy(
         stage_record=sr, pieces_cut=pieces_cut, notes=notes,
     )
 
-    from tracking.services import generate_for_cutting
-    generate_for_cutting(cr)
+    # PR-B 2026-05-29: materialize breakdown even on legacy path (single
+    # NULL-NULL row with verified_piece_count = pieces_cut). Future stages
+    # see consistent shape regardless of which path produced data.
+    _materialize_breakdown(cr, user)
+
+    # Same back-compat branch as workspace path — products without
+    # barcode_generation stage in workflow get inline barcode generation.
+    if not _product_has_barcode_gen_stage(adda):
+        from tracking.services import generate_for_cutting
+        generate_for_cutting(cr)
 
     advance_to_next_stage(adda, user)
     return cr
@@ -845,15 +921,25 @@ def _complete_cutting_from_breakup(*, adda: Adda, user) -> CuttingRecord:
                         f"Color id={it.color_id} not in layered rolls.",
                     )
 
-    # Validation passed — denormalize total + stamp completion + generate barcodes.
+    # Validation passed — denormalize total + stamp completion + materialize
+    # the verified breakdown. Atomic within this @transaction.atomic.
     cr.pieces_cut = total
     cr.save(update_fields=['pieces_cut', 'updated_at'])
     sr.completed_at = timezone.now()
     sr.completed_by = user
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
 
-    from tracking.services import generate_for_cutting
-    generate_for_cutting(cr)
+    # PR-B 2026-05-29: Cutting Stage materialises the verified breakdown.
+    # Barcode generation no longer inline — it's a downstream stage.
+    _materialize_breakdown(cr, user)
+
+    # BACK-COMPAT: agar product workflow mein barcode_generation stage NHI
+    # hai (legacy NIKKAR-style products), to barcodes yahin inline generate
+    # ho jaate hain. Naye products jo bg stage include karte hain wo apne
+    # barcode_generation stage par generate karenge.
+    if not _product_has_barcode_gen_stage(adda):
+        from tracking.services import generate_for_cutting
+        generate_for_cutting(cr)
 
     advance_to_next_stage(adda, user)
     return cr
@@ -863,8 +949,20 @@ def _complete_cutting_from_breakup(*, adda: Adda, user) -> CuttingRecord:
 def reopen_cutting(*, adda: Adda, user) -> AddaStageRecord:
     """Admin-only: completed Cutting stage ko unlock for correction.
 
-    Refuses if any BatchBarcode.last_scanned_at is not None for this Adda
-    (some piece has already been scanned in production).
+    Refusal conditions (PR-B 2026-05-29 extended):
+      1. Any BatchBarcode row exists (lazy-created on scan → scan happened).
+      2. Downstream `barcode_generation` stage has been started or completed
+         (would corrupt downstream state on partial rollback).
+      3. Any BarcodeExportBatch has been created for this Adda (vendor
+         already has exported labels — rollback would orphan them).
+
+    On reopen:
+      • Delete AddaProductSizeColorPieceBreakdown rows (re-materialised on
+        re-complete).
+      • Delete BarcodeBatch rows (one-shot regeneration rule).
+      • Clear sr.completed_at + completed_by.
+      • Adda.current_stage → cutting wf, status → IN_PROGRESS.
+      • AddaHistory.STAGE_REOPENED entry.
     """
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied("only super_admin or manager can reopen the cutting stage")
@@ -882,15 +980,40 @@ def reopen_cutting(*, adda: Adda, user) -> AddaStageRecord:
     if sr.completed_at is None:
         raise ValidationError("Cutting stage is already open for edits.")
 
-    # Refuse if any barcode has been scanned. Per-piece BatchBarcode rows
-    # are only created on scan (PR6), so existence alone implies scan.
-    from tracking.models import BarcodeBatch, BatchBarcode
+    from tracking.models import BarcodeBatch, BatchBarcode, BarcodeExportBatch
+
+    # Guard 1: any scanned piece blocks reopen
     if BatchBarcode.objects.filter(adda=adda).exists():
         raise ValidationError(
             "Cannot reopen — at least one barcode has been scanned in production."
         )
 
-    # Delete existing batches so re-generation works (one-shot rule).
+    # Guard 2: downstream barcode_generation stage started/completed blocks
+    bg_wf = adda.product.workflow_stages.filter(
+        stage__code=STAGE_BARCODE_GENERATION,
+    ).first()
+    if bg_wf is not None:
+        bg_sr = AddaStageRecord.objects.filter(
+            adda=adda, workflow_stage=bg_wf,
+        ).exclude(started_at__isnull=True).first()
+        if bg_sr is not None:
+            raise ValidationError(
+                "Cannot reopen — Barcode Generation stage has already been "
+                "started. Reopen Barcode Generation first."
+            )
+
+    # Guard 3: any export blocks reopen — vendor may have printed labels
+    if BarcodeExportBatch.objects.filter(adda=adda).exists():
+        raise ValidationError(
+            "Cannot reopen — barcode exports exist. Cancel exports first."
+        )
+
+    # Clear downstream artefacts. Breakdown rows materialised at completion
+    # — delete them so re-complete re-materialises fresh from current bundles.
+    AddaProductSizeColorPieceBreakdown.objects.filter(
+        cutting_record=sr.cutting,
+    ).delete()
+    # Delete BarcodeBatch rows so re-generation works (one-shot rule).
     BarcodeBatch.objects.filter(adda=adda).delete()
 
     sr.completed_at = None

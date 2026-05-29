@@ -1,0 +1,275 @@
+{% comment %}
+YEH TEMPLATE KYU HAI?
+─────────────────────
+Barcode Generation stage ka reusable panel partial (PR-C 2026-05-29).
+3 jagah include hota hai:
+  1. barcode_gen_workspace.html  → standalone full-page workspace
+  2. stage_panel_embedded.html   → iframe wrapper (/stage/barcode_generation/)
+  3. adda_detail.html            → iframe (auto-resize postMessage)
+
+5 SECTIONS:
+  01 Verified Breakdown   → AddaProductSizeColorPieceBreakdown read-only
+  02 Assigned Workers     → manager assigns via start form
+  03 Generate Barcodes    → one-shot trigger (atomic)
+  04 Generated Batches    → BarcodeBatch list + range labels (post-gen)
+  05 Complete + advance   → count match validation
+
+REQUIRED CONTEXT (from _build_barcode_gen_context):
+  adda, workflow_stage, stage_record, record, preview, snapshot,
+  is_management, can_start, can_generate, can_complete, can_reopen,
+  next_stage, start_form, embedded
+{% endcomment %}
+
+{% if messages %}
+<div class="messages-strip">
+    {% for m in messages %}
+        <div class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% comment %} COMPLETED-STATE SUMMARY {% endcomment %}
+{% if stage_record.completed_at %}
+<div class="bg-summary-card">
+    <div class="bg-summary-title">Barcode Generation — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
+    <div class="bg-summary-grid">
+        <div><span class="lbl">Total Barcodes</span><span class="val">{{ record.total_barcodes|default:0 }}</span></div>
+        <div><span class="lbl">Batches</span><span class="val">{{ snapshot.batches|length }}</span></div>
+        <div><span class="lbl">Generated At</span><span class="val">{% if record.generated_at %}{{ record.generated_at|date:"d M H:i" }}{% else %}—{% endif %}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.workers.count }}</span></div>
+    </div>
+</div>
+{% if can_reopen %}
+<div style="margin-top:10px; display:flex; justify-content:flex-end;">
+    <form method="post" action="{% url 'production:barcode-gen-reopen' adda.code %}"
+          onsubmit="return confirm('Reopen Barcode Generation?\n\nAll BarcodeBatch rows will be deleted (no scans, no exports). Adda rolls back to Barcode Generation stage.');">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
+            ✎ Edit / Reopen Barcode Generation
+        </button>
+    </form>
+</div>
+{% endif %}
+{% endif %}
+
+{% comment %} SECTION 01 — VERIFIED BREAKDOWN (read-only) {% endcomment %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">01</span>
+        <div>
+            <h2 class="panel-title">Verified Cutting Breakdown</h2>
+            <p class="panel-sub">Frozen at cutting completion. Read-only.</p>
+        </div>
+    </header>
+    {% if preview.rows %}
+    <div class="table-responsive">
+        <table class="tbl">
+            <thead>
+                <tr><th>Size</th><th>Color</th><th style="text-align:right;">Pieces</th></tr>
+            </thead>
+            <tbody>
+                {% for row in preview.rows %}
+                    <tr>
+                        <td data-label="Size">{{ row.size }}</td>
+                        <td data-label="Color">{{ row.color }}</td>
+                        <td data-label="Pieces" style="text-align:right; font-variant-numeric: tabular-nums;">{{ row.count }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600; background:var(--cream-2);">
+                    <td colspan="2">Total verified pieces</td>
+                    <td style="text-align:right; font-variant-numeric: tabular-nums;">{{ preview.total }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state-row">No breakdown yet. Complete the Cutting stage first.</div>
+    {% endif %}
+</section>
+
+{% comment %} SECTION 02 — ASSIGNED WORKERS / START FORM {% endcomment %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">02</span>
+        <div>
+            <h2 class="panel-title">Assigned Workers</h2>
+            <p class="panel-sub">Cutting master / helper assigns. Workers required before generation.</p>
+        </div>
+    </header>
+    {% if stage_record %}
+        {% with workers=stage_record.workers.all %}
+        {% if workers %}
+            <div class="chip-row">
+                {% for w in workers %}
+                    <span class="chip">{{ w.get_full_name|default:w.email }}</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state-row">No workers assigned yet.</div>
+        {% endif %}
+        {% endwith %}
+    {% else %}
+        <div class="empty-state-row">Stage not started.</div>
+    {% endif %}
+
+    {% if can_start and start_form %}
+    <form method="post" action="{% url 'production:barcode-gen-start' adda.code %}" style="margin-top:14px;">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <div class="field">
+            <label>Workers</label>
+            {{ start_form.workers }}
+        </div>
+        <div style="margin-top:12px;">
+            <button type="submit" class="btn btn-primary">Start Barcode Generation</button>
+        </div>
+    </form>
+    {% endif %}
+</section>
+
+{% comment %} SECTION 03 — GENERATE BARCODES {% endcomment %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">03</span>
+        <div>
+            <h2 class="panel-title">Generate Barcodes</h2>
+            <p class="panel-sub">One-shot per stage. Re-generation requires reopen.</p>
+        </div>
+    </header>
+    {% if record.generated_at %}
+        <div class="bg-info-block">
+            ✓ Generated {{ record.total_barcodes }} barcode{{ record.total_barcodes|pluralize }} on {{ record.generated_at|date:"d M Y H:i" }}
+        </div>
+    {% elif can_generate %}
+        <form method="post" action="{% url 'production:barcode-gen-generate' adda.code %}"
+              onsubmit="return confirm('Generate {{ preview.total }} barcodes? This is a one-shot operation.');">
+            {% csrf_token %}
+            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+            <button type="submit" class="btn btn-primary">Generate {{ preview.total }} barcodes</button>
+        </form>
+    {% elif not stage_record %}
+        <div class="empty-state-row">Start the stage before generating barcodes.</div>
+    {% else %}
+        <div class="empty-state-row">Awaiting permission or breakdown data.</div>
+    {% endif %}
+</section>
+
+{% comment %} SECTION 04 — GENERATED BATCHES (post-gen) {% endcomment %}
+{% if snapshot.batches %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">04</span>
+        <div>
+            <h2 class="panel-title">Generated Batches</h2>
+            <p class="panel-sub">BarcodeBatch ranges by (size, color).</p>
+        </div>
+    </header>
+    <div class="table-responsive">
+        <table class="tbl">
+            <thead>
+                <tr><th>Size</th><th>Color</th><th>Range</th><th style="text-align:right;">Pieces</th></tr>
+            </thead>
+            <tbody>
+                {% for b in snapshot.batches %}
+                    <tr>
+                        <td data-label="Size">{% if b.size %}{{ b.size.label }}{% else %}—{% endif %}</td>
+                        <td data-label="Color">{% if b.color %}{{ b.color.name }}{% else %}—{% endif %}</td>
+                        <td data-label="Range" style="font-family: 'JetBrains Mono', ui-monospace, monospace;">{{ b.start_value }} … {{ b.end_value }}</td>
+                        <td data-label="Pieces" style="text-align:right; font-variant-numeric: tabular-nums;">{{ b.total_pieces }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600; background:var(--cream-2);">
+                    <td colspan="3">Total</td>
+                    <td style="text-align:right; font-variant-numeric: tabular-nums;">{{ snapshot.total_in_batches }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <div style="margin-top:12px;">
+        <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-ghost">View / Print Barcodes →</a>
+    </div>
+</section>
+{% endif %}
+
+{% comment %} SECTION 05 — COMPLETE + ADVANCE {% endcomment %}
+{% if can_complete %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">05</span>
+        <div>
+            <h2 class="panel-title">Complete + Advance</h2>
+            <p class="panel-sub">Validates barcode count matches verified breakdown.</p>
+        </div>
+    </header>
+    <form method="post" action="{% url 'production:barcode-gen-complete' adda.code %}"
+          onsubmit="return confirm('Complete Barcode Generation and advance the Adda?');">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="btn btn-primary">
+            Complete &amp; Advance to {{ next_stage.stage.name|default:"Completion" }}
+        </button>
+    </form>
+</section>
+{% endif %}
+
+{% comment %} SECTION 06 — EXPORT PANEL (post-complete only) {% endcomment %}
+{% if stage_record.completed_at %}
+<section class="panel">
+    <header class="panel-head">
+        <span class="panel-num">06</span>
+        <div>
+            <h2 class="panel-title">Export Labels</h2>
+            <p class="panel-sub">Generate CSV / XLSX / PDF for vendor or factory printing.</p>
+        </div>
+    </header>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-primary">Export CSV</button></form>
+        <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">Export XLSX</button></form>
+        <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">PDF Summary</button></form>
+        <a href="{% url 'tracking:export-list' %}" class="btn btn-ghost">View Export History →</a>
+    </div>
+</section>
+{% endif %}
+
+<style>
+    .bg-summary-card {
+        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
+        border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .bg-summary-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 10px;
+    }
+    .bg-summary-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+    }
+    .bg-summary-grid > div { display: flex; flex-direction: column; gap: 2px; }
+    .bg-summary-grid .lbl {
+        font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--stone);
+    }
+    .bg-summary-grid .val {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink);
+    }
+    .bg-info-block {
+        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.25);
+        border-radius: 10px; padding: 14px 16px; color: var(--ink);
+        font-size: 14px;
+    }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+        display: inline-block; padding: 4px 10px; border-radius: 999px;
+        background: var(--cream-2); border: 1px solid var(--cream-3);
+        font-size: 12px; color: var(--ink);
+    }
+    @media (max-width: 600px) {
+        .bg-summary-grid .val { font-size: 16px; }
+    }
+</style>

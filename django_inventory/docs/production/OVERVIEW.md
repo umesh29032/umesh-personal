@@ -1,16 +1,16 @@
 # Production Tracking — Overview
 
-**Status:** 3 stages live (Layering · Cutting Pattern · Cutting). 74/74 tests green. `manage.py check` clean.  Last touched 2026-05-28.
+**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]). 196/196 tests green. `manage.py check` clean.  Last touched 2026-05-29.
 
-End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake → batch (Adda) production → layering → cutting-pattern design → cutting → barcode generation. Replaces the gutted batch/cloth code in the old `inventory` app (which now only owns RBAC + dashboard).
+End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake → batch (Adda) production → layering → cutting-pattern design → cutting → barcode generation → export to vendor. Replaces the gutted batch/cloth code in the old `inventory` app (which now only owns RBAC + dashboard).
 
 ## Three-app split
 
 | App | Responsibility | Owns |
 |---|---|---|
 | `raw_materials` | Cloth inventory + master data | `ClothType`, `ClothColor`, `StorageLocation`, `ClothRoll` |
-| `production` | Products, patterns, stages, workflows, stage records | `Product`, `ProductPattern`, `ProductPatternAssignment`, `Stage`, `WorkflowStage`, `Adda`, `AddaStageRecord`, `LayeringRecord`, `LayeringRollEntry`, `RemainingClothOfClothRoll`, `CuttingPatternRecord`, `CuttingPatternPhoto`, `CuttingRecord` |
-| `tracking` | Barcodes + per-domain audit history | `BatchBarcode`, `ClothRollHistory`, `AddaHistory`, `ProductHistory` |
+| `production` | Products, patterns, sizes, stages, workflows, stage records | `Product`, `ProductPattern`, `ProductPatternAssignment`, `ProductSize`, `Stage`, `WorkflowStage`, `Adda`, `AddaStageRecord`, `LayeringRecord`, `LayeringRollEntry`, `RemainingClothOfClothRoll`, `CuttingPatternRecord`, `CuttingPatternPhoto`, `CuttingPatternVerification`, `CuttingPatternSizeAllocation`, `CuttingRecord`, `CuttingPieceBreakup`, `CuttingBundle`, `CuttingBundleItem`, **`AddaProductSizeColorPieceBreakdown`**, **`BarcodeGenerationRecord`**, **`LabelPrintQueue`** (stub) |
+| `tracking` | Barcodes + exports + per-domain audit history | `BarcodeBatch`, `BatchBarcode`, **`BarcodeExportBatch`**, `ClothRollHistory`, `AddaHistory`, `ProductHistory` |
 | `expense` (future) | Worker payment ledger | placeholder only; `AddaStageRecord.workers` M2M migrates to `through='expense.StageWorkAssignment'` later |
 
 **Boundary rule**: cross-app FKs point downstream only.
@@ -26,10 +26,11 @@ End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake �
 - `access_by_skill` M2M (Skill)
 - `access_by_role` M2M (Role)
 
-Three well-known codes:
+Four well-known codes:
 - `STAGE_LAYERING = 'layering'`
-- `STAGE_CUTTING_PATTERN = 'cutting_pattern'`  ← NEW 2026-05-28
+- `STAGE_CUTTING_PATTERN = 'cutting_pattern'`
 - `STAGE_CUTTING = 'cutting'`
+- `STAGE_BARCODE_GENERATION = 'barcode_generation'`  ← NEW 2026-05-29 (optional per-product)
 
 Super Admin + Manager bypass per-stage access via `MANAGEMENT_ROLES` in `production.services.access_service`.
 

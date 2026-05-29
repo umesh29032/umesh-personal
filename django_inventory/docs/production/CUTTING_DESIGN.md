@@ -1,8 +1,17 @@
 # Cutting Pattern Validation + Cutting Stage — Design Doc
 
-**Status:** Design only. No code yet. Drafted 2026-05-28.
+**Status:** **SHIPPED 2026-05-29** (PRs 5-12 in commit `b422570a`; PR-A→PR-E barcode extraction in subsequent commits). Original 5-phase plan implemented + cutting inline barcode generation extracted into separate `barcode_generation` stage.
+
+**Successor docs:**
+- [BARCODE_STAGE_PLAN.md](BARCODE_STAGE_PLAN.md) — barcode extraction decisions (D1-D5)
+- [BARCODE_GENERATION.md](BARCODE_GENERATION.md) — barcode_generation stage spec
+- [../tracking/EXPORTS.md](../tracking/EXPORTS.md) — export flow
+- [OVERVIEW.md](OVERVIEW.md) — current stage list
+
 **Author intent:** Umesh (junior dev) + Claude pair-design session.
 **Companion docs:** [OVERVIEW.md](OVERVIEW.md), [CUTTING_PATTERN.md](CUTTING_PATTERN.md), [LAYERING_STAGE.md](LAYERING_STAGE.md), [TRACKING.md](TRACKING.md).
+
+> This document is retained for historical context. For current architecture, read the successor docs above first.
 
 This doc captures the agreed-upon design for upgrading the **Cutting Pattern** stage validation rules and building the **Cutting** stage from skeleton to full production-ready. It supersedes the bare bullet plan in [PRODUCTION_APP.md](PRODUCTION_APP.md) for these two stages.
 

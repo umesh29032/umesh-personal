@@ -289,9 +289,37 @@ Complete-time gate: `has_video OR has_photo` (at least one).
 ```
 CuttingRecord
   ├── stage_record (OneToOne AddaStageRecord)
-  ├── pieces_cut (PositiveInteger)          → triggers BatchBarcode generation
+  ├── pieces_cut (PositiveInteger)          → denorm SUM(CuttingBundleItem.count)
   └── notes
+
+CuttingPieceBreakup (suggested inventory; size × color × pattern × count + consumed_count)
+CuttingBundle      (header per (cutting_record, size); total_pieces denorm)
+CuttingBundleItem  (bundle line: pattern × color × count; source_breakup FK for consumed_count restore)
+
+On completion → materialises:
+AddaProductSizeColorPieceBreakdown    (cutting_record × size × color × verified_piece_count)
+                                       ↑ manufacturing truth, frozen, source for downstream
 ```
+
+### 5.6.1 Barcode Generation stage detail (NEW 2026-05-29 — optional per-product)
+
+```
+BarcodeGenerationRecord
+  ├── stage_record (OneToOne AddaStageRecord)
+  ├── total_barcodes (PositiveInteger)      → denorm SUM(BarcodeBatch.total_pieces)
+  ├── generated_at (DateTime, nullable)     → set when one-shot generate succeeds
+  └── notes
+
+Reads:  AddaProductSizeColorPieceBreakdown    (frozen at cutting completion)
+Writes: tracking.BarcodeBatch                  (one-shot per stage)
+```
+
+Per-product workflow: products without `barcode_generation` in their
+`WorkflowStage` list still inline-generate barcodes at cutting completion
+(legacy back-compat). New products opt in by admin via product flow editor.
+
+Reopen guards: refused if any `BatchBarcode` scanned OR any
+`BarcodeExportBatch` exists. Detailed spec: [docs/production/BARCODE_GENERATION.md](docs/production/BARCODE_GENERATION.md).
 
 ### 5.7 Cloth inventory
 
@@ -313,11 +341,27 @@ ClothRoll
 ### 5.8 Tracking
 
 ```
-BatchBarcode
+BarcodeBatch  (range header — one row per (size, color) combo per Adda)
+  ├── adda, product, color, size, bundle (PROTECT FKs)
+  ├── start_seq..end_seq (contiguous range)
+  └── total_pieces (denorm)
+
+BatchBarcode  (per-piece scan state — lazy-created on first scan)
   ├── adda (FK)
+  ├── batch (FK BarcodeBatch — backfilled on lazy create)
   ├── piece_seq (sequence within Adda)
   ├── value = "{ADDA_CODE}-{PIECE_SEQ:04d}"
+  ├── status (pending/packed/dispatched/missing)
+  ├── last_scanned_at / last_scanned_by
   └── QR served at /tracking/scan/<value>/
+
+BarcodeExportBatch  (NEW 2026-05-29 — export manifest)
+  ├── export_code = "EXP-YYYY-NNN" (unique)
+  ├── adda, product, barcode_gen_record (PROTECT FKs)
+  ├── export_method (csv/xlsx/pdf)
+  ├── exported_by (User)
+  └── total_labels (frozen at first export)
+  Files regenerated on-demand from live BarcodeBatch — not stored on disk.
 
 AddaHistory     (change_type: created | stage_advanced | stage_reopened | status_changed | roll_assigned | completed)
 ClothRollHistory
@@ -325,6 +369,8 @@ ProductHistory
 ```
 
 All history rows write-only via `tracking.services.history_service.log_*`. **No Django signals** (project rule — see `production/signals.py` tombstone).
+
+Export details: [docs/tracking/EXPORTS.md](docs/tracking/EXPORTS.md).
 
 ### 5.9 Storefront
 

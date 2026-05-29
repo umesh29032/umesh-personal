@@ -20,6 +20,11 @@ from .pattern_stage_views import (
     PatternSetSizesView,
     _build_pattern_context as _build_pattern_context,
 )
+from .barcode_gen_views import (
+    BarcodeGenWorkspaceView, BarcodeGenStartView, BarcodeGenGenerateView,
+    BarcodeGenCompleteView, BarcodeGenReopenView,
+    _build_barcode_gen_context as _build_barcode_gen_context,
+)
 from .stage_views import (
     CuttingBreakupDeleteView,
     CuttingBreakupSaveView,
@@ -87,4 +92,6 @@ __all__ = [
     'PatternAddPhotoView', 'PatternRemovePhotoView', 'PatternCompleteView',
     'PatternReopenView', 'PatternVerifyView', 'PatternUnverifyView',
     'PatternSetSizesView',
+    'BarcodeGenWorkspaceView', 'BarcodeGenStartView', 'BarcodeGenGenerateView',
+    'BarcodeGenCompleteView', 'BarcodeGenReopenView',
 ]

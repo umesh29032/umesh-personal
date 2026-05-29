@@ -196,6 +196,8 @@ to fit iframe height. Implemented in script at bottom.
         {% include 'production/_stage_panel_cutting_pattern.html' %}
     {% elif stage_type == 'cutting' %}
         {% include 'production/_stage_panel_cutting.html' %}
+    {% elif stage_type == 'barcode_generation' %}
+        {% include 'production/_stage_panel_barcode_gen.html' %}
     {% else %}
         <p>Unknown stage: {{ stage_type }}</p>
     {% endif %}

@@ -103,6 +103,16 @@ urlpatterns = [
     path('addas/<str:code>/cutting/workspace/complete/',       views.CuttingWorkspaceCompleteView.as_view(), name='cutting-workspace-complete'),
     path('addas/<str:code>/cutting/reopen/',                   views.CuttingReopenView.as_view(),            name='cutting-reopen'),
 
+    # ── Barcode Generation stage (PR-C 2026-05-29) ───────────────────────
+    # Sequence: start → generate → complete
+    # Optional per-product workflow stage (legacy products skip; cutting
+    # inline-generates for back-compat).
+    path('addas/<str:code>/barcode-gen/',          views.BarcodeGenWorkspaceView.as_view(),  name='barcode-gen-workspace'),
+    path('addas/<str:code>/barcode-gen/start/',    views.BarcodeGenStartView.as_view(),      name='barcode-gen-start'),
+    path('addas/<str:code>/barcode-gen/generate/', views.BarcodeGenGenerateView.as_view(),   name='barcode-gen-generate'),
+    path('addas/<str:code>/barcode-gen/complete/', views.BarcodeGenCompleteView.as_view(),   name='barcode-gen-complete'),
+    path('addas/<str:code>/barcode-gen/reopen/',   views.BarcodeGenReopenView.as_view(),     name='barcode-gen-reopen'),
+
     # Stage library CRUD (Super Admin only). Replaces old /stage-access/ page —
     # access controls now live on the Stage model itself.
     path('stages/',                views.StageListView.as_view(),   name='stage-list'),

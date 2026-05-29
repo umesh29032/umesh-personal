@@ -290,6 +290,10 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
                 and adda.current_stage.stage_type == STAGE_CUTTING
             )
             ctx.update(_build_cutting_context(self.request, adda))
+        elif stage_type == 'barcode_generation':
+            # Lazy import to avoid touching tracking models at startup.
+            from production.views.barcode_gen_views import _build_barcode_gen_context
+            ctx.update(_build_barcode_gen_context(self.request, adda))
         return ctx
 
 

@@ -54,6 +54,9 @@ Lazy-load only what you need:
 | [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md) | Production tracking subsystem (rolls + Adda + stages). |
 | [docs/production/CUTTING_PATTERN.md](docs/production/CUTTING_PATTERN.md) | Cutting-pattern stage: video, photos, verifications. |
 | [docs/production/CUTTING_DESIGN.md](docs/production/CUTTING_DESIGN.md) | Cutting design spec (ProductSize + breakup + bundles). |
+| [docs/production/BARCODE_STAGE_PLAN.md](docs/production/BARCODE_STAGE_PLAN.md) | Plan + decisions for barcode_generation stage extraction (2026-05-29). |
+| [docs/production/BARCODE_GENERATION.md](docs/production/BARCODE_GENERATION.md) | Barcode Generation stage spec — flow, validation, reopen rules. |
+| [docs/tracking/EXPORTS.md](docs/tracking/EXPORTS.md) | Barcode export flow (CSV / XLSX / PDF) + future label tracking. |
 | [AUDIT_2026_05_29.md](AUDIT_2026_05_29.md) | Latest application audit report (read-only findings). |
 
 ---
@@ -83,18 +86,26 @@ ClothRoll (raw_materials)
     ▼
 Adda  ──── per Product, auto-coded T-SHIRT-001
     │
-    ├── Stage 1: Layering          (start → attach rolls → complete)
-    ├── Stage 2: Cutting Pattern   (video + photos + verify + size %)
-    ├── Stage 3: Cutting           (breakup → bundles → barcodes)
-    └── ...future stages           (stitching, packing, dispatch)
+    ├── Stage 1: Layering            (start → attach rolls → complete)
+    ├── Stage 2: Cutting Pattern     (video + photos + verify + size %)
+    ├── Stage 3: Cutting             (breakup → bundles → freeze breakdown)
+    ├── Stage 4: Barcode Generation  (generate batches → validate counts)  [optional]
+    └── ...future stages             (stitching, packing, dispatch)
     │
     ▼
-BatchBarcode (tracking)  ←  scan via QR  →  scan_detail page
+BarcodeBatch / BatchBarcode (tracking)  ←  scan via QR  →  scan_detail page
+    │
+    ▼
+Export (CSV / XLSX / PDF summary)  →  Vendor or factory printer
 ```
 
-Each stage transition logs to `tracking.AddaHistory`. Stage records own
-their stage-specific child rows (LayeringRecord, CuttingRecord,
-CuttingPatternRecord). Barcodes generated automatically at cutting completion.
+Per-product workflow: some products skip Barcode Generation entirely
+(legacy cutting still inline-generates barcodes). Each stage transition
+logs to `tracking.AddaHistory`. Stage records own their stage-specific
+child rows (`LayeringRecord`, `CuttingPatternRecord`, `CuttingRecord`,
+`BarcodeGenerationRecord`). Cutting completion materializes
+`AddaProductSizeColorPieceBreakdown` — the **manufacturing truth** that
+downstream stages consume.
 
 ---
 

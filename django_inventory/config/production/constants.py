@@ -10,3 +10,7 @@ hard-codes against a specific stage (most code should use the Stage table).
 STAGE_LAYERING = 'layering'
 STAGE_CUTTING_PATTERN = 'cutting_pattern'
 STAGE_CUTTING = 'cutting'
+# Barcode generation = stage AFTER cutting (PR-A 2026-05-29). Optional per
+# product workflow — some products skip it entirely. Cutting completion
+# materializes verified breakdown; barcode_generation consumes that breakdown.
+STAGE_BARCODE_GENERATION = 'barcode_generation'

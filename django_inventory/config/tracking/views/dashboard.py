@@ -8,7 +8,6 @@ Har row pe Print QR + Export CSV actions hain (factory mein use karne ke liye).
 annotate() + filter pattern:
   Conditional Count via filter=Q(...) — single SQL query mein har status ka count.
 """
-import csv
 from datetime import datetime, time
 
 from django.contrib.auth.decorators import login_required
@@ -115,37 +114,26 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
 
 @login_required
 def barcode_export_csv(request, adda_code):
-    """Download per-piece barcode rows as CSV. Expands BarcodeBatch ranges
-    into virtual piece rows + merges scanned-state from BatchBarcode."""
+    """Legacy CSV export endpoint — quick download without manifest tracking.
+
+    PR-D 2026-05-29: this view is the back-compat / quick-download path
+    used by `barcode_list.html` toolbar. New canonical path is
+    `tracking:export-csv` which creates a `BarcodeExportBatch` manifest
+    row + supports re-download. Both paths return the same CSV bytes.
+
+    Why keep this view?
+      • Pre-completion download (works even if barcode_generation stage
+        not yet complete — diagnostic + sanity)
+      • Lightweight URL stable for any saved bookmarks
+    """
     if not user_has_role(request.user, PRODUCTION_ROLES):
         return HttpResponse(status=403)
     adda = get_object_or_404(Adda, code=adda_code)
-    from tracking.models import BarcodeBatch, BatchBarcode
-    batches = list(
-        BarcodeBatch.objects.filter(adda=adda)
-        .select_related('size', 'color').order_by('start_seq')
+    # Reuse render-only helper from export service (no manifest row written).
+    from tracking.services.barcode_export_service import _render_csv_bytes
+    payload = _render_csv_bytes(adda)
+    response = HttpResponse(payload, content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = (
+        f'attachment; filename="{adda.code}-barcodes.csv"'
     )
-    scanned = {
-        bc.piece_seq: bc for bc in
-        BatchBarcode.objects.filter(adda=adda).select_related('last_scanned_by')
-    }
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{adda.code}-barcodes.csv"'
-    writer = csv.writer(response)
-    writer.writerow([
-        'piece_seq', 'value', 'size', 'color', 'status',
-        'last_scanned_at', 'last_scanned_by',
-    ])
-    for batch in batches:
-        size_label = batch.size.code.upper() if batch.size else ''
-        color_label = batch.color.name if batch.color else ''
-        for seq in range(batch.start_seq, batch.end_seq + 1):
-            value = batch.value_for_seq(seq)
-            bc = scanned.get(seq)
-            writer.writerow([
-                seq, value, size_label, color_label,
-                bc.status if bc else 'pending',
-                bc.last_scanned_at.isoformat() if bc and bc.last_scanned_at else '',
-                bc.last_scanned_by.email if bc and bc.last_scanned_by else '',
-            ])
     return response

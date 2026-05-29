@@ -911,3 +911,175 @@ class CuttingBundleItem(TimeStampedModel):
 
     def __str__(self):
         return f"{self.pattern.name}/{self.color.name} × {self.count}"
+
+
+# ── Verified breakdown + Barcode Generation stage (PR-A 2026-05-29) ─────────
+# YEH MODELS KYU HAIN?
+# Cutting stage complete hone par "verified production breakdown" yahan freeze
+# hota hai. Per-(size, color) piece count = manufacturing truth. Barcode
+# Generation aur future stages (Stitching, Packing) isse hi consume karenge —
+# recompute nahi. CuttingBundleItem (pattern × color × count) source data,
+# yeh aggregate (size × color × count) materialized snapshot.
+#
+# Architecture (BARCODE_STAGE_PLAN.md):
+#   CuttingRecord
+#     └─ AddaProductSizeColorPieceBreakdown    (per-(size, color) aggregate)
+#         └─ BarcodeGenerationRecord            (typed stage record)
+#             └─ tracking.BarcodeBatch          (range header per (size, color))
+#                 └─ tracking.BatchBarcode      (lazy per-piece scan state)
+
+
+class AddaProductSizeColorPieceBreakdown(TimeStampedModel):
+    """Cutting stage ka final verified per-(size, color) piece count snapshot.
+
+    PURPOSE:
+    Cutting master ne actual bundles bana liye → service `CuttingBundleItem`
+    rows ko (size, color) pe aggregate karke is table mein freeze karta hai
+    (cutting completion ke andar atomic). Future stages bina recompute is
+    table ko query karte hain.
+
+    Why denormalised storage?
+        • Barcode Generation stage stable input chahiye
+        • Cutting reopen aur regenerate ke beech audit trail
+        • Future Stitching/Packing stages bhi same aggregate consume karenge
+        • Read-heavy dashboards bina JOIN aggregate dikha sakte
+
+    Lifecycle:
+        cutting complete  → bulk_create rows for this cutting_record
+        cutting reopen    → delete all rows for this cutting_record
+        barcode reopen    → preserve (barcode stage doesn't touch breakdown)
+
+    Relationships:
+        cutting_record  CASCADE  → cutting reopen ke saath rows delete
+        bundle          SET_NULL → bundle delete pe row safe (legacy NULL bhi)
+        size + color    PROTECT  → master data archive blocked
+    """
+
+    # PROTECT = Adda delete blocked; manufacturing truth audit-critical
+    adda = models.ForeignKey(
+        Adda, on_delete=models.PROTECT, related_name='size_color_breakdowns',
+    )
+    # Denormalised Product FK — fast filter for dashboards without JOIN
+    product = models.ForeignKey(
+        Product, on_delete=models.PROTECT, related_name='+',
+    )
+    # CASCADE = cutting reopen rows clean up automatically
+    cutting_record = models.ForeignKey(
+        'CuttingRecord', on_delete=models.CASCADE,
+        related_name='size_color_breakdowns',
+    )
+    # SET_NULL = bundle delete OK (rare); legacy non-bundle products NULL
+    bundle = models.ForeignKey(
+        CuttingBundle, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='size_color_breakdowns',
+    )
+    # nullable for legacy products that did not have ProductSize attached
+    size = models.ForeignKey(
+        ProductSize, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # nullable for legacy products (no per-color tracking)
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # Final verified count — barcode generation will produce this many barcodes
+    verified_piece_count = models.PositiveIntegerField()
+    # Audit fields
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, related_name='+',
+    )
+
+    class Meta:
+        # Ek cutting_record + size + color combo do baar nahi
+        unique_together = [('cutting_record', 'size', 'color')]
+        indexes = [
+            # Dashboard query: "is Adda ka size-wise breakdown"
+            models.Index(fields=['adda', 'size', 'color']),
+            # Per-cutting aggregate
+            models.Index(fields=['cutting_record']),
+        ]
+        ordering = ['adda', 'size__display_order', 'color__name']
+
+    def __str__(self):
+        size_label = self.size.code.upper() if self.size_id else '—'
+        color_label = self.color.name if self.color_id else '—'
+        return f"{self.adda.code} · {size_label} · {color_label} × {self.verified_piece_count}"
+
+
+class BarcodeGenerationRecord(TimeStampedModel):
+    """Barcode Generation stage ka typed record.
+
+    Mirror of `LayeringRecord` / `CuttingRecord` / `CuttingPatternRecord` —
+    OneToOne `AddaStageRecord` jo `barcode_generation` workflow stage pe hai.
+
+    `total_barcodes` denormalised hota hai = SUM(BarcodeBatch.total_pieces).
+    Generation idempotent — re-run pe rows nahi badhte (one-shot in service).
+
+    Lifecycle:
+        start_barcode_generation()       → sr.workers set + record exists
+        generate_barcodes()              → BarcodeBatch rows + total_barcodes
+                                            denorm + generated_at stamp
+        complete_barcode_generation()    → count match validation + advance
+        reopen_barcode_generation()      → cleared if no scans + no exports
+    """
+
+    stage_record = models.OneToOneField(
+        AddaStageRecord, on_delete=models.CASCADE,
+        related_name='barcode_generation',
+    )
+    # Denorm SUM(BarcodeBatch.total_pieces) — updated by service on generate
+    total_barcodes = models.PositiveIntegerField(default=0)
+    notes = models.TextField(blank=True)
+    # Set when generate_barcodes() runs successfully; None until then
+    generated_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"BarcodeGen · {self.stage_record.adda.code} · {self.total_barcodes}"
+
+
+class LabelPrintQueue(TimeStampedModel):
+    """STUB — future vendor/factory label printing workflow.
+
+    Designed-only-in-PR-A; no service logic yet. Per BARCODE_STAGE_PLAN.md
+    §13: "Implement label print queue logic — deferred per user instruction."
+
+    Future flow:
+        Barcode generated → Export to vendor → Vendor prints → Labels received
+        → Labels stitched → Future Manufacturing Tracking
+
+    When real workflow lands:
+        • Service adds rows on export completion (vendor case)
+        • Status transitions logged via tracking.AddaHistory
+        • Factory-printer integration writes printed_at directly
+    """
+
+    # FK to tracking.BarcodeExportBatch — string FK to avoid cycle
+    export_batch = models.ForeignKey(
+        'tracking.BarcodeExportBatch', on_delete=models.PROTECT,
+        related_name='label_print_queue_rows',
+    )
+
+    class Status(models.TextChoices):
+        QUEUED = 'queued', 'Queued'
+        SENT = 'sent', 'Sent to vendor'
+        RECEIVED = 'received', 'Labels received'
+        PRINTED = 'printed', 'Printed (factory)'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    vendor_name = models.CharField(max_length=120, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED,
+    )
+    sent_at = models.DateTimeField(null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    printed_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+
+    def __str__(self):
+        return f"PrintQueue · {self.export_batch.export_code} · {self.status}"

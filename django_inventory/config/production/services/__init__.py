@@ -62,6 +62,15 @@ from .cutting_pattern_service import (
     unverify_pattern,
     verify_pattern,
 )
+from .barcode_generation_service import (
+    complete_barcode_generation,
+    generate_barcodes,
+    get_barcode_snapshot,
+    get_or_create_barcode_stage_record,
+    preview_barcode_counts,
+    reopen_barcode_generation,
+    start_barcode_generation,
+)
 from .activity_service import adda_activity, user_activity_across_addas
 from .access_service import user_can_access_stage, stage_access_map
 from .flow_service import (
@@ -121,6 +130,14 @@ __all__ = [
     'reopen_pattern_stage',
     'get_or_create_pattern_stage_record',
     'get_pattern_snapshot',
+    # Barcode Generation stage (PR-C 2026-05-29)
+    'start_barcode_generation',
+    'generate_barcodes',
+    'complete_barcode_generation',
+    'reopen_barcode_generation',
+    'get_or_create_barcode_stage_record',
+    'preview_barcode_counts',
+    'get_barcode_snapshot',
     # Activity
     'adda_activity',
     'user_activity_across_addas',

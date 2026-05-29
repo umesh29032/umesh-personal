@@ -147,6 +147,75 @@ def _generate_legacy_batch(cutting_record, adda) -> int:
     return count
 
 
+@transaction.atomic
+def generate_from_breakdown(barcode_gen_record) -> int:
+    """PR-B 2026-05-29 — generate BarcodeBatch rows from breakdown snapshot.
+
+    Naya canonical path: barcode_generation stage iss function ko call karta
+    hai. AddaProductSizeColorPieceBreakdown rows ko (size, color) sort karke
+    contiguous seq ranges allocate karta — same deterministic key as
+    generate_for_cutting.
+
+    DIFFERENCE FROM generate_for_cutting:
+      generate_for_cutting    → reads CuttingBundleItem (live, can change)
+      generate_from_breakdown → reads AddaProductSizeColorPieceBreakdown
+                                (frozen at cutting completion — manufacturing
+                                 truth)
+
+    Both produce identical BarcodeBatch shape. New stage uses this; legacy
+    inline cutting path keeps generate_for_cutting for back-compat.
+
+    Raises IntegrityError if any BarcodeBatch already exists for this Adda.
+    Returns: total pieces covered across all batches.
+    """
+    from production.models import AddaProductSizeColorPieceBreakdown
+    sr = barcode_gen_record.stage_record
+    adda = sr.adda
+    if BarcodeBatch.objects.filter(adda=adda).exists():
+        raise IntegrityError(f"barcode batches already generated for {adda.code}")
+
+    # Source = breakdown rows. Find them via the cutting_record on this Adda.
+    # Production model has Adda → cutting_record via stage_record chain.
+    from production.models import AddaStageRecord, CuttingRecord
+    cutting_sr = AddaStageRecord.objects.filter(
+        adda=adda, workflow_stage__stage__code='cutting',
+    ).first()
+    if cutting_sr is None:
+        return 0
+    cr = getattr(cutting_sr, 'cutting', None)
+    if cr is None:
+        return 0
+
+    rows = list(
+        AddaProductSizeColorPieceBreakdown.objects
+        .filter(cutting_record=cr)
+        .select_related('size', 'color', 'bundle')
+    )
+    if not rows:
+        return 0
+
+    sorted_rows = sorted(rows, key=lambda r: _allocation_key(r.size, r.color))
+    batches: list[BarcodeBatch] = []
+    next_seq = 1
+    for r in sorted_rows:
+        if r.verified_piece_count <= 0:
+            continue
+        start = next_seq
+        end = next_seq + r.verified_piece_count - 1
+        batches.append(BarcodeBatch(
+            adda=adda, product=adda.product,
+            color_id=r.color_id, size_id=r.size_id,
+            bundle_id=r.bundle_id,
+            start_seq=start, end_seq=end,
+            total_pieces=r.verified_piece_count,
+        ))
+        next_seq = end + 1
+
+    if batches:
+        BarcodeBatch.objects.bulk_create(batches)
+    return next_seq - 1
+
+
 # ── Value parse + range lookup ─────────────────────────────────────────────
 
 def parse_value(value: str) -> tuple[str, int] | None:

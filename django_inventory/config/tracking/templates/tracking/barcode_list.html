@@ -17,7 +17,13 @@
     <div class="card card-clip">
         <div class="card-header">
             <div class="card-title">Batches (per Color × Size)</div>
-            <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Export CSV</a>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Quick CSV</a>
+                {# Manifest-tracked exports (PR-D 2026-05-29). Refused if barcode_generation stage not complete. #}
+                <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export CSV</button></form>
+                <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export XLSX</button></form>
+                <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export PDF</button></form>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="tbl">
