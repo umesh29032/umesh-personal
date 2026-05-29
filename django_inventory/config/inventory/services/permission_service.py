@@ -99,24 +99,36 @@ def user_can_edit_financials(user) -> bool:
 
 
 def user_has_perm(user, perm_codename: str) -> bool:
-    """
-    Check a Django-style permission. Looks at:
-      - superuser flag
-      - ROLE_SUPER_ADMIN (implicit bypass — admin role always wins)
-      - user's Role.permissions
-      - Django's built-in user.has_perm (groups / direct perms)
+    """User ke paas given Django permission hai ya nahi.
+
+    perm_codename format: 'app_label.codename' (e.g. 'production.change_stage').
+
+    CHECK ORDER (sabse strong se shuru):
+      1. Authenticated? Nahi to False.
+      2. is_superuser? True → grant all (Django built-in).
+      3. user.role.code == 'super_admin'? → grant all (project rule).
+         WHY: Super Admin role roles + perms manage karta hai. Agar usko
+         har perm tick karna pade to bootstrap problem.
+      4. user ke role me yeh codename hai? → True
+      5. Django default has_perm (groups + direct perms) → fallback
+
+    PROJECT CONVENTION: views perm-check ke liye is helper ko call kare,
+    raw user.is_superuser nahi (CLAUDE.md rule #6).
     """
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
-    # Super Admin role bypasses every perm gate by design — they manage
-    # roles + permissions, so they must transitively own every page.
+    # Super Admin role implicit bypass — role-perm matrix mein har checkbox
+    # tick karne ki zaroorat nahi.
     role = getattr(user, 'role', None)
     if role and role.code == ROLE_SUPER_ADMIN:
         return True
+    # perm_codename "app.codename" format hai. Hum codename part match karte
+    # hain (DB column codename store karta hai without app prefix).
     if role and role.permissions.filter(codename=perm_codename.split('.')[-1]).exists():
         return True
+    # Django default check — groups + user_permissions M2M.
     return user.has_perm(perm_codename)
 
 
@@ -149,9 +161,16 @@ def _any_role(*codes):
 
 
 def _any_perm(*codenames):
-    """Sidebar predicate: visible if user holds any of these Django perms.
+    """Sidebar predicate factory — agar user ke paas in mein se KOI BHI
+    perm ho to MenuItem visible.
 
-    Super Admin bypass + role-perm lookup live in user_has_perm.
+    Usage in SIDEBAR registry:
+        MenuItem('Stages', 'production:stage-list',
+                 predicate=_any_perm('production.view_stage',
+                                     'production.change_stage'))
+
+    Super Admin bypass aur role-perm lookup `user_has_perm` ke andar hai —
+    yeh factory just multiple perms ko OR karta hai.
     """
     return lambda user: any(user_has_perm(user, c) for c in codenames)
 
@@ -348,11 +367,19 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
 
 # ── View-layer helpers ──────────────────────────────────────────────────────
 
-# Curated sections for the role editor — group only the models a non-developer
-# admin should grant access to. Internal join tables (AddaStageRecord,
-# LayeringRollEntry, RemainingClothOfClothRoll, *Record, *History) are written
-# by services on behalf of users — exposing their perms would be noise + foot-gun.
-# Each section: (label, description, [(app_label, model), ...]).
+# ── Role Editor Sections (CURATED) ──────────────────────────────────────────
+# YEH STRUCTURE KYU HAI?
+# Default Django role editor 80+ perms ka noise dikha deta tha (har model
+# ka view/add/change/delete). Admin overwhelmed ho jata tha. Yahan hum
+# manually 5 logical sections curate karte hain — sirf un models ko
+# expose karte hain jo non-developer admin grant kare.
+#
+# Hide kiye gaye models (service-only writes):
+#   AddaStageRecord, LayeringRollEntry, LayeringRecord, CuttingPatternRecord,
+#   CuttingPatternPhoto, CuttingRecord, RemainingClothOfClothRoll,
+#   ProductPatternAssignment, *History tables
+#
+# Each section tuple: (label, description, [(app_label, model), ...])
 ROLE_EDITOR_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
     (
         'Production Flow',

@@ -1,16 +1,30 @@
-"""ProductPattern CRUD — the reusable pattern library + per-product assignments.
+"""ProductPattern CRUD — reusable pattern library + per-product assignments.
 
 YEH FILE KYU HAI?
 ─────────────────
 Cutting master ko pata hona chahiye ki har Product ke liye kitne aur kaunse
 patterns required hain (T-Shirt = 1 Front + 1 Back + 2 Sleeve etc.). Yeh
-views admin ko pattern library manage karne aur Product → Pattern mapping
-configure karne dete hain.
+file admin ko 2 cheez karne deti hai:
 
-RBAC:
+  1. PATTERN LIBRARY MANAGE KARNA (`/production/patterns/`)
+     Reusable shape entries: Front Panel, Back Panel, Sleeve, Collar...
+     Code (slug), name, description, optional reference image.
+
+  2. PER-PRODUCT ASSIGNMENT (`/production/products/<pk>/patterns/`)
+     Product ke liye kaunse patterns + kitne pieces per Adda.
+     ProductPatternAssignment(product, pattern, pieces_count) row banata.
+
+VIEW CLASSES:
+  ProductPatternListView   → list page (filterable by perms)
+  ProductPatternCreateView → naya pattern banana
+  ProductPatternUpdateView → edit (code field locked after create)
+  ProductPatternDeleteView → delete (refuse if assignments exist)
+  ProductPatternsEditView  → per-product assignment editor (add/remove/update_count)
+
+RBAC (Django built-in perms — admin role editor mein assignable):
   • List/View      → production.view_productpattern
   • Add/Change/Del → production.{add,change,delete}_productpattern
-Super Admin role bypasses every perm (see permission_service.user_has_perm).
+Super Admin role bypasses every perm via `user_has_perm`.
 """
 from __future__ import annotations
 
@@ -28,8 +42,15 @@ from production.models import Product, ProductPattern, ProductPatternAssignment
 
 
 class _PatternPermissionRequired(UserPassesTestMixin):
-    """Gate ProductPattern admin pages by Django perm. Super Admin bypass via
-    user_has_perm (ROLE_SUPER_ADMIN implicit). Sub-classes set required_perm."""
+    """ProductPattern admin pages ko gate karne wala mixin.
+
+    Django ka UserPassesTestMixin pattern follow karta hai — `test_func()`
+    True return kare to view chalega, False to 403. Sub-classes
+    `required_perm` set karte hain (e.g. 'production.view_productpattern').
+
+    `user_has_perm` mein ROLE_SUPER_ADMIN implicit bypass hai — super admin
+    ko har perm checkbox tick karne ki zaroorat nahi.
+    """
 
     required_perm = ''
 
@@ -123,9 +144,18 @@ class ProductPatternDeleteView(LoginRequiredMixin, _PatternPermissionRequired, D
 
 
 class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, TemplateView):
-    """Edit a Product's pattern assignments — add/remove/update pieces_count.
+    """Per-product pattern assignment editor.
 
     URL: /production/products/<pk>/patterns/
+
+    YEH PAGE 3 ACTIONS HANDLE KARTA HAI (single endpoint, POST body se action):
+      • action=add          → new ProductPatternAssignment row banana
+      • action=remove       → assignment row delete
+      • action=update_count → existing assignment ka pieces_count change
+
+    Single POST endpoint pattern simpler hai — har action ke liye separate
+    URL nahi banane padte. Django form submit me hidden `action` field se
+    branch chalti hai.
     """
 
     required_perm = 'production.change_productpattern'
@@ -138,11 +168,15 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
         ctx = super().get_context_data(**kwargs)
         product = self.get_product()
         ctx['product'] = product
+        # Current assignments — template iss table mein dikhata hai.
+        # select_related('pattern') = ek JOIN se pattern name fetch (no N+1).
         ctx['assignments'] = (
             product.pattern_assignments
             .select_related('pattern')
             .order_by('pattern__name')
         )
+        # Available = jo abhi attached nahi hain. Exclude se duplicate
+        # assignment prevent (unique_together(product, pattern) constraint).
         assigned_ids = set(product.pattern_assignments.values_list('pattern_id', flat=True))
         ctx['available_patterns'] = (
             ProductPattern.objects.filter(is_active=True)
@@ -154,21 +188,27 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
     def post(self, request, pk):
         product = self.get_product()
         action = request.POST.get('action', '')
+
         if action == 'add':
             pattern_id = request.POST.get('pattern')
+            # max(1, count) = safety — never less than 1 piece per assignment.
             count = int(request.POST.get('pieces_count') or 1)
             if not pattern_id:
                 messages.error(request, "Pick a pattern.")
                 return redirect('production:product-patterns', pk=pk)
+            # get_or_create = idempotent. Same pattern dobara add → no-op.
             ProductPatternAssignment.objects.get_or_create(
                 product=product, pattern_id=pattern_id,
                 defaults={'pieces_count': max(1, count)},
             )
             messages.success(request, "Pattern added.")
+
         elif action == 'remove':
             assign_id = request.POST.get('assignment')
+            # Filter by product too — defense against IDOR (id guessing).
             ProductPatternAssignment.objects.filter(pk=assign_id, product=product).delete()
             messages.success(request, "Pattern removed.")
+
         elif action == 'update_count':
             assign_id = request.POST.get('assignment')
             count = int(request.POST.get('pieces_count') or 1)
@@ -176,4 +216,6 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
                 pieces_count=max(1, count),
             )
             messages.success(request, "Count updated.")
+
+        # Same page pe redirect — Post-Redirect-Get pattern (refresh-safe).
         return redirect('production:product-patterns', pk=pk)

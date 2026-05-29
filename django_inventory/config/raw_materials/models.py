@@ -15,6 +15,26 @@ from django.conf import settings
 from django.db import models
 
 
+class ActiveManager(models.Manager):
+    """Non-default manager — returns only `is_active=True` rows.
+
+    YEH MANAGER KYU HAI?
+    Master data models (ClothType, ClothColor, StorageLocation) mein
+    `is_active=False` soft-archive flag hai. Form dropdowns + service
+    lookups archived rows ko skip karna chahte hain — but admin + audit
+    queries sab kuch dikhana chahte hain. Solution:
+        Model.objects.all()    → sab rows (archived bhi)
+        Model.active.all()     → sirf is_active=True
+
+    Default `objects` ko swap NAHI karte (regression risk) — opt-in via
+    `.active` accessor. Future me jab har queryset audit ho jaaye, default
+    swap consider karna.
+    """
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
+
+
 class TimeStampedModel(models.Model):
     """Abstract base — har row mein auto created_at + updated_at columns aate hain.
 
@@ -39,6 +59,10 @@ class ClothType(TimeStampedModel):
     # is_active=False (archived) → dropdown se hide; existing rolls ki FK valid rehti hai
     is_active = models.BooleanField(default=True)
 
+    # Default manager + opt-in `.active` (returns is_active=True only).
+    objects = models.Manager()
+    active = ActiveManager()
+
     class Meta:
         ordering = ['name']   # alphabetical — dropdown user-friendly
 
@@ -53,6 +77,9 @@ class ClothColor(TimeStampedModel):
     # hex_code blank=True — har color ka hex code zaruri nahi (e.g. mixed patterns)
     hex_code = models.CharField(max_length=7, blank=True)
     is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
 
     class Meta:
         ordering = ['name']
@@ -71,6 +98,9 @@ class StorageLocation(TimeStampedModel):
     name = models.CharField(max_length=120, unique=True)
     code = models.CharField(max_length=20, unique=True)
     is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
 
     class Meta:
         ordering = ['name']
@@ -156,10 +186,12 @@ class ClothRoll(TimeStampedModel):
 
     class Meta:
         # Indexes = common queries ko fast banate hain (dashboard filter, status check)
+        # (adda, status) = "kis Adda pe kaunse status ke rolls hain" — common per-Adda query
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['cloth_type', 'cloth_color']),
             models.Index(fields=['storage_location', 'status']),
+            models.Index(fields=['adda', 'status']),
         ]
         ordering = ['-created_at']   # latest pehle dikhe
 

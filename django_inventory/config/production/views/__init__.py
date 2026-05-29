@@ -1,5 +1,8 @@
 from .dashboard import AddaDashboardView
-from .product_views import ProductListView, ProductCreateView, ProductUpdateView, ProductArchiveView
+from .product_views import (
+    ProductArchiveView, ProductCreateView, ProductListView,
+    ProductSizesEditView, ProductUpdateView,
+)
 from .adda_views import AddaListView, AddaCreateView, AddaDetailView
 from .access_views import (
     StageListView, StageCreateView, StageUpdateView, StageDeleteView,
@@ -13,10 +16,25 @@ from .pattern_views import (
 from .pattern_stage_views import (
     PatternWorkspaceView, PatternStartView, PatternSaveVideoView,
     PatternAddPhotoView, PatternRemovePhotoView, PatternCompleteView,
+    PatternReopenView, PatternVerifyView, PatternUnverifyView,
+    PatternSetSizesView,
     _build_pattern_context as _build_pattern_context,
 )
 from .stage_views import (
+    CuttingBreakupDeleteView,
+    CuttingBreakupSaveView,
+    CuttingBundleAddItemView,
+    CuttingBundleAddPiecesView,
+    CuttingBundleCreateView,
+    CuttingBundleDeleteView,
+    CuttingBundleItemDeleteView,
+    CuttingBundleItemSaveView,
     CuttingCompleteView,
+    CuttingDraftView,
+    CuttingReopenView,
+    CuttingStartView,
+    CuttingWorkspaceCompleteView,
+    CuttingWorkspaceView,
     LayeringAttachRollView,
     LayeringCompleteView,
     LayeringEntryRemoveView,
@@ -33,6 +51,7 @@ from .stage_views import (
 __all__ = [
     'AddaDashboardView',
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',
+    'ProductSizesEditView',
     'AddaListView', 'AddaCreateView', 'AddaDetailView',
     'LayeringWorkspaceView',
     'StagePanelView',
@@ -46,6 +65,19 @@ __all__ = [
     'LayeringCompleteView',
     'LayeringReopenView',
     'CuttingCompleteView',
+    'CuttingWorkspaceView',
+    'CuttingStartView',
+    'CuttingBreakupSaveView',
+    'CuttingBreakupDeleteView',
+    'CuttingBundleCreateView',
+    'CuttingBundleAddItemView',
+    'CuttingBundleAddPiecesView',
+    'CuttingBundleItemSaveView',
+    'CuttingBundleItemDeleteView',
+    'CuttingBundleDeleteView',
+    'CuttingDraftView',
+    'CuttingWorkspaceCompleteView',
+    'CuttingReopenView',
     'StageListView', 'StageCreateView', 'StageUpdateView', 'StageDeleteView',
     'ProductFlowEditView',
     'ProductPatternListView', 'ProductPatternCreateView',
@@ -53,4 +85,6 @@ __all__ = [
     'ProductPatternsEditView',
     'PatternWorkspaceView', 'PatternStartView', 'PatternSaveVideoView',
     'PatternAddPhotoView', 'PatternRemovePhotoView', 'PatternCompleteView',
+    'PatternReopenView', 'PatternVerifyView', 'PatternUnverifyView',
+    'PatternSetSizesView',
 ]

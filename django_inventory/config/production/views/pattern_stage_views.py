@@ -1,14 +1,29 @@
-"""Cutting-pattern stage views — workspace + actions.
+"""Cutting-pattern stage views — workspace + 6 action handlers.
 
-URLs:
-  GET  addas/<code>/pattern/                   → workspace (full page)
-  POST addas/<code>/pattern/start/             → start stage (manager)
-  POST addas/<code>/pattern/save/              → upload/replace video + notes
-  POST addas/<code>/pattern/photos/add/        → attach photo (multipart)
-  POST addas/<code>/pattern/photos/<pk>/remove/→ detach photo
-  POST addas/<code>/pattern/complete/          → finalize + advance
+YEH FILE KYU HAI?
+─────────────────
+Cutting-pattern stage ka user-facing layer. Service layer ko HTTP se connect
+karta hai. Pattern:
+   browser POST → view.post() → service function → redirect back
 
-Embedded mode (?embedded=1) returns to the stage-panel iframe URL after POST.
+URL TABLE:
+  GET  addas/<code>/pattern/                    → workspace (full page)
+  POST addas/<code>/pattern/start/              → manager assigns workers
+  POST addas/<code>/pattern/save/               → upload/replace video + notes
+  POST addas/<code>/pattern/photos/add/         → attach 1+ photos (multipart)
+  POST addas/<code>/pattern/photos/<pk>/remove/ → detach photo
+  POST addas/<code>/pattern/complete/           → finalize + advance
+
+EMBEDDED MODE:
+  Adda detail page workspace ko iframe me embed karta hai
+  (`?embedded=1`). Action views check karte hain `request.POST['embedded']`
+  → agar set hai to redirect target stage-panel embedded URL hota hai (not
+  full workspace). Iframe me iframe na ho jaaye.
+
+SHARED CONTEXT BUILDER:
+  `_build_pattern_context` — workspace + StagePanelView ke between context
+  share karta hai (DRY). next_stage label, can_assign/upload/complete
+  flags, photos list ye sab yahin compute hote hain.
 """
 from __future__ import annotations
 
@@ -28,12 +43,16 @@ from accounts.skills import (
 )
 from inventory.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_CUTTING_PATTERN
+from production.forms import PatternVerifyForm, SizeAllocationForm
 from production.models import (
-    Adda, AddaStageRecord, CuttingPatternPhoto, WorkflowStage,
+    Adda, AddaStageRecord, CuttingPatternPhoto, ProductPatternAssignment,
+    ProductSize, WorkflowStage,
 )
 from production.services import (
-    attach_pattern_photo, complete_pattern_stage,
-    get_or_create_pattern_stage_record, save_pattern_record, start_pattern_stage,
+    attach_pattern_photo, complete_pattern_stage, ensure_pattern_record,
+    get_or_create_pattern_stage_record, reopen_pattern_stage,
+    save_pattern_record, set_size_allocation, start_pattern_stage,
+    unverify_pattern, verify_pattern,
 )
 
 from .mixins import ProductionRoleMixin
@@ -55,17 +74,27 @@ def _get_pattern_stage_record(adda: Adda) -> AddaStageRecord | None:
 
 
 class PatternStartForm(forms.Form):
+    """Start-stage form — manager workers select karta hai.
+
+    queryset __init__ mein set kyu hota hai (class body mein nahi)?
+    Class body Django startup pe execute hoti hai — us waqt DB ready
+    nahi hoti. Lazy init via __init__ safer hai.
+    """
+
     workers = forms.ModelMultipleChoiceField(
-        queryset=None,  # set in __init__
+        queryset=None,  # __init__ mein set
         required=True,
         widget=forms.CheckboxSelectMultiple,
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # get_user_model() = lazy User reference; settings.AUTH_USER_MODEL ko
+        # honor karta hai (custom User model project me hai).
         from django.contrib.auth import get_user_model
         User = get_user_model()
-        # Anyone with cutting_master / helper skill is eligible.
+        # Eligible workers = cutting_master ya cutting_master_helper skill
+        # wale users. distinct() M2M JOIN ke duplicates remove karta hai.
         self.fields['workers'].queryset = (
             User.objects.filter(
                 skills__name__in=[SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]
@@ -74,7 +103,21 @@ class PatternStartForm(forms.Form):
 
 
 def _build_pattern_context(request, adda: Adda) -> dict:
-    """Shared context for both standalone workspace + iframe-embedded panel."""
+    """Workspace + embedded panel ke beech common context dictionary banaye.
+
+    Yeh function DRY ka kaam karta hai: same template (`_stage_panel_
+    cutting_pattern.html`) full-page workspace + iframe me reuse hota hai.
+    Dono jagah same context chahiye.
+
+    Computes:
+      • stage_record (or None)              → workers, completed_at status
+      • record (CuttingPatternRecord)       → video + notes
+      • photos (list)                       → photo grid render karne ke liye
+      • assignments (ProductPatternAssignment list) → Section 01 checklist
+      • can_assign / can_upload / can_complete flags → button visibility
+      • next_stage                          → Complete button label
+      • start_form                          → Section 02 form (management only)
+    """
     user = request.user
     sr = _get_pattern_stage_record(adda)
     wf = _get_pattern_workflow_stage(adda)
@@ -85,6 +128,28 @@ def _build_pattern_context(request, adda: Adda) -> dict:
         .select_related('pattern')
         .order_by('pattern__name')
     )
+
+    # Verification map: {assignment_id: CuttingPatternVerification}
+    # Template loop uses `verifications_by_assignment.<a.id>` lookup pattern
+    # via `default_if_none`. assignment_id ko string key bana kar dict mein.
+    verifications_by_assignment: dict = {}
+    if record:
+        for v in record.verifications.select_related('verified_by', 'photo').all():
+            verifications_by_assignment[v.assignment_id] = v
+
+    # Assignment list with attached verification (for easier template render).
+    # Each row gets a `.verification` attribute monkey-patched (cheap).
+    for a in assignments:
+        a.verification = verifications_by_assignment.get(a.id)
+
+    # Size allocations on this record. Sum may differ from 100 mid-edit.
+    allocations = list(record.size_allocations.select_related('size').all()) if record else []
+    allocation_sum = sum(a.proportion_pct for a in allocations)
+    # Available sizes on this product (for picker). Filtered to active only.
+    product_sizes = list(
+        adda.product.sizes.filter(is_active=True).order_by('display_order', 'code')
+    )
+    allocated_size_ids = {a.size_id for a in allocations}
 
     is_management = user_has_role(user, MANAGEMENT_ROLES)
     has_master_skill = user_has_skill(
@@ -100,6 +165,11 @@ def _build_pattern_context(request, adda: Adda) -> dict:
     can_complete = sr is not None and sr.completed_at is None and (
         is_management or has_helper_skill
     )
+    # Verify + size allocation = same skill scope as upload (master/helper or mgmt).
+    can_verify = can_upload
+    can_set_sizes = can_upload
+    # Management-only reopen on the completed-state panel.
+    can_reopen = is_management and sr is not None and sr.completed_at is not None
 
     # Next stage label for the complete button.
     next_stage = None
@@ -110,6 +180,9 @@ def _build_pattern_context(request, adda: Adda) -> dict:
             .order_by('order').first()
         )
 
+    verified_count = len(verifications_by_assignment)
+    expected_count = len(assignments)
+
     return {
         'adda': adda,
         'stage_record': sr,
@@ -117,10 +190,20 @@ def _build_pattern_context(request, adda: Adda) -> dict:
         'record': record,
         'photos': photos,
         'assignments': assignments,
+        'verifications_by_assignment': verifications_by_assignment,
+        'verified_count': verified_count,
+        'expected_pattern_count': expected_count,
+        'allocations': allocations,
+        'allocation_sum': allocation_sum,
+        'product_sizes': product_sizes,
+        'allocated_size_ids': allocated_size_ids,
         'is_management': is_management,
         'can_assign': can_assign,
         'can_upload': can_upload,
+        'can_verify': can_verify,
+        'can_set_sizes': can_set_sizes,
         'can_complete': can_complete,
+        'can_reopen': can_reopen,
         'next_stage': next_stage,
         'start_form': PatternStartForm(initial={
             'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
@@ -141,9 +224,24 @@ class PatternWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView
 
 
 class _PatternActionBase(LoginRequiredMixin, ProductionRoleMixin, View):
+    """Saari pattern action views ka base — common helpers.
+
+    LoginRequiredMixin   → unauthenticated user /app/ pe redirect
+    ProductionRoleMixin  → 403 agar user PRODUCTION_ROLES me nahi
+    http_method_names    → sirf POST allowed (GET disabled)
+
+    Helpers:
+      • workspace_url    → redirect target compute (embedded vs standalone)
+      • _service_error   → ValidationError ki messages list ko flat string banaye
+    """
+
     http_method_names = ['post']
 
     def workspace_url(self, code: str, request=None) -> str:
+        """Redirect ke baad kahan jaaye:
+          • embedded=1 POST       → stage-panel embedded URL (iframe ke andar)
+          • normal POST           → pattern-workspace standalone page
+        """
         if request is not None and request.POST.get('embedded') == '1':
             return reverse('production:stage-panel', kwargs={
                 'code': code, 'stage_type': STAGE_CUTTING_PATTERN,
@@ -151,6 +249,9 @@ class _PatternActionBase(LoginRequiredMixin, ProductionRoleMixin, View):
         return reverse('production:pattern-workspace', kwargs={'code': code})
 
     def _service_error(self, exc) -> str:
+        """Service layer ValidationError ki list ko flat string banaye —
+        messages.error() string accept karta hai (not list).
+        """
         msg = getattr(exc, 'messages', None)
         return ' '.join(msg) if msg else str(exc)
 
@@ -258,7 +359,171 @@ class PatternRemovePhotoView(_PatternActionBase):
         return redirect(self.workspace_url(code, request))
 
 
+class PatternReopenView(_PatternActionBase):
+    """Management-only: unlock a completed Cutting Pattern stage for correction.
+
+    Mirror of LayeringReopenView. On embedded reopen, redirect to the pattern
+    stage's embedded panel with ?advanced=1 so parent reloads.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            reopen_pattern_stage(adda=adda, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(
+            request,
+            f"Cutting Pattern reopened for {adda.code}. Make corrections then Complete again.",
+        )
+        if request.POST.get('embedded') == '1':
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code, 'stage_type': STAGE_CUTTING_PATTERN,
+                }) + '?embedded=1&advanced=1'
+            )
+        return redirect('production:adda-detail', code=adda.code)
+
+
+class PatternVerifyView(_PatternActionBase):
+    """Pattern assignment verify karna — toggle ON.
+
+    POST data:
+      assignment_id (required), photo_id (optional), note (optional)
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            sr = get_or_create_pattern_stage_record(adda, request.user)
+            record = ensure_pattern_record(stage_record=sr, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+
+        form = PatternVerifyForm(request.POST, record=record)
+        if not form.is_valid():
+            messages.error(request, "Invalid verification payload.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            verify_pattern(
+                record=record,
+                assignment=form.cleaned_data['assignment'],
+                photo=form.cleaned_data.get('photo'),
+                note=form.cleaned_data.get('note', ''),
+                user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Pattern verified.")
+        return redirect(self.workspace_url(code, request))
+
+
+class PatternUnverifyView(_PatternActionBase):
+    """Pattern assignment ki verification hatao — toggle OFF.
+
+    POST data: assignment_id
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        sr = _get_pattern_stage_record(adda)
+        if sr is None:
+            messages.error(request, "Stage not started.")
+            return redirect(self.workspace_url(code, request))
+        record = getattr(sr, 'cutting_pattern', None)
+        if record is None:
+            messages.error(request, "Nothing to unverify yet.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            assignment_id = int(request.POST.get('assignment_id') or 0)
+        except (TypeError, ValueError):
+            assignment_id = 0
+        if assignment_id <= 0:
+            messages.error(request, "Missing assignment id.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            assignment = ProductPatternAssignment.objects.get(
+                pk=assignment_id, product=adda.product,
+            )
+        except ProductPatternAssignment.DoesNotExist:
+            messages.error(request, "Pattern not configured on this product.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            unverify_pattern(record=record, assignment=assignment, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Verification removed.")
+        return redirect(self.workspace_url(code, request))
+
+
+class PatternSetSizesView(_PatternActionBase):
+    """Size allocations full-replace.
+
+    POST data (multi-row):
+      size_id  → list of ints (`size_id` multiple values)
+      proportion_pct → parallel list of ints
+
+    HTML form sends both lists same length. Sum != 100 OK at draft;
+    complete_pattern_stage enforces sum=100.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            sr = get_or_create_pattern_stage_record(adda, request.user)
+            record = ensure_pattern_record(stage_record=sr, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+
+        size_ids = request.POST.getlist('size_id')
+        pcts = request.POST.getlist('proportion_pct')
+        if len(size_ids) != len(pcts):
+            messages.error(request, "Size/proportion mismatch in form.")
+            return redirect(self.workspace_url(code, request))
+
+        allocations: list[dict] = []
+        for sid, p in zip(size_ids, pcts):
+            try:
+                allocations.append({
+                    'size_id': int(sid),
+                    'proportion_pct': int(p),
+                })
+            except (TypeError, ValueError):
+                messages.error(request, "Invalid number in size allocations.")
+                return redirect(self.workspace_url(code, request))
+
+        try:
+            set_size_allocation(
+                record=record, allocations=allocations, user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Size proportions saved.")
+        return redirect(self.workspace_url(code, request))
+
+
 class PatternCompleteView(_PatternActionBase):
+    """Stage finalize karke agle stage pe advance.
+
+    IFRAME-SAFE FLOW (important):
+      Agar embedded iframe se call ho, redirect target = NEW current stage
+      ka embedded panel + `?advanced=1` query flag. Embedded panel ka JS
+      yeh flag detect karke parent ko postMessage `stage-advanced` bhejta
+      hai. Parent (adda_detail/user_dashboard) listen karke
+      `window.location.reload()` chala deta hai — fresh pipeline state
+      dikhe.
+
+      Yeh kyun zaroori? Django ka default X-Frame-Options DENY hota hai.
+      Iframe ke andar full adda-detail load karna "refused to connect"
+      error de deta tha (2026-05-28 bug).
+    """
+
     def post(self, request, code):
         adda = _get_adda(code)
         try:

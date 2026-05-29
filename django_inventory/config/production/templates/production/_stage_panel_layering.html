@@ -23,6 +23,75 @@ Required context (from _build_layering_context):
 </div>
 {% endif %}
 
+{% comment %}
+COMPLETED-STATE TOP SUMMARY CARD
+Inline-styled card — DO NOT use _layering_summary.html here. That partial
+depends on .ls-card-* CSS in accounts/base.html which is absent inside
+the embedded iframe (stage_panel_embedded.html has its own minimal CSS).
+Inline style block below mirrors cp-summary-card pattern from
+_stage_panel_cutting_pattern.html.
+{% endcomment %}
+{% if stage_record.completed_at %}
+<div class="ly-summary-card">
+    <div class="ly-summary-title">Layering — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
+    <div class="ly-summary-grid">
+        <div><span class="lbl">Lay Count</span><span class="val">{{ layering_snap.lay_count|default:"—" }}</span></div>
+        <div><span class="lbl">Layer Length</span><span class="val">{% if layering_snap.layer_length %}{{ layering_snap.layer_length }} m{% else %}—{% endif %}</span></div>
+        <div><span class="lbl">Duration</span><span class="val">{% if layering_snap.duration_min %}{{ layering_snap.duration_min }} min{% else %}—{% endif %}</span></div>
+        <div><span class="lbl">Total Colors</span><span class="val">{{ layering_snap.total_colors|default:"—" }}</span></div>
+        <div><span class="lbl">Rolls Used</span><span class="val">{{ layering_snap.rolls_count|default:"—" }}</span></div>
+        <div><span class="lbl">Total Fabric Used</span><span class="val">{% if layering_snap.total_fabric_used %}{{ layering_snap.total_fabric_used|floatformat:2 }} m{% else %}—{% endif %}</span></div>
+        <div><span class="lbl">Leftover Length</span><span class="val">{{ layering_snap.leftover_length_sum|floatformat:2 }} m</span></div>
+        <div><span class="lbl">Leftover Weight</span><span class="val">{{ layering_snap.leftover_weight_sum|floatformat:2 }} KG</span></div>
+    </div>
+    {% if layering_snap.record.notes %}<div class="ly-summary-notes">{{ layering_snap.record.notes }}</div>{% endif %}
+</div>
+<style>
+    .ly-summary-card {
+        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
+        border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .ly-summary-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 12px;
+    }
+    .ly-summary-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 10px 14px;
+    }
+    .ly-summary-grid > div { display: flex; flex-direction: column; }
+    .ly-summary-grid .lbl {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .ly-summary-grid .val {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); margin-top: 2px;
+    }
+    .ly-summary-notes {
+        margin-top: 12px; padding: 8px 10px; background: var(--cream);
+        border-radius: 8px; font-size: 13px; color: var(--stone); font-style: italic;
+    }
+</style>
+{% if can_reopen %}
+<div style="margin: 10px 0 14px; display: flex; justify-content: flex-end;">
+    <form method="post" action="{% url 'production:layering-reopen' adda.code %}"
+          onsubmit="return confirm('Reopen Layering for corrections?\n\nThe completed summary will be cleared and the Adda will roll back to the Layering stage. Downstream stages must not have been started.');">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
+            ✎ Edit / Reopen Layering
+        </button>
+    </form>
+</div>
+{% endif %}
+{% endif %}
+
+{% comment %}
+stage-stats tiles only when NOT completed — completed state already
+covered by ly-summary-card above (same metrics + more, richer formatting).
+{% endcomment %}
+{% if not stage_record.completed_at %}
 <div class="stage-stats">
     <div class="stat-tile">
         <div class="stat-label">Rolls Attached</div>
@@ -47,6 +116,7 @@ Required context (from _build_layering_context):
         </div>
     </div>
 </div>
+{% endif %}
 
 {% if entries %}
 <div class="panel">
@@ -693,25 +763,12 @@ JS sums them live into the readonly "Total Lay Count" cell.
                 })();
             </script>
         {% elif stage_record.completed_at %}
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;">
-                <p class="panel-sub" style="margin:0; flex:1;">
-                    Stage finalized. Lay count {{ stage_record.layering.lay_count }} ·
-                    Layer length {{ stage_record.layering.layer_length_meters }} m ·
-                    Duration {{ stage_record.layering.duration_minutes }} min.
-                </p>
-                {% if can_reopen %}
-                <form method="post" action="{% url 'production:layering-reopen' adda.code %}"
-                      onsubmit="return confirm('Reopen Layering for corrections?\n\nThe completed summary will be cleared and the Adda will roll back to the Layering stage. Downstream stages must not have been started.');">
-                    {% csrf_token %}
-                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                    <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper);">
-                        ✎ Edit / Reopen
-                    </button>
-                </form>
-                {% endif %}
-            </div>
+            {# Top of panel already shows full summary + Edit/Reopen button. #}
+            <p class="panel-sub" style="margin:0;">Stage finalized. See top of panel for full summary.</p>
         {% else %}
             <p class="panel-sub" style="margin:0;">You need <code>cutting_master_helper</code> skill to complete this stage.</p>
         {% endif %}
     </div>
 </div>
+
+{% include "production/_stage_panel_collapse.html" %}

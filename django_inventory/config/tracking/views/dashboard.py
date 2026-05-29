@@ -21,7 +21,8 @@ from django.views.generic import TemplateView
 
 from inventory.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
-from tracking.models import BatchBarcode
+from django.db.models import Sum
+from tracking.models import BarcodeBatch, BatchBarcode
 
 
 def _parse_date(s):
@@ -55,16 +56,18 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
         if to_dt:
             to_dt = to_dt + timezone.timedelta(days=1)
 
-        addas_qs = Adda.objects.filter(barcodes__isnull=False)
+        # PR6: filter Adda by BarcodeBatch existence (BatchBarcode is lazy).
+        addas_qs = Adda.objects.filter(barcode_batches__isnull=False)
         if from_dt:
             addas_qs = addas_qs.filter(created_at__gte=from_dt)
         if to_dt:
             addas_qs = addas_qs.filter(created_at__lt=to_dt)
 
+        # Total per-Adda = SUM(BarcodeBatch.total_pieces). Scanned counts
+        # come from BatchBarcode (lazy). Pending = total - scanned.
         addas = (
             addas_qs.annotate(
-                total=Count('barcodes'),
-                pending=Count('barcodes', filter=Q(barcodes__status='pending')),
+                total=Sum('barcode_batches__total_pieces'),
                 packed=Count('barcodes', filter=Q(barcodes__status='packed')),
                 dispatched=Count('barcodes', filter=Q(barcodes__status='dispatched')),
                 missing=Count('barcodes', filter=Q(barcodes__status='missing')),
@@ -73,17 +76,27 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
             .order_by('-started_at')
             .distinct()
         )
+        # Pending = total - (packed + dispatched + missing). Computed in Python
+        # to avoid double-counted M2M JOIN explosion.
+        for a in addas:
+            scanned = (a.packed or 0) + (a.dispatched or 0) + (a.missing or 0)
+            a.pending = max((a.total or 0) - scanned, 0)
 
-        # Status KPIs apply across the filtered Addas only.
-        barcodes_qs = BatchBarcode.objects.filter(adda__in=addas_qs)
+        # KPIs across all filtered Addas.
+        total_pieces = (
+            BarcodeBatch.objects.filter(adda__in=addas_qs)
+            .aggregate(total=Sum('total_pieces'))['total'] or 0
+        )
+        scanned_qs = BatchBarcode.objects.filter(adda__in=addas_qs)
+        scanned_total = scanned_qs.count()
 
         ctx['addas'] = addas
-        ctx['total_barcodes'] = barcodes_qs.count()
+        ctx['total_barcodes'] = total_pieces
         ctx['by_status'] = {
-            'pending': barcodes_qs.filter(status='pending').count(),
-            'packed': barcodes_qs.filter(status='packed').count(),
-            'dispatched': barcodes_qs.filter(status='dispatched').count(),
-            'missing': barcodes_qs.filter(status='missing').count(),
+            'pending': max(total_pieces - scanned_total, 0),
+            'packed': scanned_qs.filter(status='packed').count(),
+            'dispatched': scanned_qs.filter(status='dispatched').count(),
+            'missing': scanned_qs.filter(status='missing').count(),
         }
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')
@@ -102,20 +115,37 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
 
 @login_required
 def barcode_export_csv(request, adda_code):
-    """Download all barcode values + status for one Adda as CSV."""
+    """Download per-piece barcode rows as CSV. Expands BarcodeBatch ranges
+    into virtual piece rows + merges scanned-state from BatchBarcode."""
     if not user_has_role(request.user, PRODUCTION_ROLES):
         return HttpResponse(status=403)
     adda = get_object_or_404(Adda, code=adda_code)
+    from tracking.models import BarcodeBatch, BatchBarcode
+    batches = list(
+        BarcodeBatch.objects.filter(adda=adda)
+        .select_related('size', 'color').order_by('start_seq')
+    )
+    scanned = {
+        bc.piece_seq: bc for bc in
+        BatchBarcode.objects.filter(adda=adda).select_related('last_scanned_by')
+    }
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{adda.code}-barcodes.csv"'
     writer = csv.writer(response)
-    writer.writerow(['piece_seq', 'value', 'status', 'created_at', 'updated_at', 'last_scanned_at', 'last_scanned_by'])
-    for bc in adda.barcodes.order_by('piece_seq').select_related('last_scanned_by'):
-        writer.writerow([
-            bc.piece_seq, bc.value, bc.status,
-            bc.created_at.isoformat(),
-            bc.updated_at.isoformat(),
-            bc.last_scanned_at.isoformat() if bc.last_scanned_at else '',
-            bc.last_scanned_by.email if bc.last_scanned_by else '',
-        ])
+    writer.writerow([
+        'piece_seq', 'value', 'size', 'color', 'status',
+        'last_scanned_at', 'last_scanned_by',
+    ])
+    for batch in batches:
+        size_label = batch.size.code.upper() if batch.size else ''
+        color_label = batch.color.name if batch.color else ''
+        for seq in range(batch.start_seq, batch.end_seq + 1):
+            value = batch.value_for_seq(seq)
+            bc = scanned.get(seq)
+            writer.writerow([
+                seq, value, size_label, color_label,
+                bc.status if bc else 'pending',
+                bc.last_scanned_at.isoformat() if bc and bc.last_scanned_at else '',
+                bc.last_scanned_by.email if bc and bc.last_scanned_by else '',
+            ])
     return response

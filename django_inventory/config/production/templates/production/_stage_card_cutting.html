@@ -16,7 +16,7 @@ Inputs:
             </div>
             <div class="stat-tile">
                 <div class="stat-label">Barcodes</div>
-                <div class="stat-value">{{ adda.barcodes.count }}</div>
+                <div class="stat-value">{{ adda.total_pieces }}</div>
             </div>
         </div>
 
@@ -35,9 +35,9 @@ Inputs:
                     ✓ Completed {{ sr.completed_at|date:"d M H:i" }}
                     {% if sr.completed_by %}by <strong>{{ sr.completed_by.email }}</strong>{% endif %}
                 </div>
-                {% if adda.barcodes.exists %}
+                {% if adda.barcode_batches.exists %}
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;">
-                    <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-primary">View Barcodes ({{ adda.barcodes.count }})</a>
+                    <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-primary">View Barcodes ({{ adda.total_pieces }})</a>
                     <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-ghost">Print QR Sheet</a>
                     <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Export CSV</a>
                 </div>

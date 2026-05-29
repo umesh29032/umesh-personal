@@ -1,16 +1,33 @@
 {% comment %}
-Cutting-pattern stage panel — reusable partial.
+YEH TEMPLATE KYU HAI?
+─────────────────────
+Cutting-pattern stage ka reusable panel partial. 3 jagah include hota hai:
 
-Used by:
-  • pattern_workspace.html       (full-page workspace)
-  • stage_panel_embedded.html    (iframe embed via /stage/cutting_pattern/)
-  • adda detail page (via iframe)
-  • user dashboard accordion     (via iframe)
+  1. pattern_workspace.html       → standalone full-page workspace
+  2. stage_panel_embedded.html    → iframe wrapper (/stage/cutting_pattern/)
+  3. adda_detail.html + user_dashboard.html → iframe (auto-resize via postMessage)
 
-Required context (from _build_pattern_context):
-  adda, stage_record, workflow_stage, record, photos, assignments,
-  is_management, can_assign, can_upload, can_complete, next_stage,
-  start_form, embedded (bool)
+5 SECTIONS:
+  01 Pattern Checklist  → Product.pattern_assignments se render (read-only)
+  02 Assigned Workers   → manager assigns; chip display
+  03 Pattern Video      → optional FileField upload + notes (auto-submit)
+  04 Layered Photos     → multi-photo upload + remove (auto-submit)
+  05 Mark Complete      → confirm dialog + advance to next stage
+
+REQUIRED CONTEXT (from _build_pattern_context):
+  adda            → current Adda object
+  stage_record    → AddaStageRecord or None
+  workflow_stage  → cutting_pattern WorkflowStage row
+  record          → CuttingPatternRecord (or None pre-start)
+  photos          → list of CuttingPatternPhoto rows
+  assignments     → list of ProductPatternAssignment rows
+  is_management   → bool, role check
+  can_assign      → bool, only management
+  can_upload      → bool, master skill or management
+  can_complete    → bool, helper skill or super admin
+  next_stage      → next WorkflowStage row (for button label)
+  start_form      → PatternStartForm or None
+  embedded        → bool, true when rendered inside iframe
 {% endcomment %}
 
 {% if messages %}
@@ -21,6 +38,71 @@ Required context (from _build_pattern_context):
 </div>
 {% endif %}
 
+{% comment %}
+COMPLETED-STATE TOP SUMMARY CARD
+Cutting Pattern stage finalize hone par yahin headline summary dikhao —
+photos count, video status, completed timestamp + by-user. Photos grid
+neeche Section 04 me already render hota hai (full thumbnails).
+{% endcomment %}
+{% if stage_record.completed_at %}
+<div class="cp-summary-card">
+    <div class="cp-summary-title">Cutting Pattern — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
+    <div class="cp-summary-grid">
+        <div><span class="lbl">Patterns Verified</span><span class="val">{{ verified_count }}/{{ expected_pattern_count }}</span></div>
+        <div><span class="lbl">Photos Uploaded</span><span class="val">{{ photos|length }}</span></div>
+        <div><span class="lbl">Video</span><span class="val">{% if record.video %}✓ Yes{% else %}—{% endif %}</span></div>
+        <div><span class="lbl">Sizes Locked</span><span class="val">{{ allocations|length }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.workers.count }}</span></div>
+    </div>
+    {% if record.notes %}<div class="cp-summary-notes">{{ record.notes }}</div>{% endif %}
+</div>
+{% if can_reopen %}
+<div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+    <form method="post" action="{% url 'production:pattern-reopen' adda.code %}"
+          onsubmit="return confirm('Reopen Cutting Pattern for corrections?\n\nThe Adda will roll back to the Cutting Pattern stage. Existing photos + video are kept. Downstream stages must not have been started.');">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
+            ✎ Edit / Reopen Cutting Pattern
+        </button>
+    </form>
+</div>
+{% endif %}
+<style>
+    .cp-summary-card {
+        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
+        border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .cp-summary-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 10px;
+    }
+    .cp-summary-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    }
+    .cp-summary-grid > div { display: flex; flex-direction: column; }
+    .cp-summary-grid .lbl {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .cp-summary-grid .val {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); margin-top: 2px;
+    }
+    .cp-summary-notes {
+        margin-top: 10px; padding: 8px 10px; background: var(--cream);
+        border-radius: 8px; font-size: 13px; color: var(--stone); font-style: italic;
+    }
+</style>
+{% endif %}
+
+{% comment %}
+stage-stats tiles only when NOT completed — completed state already
+covered by cp-summary-card above (same metrics, richer formatting).
+Skipping these tiles avoids duplicate Patterns/Photos/Video/Status display.
+{% endcomment %}
+{% if not stage_record.completed_at %}
 <div class="stage-stats">
     <div class="stat-tile">
         <div class="stat-label">Patterns Required</div>
@@ -43,24 +125,75 @@ Required context (from _build_pattern_context):
         </div>
     </div>
 </div>
+{% endif %}
 
-{% comment %}Section 01: Pattern checklist — drawn from Product.patterns{% endcomment %}
+{% comment %}Section 01: Pattern checklist — verify each ProductPatternAssignment.
+
+Verification toggle UX:
+  • Unverified row → green "Verify" button (POST pattern-verify)
+  • Verified row   → ✓ badge + "Unverify" ghost button + verified-by/at audit
+Section header carries running count: "X of Y verified" (red if X < Y).
+{% endcomment %}
 <div class="panel">
     <div class="panel-head">
         <div class="panel-num">01</div>
         <div class="panel-title">Pattern Checklist ({{ adda.product.name }})</div>
+        {% if expected_pattern_count %}
+            <span class="panel-state {% if verified_count == expected_pattern_count %}completed{% else %}not-started{% endif %}">
+                {{ verified_count }} of {{ expected_pattern_count }} verified
+            </span>
+        {% endif %}
     </div>
     <div class="panel-body">
         {% if assignments %}
-            <p class="panel-sub">Draw these patterns on the layered cloth before cutting.</p>
-            <table class="breakup-table">
-                <thead><tr><th>Pattern</th><th>Pieces per Adda</th><th>Notes</th></tr></thead>
+            <p class="panel-sub">Tick each pattern after physically checking the placement on the layered cloth.</p>
+            <table class="breakup-table cp-verify-table">
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Pieces per Adda</th>
+                        <th>Notes</th>
+                        <th>Status</th>
+                        {% if can_verify and not stage_record.completed_at %}<th>Action</th>{% endif %}
+                    </tr>
+                </thead>
                 <tbody>
                 {% for a in assignments %}
                     <tr>
                         <td data-label="Pattern"><strong>{{ a.pattern.name }}</strong> <small style="color:var(--stone);font-family:monospace;">{{ a.pattern.code }}</small></td>
                         <td data-label="Pieces">{{ a.pieces_count }}</td>
                         <td data-label="Notes">{{ a.notes|default:"—" }}</td>
+                        <td data-label="Status">
+                            {% if a.verification %}
+                                <span class="cp-verify-badge ok">✓ Verified</span>
+                                <div class="cp-verify-meta">
+                                    by {{ a.verification.verified_by.get_full_name|default:a.verification.verified_by.email }}<br>
+                                    {{ a.verification.verified_at|date:"d M H:i" }}
+                                </div>
+                                {% if a.verification.note %}<div class="cp-verify-note">{{ a.verification.note }}</div>{% endif %}
+                            {% else %}
+                                <span class="cp-verify-badge pending">✗ Pending</span>
+                            {% endif %}
+                        </td>
+                        {% if can_verify and not stage_record.completed_at %}
+                        <td data-label="Action">
+                            {% if a.verification %}
+                                <form method="post" action="{% url 'production:pattern-unverify' adda.code %}" style="margin:0;" onsubmit="return confirm('Remove verification for {{ a.pattern.name }}?');">
+                                    {% csrf_token %}
+                                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                    <input type="hidden" name="assignment_id" value="{{ a.id }}">
+                                    <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--copper);border-color:var(--copper);">Unverify</button>
+                                </form>
+                            {% else %}
+                                <form method="post" action="{% url 'production:pattern-verify' adda.code %}" style="margin:0;">
+                                    {% csrf_token %}
+                                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                    <input type="hidden" name="assignment_id" value="{{ a.id }}">
+                                    <button type="submit" class="btn btn-primary" style="padding:4px 12px;font-size:11px;">Verify</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -70,6 +203,20 @@ Required context (from _build_pattern_context):
         {% endif %}
     </div>
 </div>
+<style>
+    .cp-verify-badge.ok {
+        display:inline-block; padding:3px 9px; border-radius:8px;
+        background: rgba(5,150,105,0.12); color: #047857;
+        font-size:11px; font-weight:600;
+    }
+    .cp-verify-badge.pending {
+        display:inline-block; padding:3px 9px; border-radius:8px;
+        background: rgba(220,38,38,0.08); color: #b91c1c;
+        font-size:11px; font-weight:600;
+    }
+    .cp-verify-meta { font-size:10px; color:var(--stone); margin-top:4px; line-height:1.3; }
+    .cp-verify-note { font-size:11px; color:var(--ink); margin-top:4px; font-style:italic; }
+</style>
 
 {% comment %}Section 02: Start stage — manager assigns workers{% endcomment %}
 <div class="panel">
@@ -140,6 +287,9 @@ Required context (from _build_pattern_context):
                 </div>
             </form>
             <script>
+                // Video form ka auto-submit — same pattern as photos.
+                // File size MB me dikhata hai feedback ke liye (large videos
+                // upload me time lagta hai — user ko pata chale).
                 (function(){
                     var form = document.getElementById('pp-video-form-{{ adda.code }}');
                     if (!form) return;
@@ -149,6 +299,7 @@ Required context (from _build_pattern_context):
                     if (!input) return;
                     input.addEventListener('change', function(){
                         if (!input.files || !input.files.length) return;
+                        // bytes → MB conversion (1 MB = 1024*1024 bytes)
                         var size = (input.files[0].size / (1024*1024)).toFixed(1);
                         status.textContent = 'Uploading video (' + size + ' MB)…';
                         if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
@@ -212,9 +363,15 @@ Required context (from _build_pattern_context):
                 </div>
             </form>
             <script>
-                // Auto-submit when files picked — many users miss the button click
-                // step and assume picking the file is the upload. Status line gives
-                // visible confirmation while the multipart POST is in flight.
+                // AUTO-SUBMIT ON FILE PICK
+                // ────────────────────────
+                // Pehle users ko file picker dikhta tha, file select karte but
+                // "Upload Photos" button click karna bhool jate — backend pe
+                // koi POST nahi aata tha. Yeh script `change` event sun ke
+                // immediately form.submit() chala deti hai.
+                //
+                // Visible feedback: status line "Uploading N photo(s)…" +
+                // button disabled. User ko confirmation milta hai.
                 (function(){
                     var form = document.getElementById('pp-photo-form-{{ adda.code }}');
                     if (!form) return;
@@ -234,10 +391,106 @@ Required context (from _build_pattern_context):
     </div>
 </div>
 
-{% comment %}Section 05: Complete + advance — gated to helper skill / super_admin{% endcomment %}
+{% comment %}Section 05: Sizes & Proportions — pattern designer locks per-size %.
+
+Form sends parallel arrays size_id[] + proportion_pct[].
+Sum != 100 OK at draft; complete_pattern_stage enforces sum=100.
+
+product_sizes = active ProductSize rows on this product (chip picker)
+allocations   = current saved rows (CuttingPatternSizeAllocation)
+allocation_sum = live sum of proportion_pct (red badge if != 100)
+{% endcomment %}
 <div class="panel">
     <div class="panel-head">
         <div class="panel-num">05</div>
+        <div class="panel-title">Sizes in Batch &amp; Proportions</div>
+        {% if allocations %}
+            <span class="panel-state {% if allocation_sum == 100 %}completed{% else %}not-started{% endif %}">
+                Sum {{ allocation_sum }}%
+            </span>
+        {% endif %}
+    </div>
+    <div class="panel-body">
+        {% if not product_sizes %}
+            <p class="panel-sub" style="margin:0;color:#b91c1c;">No sizes configured on this product yet. Admin must add at least one <strong>ProductSize</strong> on the Product page before this batch can be locked.</p>
+        {% elif can_set_sizes and not stage_record.completed_at %}
+            <p class="panel-sub">Pick the sizes for this batch and enter the percent share for each. Total must equal 100% before completing.</p>
+            <form method="post" action="{% url 'production:pattern-set-sizes' adda.code %}" id="cp-sizes-form-{{ adda.code }}">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <table class="breakup-table">
+                    <thead>
+                        <tr><th>Size</th><th>Label</th><th>Proportion (%)</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for s in product_sizes %}
+                        {% with existing=None %}
+                        {% for a in allocations %}{% if a.size_id == s.id %}{% with existing=a %}{% endwith %}{% endif %}{% endfor %}
+                        {% endwith %}
+                        <tr>
+                            <td data-label="Size"><strong>{{ s.code|upper }}</strong></td>
+                            <td data-label="Label">{{ s.label }}</td>
+                            <td data-label="Proportion">
+                                <input type="hidden" name="size_id" value="{{ s.id }}">
+                                {% for a in allocations %}{% if a.size_id == s.id %}
+                                    <input type="number" name="proportion_pct" value="{{ a.proportion_pct }}" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
+                                {% endif %}{% endfor %}
+                                {% if s.id not in allocated_size_ids %}
+                                    <input type="number" name="proportion_pct" value="0" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                    <button type="submit" class="btn btn-primary">Save Proportions</button>
+                    <span class="panel-sub" style="margin:0;">Live total: <strong data-cp-live-sum>{{ allocation_sum }}</strong>%</span>
+                </div>
+            </form>
+            <script>
+                // Live sum totalizer — sirf number inputs sum karta hai
+                // taaki user ko save click karne ke pehle 100% feedback mile.
+                (function(){
+                    var form = document.getElementById('cp-sizes-form-{{ adda.code }}');
+                    if (!form) return;
+                    var liveSum = form.querySelector('[data-cp-live-sum]');
+                    function recompute(){
+                        var total = 0;
+                        form.querySelectorAll('.cp-pct-input').forEach(function(inp){
+                            total += parseInt(inp.value || 0, 10) || 0;
+                        });
+                        if (liveSum) {
+                            liveSum.textContent = total;
+                            liveSum.style.color = (total === 100) ? '#047857' : '#b91c1c';
+                        }
+                    }
+                    form.addEventListener('input', recompute);
+                    recompute();
+                })();
+            </script>
+        {% elif allocations %}
+            <table class="breakup-table">
+                <thead><tr><th>Size</th><th>Proportion</th></tr></thead>
+                <tbody>
+                {% for a in allocations %}
+                    <tr>
+                        <td data-label="Size"><strong>{{ a.size.code|upper }}</strong> — {{ a.size.label }}</td>
+                        <td data-label="Proportion">{{ a.proportion_pct }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">Waiting for pattern designer to lock size proportions.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}Section 06: Complete + advance — gated to helper skill / super_admin{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">06</div>
         <div class="panel-title">Mark Pattern Complete</div>
         {% if stage_record.completed_at %}<span class="panel-state completed">Completed {{ stage_record.completed_at|date:"d M H:i" }}</span>{% endif %}
     </div>
@@ -246,7 +499,11 @@ Required context (from _build_pattern_context):
             <p class="panel-sub" style="margin:0;">Stage finalized. Adda moved to the next stage.</p>
         {% elif can_complete %}
             <p class="panel-sub">
-                At least one photo OR a video required (either works). Completing locks the record and advances{% if next_stage %} to {{ next_stage.get_stage_type_display }}{% endif %}.
+                Required to complete:
+                <strong>{{ verified_count }}/{{ expected_pattern_count }} patterns verified</strong>,
+                <strong>≥1 photo or video</strong>, and
+                <strong>size proportions sum to 100% (currently {{ allocation_sum }}%)</strong>.
+                Completing locks the record and advances{% if next_stage %} to {{ next_stage.get_stage_type_display }}{% endif %}.
             </p>
             <form method="post" action="{% url 'production:pattern-complete' adda.code %}"
                   data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
@@ -263,3 +520,5 @@ Required context (from _build_pattern_context):
     </div>
 </div>
 {% endif %}
+
+{% include "production/_stage_panel_collapse.html" %}

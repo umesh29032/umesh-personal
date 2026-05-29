@@ -1,0 +1,118 @@
+{% comment %}
+Shared collapse/expand chevron for stage panels.
+
+Include at the END of any stage panel template that uses `.panel` elements:
+    {% include "production/_stage_panel_collapse.html" %}
+
+Behavior:
+  • Auto-attaches a chevron toggle to every `.panel` element on page
+  • Click → toggles `.collapsed` on parent panel
+  • State persisted to localStorage keyed by URL path + panel-num + title
+  • Idempotent — re-running doesn't double-attach
+{% endcomment %}
+<style>
+    /* Entire panel head is the clickable toggle target. Chevron is visual only. */
+    .panel-head {
+        position: relative;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s ease;
+    }
+    .panel-head:hover { background: rgba(184,115,51,0.04); }
+    .panel-toggle {
+        background: none; border: 1.5px solid var(--border-subtle);
+        color: var(--stone);
+        width: 30px; height: 30px; border-radius: 8px;
+        margin-left: auto;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 14px; line-height: 1;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+        pointer-events: none;   /* parent .panel-head receives the click */
+    }
+    .panel-head:hover .panel-toggle {
+        color: var(--copper); border-color: var(--copper);
+        background: rgba(184,115,51,0.08);
+    }
+    .panel-toggle .ico {
+        display: inline-block; transition: transform 0.2s ease;
+    }
+    .panel.collapsed .panel-toggle .ico { transform: rotate(-90deg); }
+    .panel.collapsed .panel-body { display: none; }
+    .panel.collapsed .panel-head { border-bottom: none; padding-bottom: 12px; }
+</style>
+<script>
+(function(){
+    function panelKey(panel){
+        var explicit = panel.getAttribute('data-panel-key');
+        if (explicit) return 'panel:' + explicit;
+        var num = panel.querySelector('.panel-num');
+        var title = panel.querySelector('.panel-title');
+        var path = location.pathname.replace(/[^a-z0-9]/gi, '-');
+        return 'panel:' + path
+            + ':' + (num ? num.textContent.trim() : '')
+            + ':' + (title ? title.textContent.trim().slice(0,40) : '');
+    }
+    function attach(panel){
+        var head = panel.querySelector('.panel-head');
+        if (!head) return;
+        if (head.querySelector('.panel-toggle')) return;
+        // Visual chevron — pointer-events disabled so clicks bubble to panel-head.
+        var ind = document.createElement('span');
+        ind.className = 'panel-toggle';
+        ind.setAttribute('aria-hidden', 'true');
+        ind.title = 'Click header to collapse / expand';
+        ind.innerHTML = '<span class="ico">▾</span>';
+        head.appendChild(ind);
+        var key = null;
+        try { key = panelKey(panel); } catch (e) { /* ignore */ }
+        if (key) {
+            try {
+                if (localStorage.getItem(key) === 'collapsed') {
+                    panel.classList.add('collapsed');
+                }
+            } catch (e) { /* localStorage may be blocked */ }
+        }
+        // Whole header is the toggle target. Click on form inputs / links
+        // inside header should NOT toggle — check target tag.
+        head.setAttribute('role', 'button');
+        head.setAttribute('tabindex', '0');
+        head.setAttribute('aria-expanded', panel.classList.contains('collapsed') ? 'false' : 'true');
+        function toggle(){
+            panel.classList.toggle('collapsed');
+            head.setAttribute('aria-expanded', panel.classList.contains('collapsed') ? 'false' : 'true');
+            if (key) {
+                try {
+                    localStorage.setItem(key,
+                        panel.classList.contains('collapsed') ? 'collapsed' : 'expanded');
+                } catch (e) { /* ignore */ }
+            }
+        }
+        head.addEventListener('click', function(ev){
+            // Skip if user clicked an interactive child (form / link / button inside header).
+            var t = ev.target;
+            while (t && t !== head) {
+                var tag = t.tagName;
+                if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT'
+                    || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'LABEL') return;
+                t = t.parentElement;
+            }
+            toggle();
+        });
+        head.addEventListener('keydown', function(ev){
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                toggle();
+            }
+        });
+    }
+    function start(){
+        document.querySelectorAll('.panel').forEach(attach);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
+</script>

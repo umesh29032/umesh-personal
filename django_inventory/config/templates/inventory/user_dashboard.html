@@ -337,14 +337,17 @@
     </div>
     {% endif %}
 
-    {# My Recent Activity — per-user timeline across all Addas (spec D14). #}
+    {# My Recent Activity — per-user timeline across all Addas (spec D14).
+       PR17: collapsed by default to reduce visual noise on dashboard. #}
     {% if my_activity %}
-    <div class="card" style="margin-top: 18px;">
-        <div class="card-header"><div class="card-title">My Recent Activity</div></div>
+    <details class="card" style="margin-top: 18px;">
+        <summary class="card-header" style="cursor:pointer; list-style:none;">
+            <div class="card-title">My Recent Activity ({{ my_activity|length }})</div>
+        </summary>
         <div class="card-body">
             {% include 'production/_activity_feed.html' with activity=my_activity show_adda_code=True %}
         </div>
-    </div>
+    </details>
     {% endif %}
 </div>
 

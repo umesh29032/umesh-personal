@@ -101,8 +101,9 @@
         {% endif %}
     </div>
 
-    <div style="margin-top: 18px;">
+    <div style="margin-top: 18px; display:flex; gap:10px; flex-wrap:wrap;">
         <a href="{% url 'production:product-list' %}" class="btn btn-clear">← Back to Products</a>
+        <a href="{% url 'production:product-sizes' product.pk %}" class="btn btn-ghost">Sizes →</a>
     </div>
 </div>
 {% endblock %}

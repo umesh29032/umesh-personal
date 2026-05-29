@@ -30,11 +30,105 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 
+class BarcodeBatch(TimeStampedModel):
+    """Barcode range record — contiguous seq block for ek (Adda, Color, Size) combo.
+
+    YEH MODEL KYU HAI?
+    ──────────────────
+    Cutting stage complete pe har (color, size) ke liye ek contiguous range
+    allocate hota hai. e.g.:
+        Red S    → seq  1..60   (60 pieces)
+        Blue S   → seq 61..110  (50 pieces)
+        Green S  → seq 111..160 (50 pieces)
+        Blue L   → seq 161..200 (40 pieces)
+    Storage: 4 BarcodeBatch rows (not 200 BatchBarcode rows). Performance
+    win — 500-piece Adda mein 5 batches vs 500 rows.
+
+    Per-piece state (status / last_scanned_at) `BatchBarcode` mein lazily
+    create hota hai jab pehli baar scan ho. Bina scan ke koi row nahi.
+
+    Lookup pattern:
+      value = '{ADDA}-{SEQ:04d}'
+      → adda + seq parse
+      → BarcodeBatch.objects.filter(adda=, start_seq__lte=seq, end_seq__gte=seq).first()
+    """
+
+    # PROTECT = Adda delete blocked agar barcode batches hain
+    adda = models.ForeignKey(
+        'production.Adda', on_delete=models.PROTECT, related_name='barcode_batches',
+    )
+    # Denormalized FK — adda.product ka redundant copy. Query speed-up
+    # (filter by product directly without JOIN through adda).
+    product = models.ForeignKey(
+        'production.Product', on_delete=models.PROTECT, related_name='+',
+    )
+    # PR11 (2026-05-28): direct link to source bundle. nullable for legacy
+    # batches (NIKKAR-style without bundles). Lets future stages query
+    # "all barcodes from Bundle X" without going through adda+size.
+    bundle = models.ForeignKey(
+        'production.CuttingBundle', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='barcode_batches',
+    )
+    # null=True for legacy NIKKAR-style single-batch with no breakup metadata.
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # 1-indexed within Adda. Inclusive both ends.
+    start_seq = models.PositiveIntegerField()
+    end_seq = models.PositiveIntegerField()
+    # Denormalized: end_seq - start_seq + 1. Stored for direct query.
+    total_pieces = models.PositiveIntegerField()
+
+    class Meta:
+        # Ek Adda mein same (color, size) combo do baar nahi. Legacy null+null
+        # batch sirf ek baar (legacy Addas mein only one batch total).
+        unique_together = [('adda', 'color', 'size')]
+        indexes = [
+            models.Index(fields=['adda', 'start_seq']),
+            models.Index(fields=['adda', 'end_seq']),
+        ]
+        ordering = ['adda', 'start_seq']
+
+    def __str__(self):
+        bits = [self.adda.code]
+        if self.size_id:
+            bits.append(self.size.code.upper() if self.size else '?')
+        if self.color_id:
+            bits.append(self.color.name if self.color else '?')
+        bits.append(f"{self.start_seq:04d}..{self.end_seq:04d}")
+        return ' · '.join(bits)
+
+    @property
+    def start_value(self) -> str:
+        return f"{self.adda.code}-{self.start_seq:04d}"
+
+    @property
+    def end_value(self) -> str:
+        return f"{self.adda.code}-{self.end_seq:04d}"
+
+    def value_for_seq(self, seq: int) -> str:
+        """Render the canonical barcode value for a seq inside this batch."""
+        if not (self.start_seq <= seq <= self.end_seq):
+            raise ValueError(
+                f"seq {seq} outside batch range {self.start_seq}..{self.end_seq}"
+            )
+        return f"{self.adda.code}-{seq:04d}"
+
+
 class BatchBarcode(TimeStampedModel):
-    """Ek piece-level barcode — QR sticker jo physical piece pe lagta hai.
+    """Per-piece scan state — lazy-created on first scan from BarcodeBatch.
 
     Value format: '{ADDA_CODE}-{PIECE_SEQ:04d}' e.g. 'T-SHIRT-001-0042'.
     QR payload: '{BASE_URL}/tracking/scan/{value}/' — phone camera natively scan kar leta hai.
+
+    Yeh row sirf tab create hota hai jab piece scan ho ya status update ho.
+    Untouched pieces ka koi BatchBarcode row nahi — sirf BarcodeBatch range
+    cover karta hai.
     """
 
     class Status(models.TextChoices):
@@ -47,6 +141,12 @@ class BatchBarcode(TimeStampedModel):
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='barcodes',
     )
+    # FK back to source batch — populated on lazy create. null=True for
+    # legacy rows (pre-PR6) that didn't have batches.
+    batch = models.ForeignKey(
+        'tracking.BarcodeBatch', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='scanned_pieces',
+    )
     piece_seq = models.PositiveIntegerField()       # 1..N within an Adda
     value = models.CharField(max_length=60, unique=True)
     status = models.CharField(
@@ -55,6 +155,26 @@ class BatchBarcode(TimeStampedModel):
     last_scanned_at = models.DateTimeField(null=True, blank=True)
     last_scanned_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # ── Metadata FKs (added 2026-05-28; phase-1 schema only) ────────────────
+    # nullable = legacy barcodes (pre-cutting-overhaul) have no breakup row.
+    # Future barcodes generated by new generate_for_cutting() set all four.
+    # String FKs avoid import cycle (tracking can't import production safely).
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    pattern = models.ForeignKey(
+        'production.ProductPattern', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    roll = models.ForeignKey(
+        'raw_materials.ClothRoll', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',
     )
 
@@ -66,6 +186,8 @@ class BatchBarcode(TimeStampedModel):
             models.Index(fields=['adda', 'status']),
             # Status-only KPI counts
             models.Index(fields=['status']),
+            # Per-size/color status breakdown — "kitne medium-red dispatched"
+            models.Index(fields=['size', 'color', 'status']),
         ]
         ordering = ['adda', 'piece_seq']
 

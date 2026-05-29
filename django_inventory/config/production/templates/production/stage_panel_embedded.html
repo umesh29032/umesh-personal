@@ -203,11 +203,18 @@ to fit iframe height. Implemented in script at bottom.
     <script>
         // postMessage parent to auto-resize iframe.
         // Parent listens for `stage-panel-resize` and sets iframe.height.
+        // PR18: includes `stage` in payload so parent applies height to the
+        // RIGHT iframe (not all iframes of the same Adda).
         (function() {
             function reportSize() {
                 const h = document.documentElement.scrollHeight;
                 if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({type: 'stage-panel-resize', height: h, code: '{{ adda.code }}'}, '*');
+                    window.parent.postMessage({
+                        type: 'stage-panel-resize',
+                        height: h,
+                        code: '{{ adda.code }}',
+                        stage: '{{ stage_type }}',
+                    }, '*');
                 }
             }
             window.addEventListener('load', reportSize);

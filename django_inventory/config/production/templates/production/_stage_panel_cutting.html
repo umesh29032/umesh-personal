@@ -1,15 +1,91 @@
 {% comment %}
-Cutting stage panel — REUSABLE partial.
+YEH TEMPLATE KYU HAI?
+─────────────────────
+Cutting stage ka reusable panel partial. 3 jagah include hota hai:
 
-Used by:
-  • stage_panel_standalone.html (full page /stage/cutting/)
-  • stage_panel_embedded.html (iframe embed on adda detail / user dashboard)
-  • cutting_form.html (existing complete-cutting URL)
+  1. cutting_workspace.html       → standalone full-page workspace
+  2. stage_panel_embedded.html    → iframe wrapper (/stage/cutting/)
+  3. adda_detail.html / user_dashboard.html → iframe embed
 
-Required context:
-  adda, cutting_form (CuttingForm), can_complete_cutting (bool),
-  embedded (bool — adds hidden `embedded=1` to form for redirect handling)
+DUAL RENDER MODE:
+  • If product_sizes + product_patterns + layered_colors all exist
+    → render workspace UI (Section 01 workers + Section 02 breakup
+      + Section 03 notes + Section 04 complete). PR3 path.
+  • Else (NIKKAR-style simple flow)
+    → render legacy single-form (CuttingForm). Back-compat.
+
+REQUIRED CONTEXT (from _build_cutting_context):
+  adda, cutting_stage_record, cutting_record, breakup, total_pieces,
+  suggestion, suggested_total, product_sizes, product_patterns,
+  pattern_assignments, layered_colors, is_management,
+  can_start_cutting, can_edit_breakup, can_complete_workspace,
+  can_reopen_cutting, next_stage_after_cutting,
+  cutting_start_form, cutting_draft_form,
+
+Legacy context (back-compat):
+  cutting_form, can_complete_cutting, embedded
 {% endcomment %}
+
+{% comment %}PR16 — scoped table styles for cutting workspace.
+
+`.breakup-table` is normally scoped to `.form-shell` parent (see
+production/_form_styles.html). Cutting workspace doesn't use that
+wrapper, so we re-declare table styles here scoped to this template's
+content. Same look as form-shell tables.
+{% endcomment %}
+<style>
+    .ct-workspace-scope .breakup-table {
+        width: 100%; border-collapse: collapse; font-size: 13px;
+        background: #fff; border-radius: 10px; overflow: hidden;
+    }
+    .ct-workspace-scope .breakup-table thead tr {
+        background: var(--cream-2, #f1e8d8);
+    }
+    .ct-workspace-scope .breakup-table th {
+        text-align: left; padding: 10px 14px;
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.04em; color: var(--stone);
+    }
+    .ct-workspace-scope .breakup-table td {
+        padding: 10px 14px;
+        border-top: 1px solid var(--border-subtle, #e6dccd);
+        vertical-align: middle;
+    }
+    .ct-workspace-scope .breakup-table tfoot tr {
+        background: var(--cream, #f5ede0); font-weight: 700;
+    }
+    .ct-workspace-scope .breakup-table tfoot th,
+    .ct-workspace-scope .breakup-table tfoot td {
+        padding: 8px 14px; border-top: 1px solid var(--border-card, #d6c4a8);
+    }
+    .ct-workspace-scope .breakup-table input[type="number"],
+    .ct-workspace-scope .breakup-table input[type="text"],
+    .ct-workspace-scope .breakup-table select {
+        font-size: 13px; padding: 6px 10px;
+    }
+    /* Mobile: stack each row as a card */
+    @media (max-width: 720px) {
+        .ct-workspace-scope .breakup-table thead { display: none; }
+        .ct-workspace-scope .breakup-table tr {
+            display: block; margin-bottom: 10px;
+            border: 1px solid var(--border-card, #d6c4a8); border-radius: 10px;
+            overflow: hidden; background: #fff;
+        }
+        .ct-workspace-scope .breakup-table td {
+            display: flex; justify-content: space-between; gap: 10px;
+            border-top: none;
+            border-bottom: 1px solid var(--border-subtle, #e6dccd);
+        }
+        .ct-workspace-scope .breakup-table td:last-child { border-bottom: none; }
+        .ct-workspace-scope .breakup-table td::before {
+            content: attr(data-label);
+            font-size: 10px; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--stone);
+            font-weight: 700; flex-shrink: 0;
+        }
+    }
+</style>
+<div class="ct-workspace-scope">
 
 {% if messages %}
 <div class="messages-strip">
@@ -19,27 +95,849 @@ Required context:
 </div>
 {% endif %}
 
-{% with completed_sr=adda.stage_records.all|dictsort:"workflow_stage.order"|last %}
-    {% comment %}
-    For completed Cutting, show pieces + barcode count.
-    For pending Cutting (current stage), show form for manager.
-    For not-yet-Cutting, info only.
-    {% endcomment %}
-{% endwith %}
+{% comment %}WORKSPACE PATH: product has sizes + patterns + layered colors{% endcomment %}
+{% if product_sizes and product_patterns and layered_colors %}
 
-{% if can_complete_cutting %}
-    {% comment %}Manager-only completion form (Adda at Cutting stage){% endcomment %}
-    <div class="panel">
-        <div class="panel-head">
-            <div class="panel-num">01</div>
-            <div class="panel-title">Pieces Cut</div>
-        </div>
-        <div class="panel-body">
-            <p class="panel-sub">Pieces cut = number of barcodes generated. Cannot be changed later.</p>
-            <form method="post" action="{% url 'production:cutting-complete' adda.code %}" novalidate>
+{% comment %}Completed summary card (mirrors pattern stage style){% endcomment %}
+{% if cutting_stage_record.completed_at %}
+<div class="cp-summary-card">
+    <div class="cp-summary-title">Cutting — Completed {{ cutting_stage_record.completed_at|date:"d M Y H:i" }}{% if cutting_stage_record.completed_by %} by {{ cutting_stage_record.completed_by.get_full_name|default:cutting_stage_record.completed_by.email }}{% endif %}</div>
+    <div class="cp-summary-grid">
+        <div><span class="lbl">Total Pieces</span><span class="val">{{ total_pieces }}</span></div>
+        <div><span class="lbl">Breakup Rows</span><span class="val">{{ breakup|length }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ cutting_stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Barcodes</span><span class="val">{{ adda.total_pieces }}</span></div>
+    </div>
+    {% if cutting_record.notes %}<div class="cp-summary-notes">{{ cutting_record.notes }}</div>{% endif %}
+</div>
+{% if can_reopen_cutting %}
+<div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+    <form method="post" action="{% url 'production:cutting-reopen' adda.code %}"
+          onsubmit="return confirm('Reopen Cutting?\n\nExisting barcodes will be deleted. Refuses if any have been scanned.');">
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
+            ✎ Reopen Cutting
+        </button>
+    </form>
+</div>
+{% endif %}
+<style>
+    .cp-summary-card {
+        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
+        border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .cp-summary-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 10px;
+    }
+    .cp-summary-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+    }
+    .cp-summary-grid > div { display: flex; flex-direction: column; }
+    .cp-summary-grid .lbl {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    .cp-summary-grid .val {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); margin-top: 2px;
+    }
+    .cp-summary-notes {
+        margin-top: 10px; padding: 8px 10px; background: var(--cream);
+        border-radius: 8px; font-size: 13px; color: var(--stone); font-style: italic;
+    }
+</style>
+{% endif %}
+
+{% comment %}Section 01: Workers — manager assigns{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">01</div>
+        <div class="panel-title">Assigned Workers</div>
+        <span class="panel-state {% if cutting_stage_record %}in-progress{% else %}not-started{% endif %}">
+            {% if cutting_stage_record %}Started {{ cutting_stage_record.started_at|date:"d M H:i" }}{% else %}Not Started{% endif %}
+        </span>
+    </div>
+    <div class="panel-body">
+        {% if can_start_cutting %}
+            <p class="panel-sub">Assign the cutting master(s) who'll perform the cut.</p>
+            <form method="post" action="{% url 'production:cutting-start' adda.code %}">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                {% if cutting_form.non_field_errors %}<div class="field-error">{{ cutting_form.non_field_errors }}</div>{% endif %}
+                {{ cutting_start_form.workers }}
+                <div style="margin-top:14px;">
+                    <button type="submit" class="btn btn-primary">{% if cutting_stage_record %}Update Assignment{% else %}Start Cutting Stage{% endif %}</button>
+                </div>
+            </form>
+        {% elif cutting_stage_record %}
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                {% for w in cutting_stage_record.workers.all %}
+                    <span class="roll-id-chip">{{ w.email }}</span>
+                {% empty %}
+                    <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">Only a manager can assign workers.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if cutting_stage_record %}
+{% comment %}Section 02: Suggested Piece Breakup — INFORMATIONAL ONLY.
+Verified plan from layering + pattern data. Does NOT drive barcodes.
+Cutting master reviews + saves edits as the verified suggestion.
+{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">02</div>
+        <div class="panel-title">Suggested Piece Breakup (Estimated Output)</div>
+        <span class="panel-state {% if breakup_total > 0 %}in-progress{% else %}not-started{% endif %}">
+            Estimated: {{ breakup_total }}{% if suggested_total %} (raw {{ suggested_total }}){% endif %}
+        </span>
+    </div>
+    <div class="panel-body">
+        <p class="panel-sub" style="background:rgba(184,115,51,0.08); padding:8px 12px; border-radius:8px; border-left:3px solid var(--copper);">
+            <strong>Informational only.</strong> System suggestion based on layering + pattern allocation. Cutting Master verifies physically. Final barcode generation uses the <strong>Actual Cutting Bundle Entry</strong> below — not this section.
+        </p>
+        {% if breakup %}
+            <p class="panel-sub">Available cutting pieces inventory. Pieces consumed into bundles reduce Available. <strong>Available = Count − Consumed.</strong></p>
+            <table class="breakup-table">
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Size</th>
+                        <th>Color</th>
+                        <th>Count</th>
+                        <th>Consumed</th>
+                        <th>Available</th>
+                        {% if can_edit_breakup %}<th>Action</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for b in breakup %}
+                    <tr {% if b.available_count == 0 %}style="opacity:0.55;"{% endif %}>
+                        <td data-label="Pattern">{{ b.pattern.name }}</td>
+                        <td data-label="Size"><strong>{{ b.size.code|upper }}</strong> {{ b.size.label }}</td>
+                        <td data-label="Color">{{ b.color.name }}</td>
+                        <td data-label="Count">{{ b.count }}</td>
+                        <td data-label="Consumed">{{ b.consumed_count }}</td>
+                        <td data-label="Available">
+                            <strong style="color:{% if b.available_count == 0 %}var(--stone){% else %}#047857{% endif %};">{{ b.available_count }}</strong>
+                        </td>
+                        {% if can_edit_breakup %}
+                        <td data-label="Action">
+                            {% if b.consumed_count == 0 %}
+                            <form method="post" action="{% url 'production:cutting-breakup-delete' adda.code b.pk %}" style="margin:0;" onsubmit="return confirm('Remove this row?');">
+                                {% csrf_token %}
+                                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--danger);">Remove</button>
+                            </form>
+                            {% else %}
+                                <span style="font-size:10px;color:var(--stone);">locked — in use</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% elif suggestion %}
+            <p class="panel-sub">Suggested breakup based on layered cloth + pattern allocations (editable). Click <strong>Save Suggested</strong> to lock as actual, then adjust.</p>
+        {% else %}
+            <p class="panel-sub" style="margin:0;color:var(--stone);">No suggestion available yet (needs completed Layering + Cutting Pattern stages).</p>
+        {% endif %}
+
+        {% if can_edit_breakup %}
+        {% comment %}Add-new-row form. All 4 fields required to submit.
+        Suggestion-prefill rows persist independently (see above table) —
+        this form is purely for manual additions.{% endcomment %}
+        {% comment %}PR15: bulk add UI — tick patterns + tick colors + pick
+        size + enter per-pattern count. JS expands selection into parallel
+        hidden inputs (pattern_id[], size_id[], color_id[], count[]) on
+        submit. Backend (CuttingBreakupSaveView) untouched — same array
+        contract.{% endcomment %}
+        <form method="post" action="{% url 'production:cutting-breakup-save' adda.code %}" style="margin-top:14px;" id="ct-breakup-form-{{ adda.code }}" data-bulk-add>
+            {% csrf_token %}
+            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px;">
+                + Add Cutting Piece Rows (Bulk)
+            </div>
+
+            <div class="bulk-add-grid">
+                {# Patterns — multi-tick with per-pattern count input + Select All #}
+                <div class="bulk-add-col">
+                    <div class="bulk-add-label">Patterns (tick + enter count)</div>
+                    <label class="bulk-add-all">
+                        <input type="checkbox" data-bulk-all="pattern"> Select All
+                    </label>
+                    <div class="bulk-add-list">
+                        {% for a in pattern_assignments %}
+                            <label class="bulk-add-row">
+                                <input type="checkbox" data-bulk-pattern value="{{ a.pattern.id }}">
+                                <span class="bulk-add-name-cell">
+                                    <span class="bulk-add-name">{{ a.pattern.name }}</span>
+                                    {% if a.pieces_count > 1 %}
+                                    <span class="bulk-add-hint">×{{ a.pieces_count }}/garment</span>
+                                    {% endif %}
+                                </span>
+                                <input type="number" data-bulk-count="{{ a.pattern.id }}" value="" min="1" step="1" class="sf-input bulk-add-count" placeholder="pieces" disabled>
+                            </label>
+                        {% empty %}
+                            <div style="color:var(--stone);font-style:italic;font-size:12px;">No patterns assigned to product.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {# Size — single dropdown #}
+                <div class="bulk-add-col">
+                    <div class="bulk-add-label">Size</div>
+                    <select data-bulk-size class="sf-input" required>
+                        <option value="">— pick size —</option>
+                        {% for sz in product_sizes %}
+                            <option value="{{ sz.id }}">{{ sz.code|upper }} — {{ sz.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# Colors — multi-tick + Select All #}
+                <div class="bulk-add-col">
+                    <div class="bulk-add-label">Colors (tick)</div>
+                    <label class="bulk-add-all">
+                        <input type="checkbox" data-bulk-all="color"> Select All
+                    </label>
+                    <div class="bulk-add-list">
+                        {% for c in layered_colors %}
+                            <label class="bulk-add-row bulk-add-row-color">
+                                <input type="checkbox" data-bulk-color value="{{ c.id }}">
+                                <span class="bulk-add-name-cell">
+                                    <span class="bulk-add-name">{{ c.name }}</span>
+                                </span>
+                            </label>
+                        {% empty %}
+                            <div style="color:var(--stone);font-style:italic;font-size:12px;">No layered colors yet.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button type="submit" class="btn btn-primary">+ Save <span data-bulk-row-count>0</span> Row(s)</button>
+                <span class="panel-sub" style="margin:0;">
+                    Cross-product: each ticked pattern × each ticked color × selected size →
+                    rows added. Existing rows above can be removed individually.
+                </span>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}PR15 bulk-add CSS + JS for Section 02 add-rows form.{% endcomment %}
+<style>
+    .bulk-add-grid {
+        display: grid; grid-template-columns: 1.8fr 1fr 1fr;
+        gap: 14px;
+    }
+    @media (max-width: 768px) { .bulk-add-grid { grid-template-columns: 1fr; } }
+    .bulk-add-col {
+        background: var(--cream); border: 1px solid var(--border-subtle);
+        border-radius: 10px; padding: 10px 12px;
+    }
+    .bulk-add-label {
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--stone); font-weight: 700; margin-bottom: 6px;
+    }
+    .bulk-add-all {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 12px; font-weight: 600; color: var(--copper);
+        padding: 4px 0; cursor: pointer;
+        border-bottom: 1px solid var(--border-subtle); margin-bottom: 6px;
+    }
+    .bulk-add-list { display: flex; flex-direction: column; gap: 4px; }
+    .bulk-add-row {
+        display: grid;
+        grid-template-columns: 20px 1fr 80px;
+        gap: 8px; align-items: center;
+        padding: 4px 6px; cursor: pointer; font-size: 13px;
+        border-radius: 6px;
+    }
+    .bulk-add-row:hover { background: rgba(184,115,51,0.08); }
+    .bulk-add-name-cell {
+        display: flex; align-items: center; gap: 6px;
+        min-width: 0;            /* lets the cell shrink instead of pushing input */
+        overflow: hidden;
+    }
+    .bulk-add-name {
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bulk-add-hint {
+        font-size: 10px; color: var(--copper); background: rgba(184,115,51,0.12);
+        padding: 1px 5px; border-radius: 4px;
+        white-space: nowrap; flex-shrink: 0;
+    }
+    .bulk-add-count {
+        width: 80px; padding: 4px 8px; font-size: 12px;
+        box-sizing: border-box;
+    }
+    .bulk-add-count:disabled { background: #f3f4f6; opacity: 0.5; }
+    /* Color rows: 2-column layout (no count input) */
+    .bulk-add-row-color { grid-template-columns: 20px 1fr; }
+    /* Stack count below name on small panel widths to avoid horizontal squeeze */
+    @media (max-width: 540px) {
+        .bulk-add-row { grid-template-columns: 20px 1fr; }
+        .bulk-add-count { grid-column: 1 / -1; margin-left: 28px; width: calc(100% - 28px); }
+    }
+</style>
+<script>
+(function(){
+    // PR15 bulk-add expander.
+    // On submit, walk the form: for each ticked pattern × each ticked color,
+    // append a hidden parallel-array tuple (pattern_id, size_id, color_id, count).
+    // Backend view stays unchanged.
+    function init(form){
+        var sizeSel = form.querySelector('[data-bulk-size]');
+        var patternBoxes = form.querySelectorAll('[data-bulk-pattern]');
+        var colorBoxes = form.querySelectorAll('[data-bulk-color]');
+        var allBoxes = form.querySelectorAll('[data-bulk-all]');
+        var rowCountEl = form.querySelector('[data-bulk-row-count]');
+
+        function getCountInput(patternId){
+            return form.querySelector('[data-bulk-count="' + patternId + '"]');
+        }
+        function recompute(){
+            var ticked = 0;
+            patternBoxes.forEach(function(pb){
+                var inp = getCountInput(pb.value);
+                inp.disabled = !pb.checked;
+                if (!pb.checked) inp.value = '';
+                if (pb.checked && parseInt(inp.value || 0, 10) > 0) ticked += 1;
+            });
+            var colorTicks = 0;
+            colorBoxes.forEach(function(cb){ if (cb.checked) colorTicks += 1; });
+            var rows = ticked * colorTicks;
+            if (rowCountEl) rowCountEl.textContent = rows;
+        }
+        patternBoxes.forEach(function(pb){
+            pb.addEventListener('change', recompute);
+            var inp = getCountInput(pb.value);
+            if (inp) inp.addEventListener('input', recompute);
+        });
+        colorBoxes.forEach(function(cb){ cb.addEventListener('change', recompute); });
+
+        allBoxes.forEach(function(allBox){
+            allBox.addEventListener('change', function(){
+                var kind = allBox.getAttribute('data-bulk-all');
+                var targets = kind === 'pattern' ? patternBoxes : colorBoxes;
+                targets.forEach(function(t){ t.checked = allBox.checked; t.dispatchEvent(new Event('change')); });
+            });
+        });
+
+        form.addEventListener('submit', function(ev){
+            // Validate before expanding.
+            if (!sizeSel.value) {
+                ev.preventDefault();
+                alert('Pick a size first.');
+                return;
+            }
+            var patterns = [];
+            patternBoxes.forEach(function(pb){
+                if (!pb.checked) return;
+                var c = parseInt(getCountInput(pb.value).value || 0, 10) || 0;
+                if (c > 0) patterns.push({id: pb.value, count: c});
+            });
+            var colors = [];
+            colorBoxes.forEach(function(cb){
+                if (cb.checked) colors.push(cb.value);
+            });
+            if (!patterns.length || !colors.length) {
+                ev.preventDefault();
+                alert('Tick at least one pattern (with count) and one color.');
+                return;
+            }
+            // Append parallel hidden inputs.
+            patterns.forEach(function(p){
+                colors.forEach(function(colorId){
+                    ['pattern_id', 'size_id', 'color_id', 'count'].forEach(function(name){
+                        var v = name === 'pattern_id' ? p.id
+                              : name === 'size_id' ? sizeSel.value
+                              : name === 'color_id' ? colorId
+                              : p.count;
+                        var inp = document.createElement('input');
+                        inp.type = 'hidden';
+                        inp.name = name;
+                        inp.value = v;
+                        form.appendChild(inp);
+                    });
+                });
+            });
+            // Submit proceeds with appended hidden inputs.
+        });
+        recompute();
+    }
+    function start(){
+        document.querySelectorAll('form[data-bulk-add]').forEach(init);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
+})();
+</script>
+
+{% comment %}Section 03: Actual Cutting Bundles — DRIVES BARCODES (PR8+PR9).
+
+Two-step flow:
+  1. Top form "Create Bundle"  → picks size + optional bundle_number
+  2. Per-bundle form "Add Item" → picks pattern + color + count
+     (size implicit from bundle FK)
+Each bundle: header card + nested item table + per-bundle add-item form.
+{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">03</div>
+        <div class="panel-title">Actual Cutting Bundles</div>
+        <span class="panel-state {% if bundle_total > 0 %}in-progress{% else %}not-started{% endif %}">
+            Actual: {{ bundle_total }}
+        </span>
+    </div>
+    <div class="panel-body">
+        <p class="panel-sub" style="background:rgba(5,150,105,0.08); padding:8px 12px; border-radius:8px; border-left:3px solid #047857;">
+            <strong>Drives barcode generation.</strong> Step 1: Create a Bundle for a Size. Step 2: Inside that bundle add multiple Pattern × Color × Count items. Karigar ties everything together.
+        </p>
+
+        {% if can_edit_bundles %}
+        <div class="cb-create-bundle">
+            <form method="post" action="{% url 'production:cutting-bundle-create' adda.code %}">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">+ Create New Bundle</div>
+                <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px;">
+                    <div>
+                        <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;display:block;">Bundle Size *</label>
+                        <select name="size_id" class="sf-input" required>
+                            <option value="">— pick size —</option>
+                            {% for sz in product_sizes %}
+                                <option value="{{ sz.id }}">{{ sz.code|upper }} — {{ sz.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="flex:1;min-width:160px;">
+                        <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;display:block;">Bundle Number (optional)</label>
+                        <input type="text" name="bundle_number" maxlength="40" class="sf-input" placeholder="e.g. Lot-A, Bundle-3">
+                    </div>
+                </div>
+
+                {% comment %}PR12+PR14: Multi-select with checkbox affordance.
+                Tick row → JS auto-fills Take to max available. Untick → 0.
+                User can override Take manually. Live total badge updates.{% endcomment %}
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-bottom:6px;">
+                    Select Cutting Pieces to Include (tick row to select)
+                </div>
+                <table class="breakup-table" data-mselect-table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px;text-align:center;">
+                                <input type="checkbox" data-mselect-all title="Select all">
+                            </th>
+                            <th>Pattern</th>
+                            <th>Color</th>
+                            <th>Available</th>
+                            <th>Take</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for b in breakup %}
+                        {% if b.available_count > 0 %}
+                        <tr>
+                            <td data-label="Select" style="text-align:center;">
+                                <input type="hidden" name="breakup_id" value="{{ b.pk }}">
+                                <input type="checkbox" data-mselect-row data-max="{{ b.available_count }}">
+                            </td>
+                            <td data-label="Pattern"><strong>{{ b.pattern.name }}</strong></td>
+                            <td data-label="Color">{{ b.color.name }}</td>
+                            <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
+                            <td data-label="Take">
+                                <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% empty %}
+                        <tr><td colspan="5" style="color:var(--stone);font-style:italic;">No cutting pieces available in Section 02 inventory yet. Add pieces above in Section 02 first.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <button type="submit" class="btn btn-primary">+ Create Bundle</button>
+                    <span class="panel-sub" style="margin:0;">Will consume <strong data-mselect-sum>0</strong> piece(s). Rows with Take = 0 skipped.</span>
+                </div>
+            </form>
+        </div>
+        {% comment %}NOTE: multi-select JS lives near end of Section 03 so
+        DOM has all <table data-mselect-table> tables parsed before script
+        runs (Create Bundle table + per-bundle Add Pieces tables).{% endcomment %}
+        {% endif %}
+
+        {% if bundles %}
+            {% for bundle in bundles %}
+                <div class="cb-bundle">
+                    <div class="cb-bundle-head">
+                        <div>
+                            <span class="cb-bundle-size">Size {{ bundle.size.code|upper }}</span>
+                            <span class="cb-bundle-label">{{ bundle.size.label }}{% if bundle.bundle_number %} · <em>{{ bundle.bundle_number }}</em>{% endif %}</span>
+                        </div>
+                        <div class="cb-bundle-total">{{ bundle.total_pieces }} piece{{ bundle.total_pieces|pluralize }}</div>
+                        {% if can_edit_bundles %}
+                        <form method="post" action="{% url 'production:cutting-bundle-delete' adda.code bundle.pk %}" style="margin:0;" onsubmit="return confirm('Delete entire Size {{ bundle.size.code|upper }} bundle and all items?');">
+                            {% csrf_token %}
+                            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                            <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--danger);">Delete Bundle</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    {% comment %}PR12: Pattern visible in main view (revert
+                    PR11's over-hiding). Bundle = Pattern × Color × Count
+                    rows visible by default. Color summary shown below.{% endcomment %}
+                    {% if bundle.items.all %}
+                        {% comment %}Pattern chip list — quick overview of which
+                        patterns are in this bundle.{% endcomment %}
+                        {% regroup bundle.items.all by pattern as items_by_pattern %}
+                        <div class="cb-pattern-chips">
+                            <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-right:6px;">Patterns:</span>
+                            {% for grp in items_by_pattern %}
+                                {% with grp_total=0 %}{% endwith %}
+                                <span class="cb-pattern-chip">{{ grp.grouper.name }} ({% for it in grp.list %}{{ it.count }}{% if not forloop.last %}+{% endif %}{% endfor %})</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <table class="breakup-table" style="margin-top:8px;">
+                        <thead>
+                            <tr>
+                                <th>Pattern</th>
+                                <th>Color</th>
+                                <th>Count</th>
+                                {% if can_edit_bundles %}<th>Action</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for it in bundle.items.all %}
+                            <tr>
+                                <td data-label="Pattern"><strong>{{ it.pattern.name }}</strong></td>
+                                <td data-label="Color">{{ it.color.name }}</td>
+                                <td data-label="Count">{{ it.count }}</td>
+                                {% if can_edit_bundles %}
+                                <td data-label="Action">
+                                    <form method="post" action="{% url 'production:cutting-bundle-item-delete' adda.code it.pk %}" style="margin:0;" onsubmit="return confirm('Remove this item? Pieces return to Section 02 inventory.');">
+                                        {% csrf_token %}
+                                        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                        <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--danger);">Remove</button>
+                                    </form>
+                                </td>
+                                {% endif %}
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="{% if can_edit_bundles %}4{% else %}3{% endif %}" style="color:var(--stone);font-style:italic;">No pieces consumed into bundle yet. Use the form below.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                        {% if bundle.items.all %}
+                        <tfoot>
+                            <tr><th colspan="2" style="text-align:right;">Total</th><th>{{ bundle.total_pieces }}</th>{% if can_edit_bundles %}<th></th>{% endif %}</tr>
+                        </tfoot>
+                        {% endif %}
+                    </table>
+
+                    {% if bundle.color_summary %}
+                    <div class="cb-color-summary">
+                        <span style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;">Color Totals:</span>
+                        {% for entry in bundle.color_summary %}
+                            <span class="cb-color-pill">{{ entry.color.name }} × {{ entry.count }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% if can_edit_bundles %}
+                    {% comment %}PR10+PR14 multi-select consumption: tick row
+                    → Take auto-fills max available. Live total updates.{% endcomment %}
+                    <form method="post" action="{% url 'production:cutting-bundle-add-pieces' adda.code bundle.pk %}" style="margin-top:10px;padding:10px;background:var(--cream);border-radius:8px;">
+                        {% csrf_token %}
+                        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-bottom:6px;">
+                            Add More Cutting Pieces (tick row to select)
+                        </div>
+                        <table class="breakup-table" data-mselect-table>
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;text-align:center;">
+                                        <input type="checkbox" data-mselect-all title="Select all">
+                                    </th>
+                                    <th>Pattern</th>
+                                    <th>Color</th>
+                                    <th>Available</th>
+                                    <th>Take</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for b in breakup %}
+                                {% if b.available_count > 0 %}
+                                <tr>
+                                    <td data-label="Select" style="text-align:center;">
+                                        <input type="hidden" name="breakup_id" value="{{ b.pk }}">
+                                        <input type="checkbox" data-mselect-row data-max="{{ b.available_count }}">
+                                    </td>
+                                    <td data-label="Pattern">{{ b.pattern.name }}</td>
+                                    <td data-label="Color">{{ b.color.name }}</td>
+                                    <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
+                                    <td data-label="Take">
+                                        <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% empty %}
+                                <tr><td colspan="5" style="color:var(--stone);font-style:italic;">No pieces available (all consumed or none added yet in Section 02).</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% if breakup %}
+                        <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                            <button type="submit" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">+ Consume Selected → Bundle</button>
+                            <span style="font-size:11px;color:var(--stone);">Will consume <strong data-mselect-sum>0</strong> piece(s).</span>
+                        </div>
+                        {% endif %}
+                    </form>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <div style="text-align:right;font-weight:700;padding:8px 0;">Grand Total: {{ bundle_total }}</div>
+        {% else %}
+            <p class="panel-sub" style="margin:0;color:var(--stone);">No bundles created yet. Use <strong>+ Create Bundle</strong> above to start.</p>
+        {% endif %}
+    </div>
+</div>
+<script>
+(function(){
+    // Multi-select helper for all [data-mselect-table] tables in Section 03.
+    // Behavior:
+    //   • Tick row checkbox → Take input fills with max available
+    //   • Untick → Take resets to 0
+    //   • Type a number into Take → checkbox auto-toggles based on >0
+    //   • "Select all" header checkbox → toggles every row
+    //   • Live sum element [data-mselect-sum] reflects total Take across rows
+    function init(){
+        document.querySelectorAll('[data-mselect-table]').forEach(function(table){
+            // Find the sum span — search in same containing form/div.
+            var scope = table.closest('form') || table.parentElement;
+            var sumEl = scope ? scope.querySelector('[data-mselect-sum]') : null;
+            var rows = table.querySelectorAll('[data-mselect-row]');
+            var allBox = table.querySelector('[data-mselect-all]');
+            function recompute(){
+                var total = 0;
+                rows.forEach(function(cb){
+                    var tr = cb.closest('tr');
+                    var take = tr.querySelector('[data-mselect-take]');
+                    total += parseInt(take.value || 0, 10) || 0;
+                });
+                if (sumEl) sumEl.textContent = total;
+            }
+            rows.forEach(function(cb){
+                var tr = cb.closest('tr');
+                var take = tr.querySelector('[data-mselect-take]');
+                var max = parseInt(cb.getAttribute('data-max'), 10) || 0;
+                cb.addEventListener('change', function(){
+                    take.value = cb.checked ? max : 0;
+                    recompute();
+                });
+                take.addEventListener('input', function(){
+                    cb.checked = parseInt(take.value || 0, 10) > 0;
+                    recompute();
+                });
+            });
+            if (allBox) {
+                allBox.addEventListener('change', function(){
+                    rows.forEach(function(cb){
+                        cb.checked = allBox.checked;
+                        cb.dispatchEvent(new Event('change'));
+                    });
+                });
+            }
+            recompute();
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>
+<style>
+    .cb-create-bundle {
+        background: rgba(184,115,51,0.06); border: 1px solid var(--border-subtle);
+        border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+    }
+    .cb-bundle {
+        background: var(--surface-2); border: 1px solid var(--border-card);
+        border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;
+    }
+    .cb-bundle-head {
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px;
+    }
+    .cb-bundle-size {
+        display: inline-block; padding: 4px 10px; background: var(--copper); color: #fff;
+        border-radius: 8px; font-weight: 700; font-family: monospace; font-size: 12px;
+    }
+    .cb-bundle-label { margin-left: 8px; color: var(--stone); font-size: 13px; }
+    .cb-bundle-total {
+        margin-left: auto; font-weight: 700; font-size: 14px; color: var(--ink);
+    }
+    .cb-pattern-chips {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        margin-top: 8px;
+    }
+    .cb-pattern-chip {
+        display: inline-block; padding: 3px 9px;
+        background: rgba(184,115,51,0.12); color: var(--copper);
+        border: 1px solid rgba(184,115,51,0.30); border-radius: 999px;
+        font-size: 11px; font-weight: 600;
+    }
+    .cb-color-summary {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        margin-top: 10px; padding: 8px 10px;
+        background: var(--cream); border-radius: 8px;
+    }
+    .cb-color-pill {
+        display: inline-block; padding: 3px 9px;
+        background: rgba(5,150,105,0.10); color: #047857;
+        border: 1px solid rgba(5,150,105,0.25); border-radius: 6px;
+        font-size: 11px; font-weight: 600;
+    }
+    .cb-barcode-preview {
+        background: rgba(184,115,51,0.06);
+        border: 1px solid rgba(184,115,51,0.25);
+        border-radius: 10px; padding: 10px 12px; margin: 10px 0;
+    }
+    .cb-barcode-preview code {
+        font-size: 11px; font-family: monospace;
+        background: rgba(0,0,0,0.04); padding: 2px 6px; border-radius: 4px;
+    }
+</style>
+
+{% comment %}Section 04: Notes (cutting record){% endcomment %}
+{% if can_edit_breakup %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">04</div>
+        <div class="panel-title">Notes</div>
+    </div>
+    <div class="panel-body">
+        <form method="post" action="{% url 'production:cutting-draft' adda.code %}">
+            {% csrf_token %}
+            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+            <textarea name="notes" rows="3" class="sf-input">{{ cutting_record.notes|default:'' }}</textarea>
+            <div style="margin-top:10px;">
+                <button type="submit" class="btn btn-ghost">Save Draft</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% comment %}Section 05: Mark Complete{% endcomment %}
+<div class="panel">
+    <div class="panel-head">
+        <div class="panel-num">05</div>
+        <div class="panel-title">Mark Cutting Complete &amp; Generate Barcodes</div>
+        {% if cutting_stage_record.completed_at %}<span class="panel-state completed">Completed {{ cutting_stage_record.completed_at|date:"d M H:i" }}</span>{% endif %}
+    </div>
+    <div class="panel-body">
+        {% if cutting_stage_record.completed_at %}
+            <p class="panel-sub" style="margin:0;">Stage finalized. {{ adda.total_pieces }} barcode{{ adda.total_pieces|pluralize }} generated.</p>
+            {% if adda.barcode_batches.exists %}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-primary">View Barcodes</a>
+                <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-ghost">Print QR Sheet</a>
+            </div>
+            {% endif %}
+        {% elif can_complete_workspace %}
+            <p class="panel-sub">
+                Actual bundle total: <strong>{{ bundle_total }}</strong>.
+                Completing generates barcode batches grouped by (bundle, size, color).
+                {% if next_stage_after_cutting %}Advances to {{ next_stage_after_cutting.get_stage_type_display }}.{% else %}Adda will be marked complete.{% endif %}
+            </p>
+
+            {% comment %}PR13: barcode batch preview — show user what will
+            be generated before they click Complete.{% endcomment %}
+            {% if barcode_preview %}
+            <div class="cb-barcode-preview">
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-bottom:6px;">
+                    Barcode Generation Preview ({{ barcode_preview_total }} total piece{{ barcode_preview_total|pluralize }})
+                </div>
+                <table class="breakup-table">
+                    <thead>
+                        <tr>
+                            <th>Bundle</th>
+                            <th>Color</th>
+                            <th>Pieces</th>
+                            <th>Start</th>
+                            <th>End</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in barcode_preview %}
+                        <tr>
+                            <td data-label="Bundle">Size {{ row.size.code|upper }}{% if row.bundle.bundle_number %} · {{ row.bundle.bundle_number }}{% endif %}</td>
+                            <td data-label="Color">{{ row.color.name }}</td>
+                            <td data-label="Pieces"><strong>{{ row.total }}</strong></td>
+                            <td data-label="Start"><code>{{ adda.code }}-{{ row.start_seq|stringformat:"04d" }}</code></td>
+                            <td data-label="End"><code>{{ adda.code }}-{{ row.end_seq|stringformat:"04d" }}</code></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'production:cutting-workspace-complete' adda.code %}"
+                  onsubmit="return confirm('Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
+                  style="margin-top:14px;">
+                {% csrf_token %}
+                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                <button type="submit" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
+            </form>
+        {% else %}
+            <p class="panel-sub" style="margin:0;">{% if not bundles %}Add at least one <strong>actual bundle</strong> in Section 03 before completing.{% else %}Completion requires <code>cutting_master_helper</code> or super admin.{% endif %}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+{% comment %}LEGACY PATH: simple flow (NIKKAR-style) — single-form complete.
+
+Render only if product has no size/pattern config. Mirrors the old
+panel exactly so backward-compat URLs keep working.
+{% endcomment %}
+{% if can_complete_cutting %}
+    {% comment %}Legacy single-form path. ALL fields (pieces_cut + notes +
+    workers) live inside one <form> so the submit button carries everything.
+    Earlier the pieces_cut form and workers form were separate; the submit
+    button targeted only the workers form so pieces_cut never submitted.{% endcomment %}
+    <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-legacy-form-{{ adda.code }}" novalidate>
+        {% csrf_token %}
+        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        {% if cutting_form.non_field_errors %}<div class="field-error">{{ cutting_form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-num">01</div>
+                <div class="panel-title">Pieces Cut</div>
+            </div>
+            <div class="panel-body">
+                <p class="panel-sub">Pieces cut = number of barcodes generated. Cannot be changed later.</p>
                 <div class="form-grid">
                     <div class="field">
                         <label>Pieces cut *</label>
@@ -50,35 +948,35 @@ Required context:
                         {{ cutting_form.notes }}
                     </div>
                 </div>
-            </form>
+            </div>
         </div>
-    </div>
 
-    <div class="panel">
-        <div class="panel-head">
-            <div class="panel-num">02</div>
-            <div class="panel-title">Workers</div>
-        </div>
-        <div class="panel-body">
-            <p class="panel-sub">Tick every worker who performed this cutting.</p>
-            <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-workers-form-{{ adda.code }}">
+        <div class="panel">
+            <div class="panel-head">
+                <div class="panel-num">02</div>
+                <div class="panel-title">Workers</div>
+            </div>
+            <div class="panel-body">
+                <p class="panel-sub">Tick every worker who performed this cutting.</p>
                 {{ cutting_form.workers }}
-            </form>
+            </div>
         </div>
-    </div>
 
-    <div style="display:flex; gap:10px; flex-wrap:wrap; padding: 10px 0;">
-        <a href="{% url 'production:adda-detail' adda.code %}" class="btn btn-ghost">← Back</a>
-        <button type="submit" form="cutting-workers-form-{{ adda.code }}" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
-    </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; padding: 10px 0;">
+            {% if not embedded %}
+                <a href="{% url 'production:adda-detail' adda.code %}" target="_top" class="btn btn-ghost">← Back</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
+        </div>
+    </form>
 {% else %}
     <div class="panel">
         <div class="panel-body">
             {% if adda.current_stage and adda.current_stage.stage_type == 'cutting' %}
                 <p class="panel-sub">Only a manager can complete the Cutting stage.</p>
             {% elif adda.status == 'completed' %}
-                <p class="panel-sub">Cutting complete. {{ adda.barcodes.count }} barcode{{ adda.barcodes.count|pluralize }} generated.</p>
-                {% if adda.barcodes.exists %}
+                <p class="panel-sub">Cutting complete. {{ adda.total_pieces }} barcode{{ adda.total_pieces|pluralize }} generated.</p>
+                {% if adda.barcode_batches.exists %}
                 <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;">
                     <a href="{% url 'tracking:barcode-list' adda.code %}" class="btn btn-primary">View Barcodes</a>
                     <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-ghost">Print QR Sheet</a>
@@ -90,3 +988,8 @@ Required context:
         </div>
     </div>
 {% endif %}
+
+{% endif %}
+
+{% include "production/_stage_panel_collapse.html" %}
+</div>{# /ct-workspace-scope #}

@@ -1,22 +1,28 @@
-"""Barcode list, print sheet, scan handler views.
+"""Barcode batch list, print sheet, scan handler views.
 
 YEH FILE KYU HAI?
 ─────────────────
-BarcodeListForAddaView   — ek Adda ke saare barcodes paginated.
-BarcodePrintSheetView    — A4 print sheet with QR grid + size/status filter.
-scan_piece               — phone se QR scan karne pe yaha land karta hai.
-                           Updates last_scanned_at/by, renders piece detail.
+PR6 (2026-05-28) ke baad barcodes BarcodeBatch ranges mein store hote hain.
+Individual BatchBarcode rows lazy-created on scan. Views ko dono se kaam
+karna padta hai:
+
+  BarcodeListForAddaView   — Adda ke batches summary table + per-batch
+                              piece count + scanned state link.
+  BarcodePrintSheetView    — A4 print sheet: batches expand to virtual
+                              stickers (seq 1..N rendered on the fly).
+  scan_piece               — phone QR scan endpoint. resolve_value()
+                              parses + finds batch + lazy creates piece row.
 """
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
-from django.views.generic import ListView
+from django.views.generic import ListView, TemplateView
 
 from inventory.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
-from tracking.models import BatchBarcode
-from tracking.services import qr_data_uri
+from tracking.models import BarcodeBatch, BatchBarcode
+from tracking.services import get_or_create_piece, qr_data_uri, resolve_value
 
 
 class _ProductionRoleMixin(UserPassesTestMixin):
@@ -24,24 +30,67 @@ class _ProductionRoleMixin(UserPassesTestMixin):
         return user_has_role(self.request.user, PRODUCTION_ROLES)
 
 
-class BarcodeListForAddaView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
+def _expand_batches_to_pieces(batches, limit: int | None = None):
+    """Iterate BarcodeBatch rows, yield per-piece dicts for templating.
+
+    Each batch is expanded to its seq range. Returns lightweight dict per
+    piece — DOES NOT touch BatchBarcode table. Status defaults to 'pending'
+    unless a BatchBarcode row exists (lazy scan state).
+
+    Optionally caps total yielded pieces at `limit`.
+    """
+    # Pre-fetch scanned pieces for these batches to merge actual status.
+    if not batches:
+        return
+    adda = batches[0].adda
+    scanned = {
+        bc.piece_seq: bc for bc in
+        BatchBarcode.objects.filter(adda=adda).only(
+            'piece_seq', 'value', 'status', 'last_scanned_at',
+        )
+    }
+    yielded = 0
+    for batch in batches:
+        for seq in range(batch.start_seq, batch.end_seq + 1):
+            if limit is not None and yielded >= limit:
+                return
+            value = batch.value_for_seq(seq)
+            bc = scanned.get(seq)
+            yield {
+                'batch': batch,
+                'seq': seq,
+                'value': value,
+                'status': bc.status if bc else 'pending',
+                'last_scanned_at': bc.last_scanned_at if bc else None,
+            }
+            yielded += 1
+
+
+class BarcodeListForAddaView(LoginRequiredMixin, _ProductionRoleMixin, TemplateView):
+    """Per-Adda barcode summary: batches table + drill-down to virtual pieces."""
+
     template_name = 'tracking/barcode_list.html'
-    context_object_name = 'barcodes'
-    paginate_by = 100
 
     def get_adda(self):
         return get_object_or_404(Adda, code=self.kwargs['adda_code'])
 
-    def get_queryset(self):
-        return self.get_adda().barcodes.order_by('piece_seq')
-
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['adda'] = self.get_adda()
+        adda = self.get_adda()
+        batches = list(
+            adda.barcode_batches
+            .select_related('size', 'color', 'product')
+            .order_by('start_seq')
+        )
+        ctx['adda'] = adda
+        ctx['batches'] = batches
+        ctx['total_pieces'] = sum(b.total_pieces for b in batches)
+        # Scanned count — how many pieces have BatchBarcode rows.
+        ctx['scanned_count'] = BatchBarcode.objects.filter(adda=adda).count()
         return ctx
 
 
-class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
+class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, TemplateView):
     """A4 sticker sheet of QR codes.
 
     Query params:
@@ -50,15 +99,7 @@ class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
     """
 
     template_name = 'tracking/barcode_print_sheet.html'
-    context_object_name = 'barcodes'
-    paginate_by = None
 
-    # box_size in pixels per QR module — drives the rendered PNG size.
-    # ECC Q already takes care of damage tolerance, so we can run dense.
-    # Sticker dimensions are picked for reliable phone scan from 15-20cm:
-    #   small  → ~22mm QR, 6 cols × 9 rows = 54 stickers / A4
-    #   medium → ~30mm QR, 5 cols × 7 rows = 35 stickers / A4
-    #   large  → ~42mm QR, 4 cols × 6 rows = 24 stickers / A4
     SIZE_SPECS = {
         'small':  {'cols': 6, 'rows': 9, 'qr_mm': 22, 'box_size': 4, 'label': 'Small (54 / page)'},
         'medium': {'cols': 5, 'rows': 7, 'qr_mm': 30, 'box_size': 6, 'label': 'Medium (35 / page)'},
@@ -72,18 +113,24 @@ class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
         size = self.request.GET.get('size', 'small')
         return self.SIZE_SPECS.get(size, self.SIZE_SPECS['small']), size
 
-    def get_queryset(self):
-        qs = self.get_adda().barcodes.order_by('piece_seq')
-        status = self.request.GET.get('status')
-        if status in {'pending', 'packed', 'dispatched', 'missing'}:
-            qs = qs.filter(status=status)
-        return qs
-
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         spec, size = self._spec()
         adda = self.get_adda()
         base = self.request.build_absolute_uri('/')
+
+        batches = list(
+            adda.barcode_batches
+            .select_related('size', 'color')
+            .order_by('start_seq')
+        )
+
+        # Status filter against scanned-state rows. If filtering, only show
+        # pieces with matching status; 'pending' includes virtual (not-yet-scanned).
+        status_filter = self.request.GET.get('status', '')
+        pieces = list(_expand_batches_to_pieces(batches))
+        if status_filter in {'pending', 'packed', 'dispatched', 'missing'}:
+            pieces = [p for p in pieces if p['status'] == status_filter]
 
         ctx['adda'] = adda
         ctx['size'] = size
@@ -100,11 +147,10 @@ class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
             ('dispatched', 'Dispatched only'),
             ('missing', 'Missing only'),
         ]
-        ctx['active_status'] = self.request.GET.get('status', '')
-        # Pre-compute QR images at the chosen box_size.
+        ctx['active_status'] = status_filter
         ctx['barcode_rows'] = [
-            {'bc': bc, 'qr': qr_data_uri(bc, base, box_size=spec['box_size'])}
-            for bc in self.get_queryset()
+            {'bc': p, 'qr': qr_data_uri(p['value'], base, box_size=spec['box_size'])}
+            for p in pieces
         ]
         ctx['per_page'] = spec['cols'] * spec['rows']
         ctx['total_pages'] = (len(ctx['barcode_rows']) + ctx['per_page'] - 1) // ctx['per_page'] if ctx['barcode_rows'] else 0
@@ -113,9 +159,15 @@ class BarcodePrintSheetView(LoginRequiredMixin, _ProductionRoleMixin, ListView):
 
 @login_required
 def scan_piece(request, value):
-    """Public-after-login QR landing page. Updates last_scanned_at/by."""
-    bc = get_object_or_404(BatchBarcode.objects.select_related('adda', 'adda__product'), value=value)
+    """Public-after-login QR landing. Resolves via BarcodeBatch, lazy-creates
+    BatchBarcode scan-state row, stamps last_scanned_at/by."""
+    hit = resolve_value(value)
+    if hit is None:
+        from django.http import Http404
+        raise Http404(f"barcode '{value}' not recognized")
+    batch, seq = hit
+    bc = get_or_create_piece(batch, seq)
     bc.last_scanned_at = timezone.now()
     bc.last_scanned_by = request.user
     bc.save(update_fields=['last_scanned_at', 'last_scanned_by'])
-    return render(request, 'tracking/scan_detail.html', {'barcode': bc})
+    return render(request, 'tracking/scan_detail.html', {'barcode': bc, 'batch': batch})
