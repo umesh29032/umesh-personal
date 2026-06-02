@@ -30,7 +30,7 @@ from __future__ import annotations
 import csv
 import io
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -259,6 +259,7 @@ def generate_csv(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
         export_method=BarcodeExportBatch.ExportMethod.CSV,
         exported_by=user, total_labels=total,
     )
+    _log_export(adda, rec, batch, user)
     return batch, _render_csv_bytes(adda)
 
 
@@ -276,6 +277,7 @@ def generate_xlsx(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
         export_method=BarcodeExportBatch.ExportMethod.XLSX,
         exported_by=user, total_labels=total,
     )
+    _log_export(adda, rec, batch, user)
     return batch, _render_xlsx_bytes(adda)
 
 
@@ -297,7 +299,23 @@ def generate_pdf_summary(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
         export_method=BarcodeExportBatch.ExportMethod.PDF,
         exported_by=user, total_labels=total,
     )
+    _log_export(adda, rec, batch, user)
     return batch, _render_pdf_summary_bytes(adda)
+
+
+def _log_export(adda, rec, batch, user) -> None:
+    """Audit an export to the unified Adda timeline (EXPORTED event)."""
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(
+        adda, AddaHistory.ChangeType.EXPORTED, user,
+        stage_record=rec.stage_record,
+        metadata={
+            'export_code': batch.export_code,
+            'method': batch.export_method,
+            'total_labels': batch.total_labels,
+        },
+    )
 
 
 def list_exports(adda: Adda):

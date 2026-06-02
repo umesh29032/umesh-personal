@@ -23,7 +23,6 @@ from datetime import date
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -34,11 +33,10 @@ from production.constants import (
     STAGE_LAYERING,
 )
 from production.models import (
-    Adda, AddaProductSizeColorPieceBreakdown, AddaStageRecord,
-    BarcodeGenerationRecord, CuttingPatternRecord,
-    CuttingPatternSizeAllocation, CuttingRecord, LayeringRecord,
-    Product, ProductPattern, ProductPatternAssignment, ProductSize, Stage,
-    WorkflowStage,
+    Adda, AddaStageRecord, CuttingPatternRecord,
+    CuttingPatternSizeAllocation, LayeringRecord,
+    Product, ProductPattern, ProductPatternAssignment,
+    ProductSize, Stage, WorkflowStage,
 )
 from production.services import (
     add_pieces_to_bundle, complete_barcode_generation, complete_cutting,
@@ -63,7 +61,7 @@ def _admin(email):
 
 
 def _karigar(email):
-    role = Role.objects.get(code='karigar')
+    role = Role.objects.get(code='worker')
     u = User.objects.create_user(email=email, password='x')
     u.role = role
     u.save()

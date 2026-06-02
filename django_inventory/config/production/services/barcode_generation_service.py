@@ -202,6 +202,10 @@ def start_barcode_generation(
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
     _get_or_create_record(sr)
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
     return sr
 
 
@@ -239,6 +243,11 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
     rec.total_barcodes = total
     rec.generated_at = timezone.now()
     rec.save(update_fields=['total_barcodes', 'generated_at', 'updated_at'])
+
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.BARCODES_GENERATED, user,
+             stage_record=sr, metadata={'total_barcodes': total})
     return rec
 
 
@@ -362,6 +371,10 @@ def reopen_barcode_generation(*, adda: Adda, user) -> AddaStageRecord:
     sr.completed_at = None
     sr.completed_by = None
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
+
+    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
+    from production.services.cost_service import clear_stage_cost
+    clear_stage_cost(sr)
 
     adda.current_stage = wf
     adda.status = Adda.Status.IN_PROGRESS

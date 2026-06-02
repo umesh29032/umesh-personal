@@ -16,7 +16,6 @@ Run with: env/bin/python config/manage.py test accounts --settings=config.settin
 """
 from __future__ import annotations
 
-from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import identify_hasher
@@ -110,7 +109,7 @@ class UserEditFormTests(BaseSecurityTest):
     def test_blocks_weak_new_password(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "karigar", "new_password": "abc"},
+            data={"email": "edit@t.com", "user_type": "worker", "new_password": "abc"},
         )
         self.assertFalse(f.is_valid())
         self.assertIn("new_password", f.errors)
@@ -119,14 +118,14 @@ class UserEditFormTests(BaseSecurityTest):
         # Empty new_password should NOT trigger validator.
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "karigar", "new_password": ""},
+            data={"email": "edit@t.com", "user_type": "worker", "new_password": ""},
         )
         self.assertTrue(f.is_valid(), f.errors)
 
     def test_rejects_email_collision_with_other_user(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "other@t.com", "user_type": "karigar"},
+            data={"email": "other@t.com", "user_type": "worker"},
         )
         self.assertFalse(f.is_valid())
         self.assertIn("email", f.errors)
@@ -134,7 +133,7 @@ class UserEditFormTests(BaseSecurityTest):
     def test_allows_keeping_own_email(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "karigar"},
+            data={"email": "edit@t.com", "user_type": "worker"},
         )
         self.assertTrue(f.is_valid(), f.errors)
 

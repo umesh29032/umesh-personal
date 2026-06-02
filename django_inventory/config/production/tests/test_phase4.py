@@ -18,11 +18,11 @@ from django.test import TestCase
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.forms._shared import _layering_worker_queryset
-from production.models import Adda, AddaStageRecord, Product
+from production.models import AddaStageRecord, Product
 from production.services import (
     adda_activity, attach_roll_to_layering, complete_layering,
-    create_adda, record_remaining_cloth, start_layering,
-    sync_layering_workers_for_skill, user_activity_across_addas,
+    create_adda, record_remaining_cloth, sync_layering_workers_for_skill,
+    user_activity_across_addas,
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
@@ -42,7 +42,7 @@ def _user(email, *, role_code='super_admin', is_super=True, skills=()):
 class CreateAddaAutoTagTests(TestCase):
     def test_creates_layering_stage_record_with_skilled_workers(self):
         admin = _user('adm@p4.test', skills=['cutting_master'])
-        helper = _user('helper@p4.test', role_code='karigar', is_super=False,
+        helper = _user('helper@p4.test', role_code='worker', is_super=False,
                        skills=['cutting_master_helper'])
         adda = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
         sr = AddaStageRecord.objects.get(
@@ -79,7 +79,7 @@ class RetroTagSignalTests(TestCase):
             workflow_stage__stage__code='layering',
         )
         # New helper user added AFTER adda exists — signal should retro-tag them.
-        late = _user('late@retro.test', role_code='karigar', is_super=False)
+        late = _user('late@retro.test', role_code='worker', is_super=False)
         self.assertNotIn(late, sr.workers.all())
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
         # Signal fires on m2m_changed post_add → late should now be in workers M2M
@@ -120,7 +120,7 @@ class RetroTagSignalTests(TestCase):
         self.assertIsNotNone(sr1.completed_at)
 
         # New helper user — must NOT be added to the completed adda1's stage_record
-        late = _user('late@retro2.test', role_code='karigar', is_super=False)
+        late = _user('late@retro2.test', role_code='worker', is_super=False)
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
         self.assertNotIn(late, sr1.workers.all())
 
@@ -129,7 +129,7 @@ class RetroTagSignalTests(TestCase):
         create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
         # Make a user, attach skill via plain ORM (bypasses signal? no, M2M always fires)
         # then call sync directly to assert idempotence
-        u = _user('dir@dir.test', role_code='karigar', is_super=False,
+        u = _user('dir@dir.test', role_code='worker', is_super=False,
                   skills=['cutting_master_helper'])
         # Already tagged via signal; calling sync again should not raise
         before = AddaStageRecord.objects.filter(workers=u).count()
@@ -141,9 +141,9 @@ class RetroTagSignalTests(TestCase):
 class LayeringWorkerQuerysetTests(TestCase):
     def test_returns_only_skilled_users(self):
         _user('m@q.test', role_code='manager', is_super=False)   # manager, no skill
-        cm = _user('cm@q.test', role_code='karigar', is_super=False,
+        cm = _user('cm@q.test', role_code='worker', is_super=False,
                    skills=['cutting_master'])
-        cmh = _user('cmh@q.test', role_code='karigar', is_super=False,
+        cmh = _user('cmh@q.test', role_code='worker', is_super=False,
                     skills=['cutting_master_helper'])
         emails = set(_layering_worker_queryset().values_list('email', flat=True))
         self.assertIn(cm.email, emails)
@@ -183,7 +183,7 @@ class ActivityTimelineTests(TestCase):
         self.assertTrue(any(self.rolls[0].roll_id in t for t in targets))
 
     def test_user_activity_across_addas_filters_by_user(self):
-        outsider = _user('out@act.test', role_code='karigar', is_super=False)
+        outsider = _user('out@act.test', role_code='worker', is_super=False)
         events_admin = user_activity_across_addas(self.admin, limit=50)
         events_outsider = user_activity_across_addas(outsider, limit=50)
         self.assertGreater(len(events_admin), 0)

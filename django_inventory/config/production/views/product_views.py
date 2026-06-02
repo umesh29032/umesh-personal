@@ -21,10 +21,10 @@ from production.services import (
     reactivate_product_size, update_product, update_product_size,
 )
 
-from .mixins import SuperAdminOnlyMixin, ProductionRoleMixin
+from .mixins import SuperAdminOnlyMixin, ManagementRoleMixin
 
 
-class ProductListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
+class ProductListView(LoginRequiredMixin, ManagementRoleMixin, ListView):
     template_name = 'production/product_list.html'
     model = Product
     context_object_name = 'products'

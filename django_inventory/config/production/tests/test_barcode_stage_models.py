@@ -14,8 +14,6 @@ workflow) + PR-D (export). This file verifies the schema sticks:
   • LabelPrintQueue status default = queued
   • Backfill migration ran (assertable via Stage.code lookup post-test-DB)
 """
-from datetime import date
-from decimal import Decimal
 
 from django.db import IntegrityError
 from django.test import TestCase
@@ -27,14 +25,12 @@ from production.constants import (
     STAGE_BARCODE_GENERATION, STAGE_CUTTING, STAGE_LAYERING,
 )
 from production.models import (
-    Adda, AddaProductSizeColorPieceBreakdown, AddaStageRecord,
-    BarcodeGenerationRecord, CuttingBundle, CuttingRecord,
-    LabelPrintQueue, LayeringRecord, Product, ProductSize, Stage,
-    WorkflowStage,
+    AddaProductSizeColorPieceBreakdown, AddaStageRecord, BarcodeGenerationRecord,
+    CuttingRecord, LabelPrintQueue, Product,
+    ProductSize, Stage, WorkflowStage,
 )
 from production.services import create_adda
-from raw_materials.models import ClothColor, ClothType, StorageLocation
-from raw_materials.services import bulk_create_rolls
+from raw_materials.models import ClothColor
 from tracking.models import BarcodeExportBatch
 
 

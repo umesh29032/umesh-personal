@@ -77,6 +77,7 @@ from .flow_service import (
     add_stage_to_product_flow,
     move_stage_in_product_flow,
     remove_stage_from_product_flow,
+    set_stage_cost,
 )
 
 __all__ = [
@@ -148,4 +149,5 @@ __all__ = [
     'add_stage_to_product_flow',
     'remove_stage_from_product_flow',
     'move_stage_in_product_flow',
+    'set_stage_cost',
 ]

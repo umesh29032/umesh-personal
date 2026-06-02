@@ -22,6 +22,7 @@ Cutting URL: addas/<code>/cutting/  (single submit, unchanged)
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -34,29 +35,36 @@ from accounts.skills import (
 )
 from inventory.services import MANAGEMENT_ROLES, user_has_role
 from production.forms import (
-    AttachRollForm, CompleteLayeringForm, CuttingBreakupRowForm,
-    CuttingBundleForm, CuttingDraftForm, CuttingForm, CuttingStartForm,
-    EditRollEntryForm, StartLayeringForm,
+    AttachRollForm, CompleteLayeringForm, CuttingDraftForm,
+    CuttingForm, CuttingStartForm, EditRollEntryForm, StartLayeringForm,
 )
 from production.constants import STAGE_CUTTING, STAGE_LAYERING
 from production.models import (
-    Adda, AddaStageRecord, CuttingBundle, CuttingBundleItem,
-    CuttingPieceBreakup, LayeringRollEntry, ProductPattern, ProductSize,
+    Adda, AddaStageRecord, CuttingBundleItem, LayeringRollEntry,
     RemainingClothOfClothRoll,
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle,
     attach_roll_to_layering, complete_cutting, complete_layering,
-    create_bundle, create_bundle_with_pieces, delete_breakup_row,
-    delete_bundle, delete_bundle_item, detach_roll_from_layering,
-    get_cutting_snapshot, get_layering_snapshot, get_suggested_breakup,
-    preview_barcode_batches, remove_remaining_cloth, reopen_cutting,
-    reopen_layering, save_cutting_draft, save_layering_draft, start_cutting,
-    start_layering, update_layering_roll_entry, upsert_breakup_row,
+    create_bundle_with_pieces, delete_breakup_row, delete_bundle,
+    delete_bundle_item, detach_roll_from_layering, get_cutting_snapshot,
+    get_layering_snapshot, get_suggested_breakup, preview_barcode_batches,
+    remove_remaining_cloth, reopen_cutting, reopen_layering,
+    save_cutting_draft, save_layering_draft, start_cutting, start_layering,
+    update_layering_roll_entry, upsert_breakup_row,
 )
 from raw_materials.models import ClothColor, ClothRoll
+from expense.models import StageWorkAssignment
+from expense.services import (
+    allocate_stage_work, item_allocation_summary, void_allocation,
+)
 
-from .mixins import ProductionRoleMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin
+
+
+def _is_ajax(request) -> bool:
+    """True for debounced auto-save fetch() calls (sets X-Requested-With)."""
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -236,9 +244,11 @@ def _build_layering_context(request, adda: Adda) -> dict:
     }
 
 
-class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                            StageViewAccessMixin, TemplateView):
     """Full-page layering workspace (with nav + hero). Standalone entry point."""
 
+    stage_code = STAGE_LAYERING            # skill-gate the VIEW, not just actions
     template_name = 'production/layering_workspace.html'
 
     def get_context_data(self, **kwargs):
@@ -249,8 +259,13 @@ class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateVie
 
 
 @method_decorator(xframe_options_sameorigin, name='dispatch')
-class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class StagePanelView(LoginRequiredMixin, ProductionRoleMixin,
+                     StageViewAccessMixin, TemplateView):
     """Per-stage panel — canonical URL for iframe embed + standalone view.
+
+    Skill-gated via StageViewAccessMixin (stage_type kwarg) so a direct hit on
+    /addas/<code>/stage/<stage_type>/ obeys the same skill rule as the embedded
+    panel — not just the ProductionRole gate.
 
     `?embedded=1` strips chrome (hero/nav) so panel fits inside iframe.
     Picks layering or cutting partial based on `stage_type` URL kwarg.
@@ -761,10 +776,14 @@ class LayeringCompleteView(_LayeringActionBase):
                 user=request.user,
             )
         except (PermissionDenied, ValidationError) as exc:
+            if _is_ajax(request):
+                return HttpResponse(self._service_error(exc), status=400)
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
 
         if action == 'draft':
+            if _is_ajax(request):
+                return HttpResponse(status=204)   # debounced auto-save
             messages.success(request, "Draft saved.")
             return redirect(self.workspace_url(code, request))
 
@@ -924,6 +943,28 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     ) and bool(bundles)
     can_reopen = is_management and sr is not None and sr.completed_at is not None
 
+    # ── Per-bundle-item worker allocation (PR-6) ────────────────────────────
+    # Attach allocation data to each bundle for the template: existing
+    # (non-voided) allocations + how much of each item is still unallocated.
+    # Form is gated on can_allocate; the read-only display always renders.
+    can_allocate = is_management and sr is not None and sr.completed_at is None
+    allocation_workers = list(sr.workers.all()) if sr else []
+    for b in bundles:
+        ann = []
+        for it in b.items.select_related('pattern', 'color').all():
+            summ = item_allocation_summary(it)
+            rows = list(
+                it.work_assignments.filter(voided_at__isnull=True)
+                .select_related('worker')
+            )
+            ann.append({
+                'item': it,
+                'allocated': summ['allocated'],
+                'remaining': summ['remaining'],
+                'rows': rows,
+            })
+        b.alloc_items = ann
+
     # Suggested breakup (pre-fill hint when no rows yet).
     suggestion = get_suggested_breakup(adda) if not breakup else []
     suggested_total = sum(row['count'] for row in suggestion)
@@ -965,6 +1006,8 @@ def _build_cutting_context(request, adda: Adda) -> dict:
         'can_edit_bundles': can_edit_breakup,  # same skill gates
         'can_complete_workspace': can_complete_workspace,
         'can_reopen_cutting': can_reopen,
+        'can_allocate': can_allocate,
+        'allocation_workers': allocation_workers,
         'next_stage_after_cutting': next_stage,
         'cutting_start_form': CuttingStartForm(initial={
             'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
@@ -975,7 +1018,9 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     }
 
 
-class CuttingWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class CuttingWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                           StageViewAccessMixin, TemplateView):
+    stage_code = STAGE_CUTTING             # skill-gate the VIEW, not just actions
     template_name = 'production/cutting_workspace.html'
 
     def get_context_data(self, **kwargs):
@@ -1095,8 +1140,12 @@ class CuttingDraftView(_CuttingActionBase):
         try:
             save_cutting_draft(adda=adda, notes=notes, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
+            if _is_ajax(request):
+                return HttpResponse(self._service_error(exc), status=400)
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
+        if _is_ajax(request):
+            return HttpResponse(status=204)   # debounced auto-save
         messages.success(request, "Draft saved.")
         return redirect(self.workspace_url(code, request))
 
@@ -1342,4 +1391,66 @@ class CuttingBundleDeleteView(_CuttingActionBase):
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
         messages.success(request, "Bundle removed.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleItemAllocateView(_CuttingActionBase):
+    """Allocate a CuttingBundleItem's pieces to a worker (PR-6 payroll).
+
+    POST: worker_id + allocated_quantity + notes (optional). Resolves the
+    cutting AddaStageRecord, then books the earning via expense.allocate_stage_work
+    (which freezes the rate + credits the worker's ledger). pk = bundle_item id.
+    """
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        item = get_object_or_404(
+            CuttingBundleItem, pk=pk, bundle__cutting_record__stage_record__adda=adda,
+        )
+        sr = item.bundle.cutting_record.stage_record
+        try:
+            worker_id = int(request.POST.get('worker_id') or 0)
+            qty = int(request.POST.get('allocated_quantity') or 0)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid number in form.")
+            return redirect(self.workspace_url(code, request))
+        if worker_id <= 0:
+            messages.error(request, "Pick a worker.")
+            return redirect(self.workspace_url(code, request))
+        if qty < 1:
+            messages.error(request, "Quantity must be >= 1.")
+            return redirect(self.workspace_url(code, request))
+        from accounts.models import User
+        worker = User.objects.filter(pk=worker_id).first()
+        if worker is None:
+            messages.error(request, "Worker not found.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            allocate_stage_work(
+                user=request.user, stage_record=sr, worker=worker,
+                bundle_item=item, allocated_quantity=qty,
+                notes=request.POST.get('notes', ''),
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"Allocated {qty} to {worker.email}.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingAllocationDeleteView(_CuttingActionBase):
+    """Void a worker allocation — reverses its ledger credit (audit-preserving).
+    pk = StageWorkAssignment id. Management-only (enforced in void_allocation)."""
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        assignment = get_object_or_404(
+            StageWorkAssignment, pk=pk, stage_record__adda=adda,
+        )
+        try:
+            void_allocation(assignment, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Allocation removed.")
         return redirect(self.workspace_url(code, request))

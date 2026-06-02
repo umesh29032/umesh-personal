@@ -237,6 +237,12 @@ class AddaHistory(TimeStampedModel):
         STATUS_CHANGED = 'status_changed', 'Status Changed'
         ROLL_ASSIGNED = 'roll_assigned', 'Roll Assigned'
         COMPLETED = 'completed', 'Completed'
+        COST_FROZEN = 'cost_frozen', 'Cost Frozen'   # manufacturing cost snapshot at stage advance
+        STAGE_STARTED = 'stage_started', 'Stage Started'
+        WORKERS_ASSIGNED = 'workers_assigned', 'Workers Assigned'
+        BUNDLE_CREATED = 'bundle_created', 'Bundle Created'
+        BARCODES_GENERATED = 'barcodes_generated', 'Barcodes Generated'
+        EXPORTED = 'exported', 'Exported'
 
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='history',
@@ -259,7 +265,20 @@ class AddaHistory(TimeStampedModel):
         'raw_materials.ClothRoll', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',
     )
+    # Execution-row link for single-stage events (started/workers/bundle/cost/
+    # barcodes/exported). Binds to the AddaStageRecord, NOT WorkflowStage —
+    # two Addas share one WorkflowStage but each has its own execution row.
+    # SET_NULL so a rare stage-record delete preserves the audit row.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
     note = models.CharField(max_length=200, blank=True)
+    # Sparse per-event payload (jsonb). e.g. COST_FROZEN carries
+    # {method, rate, qty, cost}. Queried dimensions stay typed FK columns;
+    # JSON holds only event-specific extras. default=dict so existing rows
+    # read {} (additive-safe migration).
+    metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=['adda', '-created_at'])]

@@ -1,0 +1,90 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Payroll Overview{% endblock %}
+
+{% block extra_head %}
+<style>
+    .payroll-overview .hero-strip {
+        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
+        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .payroll-overview .hero-strip h1 { margin: 0; font-size: 20px; }
+    .payroll-overview .hero-strip .total { text-align: right; }
+    .payroll-overview .hero-strip .total .v { font-size: 24px; font-weight: 800; }
+    .payroll-overview .hero-strip .total .l { font-size: 11px; opacity: .9; text-transform: uppercase; }
+    .payroll-overview .actions { display: flex; gap: 8px; margin-bottom: 16px; }
+    .payroll-overview .actions a { background: var(--copper); color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+    .payroll-overview .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    .payroll-overview table { width: 100%; border-collapse: collapse; }
+    .payroll-overview th, .payroll-overview td { text-align: left; padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
+    .payroll-overview th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
+    .payroll-overview td.num, .payroll-overview th.num { text-align: right; }
+    .payroll-overview tr:last-child td { border-bottom: none; }
+    .payroll-overview a.worker { color: var(--copper); font-weight: 600; text-decoration: none; }
+    .payroll-overview .payable { font-weight: 700; color: var(--copper); }
+    .payroll-overview .empty { padding: 20px; color: var(--stone); font-style: italic; }
+    @media (max-width: 640px) {
+        .payroll-overview thead { display: none; }
+        .payroll-overview tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+        .payroll-overview td { display: flex; justify-content: space-between; border: none; padding: 5px 16px; }
+        .payroll-overview td::before { content: attr(data-label); color: var(--stone); font-size: 11px; text-transform: uppercase; }
+        .payroll-overview td.num { text-align: right; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="payroll-overview">
+    <div class="hero-strip">
+        <h1>Payroll Overview</h1>
+        <div class="total">
+            <div class="v">₹{{ total_payable|floatformat:2 }}</div>
+            <div class="l">Total Pending Payable</div>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="{% url 'expense:advance-add' %}">+ Record Advance</a>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Worker</th>
+                    <th>Role</th>
+                    <th class="num">Pieces</th>
+                    <th class="num">Earned</th>
+                    <th class="num">Advance Out</th>
+                    <th class="num">Settled</th>
+                    <th class="num">Payable</th>
+                    <th class="num"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in workers %}
+                    <tr>
+                        <td data-label="Worker">
+                            <a class="worker" href="{% url 'expense:worker-detail' w.worker.pk %}">
+                                {{ w.worker.get_full_name|default:w.worker.email }}
+                            </a>
+                        </td>
+                        <td data-label="Role">{{ w.role.name|default:"—" }}</td>
+                        <td class="num" data-label="Pieces">{{ w.pieces|floatformat:0 }}</td>
+                        <td class="num" data-label="Earned">₹{{ w.total_earnings|floatformat:2 }}</td>
+                        <td class="num" data-label="Advance Out">₹{{ w.advance_outstanding|floatformat:2 }}</td>
+                        <td class="num" data-label="Settled">₹{{ w.total_settled|floatformat:2 }}</td>
+                        <td class="num payable" data-label="Payable">₹{{ w.payable|floatformat:2 }}</td>
+                        <td class="num" data-label="">
+                            <a class="worker" href="{% url 'expense:settlement-create' w.worker.pk %}">Settle</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="empty">No payroll activity yet. Allocate work in the cutting stage to start.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

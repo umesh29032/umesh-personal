@@ -19,6 +19,18 @@ from django.conf import settings
 from django.db import models
 
 
+class CostMethod(models.TextChoices):
+    """How a stage's processing cost is computed. Used by Stage (library
+    default), WorkflowStage (binding rate), and AddaStageRecord (frozen
+    snapshot). per_piece/per_bundle/per_layer multiply a rate by a quantity
+    pulled from the typed stage record; fixed_cost ignores quantity."""
+
+    PER_PIECE = 'per_piece', 'Per Piece'
+    PER_BUNDLE = 'per_bundle', 'Per Bundle'
+    PER_LAYER = 'per_layer', 'Per Layer'
+    FIXED = 'fixed_cost', 'Fixed Cost'
+
+
 class ActiveManager(models.Manager):
     """Non-default manager — returns only `is_active=True` rows.
 
@@ -111,6 +123,16 @@ class Stage(TimeStampedModel):
         'inventory.Role', blank=True, related_name='accessible_stages',
         help_text="Users whose role (or extra_roles) matches any of these.",
     )
+    # ── Costing library defaults (nullable seed, NEVER binding) ──────────────
+    # Copied into a new WorkflowStage at flow-attach time so admins get a sane
+    # starting rate. The BINDING rate lives on WorkflowStage (per-product). A
+    # global Stage rate can't price T-SHIRT cutting differently from NIKKAR.
+    default_cost_method = models.CharField(
+        max_length=16, choices=CostMethod.choices, blank=True,
+    )
+    default_cost_rate = models.DecimalField(
+        max_digits=10, decimal_places=4, null=True, blank=True,
+    )
 
     objects = models.Manager()
     active = ActiveManager()
@@ -145,6 +167,25 @@ class WorkflowStage(TimeStampedModel):
     stage = models.ForeignKey(
         Stage, on_delete=models.PROTECT, related_name='workflow_stages',
     )
+    # ── Costing: BINDING per-product-per-stage rate (price-at-time-of-order) ──
+    # cost_rate is editable over time; past Addas are unaffected because the
+    # rate is FROZEN onto AddaStageRecord at completion. cost_rate is required
+    # in the flow-editor UI (form-level) but nullable in the DB for legacy rows
+    # + the succeed-and-flag freeze net (unpriced -> processing_cost stays NULL).
+    cost_method = models.CharField(
+        max_length=16, choices=CostMethod.choices, default=CostMethod.PER_PIECE,
+    )
+    cost_rate = models.DecimalField(
+        max_digits=10, decimal_places=4, null=True, blank=True,
+    )
+    # Cost grouping: connected stages roll their labour cost up to ONE paying
+    # stage. NULL = self-paid. Set = this stage's cost is billed at the target
+    # (it freezes processing_cost=0.00; the payer's rate x quantity covers the
+    # group). SET_NULL so deleting a payer degrades members to self-paid.
+    cost_billed_at = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='billed_stages',
+    )
 
     class Meta:
         # Same product mein 2 stages same order ya same stage na ho
@@ -165,6 +206,34 @@ class WorkflowStage(TimeStampedModel):
 
     def get_stage_type_display(self) -> str:
         return self.stage.name if self.stage_id else ''
+
+
+class WorkflowStageRoleRate(TimeStampedModel):
+    """Per-role override of a WorkflowStage's cost rate (Q7 role-based rates).
+
+    A senior cutting_master and a helper can earn different rates on the SAME
+    stage. Allocation resolves `role_rate_for(ws, worker.role)` and falls back
+    to `WorkflowStage.cost_rate` when no role override exists — so existing
+    flows are untouched. The rate is snapshotted onto StageWorkAssignment at
+    allocation, so editing this later never rewrites historical pay.
+    """
+
+    # CASCADE = role-rate is meaningless without its stage.
+    workflow_stage = models.ForeignKey(
+        WorkflowStage, on_delete=models.CASCADE, related_name='role_rates',
+    )
+    # PROTECT = don't lose a configured rate when a role is touched.
+    role = models.ForeignKey(
+        'inventory.Role', on_delete=models.PROTECT, related_name='+',
+    )
+    cost_rate = models.DecimalField(max_digits=10, decimal_places=4)
+
+    class Meta:
+        unique_together = [('workflow_stage', 'role')]
+        ordering = ['workflow_stage', 'role__name']
+
+    def __str__(self):
+        return f"{self.workflow_stage} · {self.role} = {self.cost_rate}"
 
 
 class Adda(TimeStampedModel):
@@ -265,6 +334,29 @@ class AddaStageRecord(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         null=True, related_name='+',
     )
+    # ── Frozen manufacturing-cost snapshot (set at advance, cleared at reopen) ─
+    # This is the MANUFACTURING COST of the stage execution (product costing +
+    # profitability) — NOT worker pay. Worker earnings are allocation-driven and
+    # live in the future `expense` app. Frozen so a later cost_rate edit can
+    # never rewrite a completed stage's cost. Grouped (billed-elsewhere) stages
+    # freeze processing_cost=0.00 (priced-zero); unpriced stages freeze NULL.
+    cost_method_snapshot = models.CharField(
+        max_length=16, choices=CostMethod.choices, blank=True,
+    )
+    cost_rate_snapshot = models.DecimalField(
+        max_digits=10, decimal_places=4, null=True, blank=True,
+    )
+    # Decimal (not int) so future per_meter/per_kg methods need no widening.
+    cost_quantity_snapshot = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+    )
+    # STORED frozen result = quantize(rate x quantity, 2). NULL = unpriced
+    # (never 0); 0.00 = priced but billed at a grouping payer stage.
+    processing_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+    )
+    # Strictly advances on every re-freeze (re-complete after reopen).
+    cost_frozen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = [('adda', 'workflow_stage')]

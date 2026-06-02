@@ -24,7 +24,7 @@ Test coverage:
 """
 from io import BytesIO
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from PIL import Image
@@ -33,9 +33,9 @@ from accounts.models import Skill, User
 from inventory.models import Role
 from production.constants import STAGE_CUTTING_PATTERN
 from production.models import (
-    Adda, AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation,
-    CuttingPatternVerification, Product, ProductPattern,
-    ProductPatternAssignment, ProductSize, Stage, WorkflowStage,
+    AddaStageRecord, CuttingPatternRecord, Product, ProductPattern,
+    ProductPatternAssignment, ProductSize, Stage,
+    WorkflowStage,
 )
 from production.services import (
     attach_pattern_photo, complete_pattern_stage, create_adda,

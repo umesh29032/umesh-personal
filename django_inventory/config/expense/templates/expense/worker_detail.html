@@ -1,0 +1,147 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Payroll · {{ viewed_worker.get_full_name|default:viewed_worker.email }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .worker-payroll .hero-strip {
+        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
+        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .worker-payroll .hero-strip h1 { margin: 0; font-size: 19px; }
+    .worker-payroll .hero-strip p { margin: 4px 0 0; opacity: .9; font-size: 12px; }
+    .worker-payroll .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .worker-payroll .hero-actions a { background: rgba(255,255,255,.18); color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+    .worker-payroll .hero-actions a.primary { background: #fff; color: var(--copper); }
+    .worker-payroll .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .worker-payroll .stat-card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px; }
+    .worker-payroll .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
+    .worker-payroll .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 6px; }
+    .worker-payroll .stat-card.payable .value { color: var(--copper); }
+    .worker-payroll .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 16px 18px; margin-bottom: 16px; }
+    .worker-payroll .panel h2 { font-size: 14px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; }
+    .worker-payroll .panel h2 a { font-size: 12px; font-weight: 600; color: var(--copper); text-decoration: none; }
+    .worker-payroll .line { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+    .worker-payroll .line:last-child { border-bottom: none; }
+    .worker-payroll .muted { color: var(--stone); font-size: 12px; }
+    .worker-payroll .ref { font-weight: 700; color: var(--copper); }
+    .worker-payroll .amt-credit { color: var(--success); font-weight: 600; }
+    .worker-payroll .amt-debit { color: #b91c1c; font-weight: 600; }
+    .worker-payroll .empty { color: var(--stone); font-style: italic; font-size: 13px; padding: 8px 0; }
+    .worker-payroll table.adv { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .worker-payroll table.adv th, .worker-payroll table.adv td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--border-subtle); }
+    .worker-payroll table.adv th { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .03em; }
+    .worker-payroll table.adv td.num { text-align: right; }
+    .worker-payroll .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; font-size: 13px; }
+    .worker-payroll .profile-grid .k { color: var(--stone); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
+    @media (max-width: 700px) { .worker-payroll .stat-grid { grid-template-columns: repeat(2, 1fr); } .worker-payroll .profile-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="worker-payroll">
+    <div class="hero-strip">
+        <div>
+            <h1>{{ viewed_worker.get_full_name|default:viewed_worker.email }}</h1>
+            <p>{{ viewed_worker.email }}{% if is_self %} · your payroll{% endif %}</p>
+        </div>
+        {% if is_management %}
+        <div class="hero-actions">
+            <a class="primary" href="{% url 'expense:settlement-create' viewed_worker.pk %}">Start Settlement</a>
+            <a href="{% url 'expense:advance-add' %}">+ Advance</a>
+            <a href="{% url 'expense:worker-profile' viewed_worker.pk %}">Profile</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="stat-grid">
+        <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value">₹{{ summary.pending_payable|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Total Earned</div><div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">₹{{ summary.advance_outstanding|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Total Settled</div><div class="value">₹{{ summary.total_settled|floatformat:2 }}</div></div>
+    </div>
+
+    {% if is_management and profile %}
+    <div class="panel">
+        <h2>Profile <a href="{% url 'expense:worker-profile' viewed_worker.pk %}">Edit</a></h2>
+        <div class="profile-grid">
+            <div><div class="k">Phone</div>{{ profile.phone|default:"—" }}</div>
+            <div><div class="k">UPI</div>{{ profile.upi_id|default:"—" }}</div>
+            <div><div class="k">Bank A/C</div>{{ profile.bank_account_name|default:"—" }}{% if profile.bank_account_number %} · {{ profile.bank_account_number }}{% endif %}</div>
+            <div><div class="k">IFSC</div>{{ profile.bank_ifsc|default:"—" }}</div>
+            <div><div class="k">Joined</div>{{ profile.joining_date|default:"—" }}</div>
+            <div><div class="k">Status</div>{% if profile.is_active %}Active{% else %}Inactive{% endif %}</div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if outstanding_advances %}
+    <div class="panel">
+        <h2>Outstanding Advances</h2>
+        <table class="adv">
+            <thead><tr><th>Date</th><th class="num">Amount</th><th class="num">Recovered</th><th class="num">Remaining</th></tr></thead>
+            <tbody>
+            {% for o in outstanding_advances %}
+                <tr>
+                    <td>{{ o.advance.advance_date }}{% if o.advance.notes %} · <span class="muted">{{ o.advance.notes }}</span>{% endif %}</td>
+                    <td class="num">₹{{ o.amount|floatformat:2 }}</td>
+                    <td class="num">₹{{ o.recovered|floatformat:2 }}</td>
+                    <td class="num amt-debit">₹{{ o.remaining|floatformat:2 }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <h2>Settlement History</h2>
+        {% for s in settlements %}
+            <div class="line">
+                <div>
+                    <div><span class="ref">{{ s.reference }}</span><span class="muted"> · {{ s.get_method_display }}</span></div>
+                    <div class="muted">{{ s.settlement_date }}{% if s.advance_deducted %} · advance recovered ₹{{ s.advance_deducted|floatformat:2 }}{% endif %}</div>
+                </div>
+                <div class="amt-debit">₹{{ s.amount_paid|floatformat:2 }}</div>
+            </div>
+        {% empty %}
+            <div class="empty">No settlements yet.</div>
+        {% endfor %}
+    </div>
+
+    <div class="panel">
+        <h2>Work Allocations</h2>
+        {% for a in assignments %}
+            <div class="line">
+                <div>
+                    <div>{{ a.stage_record.adda.code }} · {{ a.stage_record.workflow_stage.stage.name }}</div>
+                    <div class="muted">{{ a.allocated_quantity }} × ₹{{ a.earning_rate_snapshot }}{% if a.size %} · {{ a.size.code|upper }}{% endif %}{% if a.color %} · {{ a.color.name }}{% endif %}</div>
+                </div>
+                <div class="amt-credit">₹{{ a.earning_amount_snapshot|floatformat:2 }}</div>
+            </div>
+        {% empty %}
+            <div class="empty">No allocations.</div>
+        {% endfor %}
+    </div>
+
+    <div class="panel">
+        <h2>Ledger</h2>
+        {% for e in ledger %}
+            <div class="line">
+                <div>
+                    <div>{{ e.get_category_display }}</div>
+                    <div class="muted">{{ e.entry_date }}{% if e.notes %} · {{ e.notes }}{% endif %}</div>
+                </div>
+                {% if e.entry_type == 'credit' %}
+                    <div class="amt-credit">+₹{{ e.amount|floatformat:2 }}</div>
+                {% else %}
+                    <div class="amt-debit">−₹{{ e.amount|floatformat:2 }}</div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="empty">No ledger entries.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

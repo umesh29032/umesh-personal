@@ -31,11 +31,10 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from django.utils.decorators import method_decorator
 from django.views import View
-from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.generic import TemplateView
 
 from accounts.skills import (
@@ -43,10 +42,10 @@ from accounts.skills import (
 )
 from inventory.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_CUTTING_PATTERN
-from production.forms import PatternVerifyForm, SizeAllocationForm
+from production.forms import PatternVerifyForm
 from production.models import (
     Adda, AddaStageRecord, CuttingPatternPhoto, ProductPatternAssignment,
-    ProductSize, WorkflowStage,
+    WorkflowStage,
 )
 from production.services import (
     attach_pattern_photo, complete_pattern_stage, ensure_pattern_record,
@@ -55,7 +54,7 @@ from production.services import (
     unverify_pattern, verify_pattern,
 )
 
-from .mixins import ProductionRoleMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin
 
 
 def _get_adda(code: str) -> Adda:
@@ -211,7 +210,9 @@ def _build_pattern_context(request, adda: Adda) -> dict:
     }
 
 
-class PatternWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class PatternWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                           StageViewAccessMixin, TemplateView):
+    stage_code = 'cutting_pattern'         # skill-gate the VIEW, not just actions
     template_name = 'production/pattern_workspace.html'
 
     def get_context_data(self, **kwargs):
@@ -283,16 +284,23 @@ class PatternSaveVideoView(_PatternActionBase):
 
     def post(self, request, code):
         adda = _get_adda(code)
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
         video = request.FILES.get('video')
         notes = request.POST.get('notes', '')
         if video is None and not (notes or '').strip():
+            if is_ajax:
+                return HttpResponse("Nothing to save.", status=400)
             messages.error(request, "Pick a video file or write notes.")
             return redirect(self.workspace_url(code, request))
         try:
             save_pattern_record(adda=adda, video_file=video, notes=notes, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
+            if is_ajax:
+                return HttpResponse(self._service_error(exc), status=400)
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
+        if is_ajax:
+            return HttpResponse(status=204)   # debounced notes auto-save
         messages.success(request, "Saved.")
         return redirect(self.workspace_url(code, request))
 

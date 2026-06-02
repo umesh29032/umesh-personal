@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,7 +37,7 @@ from django.db.models import Count, Sum
 from production.constants import STAGE_LAYERING
 from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
-    RemainingClothOfClothRoll, WorkflowStage,
+    RemainingClothOfClothRoll,
 )
 from production.services.adda_service import advance_to_next_stage
 
@@ -225,6 +225,10 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
     sr.workers.set(worker_ids)
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
     return sr
 
 
@@ -762,6 +766,11 @@ def reopen_layering(*, adda: Adda, user) -> AddaStageRecord:
         'draft_layer_length_meters', 'draft_duration_minutes', 'draft_notes',
         'updated_at',
     ])
+
+    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it
+    # against the current rate + corrected quantity (price-at-time-of-order).
+    from production.services.cost_service import clear_stage_cost
+    clear_stage_cost(sr)
 
     adda.current_stage = layering_wf
     adda.status = Adda.Status.IN_PROGRESS

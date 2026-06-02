@@ -13,11 +13,15 @@ swaps (no half-applied reorders).
 """
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Max
 
-from production.models import Adda, AddaStageRecord, Product, Stage, WorkflowStage
+from production.models import (
+    Adda, AddaStageRecord, CostMethod, Product, Stage, WorkflowStage,
+)
 
 from ._shared import _ensure_can_manage
 
@@ -41,8 +45,13 @@ def add_stage_to_product_flow(*, user, product: Product, stage: Stage) -> Workfl
         WorkflowStage.objects.filter(product=product).aggregate(m=Max('order'))['m']
         or 0
     ) + 1
+    # Seed the binding cost from the Stage library defaults (admin can edit
+    # later via set_stage_cost). cost_rate stays NULL if no default seeded —
+    # surfaced as an "unpriced" badge; freeze tolerates it (succeed-and-flag).
     return WorkflowStage.objects.create(
         product=product, stage=stage, order=next_order,
+        cost_method=stage.default_cost_method or CostMethod.PER_PIECE,
+        cost_rate=stage.default_cost_rate,
     )
 
 
@@ -75,6 +84,14 @@ def remove_stage_from_product_flow(*, user, workflow_stage: WorkflowStage) -> No
         raise ValidationError(
             f"'{workflow_stage.stage.name}' has historical records on completed Addas. "
             "Removing it would orphan that history."
+        )
+    # Cost-grouping guard: other stages bill their labour at this one. Removing
+    # it would leave them pointing at nothing (SET_NULL would silently
+    # un-group + un-price them). Force the admin to re-home first.
+    if workflow_stage.billed_stages.exists():
+        raise ValidationError(
+            f"Other stages are billed at '{workflow_stage.stage.name}'. "
+            "Re-home their cost grouping before removing this stage."
         )
 
     workflow_stage.delete()
@@ -127,3 +144,103 @@ def move_stage_in_product_flow(*, user, workflow_stage: WorkflowStage, direction
     neighbor.save(update_fields=['order'])
     workflow_stage.order = b_order
     workflow_stage.save(update_fields=['order'])
+
+    # Re-validate cost grouping after the swap. A reorder can otherwise place a
+    # grouped (member) stage AFTER the payer it bills to, which would freeze the
+    # payer before the member's work. Raising here rolls back the atomic swap.
+    bad = WorkflowStage.objects.filter(
+        product=product, cost_billed_at__isnull=False,
+        cost_billed_at__order__lte=F('order'),
+    )
+    if bad.exists():
+        raise ValidationError(
+            "This reorder would place a stage at or after the stage it is billed "
+            "at. Ungroup the cost first, then reorder."
+        )
+
+
+def _validate_cost_grouping(ws: WorkflowStage, method: str, rate, billed_at) -> None:
+    """Validate a proposed cost config for one WorkflowStage (R1 + R3 guards).
+
+    billed_at = the payer WorkflowStage (this stage is a grouped MEMBER), or
+    None (this stage is SELF-PAID / a payer). Raises ValidationError on any
+    violation. This is the authoritative boundary (CLAUDE rule #4) — the
+    flow-editor view + any future form must route through set_stage_cost.
+    """
+    if billed_at is not None:
+        # ── This stage is a grouped MEMBER → billed at `billed_at` ──────────
+        # A payer-with-members can't also become a member (no 2-level chains).
+        if ws.pk and ws.billed_stages.exists():
+            raise ValidationError(
+                "This stage is a paying stage for others — it cannot also be grouped."
+            )
+        if billed_at.product_id != ws.product_id:
+            raise ValidationError("The paying stage must be in the same product flow.")
+        if billed_at.pk == ws.pk:
+            raise ValidationError("A stage cannot be billed at itself.")
+        if billed_at.order <= ws.order:
+            raise ValidationError("The paying stage must come later in the flow.")
+        if billed_at.cost_billed_at_id is not None:
+            raise ValidationError(
+                "Cannot bill at a stage that is itself grouped (single-hop only)."
+            )
+        if billed_at.cost_rate is None:
+            raise ValidationError("Set a rate on the paying stage first.")
+        if billed_at.cost_method == CostMethod.FIXED:
+            raise ValidationError("A fixed-cost stage cannot be the payer for a group.")
+    else:
+        # ── This stage is SELF-PAID / a payer → must be priced ──────────────
+        if rate is None:
+            raise ValidationError("A self-paid stage must have a cost rate.")
+        if rate <= 0:
+            raise ValidationError("Cost rate must be greater than 0.")
+        # A payer with grouped members can't be fixed_cost (no per-unit qty).
+        if ws.pk and ws.billed_stages.exists() and method == CostMethod.FIXED:
+            raise ValidationError(
+                "A paying stage with grouped members cannot use the fixed-cost method."
+            )
+
+
+@transaction.atomic
+def set_stage_cost(
+    *, user, workflow_stage: WorkflowStage,
+    cost_method: str, cost_rate, cost_billed_at_id=None,
+) -> WorkflowStage:
+    """Set the binding cost config for a WorkflowStage (R1 mandatory rate + R3
+    grouping). Parses + validates, then writes only the cost columns.
+
+    cost_rate: '', None, or a numeric string/Decimal. Empty → NULL (only valid
+    for a grouped member). cost_billed_at_id: pk of the payer WorkflowStage, or
+    falsy for self-paid.
+    """
+    _ensure_can_manage(user)
+
+    # Parse rate.
+    rate = None
+    if cost_rate not in (None, ''):
+        try:
+            rate = Decimal(str(cost_rate))
+        except (InvalidOperation, ValueError):
+            raise ValidationError("Cost rate must be a number.")
+
+    # Resolve payer (cost grouping target).
+    billed_at = None
+    if cost_billed_at_id:
+        billed_at = WorkflowStage.objects.filter(pk=cost_billed_at_id).first()
+        if billed_at is None:
+            raise ValidationError("Selected paying stage not found.")
+
+    method = cost_method or CostMethod.PER_PIECE
+    if method not in CostMethod.values:
+        raise ValidationError(f"Invalid cost method: {method!r}")
+
+    _validate_cost_grouping(workflow_stage, method, rate, billed_at)
+
+    workflow_stage.cost_method = method
+    # A grouped member's own rate is irrelevant — null it to avoid confusion.
+    workflow_stage.cost_rate = None if billed_at is not None else rate
+    workflow_stage.cost_billed_at = billed_at
+    workflow_stage.save(update_fields=[
+        'cost_method', 'cost_rate', 'cost_billed_at', 'updated_at',
+    ])
+    return workflow_stage

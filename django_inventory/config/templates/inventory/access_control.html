@@ -1,0 +1,314 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Access Control{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Access Control hub — read-only RBAC overview matrices. Scoped under
+       `.access-control` (CLAUDE.md rule 10). Reuses base.html tokens. */
+    .access-control { max-width: 1200px; margin: 0 auto; }
+
+    .access-control .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px;
+        padding: 26px 30px; margin-bottom: 18px;
+        position: relative; overflow: hidden;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+    }
+    .access-control .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: #fff; margin: 0;
+    }
+    .access-control .hero p {
+        margin: 4px 0 0; color: rgba(255,255,255,0.72);
+        font-size: 14px; max-width: 820px;
+    }
+
+    /* Concept legend — the three separate concepts the spec mandates. */
+    .access-control .legend {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 14px; margin-bottom: 22px;
+    }
+    .access-control .legend-card {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow-card);
+    }
+    .access-control .legend-card .tag {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--stone);
+    }
+    .access-control .legend-card h3 {
+        margin: 4px 0 6px; font-size: 16px; color: var(--ink);
+        font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600;
+    }
+    .access-control .legend-card p { margin: 0; font-size: 12.5px; color: var(--stone); line-height: 1.5; }
+    .access-control .legend-card.type { border-left: 3px solid var(--stone); }
+    .access-control .legend-card.role { border-left: 3px solid var(--copper); }
+    .access-control .legend-card.skill { border-left: 3px solid var(--success); }
+
+    .access-control .panel {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        margin-bottom: 20px; overflow: hidden;
+    }
+    .access-control .panel-head {
+        padding: 14px 22px; background: var(--cream);
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        flex-wrap: wrap;
+    }
+    .access-control .panel-head h2 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); margin: 0;
+    }
+    .access-control .panel-head .sub { font-size: 12px; color: var(--stone); margin-top: 2px; }
+    .access-control .edit-link {
+        font-size: 12px; font-weight: 700; color: var(--copper);
+        text-decoration: none; border: 1.5px solid var(--copper);
+        padding: 7px 14px; border-radius: 999px; white-space: nowrap;
+        transition: background 0.15s, color 0.15s;
+    }
+    .access-control .edit-link:hover { background: var(--copper); color: #fff; }
+
+    .access-control .table-scroll { overflow-x: auto; }
+    .access-control table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .access-control th, .access-control td {
+        padding: 11px 14px; text-align: left;
+        border-bottom: 1px solid var(--border-subtle); vertical-align: middle;
+    }
+    .access-control thead th {
+        font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--stone);
+        background: var(--cream-2); white-space: nowrap;
+    }
+    .access-control tbody tr:last-child td { border-bottom: none; }
+    .access-control .col-role { text-align: center; min-width: 64px; }
+    .access-control .section-band td {
+        background: var(--cream); font-weight: 700; font-size: 11px;
+        letter-spacing: 0.06em; text-transform: uppercase; color: var(--copper);
+    }
+    .access-control .page-name { font-weight: 600; color: var(--ink); }
+    .access-control .urlname { font-family: 'Courier New', monospace; font-size: 10.5px; color: var(--stone); }
+    .access-control .yes { color: var(--copper); font-weight: 800; }
+    .access-control .no  { color: var(--border-card); }
+    .access-control .badge {
+        display: inline-block; font-size: 10px; font-weight: 700;
+        padding: 2px 8px; border-radius: 999px; letter-spacing: 0.03em;
+    }
+    .access-control .badge.code { background: rgba(120,113,108,0.14); color: var(--stone); }
+    .access-control .badge.sys  { background: rgba(184,115,51,0.14); color: var(--copper); }
+    .access-control .badge.su   { background: rgba(220,38,38,0.12); color: #b91c1c; }
+    .access-control .badge.off  { background: rgba(120,113,108,0.10); color: var(--stone); }
+    .access-control .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .access-control .chip {
+        font-size: 11px; padding: 3px 9px; border-radius: 999px;
+        background: var(--cream-2); border: 1px solid var(--border-subtle); color: var(--ink);
+    }
+    .access-control .chip.skill { border-style: dashed; }
+    .access-control .muted { color: var(--stone); font-style: italic; font-size: 12px; }
+
+    @media (max-width: 820px) {
+        .access-control .legend { grid-template-columns: 1fr; }
+        .access-control .hero { padding: 22px 20px; }
+        .access-control .hero h1 { font-size: 22px; }
+        /* Roster + roles tables collapse to stacked rows with data-labels. */
+        .access-control table.stack thead { display: none; }
+        .access-control table.stack tbody tr {
+            display: block; padding: 10px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .access-control table.stack td {
+            display: flex; justify-content: space-between; gap: 12px;
+            padding: 5px 0; border: none; text-align: right;
+        }
+        .access-control table.stack td::before {
+            content: attr(data-label); font-weight: 700; font-size: 11px;
+            text-transform: uppercase; color: var(--stone); text-align: left;
+        }
+        .access-control table.stack td .chips { justify-content: flex-end; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="access-control">
+    <div class="hero">
+        <h1>Access Control</h1>
+        <p>One place to see the whole access picture: who sees which pages, which
+        skills unlock which production stages, and what every user is granted.
+        This overview is read-only — use the <strong>Edit&nbsp;→</strong> link on
+        each panel to change a setting on its dedicated page.</p>
+    </div>
+
+    <!-- The three concepts, kept strictly separate. -->
+    <div class="legend">
+        <div class="legend-card type">
+            <div class="tag">1:1 · display</div>
+            <h3>User Type</h3>
+            <p>A baseline label (superadmin / admin / worker / supplier / normal).
+            Drives the default dashboard only — it never grants access.</p>
+        </div>
+        <div class="legend-card role">
+            <div class="tag">M2M · grants access</div>
+            <h3>Roles</h3>
+            <p>Manager, accountant, listing&nbsp;team… Decide module, page, admin
+            and sidebar access. <em>Role grants access.</em></p>
+        </div>
+        <div class="legend-card skill">
+            <div class="tag">M2M · grants work</div>
+            <h3>Skills</h3>
+            <p>Cutting master, dhage&nbsp;katne&nbsp;wala… Decide which production
+            stages a user can act on. <em>Skill grants work capability.</em></p>
+        </div>
+    </div>
+
+    <!-- ── Matrix 1: Roles × Sidebar Pages ── -->
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2>Roles × Sidebar Pages</h2>
+                <div class="sub">Visibility per role. <span class="badge code">code</span> = gated in code (no DB rule yet); Super&nbsp;Admin always sees everything.</div>
+            </div>
+            <a class="edit-link" href="{% url 'inventory:sidebar-access' %}">Edit sidebar rules →</a>
+        </div>
+        <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        {% for r in roles %}<th class="col-role">{{ r.name }}</th>{% endfor %}
+                        <th>Also via skills</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for section in page_sections %}
+                        <tr class="section-band"><td colspan="{{ roles|length|add:2 }}">{{ section.label }}</td></tr>
+                        {% for row in section.rows %}
+                            <tr>
+                                <td>
+                                    <div class="page-name">{{ row.label }}</div>
+                                    <div class="urlname">{{ row.url_name }}{% if row.governed == 'code' %} · <span class="badge code">code</span>{% endif %}</div>
+                                </td>
+                                {% for cell in row.cells %}
+                                    <td class="col-role">
+                                        {% if cell.on is None %}<span class="no">—</span>
+                                        {% elif cell.on %}<span class="yes">✓</span>
+                                        {% else %}<span class="no">·</span>{% endif %}
+                                    </td>
+                                {% endfor %}
+                                <td>
+                                    {% if row.skills_on %}
+                                        <div class="chips">{% for s in row.skills_on %}<span class="chip skill">{{ s }}</span>{% endfor %}</div>
+                                    {% else %}<span class="muted">—</span>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Matrix 2: Skills/Roles × Stages ── -->
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2>Production Stages × Access</h2>
+                <div class="sub">Which skills/roles can act on each stage. Super&nbsp;Admin &amp; Manager are always allowed (built-in).</div>
+            </div>
+            <a class="edit-link" href="{% url 'production:stage-list' %}">Edit stage access →</a>
+        </div>
+        <div class="table-scroll">
+            <table class="stack">
+                <thead>
+                    <tr><th>Stage</th><th>Unlocked by skills</th><th>Unlocked by roles</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for st in stage_rows %}
+                        <tr>
+                            <td data-label="Stage"><span class="page-name">{{ st.name }}</span> <span class="urlname">{{ st.code }}</span></td>
+                            <td data-label="Skills">
+                                {% if st.skills %}<div class="chips">{% for s in st.skills %}<span class="chip skill">{{ s }}</span>{% endfor %}</div>
+                                {% else %}<span class="muted">none</span>{% endif %}
+                            </td>
+                            <td data-label="Roles">
+                                {% if st.roles %}<div class="chips">{% for r in st.roles %}<span class="chip">{{ r }}</span>{% endfor %}</div>
+                                {% else %}<span class="muted">none</span>{% endif %}
+                            </td>
+                            <td data-label="Status">{% if st.is_active %}<span class="badge sys">active</span>{% else %}<span class="badge off">archived</span>{% endif %}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4"><span class="muted">No stages defined yet.</span></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Matrix 3: Users roster ── -->
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2>Users</h2>
+                <div class="sub">Type + role + skills per user. {{ user_rows|length }} total.</div>
+            </div>
+            <a class="edit-link" href="{% url 'accounts:user_list' %}">Manage users →</a>
+        </div>
+        <div class="table-scroll">
+            <table class="stack">
+                <thead>
+                    <tr><th>User</th><th>Type</th><th>Role</th><th>Extra roles</th><th>Skills</th><th>Flags</th></tr>
+                </thead>
+                <tbody>
+                    {% for u in user_rows %}
+                        <tr {% if not u.is_active %}style="opacity:.55;"{% endif %}>
+                            <td data-label="User"><span class="page-name">{{ u.email }}</span></td>
+                            <td data-label="Type">{{ u.user_type }}</td>
+                            <td data-label="Role">{% if u.role %}<span class="chip">{{ u.role }}</span>{% else %}<span class="muted">none</span>{% endif %}</td>
+                            <td data-label="Extra roles">
+                                {% if u.extra_roles %}<div class="chips">{% for r in u.extra_roles %}<span class="chip">{{ r }}</span>{% endfor %}</div>
+                                {% else %}<span class="muted">—</span>{% endif %}
+                            </td>
+                            <td data-label="Skills">
+                                {% if u.skills %}<div class="chips">{% for s in u.skills %}<span class="chip skill">{{ s }}</span>{% endfor %}</div>
+                                {% else %}<span class="muted">—</span>{% endif %}
+                            </td>
+                            <td data-label="Flags">{% if u.is_superuser %}<span class="badge su">superuser</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6"><span class="muted">No users.</span></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Matrix 4: Roles summary ── -->
+    <section class="panel">
+        <div class="panel-head">
+            <div>
+                <h2>Roles &amp; Permissions</h2>
+                <div class="sub">Permission count per role. Super&nbsp;Admin bypasses the matrix (implicit all).</div>
+            </div>
+            <a class="edit-link" href="{% url 'inventory:role_list' %}">Edit roles →</a>
+        </div>
+        <div class="table-scroll">
+            <table class="stack">
+                <thead>
+                    <tr><th>Role</th><th>Code</th><th>Type</th><th>Permissions</th></tr>
+                </thead>
+                <tbody>
+                    {% for r in role_summary %}
+                        <tr>
+                            <td data-label="Role"><span class="page-name">{{ r.name }}</span></td>
+                            <td data-label="Code"><span class="urlname">{{ r.code }}</span></td>
+                            <td data-label="Type">{% if r.is_system %}<span class="badge sys">system</span>{% else %}<span class="badge off">custom</span>{% endif %}</td>
+                            <td data-label="Permissions">{% if r.code == 'super_admin' %}<span class="muted">all (bypass)</span>{% else %}{{ r.perm_count }}{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

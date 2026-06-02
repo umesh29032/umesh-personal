@@ -8,8 +8,8 @@
 
 {% block content %}
 <div class="barcode-gen-workspace" style="max-width:1100px; margin:0 auto;">
-    {# Hero strip — reusable `.hero-strip` component added to base.html (audit 2026-05-29).
-       Same gradient as other stage workspaces; serves as visual anchor. #}
+    {% comment %}Hero strip — reusable `.hero-strip` component added to base.html (audit 2026-05-29).
+       Same gradient as other stage workspaces; serves as visual anchor.{% endcomment %}
     <section class="hero-strip">
         <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; opacity:0.7;">{{ adda.product.name }}</div>
         <h1>{{ adda.code }} · Barcode Generation</h1>

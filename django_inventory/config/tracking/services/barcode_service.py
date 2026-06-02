@@ -27,7 +27,6 @@ from __future__ import annotations
 import base64
 import io
 from collections import defaultdict
-from typing import Iterable
 
 from django.db import IntegrityError, transaction
 from django.urls import reverse
@@ -176,7 +175,7 @@ def generate_from_breakdown(barcode_gen_record) -> int:
 
     # Source = breakdown rows. Find them via the cutting_record on this Adda.
     # Production model has Adda → cutting_record via stage_record chain.
-    from production.models import AddaStageRecord, CuttingRecord
+    from production.models import AddaStageRecord
     cutting_sr = AddaStageRecord.objects.filter(
         adda=adda, workflow_stage__stage__code='cutting',
     ).first()

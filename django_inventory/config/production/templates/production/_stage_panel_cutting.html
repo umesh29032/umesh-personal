@@ -506,7 +506,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
     </div>
     <div class="panel-body">
         <p class="panel-sub" style="background:rgba(5,150,105,0.08); padding:8px 12px; border-radius:8px; border-left:3px solid #047857;">
-            <strong>Drives barcode generation.</strong> Step 1: Create a Bundle for a Size. Step 2: Inside that bundle add multiple Pattern × Color × Count items. Karigar ties everything together.
+            <strong>Drives barcode generation.</strong> Step 1: Create a Bundle for a Size. Step 2: Inside that bundle add multiple Pattern × Color × Count items. Worker ties everything together.
         </p>
 
         {% if can_edit_bundles %}
@@ -656,6 +656,53 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                         {% for entry in bundle.color_summary %}
                             <span class="cb-color-pill">{{ entry.color.name }} × {{ entry.count }}</span>
                         {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% comment %}PR-6: per-item worker allocation → payroll earnings.
+                    Each item shows allocated/count + who did it; management can
+                    allocate remaining pieces to a worker (books a ledger credit).{% endcomment %}
+                    {% if bundle.alloc_items %}
+                    <div style="margin-top:10px;padding:10px;border:1px dashed var(--border-subtle);border-radius:8px;">
+                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-bottom:8px;">Worker Allocation</div>
+                        {% for ai in bundle.alloc_items %}
+                        <div style="padding:8px 0;border-bottom:1px solid var(--border-subtle);">
+                            <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;">
+                                <span><strong>{{ ai.item.pattern.name }}</strong> · {{ ai.item.color.name }}</span>
+                                <span style="color:var(--stone);">{{ ai.allocated }}/{{ ai.item.count }} allocated</span>
+                            </div>
+                            {% for r in ai.rows %}
+                            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;margin-top:4px;">
+                                <span>{{ r.worker.get_full_name|default:r.worker.email }} · {{ r.allocated_quantity }} pc · ₹{{ r.earning_amount_snapshot }}</span>
+                                {% if can_allocate %}
+                                <form method="post" action="{% url 'production:cutting-allocation-delete' adda.code r.pk %}" style="margin:0;" onsubmit="return confirm('Remove this allocation? Its earning is reversed.');">
+                                    {% csrf_token %}
+                                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                    <button type="submit" class="btn btn-ghost" style="padding:2px 8px;font-size:12px;color:var(--danger);" title="Remove">×</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            {% if can_allocate and ai.remaining > 0 %}
+                            <form method="post" action="{% url 'production:cutting-item-allocate' adda.code ai.item.pk %}" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                                {% csrf_token %}
+                                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                                <select name="worker_id" required class="sf-input" style="max-width:170px;">
+                                    <option value="">— worker —</option>
+                                    {% for w in allocation_workers %}
+                                        <option value="{{ w.pk }}">{{ w.get_full_name|default:w.email }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="number" name="allocated_quantity" min="1" max="{{ ai.remaining }}" value="{{ ai.remaining }}" required class="sf-input" style="max-width:80px;">
+                                <input type="text" name="notes" placeholder="notes (optional)" class="sf-input" style="max-width:160px;">
+                                <button type="submit" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Allocate</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if can_allocate and not allocation_workers %}
+                            <div style="font-size:12px;color:var(--danger);margin-top:6px;">Assign workers in Section 01 first to allocate.</div>
+                        {% endif %}
                     </div>
                     {% endif %}
 
@@ -834,12 +881,14 @@ Each bundle: header card + nested item table + per-bundle add-item form.
         <div class="panel-title">Notes</div>
     </div>
     <div class="panel-body">
-        <form method="post" action="{% url 'production:cutting-draft' adda.code %}">
+        <form method="post" action="{% url 'production:cutting-draft' adda.code %}"
+              data-autosave-url="{% url 'production:cutting-draft' adda.code %}">
             {% csrf_token %}
             {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
             <textarea name="notes" rows="3" class="sf-input">{{ cutting_record.notes|default:'' }}</textarea>
             <div style="margin-top:10px;">
                 <button type="submit" class="btn btn-ghost">Save Draft</button>
+                <span data-autosave-status class="autosave-pill"></span>
             </div>
         </form>
     </div>
@@ -992,4 +1041,5 @@ panel exactly so backward-compat URLs keep working.
 {% endif %}
 
 {% include "production/_stage_panel_collapse.html" %}
+{% include "production/_autosave.html" %}
 </div>{# /ct-workspace-scope #}

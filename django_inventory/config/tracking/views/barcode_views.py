@@ -18,11 +18,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
-from django.views.generic import ListView, TemplateView
+from django.views.generic import TemplateView
 
 from inventory.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
-from tracking.models import BarcodeBatch, BatchBarcode
+from tracking.models import BatchBarcode
 from tracking.services import get_or_create_piece, qr_data_uri, resolve_value
 
 
@@ -170,7 +170,14 @@ def scan_piece(request, value):
     status update interleave kar sakta tha. Ab dono ek transaction ke andar.
     SELECT FOR UPDATE bhi lagaya gaya hai BatchBarcode row pe taaki
     parallel scans serialize ho jaayen.
+
+    RBAC (review fix 2026-06-02): production-floor only. Mutates audit fields
+    (last_scanned_at/by), so a bare @login_required let any authenticated user
+    (office/normal) stamp scans. Gate to PRODUCTION_ROLES like the sibling views.
     """
+    if not user_has_role(request.user, PRODUCTION_ROLES):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Scanning is restricted to production staff.")
     hit = resolve_value(value)
     if hit is None:
         from django.http import Http404

@@ -32,9 +32,9 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.views.generic import (
-    CreateView, DeleteView, ListView, TemplateView, UpdateView, View,
+    CreateView, DeleteView, ListView, TemplateView, UpdateView,
 )
 
 from inventory.services import user_has_perm

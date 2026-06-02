@@ -22,7 +22,7 @@ Coverage:
 from datetime import date
 from decimal import Decimal
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 

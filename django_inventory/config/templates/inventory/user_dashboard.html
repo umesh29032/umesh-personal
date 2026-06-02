@@ -337,8 +337,8 @@
     </div>
     {% endif %}
 
-    {# My Recent Activity — per-user timeline across all Addas (spec D14).
-       PR17: collapsed by default to reduce visual noise on dashboard. #}
+    {% comment %}My Recent Activity — per-user timeline across all Addas (spec D14).
+       PR17: collapsed by default to reduce visual noise on dashboard.{% endcomment %}
     {% if my_activity %}
     <details class="card" style="margin-top: 18px;">
         <summary class="card-header" style="cursor:pointer; list-style:none;">

@@ -22,13 +22,12 @@ from __future__ import annotations
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
 from inventory.services import PRODUCTION_ROLES, user_has_role
 from production.constants import STAGE_LAYERING
-from production.models import Adda, AddaStageRecord, Product, WorkflowStage
+from production.models import Adda, AddaStageRecord, Product
 
 
 def _ensure_can_manage(user):
@@ -113,6 +112,9 @@ def create_adda(user, *, product: Product) -> Adda:
     from tracking.services import log_adda
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.CREATED, user)
+    if first_stage.stage_type == STAGE_LAYERING:
+        log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+                 stage_record=sr, metadata={'worker_ids': list(skilled_pks)})
     return adda
 
 
@@ -120,8 +122,8 @@ def create_adda(user, *, product: Product) -> Adda:
 def advance_to_next_stage(adda: Adda, user) -> Adda:
     """Adda ko next WorkflowStage pe move karta hai. Last stage ke baad COMPLETED.
 
-    stage_service.complete_layering / complete_cutting iss helper ko call karte hain
-    typed record save hone ke baad.
+    Stage services (complete_layering / complete_cutting, in layering_service /
+    cutting_service) iss helper ko call karte hain typed record save hone ke baad.
 
     Last-stage handling:
         nxt=None    → Adda completed, current_stage=None set, completed_at stamp
@@ -130,6 +132,16 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     cur = adda.current_stage
     if cur is None:
         raise ValidationError("Adda has no current stage")
+
+    # FREEZE manufacturing cost of the stage being LEFT, before advancing.
+    # This is the single choke point every complete_* funnels through
+    # (price-at-time-of-order). The caller has already stamped completed_at and
+    # finalized the typed record (pieces_cut/lay_count/total_barcodes) inside
+    # the same atomic block, so the quantity is authoritative here.
+    from production.services.cost_service import freeze_stage_cost
+    leaving_sr = AddaStageRecord.objects.filter(adda=adda, workflow_stage=cur).first()
+    if leaving_sr is not None:
+        freeze_stage_cost(leaving_sr, user=user)
 
     # Next stage = order > current ke saare stages mein se sabse pehla
     nxt = adda.product.workflow_stages.filter(order__gt=cur.order).order_by('order').first()
@@ -146,6 +158,18 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     # History entry — transition record + agar completed to extra event bhi
     from tracking.services import log_adda
     from tracking.models import AddaHistory
+    # Audit the freeze (logged even when cost is NULL — 'unpriced completion' signal).
+    if leaving_sr is not None:
+        log_adda(
+            adda, AddaHistory.ChangeType.COST_FROZEN, user, stage_from=cur,
+            stage_record=leaving_sr,
+            metadata={
+                'method': leaving_sr.cost_method_snapshot or None,
+                'rate': str(leaving_sr.cost_rate_snapshot) if leaving_sr.cost_rate_snapshot is not None else None,
+                'qty': str(leaving_sr.cost_quantity_snapshot) if leaving_sr.cost_quantity_snapshot is not None else None,
+                'cost': str(leaving_sr.processing_cost) if leaving_sr.processing_cost is not None else None,
+            },
+        )
     log_adda(adda, AddaHistory.ChangeType.STAGE_ADVANCED, user, stage_from=cur, stage_to=nxt)
     if nxt is None:
         log_adda(adda, AddaHistory.ChangeType.COMPLETED, user)

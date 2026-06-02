@@ -21,7 +21,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from inventory.services import user_can_edit_financials
-from raw_materials.models import ClothRoll, ClothColor, ClothType, StorageLocation
+from raw_materials.models import ClothRoll, ClothType, StorageLocation
 # tracking.services ka import yahan TOP-level pe NAHI hai — circular import bachne ke liye
 # functions ke andar lazy-import karte hain.
 

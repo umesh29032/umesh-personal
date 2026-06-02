@@ -25,6 +25,7 @@ app_name = 'production'
 
 urlpatterns = [
     path('',                              views.AddaDashboardView.as_view(),   name='dashboard'),
+    path('costing/',                      views.ProductionCostingView.as_view(), name='costing'),
 
     # Products
     path('products/',                     views.ProductListView.as_view(),     name='product-list'),
@@ -99,6 +100,8 @@ urlpatterns = [
     path('addas/<str:code>/cutting/bundle/item/save/',           views.CuttingBundleItemSaveView.as_view(),   name='cutting-bundle-item-save'),
     path('addas/<str:code>/cutting/bundle/item/<int:pk>/delete/', views.CuttingBundleItemDeleteView.as_view(), name='cutting-bundle-item-delete'),
     path('addas/<str:code>/cutting/bundle/<int:pk>/delete/',     views.CuttingBundleDeleteView.as_view(),     name='cutting-bundle-delete'),
+    path('addas/<str:code>/cutting/bundle/item/<int:pk>/allocate/', views.CuttingBundleItemAllocateView.as_view(), name='cutting-item-allocate'),
+    path('addas/<str:code>/cutting/allocation/<int:pk>/delete/', views.CuttingAllocationDeleteView.as_view(), name='cutting-allocation-delete'),
     path('addas/<str:code>/cutting/draft/',                    views.CuttingDraftView.as_view(),             name='cutting-draft'),
     path('addas/<str:code>/cutting/workspace/complete/',       views.CuttingWorkspaceCompleteView.as_view(), name='cutting-workspace-complete'),
     path('addas/<str:code>/cutting/reopen/',                   views.CuttingReopenView.as_view(),            name='cutting-reopen'),

@@ -12,7 +12,6 @@ hoti hain. POST mein same name ke saare values list ban jaate hain. View getlist
 karke zip karta hai, phir form ke clean() mein structured dict list ban jaati hai.
 """
 from datetime import date
-from decimal import Decimal, InvalidOperation
 
 from django import forms
 

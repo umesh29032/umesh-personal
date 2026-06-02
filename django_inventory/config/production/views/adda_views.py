@@ -97,10 +97,12 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         adda = self.object
         stages = list(adda.product.workflow_stages.order_by('order'))
 
-        # ── Per-stage RBAC gate (DB-driven via StageAccessRule) ──────────────
-        # access_service.stage_access_map reads StageAccessRule rows; super_admin
-        # + manager always pass (built-in defense). Admins edit rules at
-        # /production/stage-access/.
+        # ── Per-stage RBAC gate (SKILL-driven via the Stage model) ───────────
+        # access_service.stage_access_map reads Stage.access_by_skill (+ optional
+        # access_by_role), OR semantics; super_admin + manager always pass
+        # (built-in defense). Admins edit access on the Stage library
+        # (/production/stages/). (Old StageAccessRule table was dropped in
+        # migration 0011.)
         from inventory.services import MANAGEMENT_ROLES, user_has_role
         from production.services import stage_access_map
 

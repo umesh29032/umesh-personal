@@ -25,15 +25,18 @@ def log_roll(roll, change_type, actor, *, field_name='', old_value='', new_value
     )
 
 
-def log_adda(adda, change_type, actor, *, stage_from=None, stage_to=None, roll=None, note=''):
-    """Adda pe event log — stage transition, roll assignment, completion.
+def log_adda(adda, change_type, actor, *, stage_from=None, stage_to=None, roll=None, note='', metadata=None, stage_record=None):
+    """Adda pe event log — stage transition, roll assignment, completion, cost freeze, worker/bundle/barcode/export events.
 
     stage_from/stage_to = WorkflowStage FKs (NULL valid hain — e.g. CREATED event mein dono None).
     roll = optional ClothRoll FK — sirf ROLL_ASSIGNED events ke liye populated.
+    stage_record = optional AddaStageRecord FK — single-stage events (started/workers/bundle/barcodes/exported/cost).
+    metadata = optional dict (jsonb) — event-specific payload (e.g. COST_FROZEN {method,rate,qty,cost}).
     """
     return AddaHistory.objects.create(
         adda=adda, change_type=change_type, actor=actor,
         stage_from=stage_from, stage_to=stage_to, roll=roll, note=note,
+        stage_record=stage_record, metadata=metadata or {},
     )
 
 

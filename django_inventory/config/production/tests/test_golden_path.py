@@ -13,7 +13,7 @@ from production.services import (
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
-from tracking.models import AddaHistory, BatchBarcode, ClothRollHistory
+from tracking.models import AddaHistory, ClothRollHistory
 
 
 def _superuser():

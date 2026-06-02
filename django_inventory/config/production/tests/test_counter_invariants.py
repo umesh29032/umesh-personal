@@ -21,15 +21,15 @@ from django.utils import timezone
 
 from accounts.models import Skill, User
 from inventory.models import Role
-from production.constants import STAGE_CUTTING, STAGE_CUTTING_PATTERN, STAGE_LAYERING
+from production.constants import STAGE_CUTTING, STAGE_LAYERING
 from production.models import (
-    Adda, AddaStageRecord, CuttingBundle, CuttingBundleItem, CuttingPatternRecord,
-    CuttingPatternSizeAllocation, CuttingPieceBreakup, Product, ProductPattern,
-    ProductPatternAssignment, ProductSize, Stage, WorkflowStage, LayeringRecord,
+    AddaStageRecord, CuttingBundle, CuttingBundleItem, CuttingPatternRecord, CuttingPatternSizeAllocation,
+    CuttingPieceBreakup, Product, ProductPattern, ProductPatternAssignment,
+    ProductSize, Stage, WorkflowStage, LayeringRecord,
 )
 from production.services import (
-    add_pieces_to_bundle, create_adda, create_bundle, delete_bundle,
-    delete_bundle_item, start_cutting, upsert_breakup_row,
+    add_item_to_bundle, add_pieces_to_bundle, create_adda, create_bundle,
+    delete_bundle, delete_bundle_item, start_cutting, upsert_breakup_row,
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
@@ -297,6 +297,29 @@ class BreakupConsumedCountInvariantTests(CounterInvariantFixture):
         self.assertEqual(self.b_back_m.consumed_count, 0)
         self.assertTrue(_breakup_invariant_holds(self.b_front_m))
         self.assertTrue(_breakup_invariant_holds(self.b_back_m))
+
+    def test_manual_add_resyncs_source_consumed_count(self):
+        """Regression: add_item_to_bundle overwriting a SOURCED item's count must
+        re-sync that breakup's consumed_count. Before the fix the counter stayed
+        stale (drift), so consumed_count could diverge from actual cut pieces."""
+        bundle = create_bundle(
+            adda=self.adda, size_id=self.s_m.id, user=self.admin,
+        )
+        add_pieces_to_bundle(
+            adda=self.adda, bundle_id=bundle.id,
+            selections=[{'breakup_id': self.b_front_m.id, 'take_count': 12}],
+            user=self.admin,
+        )
+        self.b_front_m.refresh_from_db()
+        self.assertEqual(self.b_front_m.consumed_count, 12)
+        # Manual add lands on the same (bundle, front, red) row → count overwritten.
+        add_item_to_bundle(
+            adda=self.adda, bundle_id=bundle.id,
+            pattern_id=self.front.id, color_id=self.red.id, count=5, user=self.admin,
+        )
+        self.b_front_m.refresh_from_db()
+        self.assertEqual(self.b_front_m.consumed_count, 5)   # re-synced, not stale 12
+        self.assertTrue(_breakup_invariant_holds(self.b_front_m))
 
     def test_multiple_breakups_independent(self):
         """Front + back consumed counts track independently."""

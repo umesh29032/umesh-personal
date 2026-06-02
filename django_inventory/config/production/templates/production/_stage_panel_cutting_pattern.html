@@ -268,7 +268,8 @@ Section header carries running count: "X of Y verified" (red if X < Y).
         {% endif %}
 
         {% if can_upload %}
-            <form method="post" enctype="multipart/form-data" action="{% url 'production:pattern-save' adda.code %}" style="margin-top:14px;" id="pp-video-form-{{ adda.code }}">
+            <form method="post" enctype="multipart/form-data" action="{% url 'production:pattern-save' adda.code %}" style="margin-top:14px;" id="pp-video-form-{{ adda.code }}"
+                  data-autosave-url="{% url 'production:pattern-save' adda.code %}">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
                 <div class="form-grid">
@@ -278,7 +279,7 @@ Section header carries running count: "X of Y verified" (red if X < Y).
                         <div data-pp-video-status style="margin-top:6px;font-size:11px;color:var(--stone);"></div>
                     </div>
                     <div class="field full">
-                        <label>Notes</label>
+                        <label>Notes <span data-autosave-status class="autosave-pill"></span></label>
                         <textarea name="notes" rows="2" class="sf-input">{{ record.notes|default:'' }}</textarea>
                     </div>
                 </div>
@@ -522,3 +523,4 @@ allocation_sum = live sum of proportion_pct (red badge if != 100)
 {% endif %}
 
 {% include "production/_stage_panel_collapse.html" %}
+{% include "production/_autosave.html" %}

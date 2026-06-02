@@ -74,19 +74,22 @@ class User(AbstractUser):
     - No username
     - Email is unique and used for login
     """
+    # Display/baseline label ONLY — never gates access (Role does that).
+    # Aligned to the ERP spec set 2026-06-02 (old admin/manager/karigar/helper
+    # data-migrated → superadmin/admin/worker/supplier/normal in accounts 0011).
     USER_TYPE_CHOICES = (
+        ('superadmin', 'Super Admin'),
         ('admin', 'Admin'),
-        ('manager', 'Manager'),
-        ('karigar', 'Karigar'),
-        ('helper', 'Helper'),
+        ('worker', 'Worker'),
+        ('supplier', 'Supplier'),
         ('normal', 'Normal'),
     )
 
     username = None
     email = models.EmailField(unique=True, verbose_name="Email Address")
-    
+
     # Basic fields
-    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='karigar', verbose_name="User Type")
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='worker', verbose_name="User Type")
     first_name = models.CharField(max_length=30, blank=True, verbose_name="First Name")
     last_name = models.CharField(max_length=30, blank=True, verbose_name="Last Name")
 

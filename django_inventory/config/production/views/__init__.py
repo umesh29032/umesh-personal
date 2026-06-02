@@ -25,13 +25,16 @@ from .barcode_gen_views import (
     BarcodeGenCompleteView, BarcodeGenReopenView,
     _build_barcode_gen_context as _build_barcode_gen_context,
 )
+from .costing_views import ProductionCostingView
 from .stage_views import (
+    CuttingAllocationDeleteView,
     CuttingBreakupDeleteView,
     CuttingBreakupSaveView,
     CuttingBundleAddItemView,
     CuttingBundleAddPiecesView,
     CuttingBundleCreateView,
     CuttingBundleDeleteView,
+    CuttingBundleItemAllocateView,
     CuttingBundleItemDeleteView,
     CuttingBundleItemSaveView,
     CuttingCompleteView,
@@ -80,6 +83,9 @@ __all__ = [
     'CuttingBundleItemSaveView',
     'CuttingBundleItemDeleteView',
     'CuttingBundleDeleteView',
+    'CuttingBundleItemAllocateView',
+    'CuttingAllocationDeleteView',
+    'ProductionCostingView',
     'CuttingDraftView',
     'CuttingWorkspaceCompleteView',
     'CuttingReopenView',

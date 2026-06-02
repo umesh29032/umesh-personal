@@ -27,6 +27,22 @@
         ══════════════════════════════════════════════════════════════ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* ── Cross-document View Transitions ─────────────────────────────
+           Same-origin page navigations animate smoothly instead of a hard
+           full-window reload flash. The sidebar + topbar are pinned with a
+           stable view-transition-name so they stay STATIC across navigation —
+           only the main content transitions, giving an SPA-like feel ("only
+           the page changes, not the whole window"). Progressive: a silent
+           no-op on browsers without cross-document VT (they fall back to
+           normal nav + the existing sidebar scroll/accordion persistence).
+           Pure CSS — zero JS, no per-page regression risk. */
+        @view-transition { navigation: auto; }
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-group(*),
+            ::view-transition-old(*),
+            ::view-transition-new(*) { animation: none !important; }
+        }
+
         :root {
             /* Brand colours */
             --ink:       #0e0b09;
@@ -202,6 +218,9 @@
             height: 100%;
             z-index: 200;
             box-shadow: var(--sidebar-shadow);
+            /* Pin as a static element across page navigations — the sidebar
+               does not re-animate/reload, only the main content transitions. */
+            view-transition-name: ke-sidebar;
         }
 
         /* Subtle warm texture — hidden in light, visible in dark */
@@ -487,6 +506,7 @@
             justify-content: space-between;
             z-index: 100;
             flex-shrink: 0;
+            view-transition-name: ke-topbar;   /* stays static across nav */
             box-shadow: 0 1px 0 var(--cream-3), 0 2px 12px rgba(14,11,9,0.05);
         }
 

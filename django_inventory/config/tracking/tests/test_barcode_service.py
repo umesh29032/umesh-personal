@@ -2,7 +2,6 @@
 from datetime import date
 from decimal import Decimal
 
-from django.db import IntegrityError
 from django.test import TestCase
 
 from accounts.models import User
@@ -127,8 +126,7 @@ class BarcodeBatchAllocationTests(TestCase):
         from production.constants import STAGE_CUTTING, STAGE_LAYERING
         from production.models import (
             AddaStageRecord, CuttingBundle, CuttingBundleItem, CuttingRecord,
-            LayeringRecord, ProductPattern, ProductPatternAssignment,
-            ProductSize, WorkflowStage,
+            LayeringRecord, ProductSize, WorkflowStage,
         )
 
         user = _user()

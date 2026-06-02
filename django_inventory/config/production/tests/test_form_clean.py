@@ -26,9 +26,9 @@ from inventory.models import Role
 from production.constants import STAGE_LAYERING
 from production.forms import PatternVerifyForm, SizeAllocationForm
 from production.models import (
-    Adda, AddaStageRecord, CuttingPatternPhoto, CuttingPatternRecord,
-    LayeringRecord, Product, ProductPattern, ProductPatternAssignment,
-    ProductSize, Stage, WorkflowStage,
+    AddaStageRecord, CuttingPatternPhoto, CuttingPatternRecord, LayeringRecord,
+    Product, ProductPattern, ProductPatternAssignment, ProductSize,
+    Stage, WorkflowStage,
 )
 from production.services import create_adda
 from raw_materials.models import ClothColor, ClothType, StorageLocation

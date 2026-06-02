@@ -21,7 +21,6 @@ from __future__ import annotations
 from collections import namedtuple
 from typing import Iterable
 
-from django.contrib.auth import get_user_model
 
 
 ActivityEvent = namedtuple(
@@ -44,9 +43,15 @@ def _adda_history_events(adda_filter: dict, user=None) -> Iterable[ActivityEvent
     verb_map = {
         AddaHistory.ChangeType.CREATED: 'created Adda',
         AddaHistory.ChangeType.STAGE_ADVANCED: 'advanced stage',
+        AddaHistory.ChangeType.STAGE_REOPENED: 'reopened stage',
         AddaHistory.ChangeType.STATUS_CHANGED: 'changed status',
         AddaHistory.ChangeType.ROLL_ASSIGNED: 'assigned roll',
         AddaHistory.ChangeType.COMPLETED: 'completed Adda',
+        AddaHistory.ChangeType.COST_FROZEN: 'froze stage cost',
+        AddaHistory.ChangeType.WORKERS_ASSIGNED: 'assigned workers',
+        AddaHistory.ChangeType.BUNDLE_CREATED: 'created bundle',
+        AddaHistory.ChangeType.BARCODES_GENERATED: 'generated barcodes',
+        AddaHistory.ChangeType.EXPORTED: 'exported barcodes',
     }
     for h in qs:
         verb = verb_map.get(h.change_type, h.change_type)

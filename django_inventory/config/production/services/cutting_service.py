@@ -46,9 +46,9 @@ from production.constants import (
 )
 from production.models import (
     Adda, AddaProductSizeColorPieceBreakdown, AddaStageRecord, CuttingBundle,
-    CuttingBundleItem, CuttingPatternRecord, CuttingPatternSizeAllocation,
-    CuttingPieceBreakup, CuttingRecord, ProductPattern,
-    ProductPatternAssignment, ProductSize, WorkflowStage,
+    CuttingBundleItem, CuttingPatternRecord, CuttingPieceBreakup,
+    CuttingRecord, ProductPatternAssignment, ProductSize,
+    WorkflowStage,
 )
 from production.services.adda_service import advance_to_next_stage
 
@@ -399,6 +399,10 @@ def start_cutting(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaStageRe
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
     return sr
 
 
@@ -450,6 +454,11 @@ def create_bundle(
         if bundle.bundle_number != new_num:
             bundle.bundle_number = new_num
             bundle.save(update_fields=['bundle_number', 'updated_at'])
+    if created:
+        from tracking.services import log_adda
+        from tracking.models import AddaHistory
+        log_adda(adda, AddaHistory.ChangeType.BUNDLE_CREATED, user,
+                 stage_record=sr, metadata={'bundle_id': bundle.id, 'size_id': size_id})
     return bundle
 
 
@@ -614,6 +623,11 @@ def add_item_to_bundle(
         bundle=bundle, pattern_id=pattern_id, color_id=color_id,
         defaults={'count': count},
     )
+    # If this (bundle,pattern,color) row was originally sourced from a breakup
+    # (created via add_pieces_to_bundle), overwriting its count above leaves that
+    # breakup's consumed_count stale → re-sync it. Purely-manual rows have no source.
+    if item.source_breakup_id is not None:
+        _recompute_breakup_consumed(item.source_breakup)
     _recompute_bundle_total(bundle)
     return item
 
@@ -648,10 +662,17 @@ def add_bundle_item(
         )
 
     cr = _get_or_create_cutting_record(adda)
-    bundle, _ = CuttingBundle.objects.get_or_create(
+    bundle, bundle_created = CuttingBundle.objects.get_or_create(
         cutting_record=cr, size_id=size_id,
         defaults={'total_pieces': 0, 'bundle_number': (bundle_number or '')[:40]},
     )
+    if bundle_created:
+        # Log BUNDLE_CREATED on the lazy-create path too (parity with
+        # create_bundle) so the Adda timeline never misses a bundle event.
+        from tracking.services import log_adda
+        from tracking.models import AddaHistory
+        log_adda(adda, AddaHistory.ChangeType.BUNDLE_CREATED, user,
+                 stage_record=sr, metadata={'bundle_id': bundle.id, 'size_id': size_id})
     if bundle_number and bundle.bundle_number != bundle_number[:40]:
         bundle.bundle_number = bundle_number[:40]
         bundle.save(update_fields=['bundle_number', 'updated_at'])
@@ -660,6 +681,11 @@ def add_bundle_item(
         bundle=bundle, pattern_id=pattern_id, color_id=color_id,
         defaults={'count': count},
     )
+    # If this (bundle,pattern,color) row was originally sourced from a breakup
+    # (created via add_pieces_to_bundle), overwriting its count above leaves that
+    # breakup's consumed_count stale → re-sync it. Purely-manual rows have no source.
+    if item.source_breakup_id is not None:
+        _recompute_breakup_consumed(item.source_breakup)
     _recompute_bundle_total(bundle)
     return item
 
@@ -677,6 +703,16 @@ def delete_bundle_item(*, adda: Adda, item_id: int, user) -> None:
     ).select_related('bundle', 'source_breakup').first()
     if item is None:
         return
+    # A worker allocation (StageWorkAssignment, expense app) PROTECTs this item,
+    # and those rows are immutable (never hard-deleted — voiding only flags them),
+    # so ANY allocation history blocks deletion. Raw delete would 500 with
+    # ProtectedError; refuse with a clear msg instead. Void an active allocation
+    # to reverse the pay; the audit row (and so this item) stays for the record.
+    if item.work_assignments.exists():
+        raise ValidationError(
+            "This item has worker allocation records and can't be deleted "
+            "(its pay audit trail is permanent). Void any active allocation "
+            "to reverse the pay; the row stays for the record.")
     bundle = item.bundle
     source = item.source_breakup
     item.delete()
@@ -699,6 +735,15 @@ def delete_bundle(*, adda: Adda, bundle_id: int, user) -> None:
     ).first()
     if bundle is None:
         return
+    # Any item in this bundle that carries worker-allocation history PROTECTs the
+    # cascade (immutable audit rows) — refuse with a clear msg instead of a 500
+    # ProtectedError.
+    if CuttingBundleItem.objects.filter(
+        bundle=bundle, work_assignments__isnull=False,
+    ).exists():
+        raise ValidationError(
+            "This bundle has items with worker allocation records and can't be "
+            "deleted (the pay audit trail is permanent).")
     # Collect source breakup IDs before delete (cascade will drop items).
     source_ids = set(
         bundle.items.exclude(source_breakup__isnull=True)
@@ -1019,6 +1064,10 @@ def reopen_cutting(*, adda: Adda, user) -> AddaStageRecord:
     sr.completed_at = None
     sr.completed_by = None
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
+
+    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
+    from production.services.cost_service import clear_stage_cost
+    clear_stage_cost(sr)
 
     adda.current_stage = wf
     adda.status = Adda.Status.IN_PROGRESS

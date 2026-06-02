@@ -498,10 +498,9 @@ Two modes:
                         <td data-label="Weight">{{ e.weight_verified_kg|default:"—" }} KG</td>
                         <td data-label="Layers">{{ e.layers_on_roll|default:"—" }}</td>
                         <td data-label="Leftover">
-                            {% if primary_leftover %}
-                                {{ primary_leftover.remaining_length_meters|default:"—" }} m /
-                                {{ primary_leftover.remaining_weight_kg|default:"—" }} KG
-                            {% else %}—{% endif %}
+                            {% for lo in e.remaining_pieces.all %}
+                                {{ lo.remaining_length_meters }} m / {{ lo.remaining_weight_kg }} KG{% if not forloop.last %}<br>{% endif %}
+                            {% empty %}—{% endfor %}
                         </td>
                         <td data-label="Attached">
                             {{ e.attached_by.email|default:"—" }}<br>
@@ -644,6 +643,7 @@ JS sums them live into the readonly "Total Lay Count" cell.
             {% endcomment %}
             <form method="post" action="{% url 'production:layering-complete' adda.code %}"
                   id="layering-complete-form-{{ adda.code }}" class="layering-section04"
+                  data-autosave-url="{% url 'production:layering-complete' adda.code %}"
                   data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
                   onsubmit="return window.__confirmLayeringSubmit ? window.__confirmLayeringSubmit(event) : true;">
                 {% csrf_token %}
@@ -722,6 +722,7 @@ JS sums them live into the readonly "Total Lay Count" cell.
                 {% endcomment %}
                 <div class="stage-actions-row">
                     <button type="submit" name="action" value="draft" class="btn btn-ghost">💾 Save Draft</button>
+                    <span data-autosave-status class="autosave-pill"></span>
                     {% if can_complete %}
                     <button type="submit" name="action" value="complete" class="btn btn-primary">Complete Layering{% if next_stage %} → Advance to {{ next_stage.get_stage_type_display }}{% endif %}</button>
                     {% endif %}
@@ -772,3 +773,4 @@ JS sums them live into the readonly "Total Lay Count" cell.
 </div>
 
 {% include "production/_stage_panel_collapse.html" %}
+{% include "production/_autosave.html" %}

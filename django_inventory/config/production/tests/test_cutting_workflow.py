@@ -29,21 +29,20 @@ from django.utils import timezone
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.constants import (
-    STAGE_CUTTING, STAGE_CUTTING_PATTERN, STAGE_LAYERING,
+    STAGE_CUTTING, STAGE_LAYERING,
 )
 from production.models import (
-    Adda, AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation,
-    CuttingPieceBreakup, CuttingRecord, LayeringRecord, Product, ProductPattern,
-    ProductPatternAssignment, ProductSize, Stage, WorkflowStage,
+    AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation, CuttingPieceBreakup,
+    CuttingRecord, LayeringRecord, Product, ProductPattern, ProductPatternAssignment,
+    ProductSize, Stage, WorkflowStage,
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle, complete_cutting,
     create_adda, create_bundle, create_bundle_with_pieces, delete_breakup_row,
-    delete_bundle, delete_bundle_item, get_cutting_snapshot,
-    get_suggested_breakup, reopen_cutting, save_cutting_draft, start_cutting,
-    upsert_breakup_row,
+    delete_bundle, delete_bundle_item, get_suggested_breakup,
+    reopen_cutting, save_cutting_draft, start_cutting, upsert_breakup_row,
 )
-from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
+from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
 from tracking.models import BatchBarcode
 
@@ -189,7 +188,7 @@ class StartCuttingTests(CuttingWorkflowFixture):
         self.assertIn(self.admin, sr.workers.all())
 
     def test_requires_management(self):
-        karigar = _user('k1@cw.test', role_code='karigar', is_super=False,
+        karigar = _user('k1@cw.test', role_code='worker', is_super=False,
                         skills=['cutting_master'])
         with self.assertRaises(PermissionDenied):
             start_cutting(adda=self.adda, worker_ids=[karigar.pk], user=karigar)
@@ -433,7 +432,6 @@ class CreateBundleTests(CuttingWorkflowFixture):
         start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
 
     def test_create_bundle_creates_header_without_items(self):
-        from production.models import CuttingBundle
         bundle = create_bundle(
             adda=self.adda, size_id=self.s_l.id,
             bundle_number='Lot-A', user=self.admin,

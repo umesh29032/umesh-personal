@@ -1,0 +1,86 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Manufacturing Costing{% endblock %}
+
+{% block extra_head %}
+<style>
+    .costing .hero-strip {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 55%, #b87333 130%);
+        color: #fff; border-radius: 16px; padding: 20px 24px; margin-bottom: 18px;
+        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
+    }
+    .costing .hero-strip h1 { margin: 0; font-size: 21px; }
+    .costing .hero-strip p { margin: 4px 0 0; font-size: 12px; opacity: .8; }
+    .costing .hero-strip .total .v { font-size: 24px; font-weight: 800; }
+    .costing .hero-strip .total .l { font-size: 11px; opacity: .85; text-transform: uppercase; }
+    .costing .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    .costing table { width: 100%; border-collapse: collapse; }
+    .costing th, .costing td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
+    .costing th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
+    .costing td.num, .costing th.num { text-align: right; }
+    .costing tr:last-child td { border-bottom: none; }
+    .costing a.adda { color: var(--copper); font-weight: 600; text-decoration: none; }
+    .costing .cost { font-weight: 700; color: var(--copper); }
+    .costing .unpriced { font-size: 11px; color: #b91c1c; font-weight: 600; }
+    .costing .empty { padding: 20px; color: var(--stone); font-style: italic; }
+    @media (max-width: 720px) {
+        .costing thead { display: none; }
+        .costing tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+        .costing td { display: flex; flex-wrap: wrap; justify-content: space-between; border: none; padding: 5px 16px; }
+        .costing td::before { content: attr(data-label); color: var(--stone); font-size: 11px; text-transform: uppercase; }
+        /* nested 'N unpriced' note drops below the cost instead of crowding the row */
+        .costing td .unpriced { flex-basis: 100%; text-align: right; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="costing">
+    <div class="hero-strip">
+        <div>
+            <h1>Manufacturing Costing</h1>
+            <p>Per-Adda manufacturing cost = sum of frozen per-stage costs. Worker earnings shown alongside.</p>
+        </div>
+        <div class="total">
+            <div class="v">₹{{ grand_cost|floatformat:2 }}</div>
+            <div class="l">Total (shown Addas)</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Adda</th>
+                    <th>Product</th>
+                    <th>Stage</th>
+                    <th>Status</th>
+                    <th class="num">Pieces</th>
+                    <th class="num">Mfg Cost</th>
+                    <th class="num">Worker Earnings</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                    <tr>
+                        <td data-label="Adda">
+                            <a class="adda" href="{% url 'production:adda-detail' r.adda.code %}">{{ r.adda.code }}</a>
+                        </td>
+                        <td data-label="Product">{{ r.adda.product.name }}</td>
+                        <td data-label="Stage">{{ r.current_stage }}</td>
+                        <td data-label="Status">{{ r.adda.get_status_display }}</td>
+                        <td class="num" data-label="Pieces">{{ r.pieces }}</td>
+                        <td class="num" data-label="Mfg Cost">
+                            <span class="cost">₹{{ r.total_cost|floatformat:2 }}</span>
+                            {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced</div>{% endif %}
+                        </td>
+                        <td class="num" data-label="Worker Earnings">₹{{ r.worker_earnings|floatformat:2 }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty">No Addas yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

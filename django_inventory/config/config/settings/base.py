@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'raw_materials',  # cloth rolls, types, colors, storage locations
     'production',     # products, Adda batches, workflow stages, stage records
     'tracking',       # piece-level barcodes (QR) + per-domain audit history
+    'expense',        # worker payroll: allocation, ledger, advances, payments (downstream of production)
 ]
 
 # AUTHENTICATION_BACKENDS: Django kaise verify karta hai ki user valid hai
@@ -101,6 +102,10 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',             # allauth ka apna processing
     'django.contrib.messages.middleware.MessageMiddleware',     # request.messages (flash messages) available karta hai
     'django.middleware.clickjacking.XFrameOptionsMiddleware',  # X-Frame-Options header — iframes mein load hone se rokta hai
+    # URL-level enforcement of the Access-Control panel (SidebarItemRule): hiding
+    # a menu item also blocks its URL (not just the sidebar link). After auth +
+    # messages so request.user + flash messages are available.
+    'inventory.middleware.SidebarAccessMiddleware',
 ]
 
 # ROOT_URLCONF: pehli URL config file — yahan se URL routing shuru hoti hai

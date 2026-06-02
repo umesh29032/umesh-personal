@@ -32,10 +32,9 @@ from production.constants import (
     STAGE_LAYERING,
 )
 from production.models import (
-    Adda, AddaStageRecord, BarcodeGenerationRecord, CuttingPatternRecord,
-    CuttingPatternSizeAllocation, CuttingRecord, LayeringRecord, Product,
-    ProductPattern, ProductPatternAssignment, ProductSize, Stage,
-    WorkflowStage,
+    AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation, LayeringRecord,
+    Product, ProductPattern, ProductPatternAssignment, ProductSize,
+    Stage, WorkflowStage,
 )
 from production.services import (
     add_pieces_to_bundle, complete_barcode_generation, complete_cutting,
@@ -44,7 +43,6 @@ from production.services import (
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
-from tracking.models import BarcodeBatch, BarcodeExportBatch
 from tracking.services import (
     generate_csv, generate_pdf_summary, generate_xlsx, regenerate_for_export,
 )

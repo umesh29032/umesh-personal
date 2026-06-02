@@ -206,6 +206,10 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
     return sr
 
 
@@ -539,6 +543,10 @@ def reopen_pattern_stage(*, adda: Adda, user) -> AddaStageRecord:
     sr.completed_at = None
     sr.completed_by = None
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
+
+    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
+    from production.services.cost_service import clear_stage_cost
+    clear_stage_cost(sr)
 
     adda.current_stage = wf
     adda.status = Adda.Status.IN_PROGRESS

@@ -44,7 +44,7 @@ from production.services import (
     preview_barcode_counts, reopen_barcode_generation, start_barcode_generation,
 )
 
-from .mixins import ProductionRoleMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin
 
 
 def _get_adda(code: str) -> Adda:
@@ -149,7 +149,9 @@ def _build_barcode_gen_context(request, adda: Adda) -> dict:
     }
 
 
-class BarcodeGenWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class BarcodeGenWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                              StageViewAccessMixin, TemplateView):
+    stage_code = 'barcode_generation'      # skill-gate the VIEW, not just actions
     template_name = 'production/barcode_gen_workspace.html'
 
     def get_context_data(self, **kwargs):

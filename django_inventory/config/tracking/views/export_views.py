@@ -19,14 +19,11 @@ PERMISSIONS:
 """
 from __future__ import annotations
 
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
-from django.utils.decorators import method_decorator
+from django.shortcuts import get_object_or_404
 from django.views import View
-from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
 from inventory.services import PRODUCTION_ROLES, user_has_role
