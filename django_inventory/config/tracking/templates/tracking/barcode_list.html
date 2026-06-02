@@ -3,50 +3,55 @@
 {% block page_title %}Barcodes · {{ adda.code }}{% endblock %}
 
 {% block content %}
-{# `barcodes` paginated queryset (adda ki sari barcodes); print sheet alag standalone HTML hai #}
+{# Batches-level view (PR6 2026-05-28). Per-piece BatchBarcode rows lazy-created on scan; #}
+{# range info lives on BarcodeBatch. #}
 <div class="bc-list">
     <div class="page-header">
         <div class="page-header-text">
-            <h1>{{ adda.code }} <span style="color:var(--stone); font-size:14px; font-weight:400;">— Piece Barcodes</span></h1>
-            <p>{{ adda.barcodes.count }} pieces. Each QR encodes a scan URL — phone camera reads it natively.</p>
+            <h1>{{ adda.code }} <span style="color:var(--stone); font-size:14px; font-weight:400;">— Barcode Batches</span></h1>
+            <p>{{ total_pieces }} piece{{ total_pieces|pluralize }} across {{ batches|length }} batch{{ batches|length|pluralize:"es" }}. {{ scanned_count }} scanned.</p>
         </div>
         <a href="{% url 'tracking:barcode-print' adda.code %}" target="_blank" class="btn btn-primary">Open Print Sheet →</a>
     </div>
 
     <div class="card card-clip">
         <div class="card-header">
-            <div class="card-title">Barcodes</div>
-            <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Export CSV</a>
+            <div class="card-title">Batches (per Color × Size)</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Quick CSV</a>
+                {# Manifest-tracked exports (PR-D 2026-05-29). Refused if barcode_generation stage not complete. #}
+                <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export CSV</button></form>
+                <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export XLSX</button></form>
+                <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export PDF</button></form>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="tbl">
-                <thead><tr><th>Seq</th><th>Barcode value</th><th>Status</th><th>Last scanned</th></tr></thead>
+                <thead><tr><th>Size</th><th>Color</th><th>Start</th><th>End</th><th>Pieces</th></tr></thead>
                 <tbody>
-                {% for bc in barcodes %}
+                {% for batch in batches %}
                 <tr>
-                    <td data-label="Seq">{{ bc.piece_seq }}</td>
-                    <td data-label="Barcode value"><code>{{ bc.value }}</code></td>
-                    <td data-label="Status">
-                        {% if bc.status == 'packed' %}<span class="badge" style="padding:2px 8px; border-radius:10px; font-size:11px; background:var(--info-bg); color:var(--info);">Packed</span>
-                        {% elif bc.status == 'dispatched' %}<span class="badge badge-active">Dispatched</span>
-                        {% elif bc.status == 'missing' %}<span class="badge" style="padding:2px 8px; border-radius:10px; font-size:11px; background:var(--danger-bg); color:var(--danger);">Missing</span>
-                        {% else %}<span class="badge badge-inactive">Pending</span>{% endif %}
+                    <td data-label="Size">
+                        {% if batch.size %}<strong>{{ batch.size.code|upper }}</strong> {{ batch.size.label }}{% else %}<span style="color:var(--stone);">—</span>{% endif %}
                     </td>
-                    <td data-label="Last scanned">{% if bc.last_scanned_at %}{{ bc.last_scanned_at|date:"d M Y H:i" }}{% else %}—{% endif %}</td>
+                    <td data-label="Color">
+                        {% if batch.color %}{{ batch.color.name }}{% else %}<span style="color:var(--stone);">—</span>{% endif %}
+                    </td>
+                    <td data-label="Start"><code>{{ batch.start_value }}</code></td>
+                    <td data-label="End"><code>{{ batch.end_value }}</code></td>
+                    <td data-label="Pieces">{{ batch.total_pieces }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="4" style="padding:24px; text-align:center; color:var(--stone);">No barcodes yet. Complete Cutting to generate.</td></tr>
+                <tr><td colspan="5" style="padding:24px; text-align:center; color:var(--stone);">No barcode batches yet. Complete Cutting to generate.</td></tr>
                 {% endfor %}
                 </tbody>
+                {% if batches %}
+                <tfoot>
+                    <tr><th colspan="4" style="text-align:right;">Total</th><th>{{ total_pieces }}</th></tr>
+                </tfoot>
+                {% endif %}
             </table>
         </div>
-        {% if is_paginated %}
-        <div style="display:flex; gap:8px; padding:14px 18px; border-top:1px solid var(--border-card); align-items:center; flex-wrap:wrap;">
-            {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}" class="btn btn-ghost">← Previous</a>{% endif %}
-            <span style="font-size:13px; color:var(--stone);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}" class="btn btn-ghost">Next →</a>{% endif %}
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

@@ -13,7 +13,7 @@ from production.services import (
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
-from tracking.models import AddaHistory, BatchBarcode, ClothRollHistory
+from tracking.models import AddaHistory, ClothRollHistory
 
 
 def _superuser():
@@ -89,15 +89,13 @@ class GoldenPathTest(TestCase):
 
         self.assertEqual(adda.status, Adda.Status.COMPLETED)
         self.assertIsNone(adda.current_stage)
-        self.assertEqual(BatchBarcode.objects.filter(adda=adda).count(), 100)
-        self.assertEqual(
-            BatchBarcode.objects.filter(adda=adda).order_by('piece_seq').first().value,
-            'NIKKAR-001-0001',
-        )
-        self.assertEqual(
-            BatchBarcode.objects.filter(adda=adda).order_by('piece_seq').last().value,
-            'NIKKAR-001-0100',
-        )
+        # PR6: BarcodeBatch range covers all 100 pieces; BatchBarcode lazy.
+        from tracking.models import BarcodeBatch
+        batches = list(BarcodeBatch.objects.filter(adda=adda))
+        self.assertEqual(len(batches), 1)
+        self.assertEqual(batches[0].total_pieces, 100)
+        self.assertEqual(batches[0].start_value, 'NIKKAR-001-0001')
+        self.assertEqual(batches[0].end_value, 'NIKKAR-001-0100')
 
         # 7. History tables populated
         self.assertGreaterEqual(AddaHistory.objects.filter(adda=adda).count(), 4)

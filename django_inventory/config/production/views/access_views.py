@@ -19,13 +19,23 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from accounts.models import Skill
 from inventory.models import Role
-from inventory.services import ROLE_SUPER_ADMIN, user_has_role
+from inventory.services import ROLE_SUPER_ADMIN, user_has_perm
 from production.models import Stage, WorkflowStage
 
 
-class _SuperAdminOnly(UserPassesTestMixin):
+class _StagePermissionRequired(UserPassesTestMixin):
+    """Stage CRUD gate driven by Django perms (production.view/add/change/delete_stage).
+
+    Super Admin role bypasses every perm check (see user_has_perm). Other roles
+    must be granted the specific perm via the Roles & Permissions editor —
+    that's the RBAC seam an admin uses to delegate Stage editing without
+    handing over full super-admin rights.
+    """
+
+    required_perm = ''  # subclasses set this
+
     def test_func(self):
-        return user_has_role(self.request.user, {ROLE_SUPER_ADMIN})
+        return user_has_perm(self.request.user, self.required_perm)
 
 
 class StageForm(forms.ModelForm):
@@ -56,7 +66,8 @@ class StageForm(forms.ModelForm):
         }
 
 
-class StageListView(LoginRequiredMixin, _SuperAdminOnly, ListView):
+class StageListView(LoginRequiredMixin, _StagePermissionRequired, ListView):
+    required_perm = 'production.view_stage'
     model = Stage
     template_name = 'production/stage_list.html'
     context_object_name = 'stages'
@@ -68,8 +79,17 @@ class StageListView(LoginRequiredMixin, _SuperAdminOnly, ListView):
             .order_by('name')
         )
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        u = self.request.user
+        ctx['can_add_stage'] = user_has_perm(u, 'production.add_stage')
+        ctx['can_change_stage'] = user_has_perm(u, 'production.change_stage')
+        ctx['can_delete_stage'] = user_has_perm(u, 'production.delete_stage')
+        return ctx
 
-class StageCreateView(LoginRequiredMixin, _SuperAdminOnly, CreateView):
+
+class StageCreateView(LoginRequiredMixin, _StagePermissionRequired, CreateView):
+    required_perm = 'production.add_stage'
     model = Stage
     form_class = StageForm
     template_name = 'production/stage_form.html'
@@ -86,7 +106,8 @@ class StageCreateView(LoginRequiredMixin, _SuperAdminOnly, CreateView):
         return response
 
 
-class StageUpdateView(LoginRequiredMixin, _SuperAdminOnly, UpdateView):
+class StageUpdateView(LoginRequiredMixin, _StagePermissionRequired, UpdateView):
+    required_perm = 'production.change_stage'
     model = Stage
     form_class = StageForm
     template_name = 'production/stage_form.html'
@@ -115,7 +136,8 @@ class StageUpdateView(LoginRequiredMixin, _SuperAdminOnly, UpdateView):
         return response
 
 
-class StageDeleteView(LoginRequiredMixin, _SuperAdminOnly, DeleteView):
+class StageDeleteView(LoginRequiredMixin, _StagePermissionRequired, DeleteView):
+    required_perm = 'production.delete_stage'
     model = Stage
     template_name = 'production/stage_confirm_delete.html'
     success_url = reverse_lazy('production:stage-list')

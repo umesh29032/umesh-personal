@@ -22,6 +22,7 @@ Cutting URL: addas/<code>/cutting/  (single submit, unchanged)
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -34,23 +35,36 @@ from accounts.skills import (
 )
 from inventory.services import MANAGEMENT_ROLES, user_has_role
 from production.forms import (
-    AttachRollForm, CompleteLayeringForm, CuttingForm,
-    EditRollEntryForm, StartLayeringForm,
+    AttachRollForm, CompleteLayeringForm, CuttingDraftForm,
+    CuttingForm, CuttingStartForm, EditRollEntryForm, StartLayeringForm,
 )
 from production.constants import STAGE_CUTTING, STAGE_LAYERING
 from production.models import (
-    Adda, AddaStageRecord, LayeringRollEntry,
+    Adda, AddaStageRecord, CuttingBundleItem, LayeringRollEntry,
     RemainingClothOfClothRoll,
 )
 from production.services import (
+    add_bundle_item, add_item_to_bundle, add_pieces_to_bundle,
     attach_roll_to_layering, complete_cutting, complete_layering,
-    detach_roll_from_layering, remove_remaining_cloth,
-    save_layering_draft, start_layering,
-    update_layering_roll_entry,
+    create_bundle_with_pieces, delete_breakup_row, delete_bundle,
+    delete_bundle_item, detach_roll_from_layering, get_cutting_snapshot,
+    get_layering_snapshot, get_suggested_breakup, preview_barcode_batches,
+    remove_remaining_cloth, reopen_cutting, reopen_layering,
+    save_cutting_draft, save_layering_draft, start_cutting, start_layering,
+    update_layering_roll_entry, upsert_breakup_row,
 )
-from raw_materials.models import ClothRoll
+from raw_materials.models import ClothColor, ClothRoll
+from expense.models import StageWorkAssignment
+from expense.services import (
+    allocate_stage_work, item_allocation_summary, void_allocation,
+)
 
-from .mixins import ProductionRoleMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin
+
+
+def _is_ajax(request) -> bool:
+    """True for debounced auto-save fetch() calls (sets X-Requested-With)."""
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,6 +166,17 @@ def _build_layering_context(request, adda: Adda) -> dict:
         .order_by('attached_at')
         if sr else []
     )
+
+    # Next stage in product flow (used for "Advance to {next}" labels).
+    # current_stage may be None on completed Addas — falls back to None safely.
+    next_stage = None
+    if adda.current_stage is not None:
+        next_stage = (
+            adda.product.workflow_stages
+            .filter(order__gt=adda.current_stage.order)
+            .order_by('order')
+            .first()
+        )
     total_weight = sum((e.weight_verified_kg or 0) for e in entries)
     distinct_colors = {e.roll.cloth_color_id for e in entries} if sr else set()
 
@@ -168,9 +193,9 @@ def _build_layering_context(request, adda: Adda) -> dict:
     # Master data for filter dropdowns + quick-create form pre-fill
     from raw_materials.models import ClothColor, ClothType, StorageLocation
     from inventory.services import user_can_edit_financials
-    cloth_colors = ClothColor.objects.filter(is_active=True).order_by('name')
-    cloth_types = ClothType.objects.filter(is_active=True).order_by('name')
-    storage_locations = StorageLocation.objects.filter(is_active=True).order_by('name')
+    cloth_colors = ClothColor.active.order_by('name')
+    cloth_types = ClothType.active.order_by('name')
+    storage_locations = StorageLocation.active.order_by('name')
     width_choices = list(range(36, 45))
     can_edit_financials = user_can_edit_financials(user)
 
@@ -197,6 +222,12 @@ def _build_layering_context(request, adda: Adda) -> dict:
         'can_attach': can_attach,
         'can_draft': can_draft,
         'can_complete': can_complete,
+        # Management-only "Edit Layering" button on the completed-state panel —
+        # invokes reopen_layering to unlock corrections.
+        'can_reopen': is_management and sr is not None and sr.completed_at is not None,
+        'next_stage': next_stage,
+        # Snapshot for the top-of-panel summary card (rendered when completed).
+        'layering_snap': get_layering_snapshot(adda),
         'stages': adda.product.workflow_stages.order_by('order'),
         # Filter state — template uses to preselect dropdowns + toggle "no match" UX
         'filter_color': filter_color,
@@ -213,9 +244,11 @@ def _build_layering_context(request, adda: Adda) -> dict:
     }
 
 
-class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                            StageViewAccessMixin, TemplateView):
     """Full-page layering workspace (with nav + hero). Standalone entry point."""
 
+    stage_code = STAGE_LAYERING            # skill-gate the VIEW, not just actions
     template_name = 'production/layering_workspace.html'
 
     def get_context_data(self, **kwargs):
@@ -226,8 +259,13 @@ class LayeringWorkspaceView(LoginRequiredMixin, ProductionRoleMixin, TemplateVie
 
 
 @method_decorator(xframe_options_sameorigin, name='dispatch')
-class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+class StagePanelView(LoginRequiredMixin, ProductionRoleMixin,
+                     StageViewAccessMixin, TemplateView):
     """Per-stage panel — canonical URL for iframe embed + standalone view.
+
+    Skill-gated via StageViewAccessMixin (stage_type kwarg) so a direct hit on
+    /addas/<code>/stage/<stage_type>/ obeys the same skill rule as the embedded
+    panel — not just the ProductionRole gate.
 
     `?embedded=1` strips chrome (hero/nav) so panel fits inside iframe.
     Picks layering or cutting partial based on `stage_type` URL kwarg.
@@ -252,14 +290,25 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
         if stage_type == STAGE_LAYERING:
             ctx.update(_build_layering_context(self.request, adda))
+        elif stage_type == 'cutting_pattern':
+            # Lazy import — pattern_stage_views depends on services that
+            # touch Pillow / FileField storage; only loaded when this branch hits.
+            from production.views.pattern_stage_views import _build_pattern_context
+            ctx.update(_build_pattern_context(self.request, adda))
         elif stage_type == STAGE_CUTTING:
-            # Cutting needs current Adda + management gate + CuttingForm
+            # New cutting workspace context (PR3). Legacy CuttingForm
+            # still in context for products without cutting_pattern stage.
             ctx['cutting_form'] = CuttingForm()
             ctx['can_complete_cutting'] = (
                 user_has_role(self.request.user, MANAGEMENT_ROLES)
                 and adda.current_stage is not None
                 and adda.current_stage.stage_type == STAGE_CUTTING
             )
+            ctx.update(_build_cutting_context(self.request, adda))
+        elif stage_type == 'barcode_generation':
+            # Lazy import to avoid touching tracking models at startup.
+            from production.views.barcode_gen_views import _build_barcode_gen_context
+            ctx.update(_build_barcode_gen_context(self.request, adda))
         return ctx
 
 
@@ -288,6 +337,33 @@ class _LayeringActionBase(LoginRequiredMixin, ProductionRoleMixin, View):
         # ValidationError aata hai list mein kabhi-kabhi — get a flat string
         msg = getattr(exc, 'messages', None)
         return ' '.join(msg) if msg else str(exc)
+
+
+class LayeringReopenView(_LayeringActionBase):
+    """Management-only: unlock a completed Layering stage for correction.
+
+    UX: Admin clicks "Edit / Reopen" on the completed Layering panel, confirms
+    (handled in template), POST hits here. Service refuses if any downstream
+    stage has started — see reopen_layering.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            reopen_layering(adda=adda, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"Layering reopened for {adda.code}. Make corrections then Complete again.")
+        # On embedded reopen, ping parent to reload — fresh flow state shows
+        # Layering as current again, downstream tabs locked.
+        if request.POST.get('embedded') == '1':
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code, 'stage_type': STAGE_LAYERING,
+                }) + '?embedded=1&advanced=1'
+            )
+        return redirect('production:adda-detail', code=adda.code)
 
 
 class LayeringStartView(_LayeringActionBase):
@@ -700,10 +776,14 @@ class LayeringCompleteView(_LayeringActionBase):
                 user=request.user,
             )
         except (PermissionDenied, ValidationError) as exc:
+            if _is_ajax(request):
+                return HttpResponse(self._service_error(exc), status=400)
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
 
         if action == 'draft':
+            if _is_ajax(request):
+                return HttpResponse(status=204)   # debounced auto-save
             messages.success(request, "Draft saved.")
             return redirect(self.workspace_url(code, request))
 
@@ -748,7 +828,27 @@ class LayeringCompleteView(_LayeringActionBase):
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
-        messages.success(request, f"Layering complete for {adda.code}. Advanced to Cutting.")
+
+        # Refresh to read the newly-advanced current_stage from DB.
+        adda.refresh_from_db()
+        next_label = (
+            adda.current_stage.get_stage_type_display() if adda.current_stage else "next stage"
+        )
+        messages.success(request, f"Layering complete for {adda.code}. Advanced to {next_label}.")
+
+        # When complete was POSTed from inside an iframe (embedded mode), the
+        # default 'production:adda-detail' redirect would load adda-detail INSIDE
+        # the iframe — and Django's default X-Frame-Options blocks that ("refused
+        # to connect" error). Instead, redirect the iframe to the new current
+        # stage's embedded panel with ?advanced=1 so the embedded JS can postMessage
+        # the parent window to reload itself with fresh flow state.
+        if request.POST.get('embedded') == '1' and adda.current_stage is not None:
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code,
+                    'stage_type': adda.current_stage.stage_type,
+                }) + '?embedded=1&advanced=1'
+            )
         return redirect('production:adda-detail', code=adda.code)
 
 
@@ -784,3 +884,573 @@ class CuttingCompleteView(LoginRequiredMixin, ProductionRoleMixin, FormView):
             return self.form_invalid(form)
         messages.success(self.request, f"Cutting complete. {cr.pieces_cut} barcodes generated for {adda.code}.")
         return redirect('tracking:barcode-list', adda_code=adda.code)
+
+
+# ── Cutting workspace (PR3 2026-05-28) ──────────────────────────────────────
+
+
+def _build_cutting_context(request, adda: Adda) -> dict:
+    """Cutting workspace context — mirrors _build_pattern_context shape.
+
+    Returns dict with snapshot, breakup rows, suggestion, pickers, gates.
+    """
+    user = request.user
+    snapshot = get_cutting_snapshot(adda)
+    sr = snapshot.get('stage_record')
+    cutting_record = snapshot.get('cutting_record')
+    breakup = snapshot.get('breakup') or []
+    bundles = snapshot.get('bundles') or []
+    breakup_total = snapshot.get('breakup_total', 0)
+    bundle_total = snapshot.get('bundle_total', 0)
+
+    # Sizes available on this product
+    product_sizes = list(
+        adda.product.sizes.filter(is_active=True).order_by('display_order', 'code')
+    )
+    # Patterns assigned to this product
+    pattern_assignments = list(
+        adda.product.pattern_assignments.select_related('pattern').order_by('pattern__name')
+    )
+    patterns = [a.pattern for a in pattern_assignments]
+    # Colors from layered rolls (if layering completed)
+    layering_wf = adda.product.workflow_stages.filter(stage__code='layering').first()
+    layered_color_ids: set[int] = set()
+    if layering_wf:
+        layering_sr = AddaStageRecord.objects.filter(
+            adda=adda, workflow_stage=layering_wf,
+        ).first()
+        layering_record = getattr(layering_sr, 'layering', None) if layering_sr else None
+        if layering_record:
+            layered_color_ids = set(
+                layering_record.rolls_used.values_list('cloth_color_id', flat=True)
+            )
+    colors = list(ClothColor.objects.filter(id__in=layered_color_ids).order_by('name')) if layered_color_ids else []
+
+    is_management = user_has_role(user, MANAGEMENT_ROLES)
+    has_master_skill = user_has_skill(
+        user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER],
+    )
+    has_helper_skill = user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)
+
+    can_start = is_management
+    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    can_edit_breakup = sr is not None and sr.completed_at is None and (
+        is_management or (is_assigned and has_master_skill)
+    )
+    # PR7: complete now requires actual BUNDLES (not breakup).
+    can_complete_workspace = sr is not None and sr.completed_at is None and (
+        is_management or has_helper_skill
+    ) and bool(bundles)
+    can_reopen = is_management and sr is not None and sr.completed_at is not None
+
+    # ── Per-bundle-item worker allocation (PR-6) ────────────────────────────
+    # Attach allocation data to each bundle for the template: existing
+    # (non-voided) allocations + how much of each item is still unallocated.
+    # Form is gated on can_allocate; the read-only display always renders.
+    can_allocate = is_management and sr is not None and sr.completed_at is None
+    allocation_workers = list(sr.workers.all()) if sr else []
+    for b in bundles:
+        ann = []
+        for it in b.items.select_related('pattern', 'color').all():
+            summ = item_allocation_summary(it)
+            rows = list(
+                it.work_assignments.filter(voided_at__isnull=True)
+                .select_related('worker')
+            )
+            ann.append({
+                'item': it,
+                'allocated': summ['allocated'],
+                'remaining': summ['remaining'],
+                'rows': rows,
+            })
+        b.alloc_items = ann
+
+    # Suggested breakup (pre-fill hint when no rows yet).
+    suggestion = get_suggested_breakup(adda) if not breakup else []
+    suggested_total = sum(row['count'] for row in suggestion)
+
+    # PR13: barcode batch preview — what would generate on Mark Complete?
+    barcode_preview = preview_barcode_batches(adda)
+    barcode_preview_total = sum(p['total'] for p in barcode_preview)
+
+    next_stage = None
+    if adda.current_stage is not None:
+        next_stage = (
+            adda.product.workflow_stages
+            .filter(order__gt=adda.current_stage.order)
+            .order_by('order').first()
+        )
+
+    return {
+        'adda': adda,
+        'cutting_snapshot': snapshot,
+        'cutting_stage_record': sr,
+        'cutting_record': cutting_record,
+        'breakup': breakup,
+        'bundles': bundles,
+        'breakup_total': breakup_total,
+        'bundle_total': bundle_total,
+        # total_pieces (template legacy) = bundle total (drives barcodes).
+        'total_pieces': bundle_total,
+        'suggestion': suggestion,
+        'suggested_total': suggested_total,
+        'barcode_preview': barcode_preview,
+        'barcode_preview_total': barcode_preview_total,
+        'product_sizes': product_sizes,
+        'product_patterns': patterns,
+        'pattern_assignments': pattern_assignments,
+        'layered_colors': colors,
+        'is_management': is_management,
+        'can_start_cutting': can_start,
+        'can_edit_breakup': can_edit_breakup,
+        'can_edit_bundles': can_edit_breakup,  # same skill gates
+        'can_complete_workspace': can_complete_workspace,
+        'can_reopen_cutting': can_reopen,
+        'can_allocate': can_allocate,
+        'allocation_workers': allocation_workers,
+        'next_stage_after_cutting': next_stage,
+        'cutting_start_form': CuttingStartForm(initial={
+            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+        }) if can_start else None,
+        'cutting_draft_form': CuttingDraftForm(initial={
+            'notes': cutting_record.notes if cutting_record else '',
+        }) if can_edit_breakup else None,
+    }
+
+
+class CuttingWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
+                           StageViewAccessMixin, TemplateView):
+    stage_code = STAGE_CUTTING             # skill-gate the VIEW, not just actions
+    template_name = 'production/cutting_workspace.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(_build_cutting_context(self.request, _get_adda(self.kwargs['code'])))
+        return ctx
+
+
+class _CuttingActionBase(LoginRequiredMixin, ProductionRoleMixin, View):
+    http_method_names = ['post']
+
+    def workspace_url(self, code: str, request=None) -> str:
+        if request is not None and request.POST.get('embedded') == '1':
+            return reverse('production:stage-panel', kwargs={
+                'code': code, 'stage_type': STAGE_CUTTING,
+            }) + '?embedded=1'
+        return reverse('production:cutting-workspace', kwargs={'code': code})
+
+    def _service_error(self, exc) -> str:
+        msg = getattr(exc, 'messages', None)
+        return ' '.join(msg) if msg else str(exc)
+
+
+class CuttingStartView(_CuttingActionBase):
+    def post(self, request, code):
+        adda = _get_adda(code)
+        form = CuttingStartForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Select at least one worker.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            start_cutting(
+                adda=adda,
+                worker_ids=[u.pk for u in form.cleaned_data['workers']],
+                user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Cutting stage started.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBreakupSaveView(_CuttingActionBase):
+    """Bulk save of breakup rows — parallel arrays size_id/color_id/pattern_id/count.
+
+    PR14: any incomplete row (missing pattern/size/color or non-numeric count)
+    raises a user-facing error instead of silent skip. Count = 0 still treated
+    as "delete existing combo" per upsert_breakup_row semantics.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        size_ids = request.POST.getlist('size_id')
+        color_ids = request.POST.getlist('color_id')
+        pattern_ids = request.POST.getlist('pattern_id')
+        counts = request.POST.getlist('count')
+        roll_ids = request.POST.getlist('roll_id') or [''] * len(size_ids)
+
+        if not (len(size_ids) == len(color_ids) == len(pattern_ids) == len(counts)):
+            messages.error(request, "Form array length mismatch.")
+            return redirect(self.workspace_url(code, request))
+        if not size_ids:
+            messages.error(request, "No rows submitted.")
+            return redirect(self.workspace_url(code, request))
+
+        saved = 0
+        for row_idx, (sid, cid, pid, cnt, rid) in enumerate(zip(size_ids, color_ids, pattern_ids, counts, roll_ids), start=1):
+            # Reject incomplete rows — surface a clear error to the user.
+            if not (sid and cid and pid):
+                messages.error(
+                    request,
+                    f"Row {row_idx}: pattern, size, and color are all required.",
+                )
+                return redirect(self.workspace_url(code, request))
+            try:
+                size_id = int(sid); color_id = int(cid)
+                pattern_id = int(pid); count = int(cnt)
+                roll_id = int(rid) if rid else None
+            except (TypeError, ValueError):
+                messages.error(request, f"Row {row_idx}: invalid number in form.")
+                return redirect(self.workspace_url(code, request))
+            try:
+                upsert_breakup_row(
+                    adda=adda, size_id=size_id, color_id=color_id,
+                    pattern_id=pattern_id, count=count, roll_id=roll_id,
+                    user=request.user,
+                )
+                saved += 1
+            except (PermissionDenied, ValidationError) as exc:
+                messages.error(request, self._service_error(exc))
+                return redirect(self.workspace_url(code, request))
+        if saved == 0:
+            messages.error(request, "Nothing saved — check that all rows are complete.")
+        else:
+            messages.success(request, f"{saved} breakup row(s) saved.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBreakupDeleteView(_CuttingActionBase):
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        try:
+            delete_breakup_row(adda=adda, breakup_id=pk, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Row removed.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingDraftView(_CuttingActionBase):
+    def post(self, request, code):
+        adda = _get_adda(code)
+        form = CuttingDraftForm(request.POST)
+        notes = form.data.get('notes', '') if not form.is_valid() else form.cleaned_data.get('notes', '')
+        try:
+            save_cutting_draft(adda=adda, notes=notes, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            if _is_ajax(request):
+                return HttpResponse(self._service_error(exc), status=400)
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        if _is_ajax(request):
+            return HttpResponse(status=204)   # debounced auto-save
+        messages.success(request, "Draft saved.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingWorkspaceCompleteView(_CuttingActionBase):
+    """Workspace-mode complete — drives barcode generation from breakup rows."""
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            cr = complete_cutting(adda=adda, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(
+            request,
+            f"Cutting complete. {cr.pieces_cut} barcodes generated for {adda.code}.",
+        )
+        if request.POST.get('embedded') == '1' and adda.current_stage is not None:
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code, 'stage_type': adda.current_stage.stage_type,
+                }) + '?embedded=1&advanced=1'
+            )
+        return redirect('tracking:barcode-list', adda_code=adda.code)
+
+
+class CuttingReopenView(_CuttingActionBase):
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            reopen_cutting(adda=adda, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"Cutting reopened for {adda.code}.")
+        if request.POST.get('embedded') == '1':
+            return redirect(
+                reverse('production:stage-panel', kwargs={
+                    'code': adda.code, 'stage_type': STAGE_CUTTING,
+                }) + '?embedded=1&advanced=1'
+            )
+        return redirect('production:adda-detail', code=adda.code)
+
+
+class CuttingBundleCreateView(_CuttingActionBase):
+    """Bundle create — atomic header + initial pieces (PR12).
+
+    POST: size_id + bundle_number + parallel breakup_id[] + take_count[].
+    If no take_count > 0, creates empty bundle header (PR9 back-compat).
+    Otherwise atomic create header + consume pieces in one tx.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            size_id = int(request.POST.get('size_id') or 0)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid size.")
+            return redirect(self.workspace_url(code, request))
+        if size_id <= 0:
+            messages.error(request, "Bundle size is required.")
+            return redirect(self.workspace_url(code, request))
+        bundle_number = request.POST.get('bundle_number', '')
+
+        # Parse multi-select breakup picker (PR12).
+        breakup_ids = request.POST.getlist('breakup_id')
+        take_counts = request.POST.getlist('take_count')
+        selections: list[dict] = []
+        if breakup_ids and len(breakup_ids) == len(take_counts):
+            for bid, tc in zip(breakup_ids, take_counts):
+                try:
+                    breakup_id = int(bid); take_count = int(tc)
+                except (TypeError, ValueError):
+                    continue
+                if take_count <= 0:
+                    continue
+                selections.append({
+                    'breakup_id': breakup_id, 'take_count': take_count,
+                })
+        try:
+            bundle = create_bundle_with_pieces(
+                adda=adda, size_id=size_id,
+                bundle_number=bundle_number, selections=selections,
+                user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        if selections:
+            messages.success(
+                request,
+                f"Bundle created with {len(selections)} piece row(s) "
+                f"({bundle.total_pieces} pieces).",
+            )
+        else:
+            messages.success(request, "Empty bundle created. Add pieces below.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleAddPiecesView(_CuttingActionBase):
+    """Multi-select bulk consume (PR10).
+
+    POST parallel arrays:
+      breakup_id[], take_count[]
+    Each non-zero take_count → CuttingBundleItem in this bundle with
+    source_breakup FK + breakup.consumed_count incremented.
+    """
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        breakup_ids = request.POST.getlist('breakup_id')
+        take_counts = request.POST.getlist('take_count')
+        if len(breakup_ids) != len(take_counts):
+            messages.error(request, "Form array length mismatch.")
+            return redirect(self.workspace_url(code, request))
+
+        selections: list[dict] = []
+        for row_idx, (bid, tc) in enumerate(zip(breakup_ids, take_counts), start=1):
+            try:
+                breakup_id = int(bid); take_count = int(tc)
+            except (TypeError, ValueError):
+                # PR14: surface parse errors instead of silent skip.
+                messages.error(
+                    request,
+                    f"Row {row_idx}: invalid number — check breakup id / take count.",
+                )
+                return redirect(self.workspace_url(code, request))
+            if take_count <= 0:
+                continue
+            selections.append({'breakup_id': breakup_id, 'take_count': take_count})
+
+        if not selections:
+            messages.error(request, "Tick at least one piece row with Take > 0.")
+            return redirect(self.workspace_url(code, request))
+
+        try:
+            items = add_pieces_to_bundle(
+                adda=adda, bundle_id=pk, selections=selections,
+                user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"{len(items)} piece row(s) consumed into bundle.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleAddItemView(_CuttingActionBase):
+    """Per-bundle item add (PR9). POST: bundle_id + pattern_id + color_id + count.
+
+    Size scoped via bundle FK (no size picker needed in the per-bundle form).
+    """
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        try:
+            pattern_id = int(request.POST.get('pattern_id') or 0)
+            color_id = int(request.POST.get('color_id') or 0)
+            count = int(request.POST.get('count') or 0)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid number in form.")
+            return redirect(self.workspace_url(code, request))
+        if pattern_id <= 0 or color_id <= 0:
+            messages.error(request, "Pattern and color are required.")
+            return redirect(self.workspace_url(code, request))
+        if count < 1:
+            messages.error(request, "Count must be >= 1.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            add_item_to_bundle(
+                adda=adda, bundle_id=pk, pattern_id=pattern_id,
+                color_id=color_id, count=count, user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Item added.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleItemSaveView(_CuttingActionBase):
+    """Add (or update count of) one bundle line item via shortcut form.
+
+    POST fields:
+      size_id, pattern_id, color_id, count, bundle_number (optional)
+    Bundle (per-size header) lazy-created via service. Kept for back-compat
+    and for the "add item without explicit Create Bundle step" shortcut.
+    """
+
+    def post(self, request, code):
+        adda = _get_adda(code)
+        try:
+            size_id = int(request.POST.get('size_id') or 0)
+            pattern_id = int(request.POST.get('pattern_id') or 0)
+            color_id = int(request.POST.get('color_id') or 0)
+            count = int(request.POST.get('count') or 0)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid number in form.")
+            return redirect(self.workspace_url(code, request))
+        bundle_number = request.POST.get('bundle_number', '')
+        if size_id <= 0 or pattern_id <= 0 or color_id <= 0:
+            messages.error(request, "Size, pattern, and color are all required.")
+            return redirect(self.workspace_url(code, request))
+        if count < 1:
+            messages.error(request, "Count must be >= 1.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            add_bundle_item(
+                adda=adda, size_id=size_id, pattern_id=pattern_id,
+                color_id=color_id, count=count,
+                bundle_number=bundle_number, user=request.user,
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Bundle item saved.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleItemDeleteView(_CuttingActionBase):
+    """Remove a single bundle line item. Bundle auto-deletes if last item."""
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        try:
+            delete_bundle_item(adda=adda, item_id=pk, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Item removed.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleDeleteView(_CuttingActionBase):
+    """Remove an entire bundle (size group)."""
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        try:
+            delete_bundle(adda=adda, bundle_id=pk, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Bundle removed.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingBundleItemAllocateView(_CuttingActionBase):
+    """Allocate a CuttingBundleItem's pieces to a worker (PR-6 payroll).
+
+    POST: worker_id + allocated_quantity + notes (optional). Resolves the
+    cutting AddaStageRecord, then books the earning via expense.allocate_stage_work
+    (which freezes the rate + credits the worker's ledger). pk = bundle_item id.
+    """
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        item = get_object_or_404(
+            CuttingBundleItem, pk=pk, bundle__cutting_record__stage_record__adda=adda,
+        )
+        sr = item.bundle.cutting_record.stage_record
+        try:
+            worker_id = int(request.POST.get('worker_id') or 0)
+            qty = int(request.POST.get('allocated_quantity') or 0)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid number in form.")
+            return redirect(self.workspace_url(code, request))
+        if worker_id <= 0:
+            messages.error(request, "Pick a worker.")
+            return redirect(self.workspace_url(code, request))
+        if qty < 1:
+            messages.error(request, "Quantity must be >= 1.")
+            return redirect(self.workspace_url(code, request))
+        from accounts.models import User
+        worker = User.objects.filter(pk=worker_id).first()
+        if worker is None:
+            messages.error(request, "Worker not found.")
+            return redirect(self.workspace_url(code, request))
+        try:
+            allocate_stage_work(
+                user=request.user, stage_record=sr, worker=worker,
+                bundle_item=item, allocated_quantity=qty,
+                notes=request.POST.get('notes', ''),
+            )
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, f"Allocated {qty} to {worker.email}.")
+        return redirect(self.workspace_url(code, request))
+
+
+class CuttingAllocationDeleteView(_CuttingActionBase):
+    """Void a worker allocation — reverses its ledger credit (audit-preserving).
+    pk = StageWorkAssignment id. Management-only (enforced in void_allocation)."""
+
+    def post(self, request, code, pk):
+        adda = _get_adda(code)
+        assignment = get_object_or_404(
+            StageWorkAssignment, pk=pk, stage_record__adda=adda,
+        )
+        try:
+            void_allocation(assignment, user=request.user)
+        except (PermissionDenied, ValidationError) as exc:
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
+        messages.success(request, "Allocation removed.")
+        return redirect(self.workspace_url(code, request))

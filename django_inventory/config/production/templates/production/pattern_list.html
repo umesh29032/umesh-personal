@@ -1,0 +1,106 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Product Patterns{% endblock %}
+
+{% block extra_head %}
+<style>
+    .pattern-list { max-width: 1100px; margin: 0 auto; }
+    .pattern-list .hero {
+        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        color: #fff; border-radius: 16px;
+        padding: 26px 30px; margin-bottom: 22px;
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 14px; flex-wrap: wrap;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+    }
+    .pattern-list .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 28px; font-weight: 600; color: #fff; margin: 0;
+    }
+    .pattern-list .hero p { margin: 4px 0 0; color: rgba(255,255,255,0.72); font-size: 14px; }
+    .pattern-list .add-btn {
+        background: var(--copper); color: #fff;
+        padding: 10px 18px; border-radius: 10px;
+        font-weight: 700; font-size: 13px; text-decoration: none;
+    }
+    .pattern-list .pattern-card {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        padding: 18px 22px; margin-bottom: 12px;
+        display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start;
+    }
+    .pattern-list .name { font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); }
+    .pattern-list .code { margin-left: 8px; font-family: monospace; font-size: 12px;
+        color: var(--stone); padding: 2px 8px; background: var(--cream-2); border-radius: 6px; }
+    .pattern-list .meta { margin-top: 8px; font-size: 13px; color: var(--stone); }
+    .pattern-list .btn-inline {
+        padding: 6px 14px; border-radius: 8px; font-size: 12px;
+        font-weight: 600; text-decoration: none; border: 1px solid var(--border-subtle);
+        display: inline-block; text-align: center;
+    }
+    .pattern-list .btn-edit { background: var(--copper); color: #fff; border-color: var(--copper); }
+    .pattern-list .btn-delete { color: #b91c1c; border-color: rgba(185,28,28,0.35); }
+    .pattern-list .actions { display: flex; flex-direction: column; gap: 6px; }
+    .pattern-list .empty {
+        background: var(--card-bg); border: 1px dashed var(--border-card);
+        border-radius: 14px; padding: 40px; text-align: center; color: var(--stone);
+    }
+    .pattern-list .product-pill {
+        display: inline-block; padding: 2px 10px; margin-right: 4px;
+        background: var(--cream-2); border-radius: 999px;
+        font-size: 11px; color: var(--ink);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pattern-list">
+    <div class="hero">
+        <div>
+            <h1>Product Patterns</h1>
+            <p>Reusable pattern shapes — assign per product with piece counts on the product page.</p>
+        </div>
+        {% if can_add %}
+        <a href="{% url 'production:pattern-add' %}" class="add-btn">+ New Pattern</a>
+        {% endif %}
+    </div>
+
+    {% if messages %}{% for m in messages %}
+        <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:14px;">{{ m }}</div>
+    {% endfor %}{% endif %}
+
+    {% for p in patterns %}
+        <div class="pattern-card">
+            <div>
+                <div>
+                    <span class="name">{{ p.name }}</span>
+                    <span class="code">{{ p.code }}</span>
+                    {% if not p.is_active %}<span class="code" style="background:#fee2e2;color:#991b1b;">Inactive</span>{% endif %}
+                </div>
+                {% if p.description %}<div class="meta">{{ p.description }}</div>{% endif %}
+                <div class="meta" style="margin-top: 10px;">
+                    {% for a in p.product_assignments.all %}
+                        <span class="product-pill">{{ a.product.code }} × {{ a.pieces_count }}</span>
+                    {% empty %}
+                        <em>Unassigned</em>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="actions">
+                {% if can_change %}
+                    <a href="{% url 'production:pattern-edit' p.pk %}" class="btn-inline btn-edit">Edit</a>
+                {% endif %}
+                {% if can_delete %}
+                    <a href="{% url 'production:pattern-delete' p.pk %}" class="btn-inline btn-delete">Delete</a>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty">
+            No patterns yet.
+            {% if can_add %}<a href="{% url 'production:pattern-add' %}" style="color:var(--copper);">Create the first one</a>.{% endif %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

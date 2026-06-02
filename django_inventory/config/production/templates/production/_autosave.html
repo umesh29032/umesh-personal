@@ -1,0 +1,58 @@
+{% comment %}Debounced auto-save for stage draft forms (PR-6).
+
+Usage: tag a draft form with `data-autosave-url="<draft endpoint>"`. Optionally
+add a `<span data-autosave-status>` inside it for the status pill. On input/change
+(debounced ~900ms) it POSTs the form's NON-FILE, NON-BUTTON fields with
+X-Requested-With, so the draft view returns 204 (file uploads + the Complete
+button stay manual — files are never re-sent, and no `action=complete` leaks).
+The manual "Save Draft" button remains as an explicit fallback.{% endcomment %}
+<script>
+(function () {
+  function csrf(form) {
+    var i = form.querySelector('input[name=csrfmiddlewaretoken]');
+    return i ? i.value : '';
+  }
+  function buildData(form) {
+    var fd = new FormData();
+    Array.prototype.forEach.call(form.elements, function (el) {
+      if (!el.name) return;
+      if (el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+      if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
+      fd.append(el.name, el.value);
+    });
+    return fd;
+  }
+  document.querySelectorAll('form[data-autosave-url]').forEach(function (form) {
+    var url = form.getAttribute('data-autosave-url');
+    var pill = form.querySelector('[data-autosave-status]');
+    var timer = null;
+    function status(txt, cls) {
+      if (!pill) return;
+      pill.textContent = txt;
+      pill.className = 'autosave-pill ' + (cls || '');
+    }
+    function save() {
+      status('Saving…', 'saving');
+      fetch(url, {
+        method: 'POST', body: buildData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrf(form) },
+      }).then(function (r) {
+        status(r.ok ? 'Saved ✓' : 'Save failed', r.ok ? 'saved' : 'failed');
+      }).catch(function () { status('Save failed', 'failed'); });
+    }
+    function schedule(e) {
+      if (e.target && e.target.type === 'file') return;   // never auto-upload files
+      clearTimeout(timer);
+      timer = setTimeout(save, 900);
+    }
+    form.addEventListener('input', schedule);
+    form.addEventListener('change', schedule);
+  });
+})();
+</script>
+<style>
+  .autosave-pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+  .autosave-pill.saving { color: var(--stone); }
+  .autosave-pill.saved  { color: var(--success); }
+  .autosave-pill.failed { color: var(--danger); }
+</style>

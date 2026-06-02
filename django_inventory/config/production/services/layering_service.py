@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,7 +37,7 @@ from django.db.models import Count, Sum
 from production.constants import STAGE_LAYERING
 from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
-    RemainingClothOfClothRoll, WorkflowStage,
+    RemainingClothOfClothRoll,
 )
 from production.services.adda_service import advance_to_next_stage
 
@@ -225,6 +225,10 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
     sr.workers.set(worker_ids)
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
+             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
     return sr
 
 
@@ -675,3 +679,107 @@ def complete_layering(
 
     advance_to_next_stage(adda, user)
     return lr
+
+
+@transaction.atomic
+def reopen_layering(*, adda: Adda, user) -> AddaStageRecord:
+    """Admin-only: completed Layering stage ko correction ke liye unlock.
+
+    YEH KAB ZAROORAT PADTI HAI?
+      Manager/Helper ne galti se complete kar diya, ya values galat fill
+      ki — admin "Edit / Reopen" button click karke stage wapas in-progress
+      kar deta hai. Workers + attached rolls + per-roll layers + leftover
+      preserve rehte hain (sirf typed LayeringRecord delete hota hai).
+
+    ROLLBACK KARTA HAI:
+      • adda.current_stage  → Layering WorkflowStage pe wapas
+      • stage_record.completed_at / completed_by → cleared (sr active again)
+      • LayeringRecord summary → deleted (re-create hoga next complete)
+      • adda.status → IN_PROGRESS (agar COMPLETED ho gaya tha to)
+
+    REFUSE KARTA HAI:
+      Agar koi DOWNSTREAM stage (cutting_pattern, cutting) start ho chuka
+      hai — partial rollback dangerous hota hai. Admin pehle un stages ko
+      manually clean kare.
+
+    HEADER PRESERVE TRICK (important):
+      LayeringRecord delete karne se pehle uske layer_length_meters,
+      duration_minutes, notes ko sr.draft_* fields mein wapas copy karte
+      hain. Warna re-edit form blank dikhega aur user ko galti lagegi.
+      (Yeh bug 2026-05-28 ko mila tha — silent ValidationError pe
+      "duration_minutes must be >= 1" aata tha.)
+
+    AUDIT: tracking.AddaHistory mein STAGE_REOPENED entry log hoti hai.
+    """
+    # Gate: sirf super_admin ya manager. Karigar reopen nahi kar sakta.
+    _ensure_management(user)
+
+    # Iss product ka Layering WorkflowStage row find karo (har product ka
+    # apna WorkflowStage row hota hai with order=1 typically).
+    layering_wf = adda.product.workflow_stages.filter(stage__code=STAGE_LAYERING).first()
+    if layering_wf is None:
+        raise ValidationError("This product has no Layering stage configured.")
+
+    # select_for_update() = SQL "FOR UPDATE" lock taaki parallel reopen
+    # race na ho. @transaction.atomic block ke andar mandatory.
+    try:
+        sr = AddaStageRecord.objects.select_for_update().get(
+            adda=adda, workflow_stage=layering_wf,
+        )
+    except AddaStageRecord.DoesNotExist:
+        raise ValidationError("Layering stage has never been started.")
+    if sr.completed_at is None:
+        raise ValidationError("Layering is already open for edits.")
+
+    # Downstream check: agar koi later stage (cutting_pattern, cutting) ka
+    # AddaStageRecord pehle se started hai, reopen refuse karo. Reason —
+    # us stage ke data (workers, barcodes) ko bhi unwind karna padega which
+    # is out of scope yahan. Admin pehle manual cleanup kare.
+    downstream = (
+        AddaStageRecord.objects
+        .filter(adda=adda, workflow_stage__order__gt=layering_wf.order)
+        .exclude(started_at__isnull=True)
+        .exists()
+    )
+    if downstream:
+        raise ValidationError(
+            "Cannot reopen Layering — a downstream stage has already started. "
+            "Reopen requires no later stages to have been touched."
+        )
+
+    # Preserve header values BEFORE tearing down LayeringRecord. Without this,
+    # the reopened editor renders blank layer_length / duration / notes and the
+    # next Complete submit fails strict validation ("duration_minutes must be
+    # >= 1"). Copy the prior values back into the stage_record.draft_* fields
+    # so the form pre-fills them on re-render.
+    lr = LayeringRecord.objects.filter(stage_record=sr).first()
+    if lr is not None:
+        sr.draft_layer_length_meters = lr.layer_length_meters
+        sr.draft_duration_minutes = lr.duration_minutes
+        sr.draft_notes = lr.notes or ''
+        lr.delete()
+
+    sr.completed_at = None
+    sr.completed_by = None
+    sr.save(update_fields=[
+        'completed_at', 'completed_by',
+        'draft_layer_length_meters', 'draft_duration_minutes', 'draft_notes',
+        'updated_at',
+    ])
+
+    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it
+    # against the current rate + corrected quantity (price-at-time-of-order).
+    from production.services.cost_service import clear_stage_cost
+    clear_stage_cost(sr)
+
+    adda.current_stage = layering_wf
+    adda.status = Adda.Status.IN_PROGRESS
+    adda.completed_at = None
+    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
+
+    # Audit
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=layering_wf)
+
+    return sr

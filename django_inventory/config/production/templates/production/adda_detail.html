@@ -37,6 +37,60 @@
     .adda-detail .hero-badge.onhold     { background: rgba(217,119,6,0.18); color:#fbbf24; border-color: rgba(217,119,6,0.3); }
     .adda-detail .hero-badge.cancelled  { background: rgba(220,38,38,0.18); color:#fca5a5; border-color: rgba(220,38,38,0.3); }
 
+    /* Stages Overview — per-stage compact tiles above the flow card */
+    .adda-detail .stages-overview {
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-radius: 14px; box-shadow: var(--shadow-card);
+        padding: 14px 18px 16px;
+        margin-bottom: 16px;
+    }
+    .adda-detail .stages-overview-title {
+        font-size: 10px; font-weight: 700; letter-spacing: 0.10em;
+        text-transform: uppercase; color: var(--stone); margin-bottom: 10px;
+    }
+    .adda-detail .stages-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+    }
+    .adda-detail .so-tile {
+        background: var(--cream); border: 1px solid var(--border-subtle);
+        border-radius: 12px; padding: 12px 14px;
+        display: flex; flex-direction: column; gap: 6px;
+        position: relative;
+    }
+    .adda-detail .so-tile.so-completed   { background: rgba(5,150,105,0.07); border-color: rgba(5,150,105,0.30); }
+    .adda-detail .so-tile.so-in_progress { background: rgba(184,115,51,0.08); border-color: rgba(184,115,51,0.35); }
+    .adda-detail .so-tile.so-pending     { opacity: 0.75; }
+    .adda-detail .so-tile-head {
+        display: flex; align-items: center; gap: 8px;
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 16px; font-weight: 600; color: var(--ink);
+    }
+    .adda-detail .so-tile-state {
+        width: 22px; height: 22px; border-radius: 50%;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 12px;
+    }
+    .adda-detail .so-completed   .so-tile-state { background: var(--success); color: #fff; }
+    .adda-detail .so-in_progress .so-tile-state { background: var(--copper); color: #fff; }
+    .adda-detail .so-pending     .so-tile-state { background: var(--cream-2); color: var(--stone); }
+    .adda-detail .so-tile-meta {
+        display: flex; flex-wrap: wrap; gap: 4px 10px;
+        font-size: 11px; color: var(--stone);
+    }
+    .adda-detail .so-tile-meta strong { color: var(--ink); font-family: monospace; font-size: 12px; }
+    .adda-detail .so-tile-foot {
+        font-size: 10px; color: var(--stone); font-style: italic;
+    }
+    .adda-detail .so-tile-jump {
+        align-self: flex-start; margin-top: 4px;
+        background: transparent; border: none; padding: 0;
+        font-family: inherit; font-size: 11px; font-weight: 600;
+        color: var(--copper); cursor: pointer;
+    }
+    .adda-detail .so-tile-jump:hover { text-decoration: underline; }
+
     /* Production Flow — connected pipeline (replaces old tab bar). */
     .adda-detail .flow-card {
         background: var(--card-bg);
@@ -239,11 +293,15 @@
         }
         .adda-detail .flow-node[aria-selected="true"]::after { display: none; }
 
-        /* Dots — flat, no shadows on mobile. */
+        /* Dots — flat, no shadows on mobile. Sized + bordered for legibility:
+           copper "3" inside a copper pill was hard to read at 11px — bump to
+           24px with bolder type + thin border ensures the number always reads. */
         .adda-detail .flow-dot {
-            width: 22px; height: 22px;
-            font-size: 11px;
-            border: 0 !important;
+            width: 26px; height: 26px;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1;
+            border: 1.5px solid var(--border-subtle) !important;
             background: #fff;
             color: var(--stone);
             box-shadow: none !important;
@@ -252,13 +310,17 @@
         .adda-detail .flow-node.done .flow-dot {
             background: var(--success) !important;
             color: #fff !important;
+            border-color: var(--success) !important;
         }
         .adda-detail .flow-node.current .flow-dot {
+            /* White circle with copper number; thicker border so it pops on
+               copper pill bg (otherwise dot blends into pill). */
             background: #fff !important;
             color: var(--copper) !important;
+            border: 2px solid #fff !important;
         }
         .adda-detail .flow-node.current .flow-dot::after { display: none; }
-        .adda-detail .flow-dot svg { width: 12px; height: 12px; }
+        .adda-detail .flow-dot svg { width: 14px; height: 14px; }
 
         /* Labels — state-driven color. */
         .adda-detail .flow-label {
@@ -409,11 +471,58 @@
         </div>
     </div>
 
-    {% comment %}Layering Summary — confidential roll/layer/leftover counts.
-    Hidden unless user has layering skill or sits in management.{% endcomment %}
-    {% if has_layering_access and layering_snap.state != 'absent' %}
-    <div style="margin-bottom: 18px;">
-        {% include 'production/_layering_summary.html' with snap=layering_snap style='full' %}
+    {% comment %}
+    STAGES OVERVIEW PANEL — saare stages ka headline summary ek jagah.
+
+    Pehle yahan sirf layering ka full summary card show hota tha. User ne
+    bola: yahan har stage ka summary chip dikhna chahiye, full details
+    individual stage tab ke andar ho. Isliye ab compact tiles per-stage —
+    completed stages ka data + in-progress / pending status.
+
+    Tiles:
+      • completed → green check + key metrics (lay_count, photos count, ...)
+      • in_progress → copper pulse + "Currently active"
+      • pending → muted "Pending"
+    {% endcomment %}
+    {% if is_management or has_layering_access %}
+    <div class="stages-overview">
+        <div class="stages-overview-title">Stages Overview</div>
+        <div class="stages-overview-grid">
+            {% for so in stages_overview %}
+            <div class="so-tile so-{{ so.state }}">
+                <div class="so-tile-head">
+                    <span class="so-tile-state">
+                        {% if so.state == 'completed' %}✓{% elif so.state == 'in_progress' %}▸{% else %}•{% endif %}
+                    </span>
+                    <span class="so-tile-label">{{ so.label }}</span>
+                </div>
+                {% if so.state == 'completed' %}
+                    {% if so.stage_type == 'layering' and so.snap.record %}
+                        <div class="so-tile-meta">
+                            <span>Lay count <strong>{{ so.snap.lay_count }}</strong></span>
+                            <span>Length <strong>{{ so.snap.layer_length }} m</strong></span>
+                            <span>Duration <strong>{{ so.snap.duration_min }} min</strong></span>
+                            <span>Rolls <strong>{{ so.snap.rolls_count }}</strong></span>
+                        </div>
+                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
+                    {% elif so.stage_type == 'cutting_pattern' and so.snap.record %}
+                        <div class="so-tile-meta">
+                            <span>Photos <strong>{{ so.snap.photo_count }}</strong></span>
+                            <span>Video <strong>{% if so.snap.record.video %}✓{% else %}—{% endif %}</strong></span>
+                        </div>
+                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
+                    {% else %}
+                        <div class="so-tile-meta"><span>Completed</span></div>
+                    {% endif %}
+                {% elif so.state == 'in_progress' %}
+                    <div class="so-tile-meta"><span>Currently active</span></div>
+                {% else %}
+                    <div class="so-tile-meta"><span style="color:var(--stone);">Pending</span></div>
+                {% endif %}
+                <button type="button" class="so-tile-jump" data-tab="{{ so.stage_type }}">Open tab →</button>
+            </div>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 
@@ -502,7 +611,7 @@
                         src="{% url 'production:stage-panel' adda.code s.stage_type %}?embedded=1"
                         title="{{ s.get_stage_type_display }} panel"
                         loading="lazy"
-                        style="width:100%; border:none; min-height:400px;"></iframe>
+                        style="width:100%; border:none; min-height:120px;"></iframe>
             {% else %}
                 <div class="stage-restricted">
                     <div class="stage-restricted-icon">
@@ -543,11 +652,17 @@
         </details>
     </div>
 
-    <div class="tabpane">
-        <h3 style="margin: 0 0 14px; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; color: var(--ink);">
-            Activity ({{ activity|length }})
-        </h3>
-        {% include 'production/_activity_feed.html' with activity=activity show_adda_code=False %}
+    <div class="tabpane" style="padding: 0;">
+        {% comment %}PR17: collapse Activity by default — was always-expanded
+        feed taking lot of vertical space. User can click to expand.{% endcomment %}
+        <details>
+            <summary style="cursor:pointer; padding: 16px 22px; font-weight: 600; font-size: 14px; color: var(--ink);">
+                Activity ({{ activity|length }})
+            </summary>
+            <div style="padding: 0 22px 22px;">
+                {% include 'production/_activity_feed.html' with activity=activity show_adda_code=False %}
+            </div>
+        </details>
     </div>
     {% endif %}
 
@@ -567,6 +682,17 @@
             panes.forEach(p => { p.hidden = (p.id !== 'tab-' + name); });
         }
         tabs.forEach(btn => btn.addEventListener('click', () => activate(btn.dataset.tab)));
+
+        // "Open tab" buttons inside Stages Overview tiles — same activate() +
+        // smooth scroll the matching pane into view so user sees their click landed.
+        document.querySelectorAll('.adda-detail .so-tile-jump').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const name = btn.dataset.tab;
+                activate(name);
+                const pane = document.getElementById('tab-' + name);
+                if (pane) pane.scrollIntoView({behavior: 'smooth', block: 'start'});
+            });
+        });
 
         // Jump-to-form: activate pane → scroll iframe into view → ask iframe to
         // focus its action form (the actual form lives inside the stage-panel iframe,
@@ -602,13 +728,24 @@
     // Iframe auto-resize — receives `stage-panel-resize` postMessage from embedded
     // stage panel and grows the iframe to fit its content (no inner scrollbars).
     window.addEventListener('message', function(ev) {
-        if (!ev.data || ev.data.type !== 'stage-panel-resize') return;
+        if (!ev.data) return;
+        // Stage just advanced inside an iframe (complete handler redirected the
+        // iframe to the next stage's embedded panel). Reload parent so the flow
+        // pipeline + tabs reflect the new current_stage.
+        if (ev.data.type === 'stage-advanced') {
+            window.location.reload();
+            return;
+        }
+        if (ev.data.type !== 'stage-panel-resize') return;
         const code = ev.data.code;
+        const stage = ev.data.stage;
         const h = ev.data.height;
+        // PR18: match BOTH adda code + stage type. Earlier filter matched only
+        // adda code → cutting iframe's height clobbered all three iframes.
         document.querySelectorAll('.stage-iframe').forEach(f => {
-            if (f.src.indexOf('/' + code + '/') !== -1) {
-                f.style.height = (h + 20) + 'px';
-            }
+            if (stage && f.dataset.stage !== stage) return;
+            if (f.src.indexOf('/' + code + '/') === -1) return;
+            f.style.height = h + 'px';
         });
     });
 </script>

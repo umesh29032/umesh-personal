@@ -41,8 +41,16 @@
         </div>
     </div>
 
-    {% if form.non_field_errors %}
-        <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+    {# Show ALL validation errors (field + non-field). Without this, a rejected
+       password / email silently re-renders with no feedback (looks "broken"). #}
+    {% if form.errors %}
+        <div class="form-alert form-alert-error">
+            <strong>Could not save — please fix:</strong>
+            <ul style="margin:6px 0 0; padding-left:18px;">
+                {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
+                {% for field in form %}{% for e in field.errors %}<li>{{ field.label }}: {{ e }}</li>{% endfor %}{% endfor %}
+            </ul>
+        </div>
     {% endif %}
 
     <form method="post" enctype="multipart/form-data" id="userForm">
@@ -113,6 +121,7 @@
                             <div class="field">
                                 <label for="id_new_password">Reset Password</label>
                                 <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
+                                {% if form.new_password.errors %}<small class="form-alert form-alert-error" style="display:block;margin-top:6px;">{{ form.new_password.errors|join:" " }}</small>{% endif %}
                                 <small>Only fill to issue a new password.</small>
                             </div>
                         </div>
@@ -181,13 +190,13 @@
                         </div>
 
                         <div class="field">
-                            <label for="id_user_type">Legacy User Type</label>
+                            <label for="id_user_type">User Type</label>
                             <select name="user_type" id="id_user_type">
                                 {% for value, label in form.user_type.field.choices %}
                                 <option value="{{ value }}" {% if object.user_type == value %}selected{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
-                            <small>Backward-compat — new code paths read Role above.</small>
+                            <small>Display/baseline label only — does NOT grant access. Role above controls access.</small>
                         </div>
 
                         <div class="field">

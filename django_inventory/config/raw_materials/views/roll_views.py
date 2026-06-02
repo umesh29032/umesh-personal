@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.views.generic import DetailView, FormView, ListView, UpdateView
 
 from inventory.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
@@ -50,9 +50,9 @@ class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['cloth_types'] = ClothType.objects.filter(is_active=True)
-        ctx['locations'] = StorageLocation.objects.filter(is_active=True)
-        ctx['colors'] = ClothColor.objects.filter(is_active=True).order_by('name')
+        ctx['cloth_types'] = ClothType.active.all()
+        ctx['locations'] = StorageLocation.active.all()
+        ctx['colors'] = ClothColor.active.order_by('name')
         ctx['can_view_financials'] = user_can_view_financials(self.request.user)
         ctx['can_add_rolls'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
 
@@ -149,7 +149,7 @@ class RollBulkCreateView(LoginRequiredMixin, SuperAdminOnlyMixin, FormView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['active_colors'] = ClothColor.objects.filter(is_active=True).order_by('name')
+        ctx['active_colors'] = ClothColor.active.order_by('name')
         # On re-render after invalid POST, repopulate breakup rows so the user
         # doesn't have to re-type their breakdown.
         submitted = []

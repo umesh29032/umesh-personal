@@ -21,18 +21,18 @@ from django.urls import NoReverseMatch, reverse
 # ── Role codes (must match the seed migrations) ──────────────────────────────
 ROLE_SUPER_ADMIN = 'super_admin'
 ROLE_MANAGER = 'manager'
-ROLE_KARIGAR = 'karigar'
+ROLE_WORKER = 'worker'      # renamed from 'karigar' 2026-06-02 (inventory 0019)
 ROLE_LISTING_TEAM = 'listing_team'  # can manage storefront product/category listings
 ROLE_ACCOUNTANT = 'accountant'      # can view + edit Supplier and Cost Per KG on cloth rolls
 
 # Convenience sets
 ADMIN_ROLES = {ROLE_SUPER_ADMIN}
 MANAGEMENT_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER}
-ALL_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
+ALL_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_WORKER}
 STOREFRONT_ROLES = {ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM}
 
 # Production lifecycle: who can touch cloth + Adda + stages.
-PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
+PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_WORKER}
 
 # Financial fields (Supplier, Cost Per KG): view + edit gated to these roles.
 # Super Admin is included so universal-view is preserved by every gate.
@@ -51,9 +51,13 @@ def user_role_code(user) -> str | None:
     if role:
         return role.code
     legacy = getattr(user, 'user_type', None)
-    # 'normal' intentionally maps to None — no privileged role. Such users can
-    # log in and see Dashboard only; nothing else in the sidebar resolves.
-    legacy_map = {'admin': ROLE_SUPER_ADMIN, 'manager': ROLE_MANAGER, 'karigar': ROLE_KARIGAR, 'helper': ROLE_KARIGAR, 'normal': None}
+    # Spec user_type set (2026-06-02). 'supplier'/'normal' map to None — no
+    # privileged role; such users log in + see Dashboard only. This is a SAFETY
+    # fallback only: every existing role=None user was assigned an explicit Role
+    # in accounts 0011, and the create form requires a Role, so new users always
+    # have one. user_type does NOT gate access — Role does.
+    legacy_map = {'superadmin': ROLE_SUPER_ADMIN, 'admin': ROLE_SUPER_ADMIN,
+                  'worker': ROLE_WORKER, 'supplier': None, 'normal': None}
     return legacy_map.get(legacy)
 
 
@@ -99,19 +103,36 @@ def user_can_edit_financials(user) -> bool:
 
 
 def user_has_perm(user, perm_codename: str) -> bool:
-    """
-    Check a Django-style permission. Looks at:
-      - superuser flag
-      - user's Role.permissions
-      - Django's built-in user.has_perm (groups / direct perms)
+    """User ke paas given Django permission hai ya nahi.
+
+    perm_codename format: 'app_label.codename' (e.g. 'production.change_stage').
+
+    CHECK ORDER (sabse strong se shuru):
+      1. Authenticated? Nahi to False.
+      2. is_superuser? True → grant all (Django built-in).
+      3. user.role.code == 'super_admin'? → grant all (project rule).
+         WHY: Super Admin role roles + perms manage karta hai. Agar usko
+         har perm tick karna pade to bootstrap problem.
+      4. user ke role me yeh codename hai? → True
+      5. Django default has_perm (groups + direct perms) → fallback
+
+    PROJECT CONVENTION: views perm-check ke liye is helper ko call kare,
+    raw user.is_superuser nahi (CLAUDE.md rule #6).
     """
     if not user or not user.is_authenticated:
         return False
     if user.is_superuser:
         return True
+    # Super Admin role implicit bypass — role-perm matrix mein har checkbox
+    # tick karne ki zaroorat nahi.
     role = getattr(user, 'role', None)
+    if role and role.code == ROLE_SUPER_ADMIN:
+        return True
+    # perm_codename "app.codename" format hai. Hum codename part match karte
+    # hain (DB column codename store karta hai without app prefix).
     if role and role.permissions.filter(codename=perm_codename.split('.')[-1]).exists():
         return True
+    # Django default check — groups + user_permissions M2M.
     return user.has_perm(perm_codename)
 
 
@@ -143,6 +164,21 @@ def _any_role(*codes):
     return lambda user: user_has_role(user, codes)
 
 
+def _any_perm(*codenames):
+    """Sidebar predicate factory — agar user ke paas in mein se KOI BHI
+    perm ho to MenuItem visible.
+
+    Usage in SIDEBAR registry:
+        MenuItem('Stages', 'production:stage-list',
+                 predicate=_any_perm('production.view_stage',
+                                     'production.change_stage'))
+
+    Super Admin bypass aur role-perm lookup `user_has_perm` ke andar hai —
+    yeh factory just multiple perms ko OR karta hai.
+    """
+    return lambda user: any(user_has_perm(user, c) for c in codenames)
+
+
 # Sidebar definition. Order here is the order the user sees.
 SIDEBAR: tuple[MenuSection, ...] = (
     MenuSection(
@@ -158,6 +194,10 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('Dashboard', 'inventory:user_dashboard',
                      predicate=lambda u: u and u.is_authenticated and not user_has_role(u, [ROLE_SUPER_ADMIN, ROLE_MANAGER]),
                      match=('my-dashboard',)),
+            # Every worker's own earnings page lives in Main, NOT the Payroll
+            # section — workers never see the management payroll tools. Ungated
+            # on purpose (self-scoped view): payroll is critical, no role gate.
+            MenuItem('My Earnings', 'expense:my-earnings', match=('expense/my',)),
         ),
     ),
     MenuSection(
@@ -185,8 +225,13 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(*PRODUCTION_ROLES),
         items=(
             MenuItem('Adda Dashboard', 'production:dashboard', match=('production/',)),
+            MenuItem('Manufacturing Costing', 'production:costing', match=('production/costing',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
-            MenuItem('Products', 'production:product-list', match=('production/products',)),
+            MenuItem('Products', 'production:product-list', match=('production/products',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            MenuItem('Product Patterns', 'production:pattern-list', match=('production/patterns',),
+                     predicate=_any_perm('production.view_productpattern', 'production.change_productpattern')),
         ),
     ),
     MenuSection(
@@ -197,30 +242,66 @@ SIDEBAR: tuple[MenuSection, ...] = (
         ),
     ),
     MenuSection(
-        label='Administration',
-        predicate=_any_role(ROLE_SUPER_ADMIN),
+        label='Payroll',
+        # Management-only section. Workers never see it — their self-service
+        # "My Earnings" lives under Main instead. This is the admin side:
+        # the all-worker overview + advance/payment (settlement) entry.
+        predicate=_any_role(*MANAGEMENT_ROLES),
         items=(
-            MenuItem('Team Members', 'accounts:user_list', match=('users',)),
-            MenuItem('User Skills', 'accounts:skill_list', match=('skills',)),
-            MenuItem('Roles & Permissions', 'inventory:role_list', match=('roles',)),
-            MenuItem('Stages', 'production:stage-list', match=('stages',)),
-            MenuItem('Sidebar Access', 'inventory:sidebar-access', match=('sidebar-access',)),
+            MenuItem('Payroll', 'expense:payroll-overview', match=('expense/payroll',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            MenuItem('Record Advance', 'expense:advance-add', match=('expense/advances',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+        ),
+    ),
+    MenuSection(
+        label='Administration',
+        # Section visible to Super Admin OR anyone holding a stage-management perm
+        # (delegated via the Role editor) — they need the Stages entry to land here.
+        # Per-item predicates still gate individual links.
+        predicate=lambda u: (
+            user_has_role(u, {ROLE_SUPER_ADMIN})
+            or user_has_perm(u, 'production.view_stage')
+            or user_has_perm(u, 'production.change_stage')
+        ),
+        items=(
+            MenuItem('Access Control', 'inventory:access-control', match=('inventory/access',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('Team Members', 'accounts:user_list', match=('users',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('User Skills', 'accounts:skill_list', match=('skills',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('Roles & Permissions', 'inventory:role_list', match=('roles',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
+            MenuItem('Stages', 'production:stage-list', match=('stages',),
+                     predicate=_any_perm('production.view_stage', 'production.change_stage')),
+            MenuItem('Sidebar Access', 'inventory:sidebar-access', match=('sidebar-access',),
+                     predicate=_any_role(ROLE_SUPER_ADMIN)),
         ),
     ),
 )
 
 
-def _db_visible_url_names(user) -> set[str] | None:
-    """Resolve SidebarItemRule rows into a set of url_names visible to `user`.
+def _db_visible_url_names(user) -> tuple[set[str], set[str]] | None:
+    """Resolve SidebarItemRule rows for `user`.
 
-    Returns None when the table is empty (no rules seeded yet) — caller should
-    fall back to the in-code predicate. Returns a (possibly empty) set when
-    DB rules exist, even if the user has no matching rule.
+    Returns a `(visible, managed)` tuple where `managed` is every url_name that
+    has a DB rule (the set of items the Sidebar Access page governs) and
+    `visible` is the subset this user's roles/skills may see. Returns None when
+    the table is empty (fresh install before the seed migration) so the caller
+    falls back to the in-code predicate.
+
+    Items NOT in `managed` (new features added to SIDEBAR after the table was
+    seeded, or perm-gated items the role/skill table can't express) must fall
+    back to the in-code predicate at the caller — otherwise a brand-new menu
+    item is silently invisible to every non-super-admin until someone hand-adds
+    a row. The DB acts as an override for the items it knows about, not a
+    blanket whitelist.
 
     Super Admin always sees everything — handled at caller.
     """
     if not user or not user.is_authenticated:
-        return set()
+        return (set(), set())
 
     # Lazy import — permission_service is imported very early in app startup.
     from inventory.models import SidebarItemRule
@@ -238,7 +319,9 @@ def _db_visible_url_names(user) -> set[str] | None:
     user_skill_ids: set[int] = set(user.skills.values_list('id', flat=True))
 
     visible: set[str] = set()
+    managed: set[str] = set()
     for rule in rules:
+        managed.add(rule.url_name)
         allowed_role_ids = set(rule.allowed_roles.values_list('id', flat=True))
         if allowed_role_ids & user_role_ids:
             visible.add(rule.url_name)
@@ -246,7 +329,7 @@ def _db_visible_url_names(user) -> set[str] | None:
         allowed_skill_ids = set(rule.allowed_skills.values_list('id', flat=True))
         if allowed_skill_ids & user_skill_ids:
             visible.add(rule.url_name)
-    return visible
+    return (visible, managed)
 
 
 def build_menu_for(user, current_path: str = '') -> list[dict]:
@@ -257,9 +340,11 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
 
     Visibility precedence per item:
       1. Super Admin → always visible (built-in, never gated).
-      2. SidebarItemRule (DB) → if seeded, role overlap decides.
-      3. Hardcoded MenuItem.predicate / MenuSection.predicate → final fallback
-         when the DB table is empty (e.g., fresh install before migrations).
+      2. SidebarItemRule (DB) → if a rule exists FOR THIS ITEM, role overlap decides.
+      3. Hardcoded MenuItem.predicate / MenuSection.predicate → fallback when the
+         DB table is empty (fresh install) OR the item has no DB rule yet (new
+         feature / perm-gated item). Prevents new menu items from being silently
+         invisible to non-super-admins before someone seeds a rule.
 
     Active-tab rule: only ONE item across the whole sidebar is marked
     `is_active=True` — the one whose `match` substring has the longest
@@ -270,8 +355,12 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
     all_items: list[dict] = []  # flat list so we can pick a single winner
 
     is_super_admin = user_has_role(user, {ROLE_SUPER_ADMIN}) if user else False
-    db_visible = None if is_super_admin else _db_visible_url_names(user)
-    # `db_visible is None` → no DB rules at all, use hardcoded predicate.
+    db_rules = None if is_super_admin else _db_visible_url_names(user)
+    # `db_rules is None` → table empty, use hardcoded predicate for every item.
+    # Otherwise db_rules = (visible, managed): managed items obey the DB set,
+    # un-managed items (no rule yet) fall back to the in-code predicate.
+    db_visible = db_rules[0] if db_rules is not None else None
+    db_managed = db_rules[1] if db_rules is not None else None
 
     for section in SIDEBAR:
         items: list[dict] = []
@@ -285,9 +374,12 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
             # Visibility decision
             if is_super_admin:
                 allowed = True
-            elif db_visible is not None:
+            elif db_managed is not None and item.url_name in db_managed:
+                # The Sidebar Access page governs this item → DB set decides.
                 allowed = item.url_name in db_visible
             else:
+                # Empty table, or a new/perm-gated item with no rule yet →
+                # honour the in-code predicate so it is never silently hidden.
                 allowed = section.predicate(user) and item.predicate(user)
 
             if not allowed:
@@ -319,13 +411,173 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
     return visible_sections
 
 
+def can_access_url_name(user, url_name: str) -> bool:
+    """Can `user` open the page registered under `url_name`? Uses the SAME rule
+    the sidebar uses (SidebarItemRule), so removing access in the Access-Control
+    page blocks the URL too — not just the menu link (SidebarAccessMiddleware).
+
+      • anonymous          → True  (let LoginRequired handle the redirect)
+      • Super Admin        → True  (always)
+      • item HAS a DB rule → role overlap OR skill overlap decides
+      • item has NO rule   → True  (unmanaged — not governed by the panel; the
+                                     view's own mixin gates it = defense in depth)
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return True
+    if user_has_role(user, {ROLE_SUPER_ADMIN}):
+        return True
+
+    from inventory.models import SidebarItemRule
+    rule = (
+        SidebarItemRule.objects
+        .filter(url_name=url_name)
+        .prefetch_related('allowed_roles', 'allowed_skills')
+        .first()
+    )
+    if rule is None:
+        return True
+
+    role_ids: set[int] = set()
+    if getattr(user, 'role_id', None):
+        role_ids.add(user.role_id)
+    role_ids.update(user.extra_roles.values_list('id', flat=True))
+    if set(rule.allowed_roles.values_list('id', flat=True)) & role_ids:
+        return True
+    skill_ids = set(user.skills.values_list('id', flat=True))
+    if set(rule.allowed_skills.values_list('id', flat=True)) & skill_ids:
+        return True
+    return False
+
+
 # ── View-layer helpers ──────────────────────────────────────────────────────
 
-def permissions_qs_by_app(app_labels: tuple[str, ...] = ('inventory', 'accounts')):
-    """For the role editor — list permissions grouped by app / model."""
-    return (
+# ── Role Editor Sections (CURATED) ──────────────────────────────────────────
+# YEH STRUCTURE KYU HAI?
+# Default Django role editor 80+ perms ka noise dikha deta tha (har model
+# ka view/add/change/delete). Admin overwhelmed ho jata tha. Yahan hum
+# manually 5 logical sections curate karte hain — sirf un models ko
+# expose karte hain jo non-developer admin grant kare.
+#
+# Hide kiye gaye models (service-only writes):
+#   AddaStageRecord, LayeringRollEntry, LayeringRecord, CuttingPatternRecord,
+#   CuttingPatternPhoto, CuttingRecord, RemainingClothOfClothRoll,
+#   ProductPatternAssignment, *History tables
+#
+# Each section tuple: (label, description, [(app_label, model), ...])
+ROLE_EDITOR_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] = (
+    (
+        'Production Flow',
+        'Products, stages, workflows, and live Adda batches.',
+        (
+            ('production', 'product'),
+            ('production', 'productpattern'),
+            ('production', 'stage'),
+            ('production', 'workflowstage'),
+            ('production', 'adda'),
+        ),
+    ),
+    (
+        'Raw Materials',
+        'Cloth inventory + master data (types, colors, storage).',
+        (
+            ('raw_materials', 'clothroll'),
+            ('raw_materials', 'clothtype'),
+            ('raw_materials', 'clothcolor'),
+            ('raw_materials', 'storagelocation'),
+        ),
+    ),
+    (
+        'Tracking',
+        'Per-piece barcodes generated after cutting.',
+        (
+            ('tracking', 'batchbarcode'),
+        ),
+    ),
+    (
+        'Storefront',
+        'Public homepage content — categories, hero cards, featured products.',
+        (
+            ('storefront', 'homepageconfig'),
+            ('storefront', 'category'),
+            ('storefront', 'featuredproduct'),
+            ('storefront', 'heroshowcasecard'),
+            ('storefront', 'whyuscard'),
+            ('storefront', 'footerlink'),
+            ('storefront', 'navlink'),
+        ),
+    ),
+    (
+        'Administration',
+        'Roles, sidebar visibility rules, and reusable Skills.',
+        (
+            ('inventory', 'role'),
+            ('inventory', 'sidebaritemrule'),
+            ('accounts', 'skill'),
+        ),
+    ),
+)
+
+# Flattened (app_label, model) allowlist derived from the section map.
+ROLE_EDITABLE_CONTENT_TYPES: frozenset[tuple[str, str]] = frozenset(
+    ct for _, _, cts in ROLE_EDITOR_SECTIONS for ct in cts
+)
+# Distinct app labels used by the editor — kept for backward compat callers.
+ROLE_EDITABLE_APPS: tuple[str, ...] = tuple(
+    sorted({app for app, _ in ROLE_EDITABLE_CONTENT_TYPES})
+)
+# Legacy alias — earlier code referenced an excluded set. Empty now because
+# the allowlist above is positive. Kept so existing imports don't break.
+ROLE_EDITABLE_MODELS_EXCLUDED: frozenset[tuple[str, str]] = frozenset()
+
+
+def permissions_qs_by_app(app_labels: tuple[str, ...] = ROLE_EDITABLE_APPS):
+    """Role editor perm list — restricted to curated content types.
+
+    Reads ROLE_EDITOR_SECTIONS to decide which perms surface. Internal models
+    (history tables, stage records, join tables) stay invisible because they're
+    only ever written by services. `app_labels` is honored as a final narrowing
+    filter for callers that want a subset.
+    """
+    qs = (
         Permission.objects
         .filter(content_type__app_label__in=app_labels)
         .select_related('content_type')
         .order_by('content_type__app_label', 'content_type__model', 'codename')
     )
+    return [
+        p for p in qs
+        if (p.content_type.app_label, p.content_type.model)
+        in ROLE_EDITABLE_CONTENT_TYPES
+    ]
+
+
+def permissions_sectioned_for_role_editor():
+    """Return [(section_label, section_desc, [(model_label, [perm, ...]), ...]), ...].
+
+    Drives the role-edit form's section-by-section layout. Each inner tuple is
+    a model with its 4 standard CRUD perms (view/add/change/delete) — sorted so
+    the UI is predictable.
+    """
+    perms = list(permissions_qs_by_app())
+    by_ct: dict[tuple[str, str], list] = {}
+    for p in perms:
+        by_ct.setdefault((p.content_type.app_label, p.content_type.model), []).append(p)
+    # Sort each model's perms in conventional CRUD order.
+    crud_order = {'view': 0, 'add': 1, 'change': 2, 'delete': 3}
+    for k in by_ct:
+        by_ct[k].sort(key=lambda p: (crud_order.get(p.codename.split('_', 1)[0], 9), p.codename))
+
+    sections = []
+    for label, desc, cts in ROLE_EDITOR_SECTIONS:
+        models = []
+        for app, model in cts:
+            plist = by_ct.get((app, model), [])
+            if not plist:
+                continue
+            # Friendly model label — first matching perm's content_type.name
+            # ("cloth roll" → "Cloth Roll").
+            model_label = plist[0].content_type.name.title()
+            models.append((model_label, plist))
+        if models:
+            sections.append((label, desc, models))
+    return sections

@@ -18,7 +18,11 @@ from .layering import (
     RemainingClothForm,
     StartLayeringForm,
 )
-from .cutting import CuttingForm
+from .cutting import (
+    CuttingBreakupRowForm, CuttingBundleForm, CuttingDraftForm, CuttingForm,
+    CuttingStartForm,
+)
+from .cutting_pattern import PatternVerifyForm, SizeAllocationForm
 
 
 __all__ = [
@@ -32,4 +36,11 @@ __all__ = [
     'CompleteLayeringForm',
     # Cutting stage
     'CuttingForm',
+    'CuttingStartForm',
+    'CuttingBreakupRowForm',
+    'CuttingBundleForm',
+    'CuttingDraftForm',
+    # Cutting-pattern stage
+    'PatternVerifyForm',
+    'SizeAllocationForm',
 ]

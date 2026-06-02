@@ -35,22 +35,79 @@
             </div>
         </div>
 
+        {% comment %}
+        Permissions — grouped section-by-section to mirror the current project flow.
+        Each section title matches the sidebar area it governs. Inner models render
+        a row of 4 CRUD checkboxes (view / add / change / delete). Internal models
+        (history tables, stage records, join rows) intentionally omitted — those
+        are written by services, not by users.
+        {% endcomment %}
         <div class="form-section">
             <div class="form-section-title"><span class="form-section-num">2</span> Permissions</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                {% for group_label, perms in grouped_permissions %}
-                <fieldset style="border:1px solid var(--border-default); border-radius:8px; padding:14px 16px;">
-                    <legend style="padding:0 8px; font-size:10px; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--text-secondary);">{{ group_label }}</legend>
-                    {% for perm in perms %}
-                    <label style="display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:13px; color:var(--text-primary); cursor:pointer;">
-                        <input type="checkbox" name="permissions" value="{{ perm.pk }}" {% if perm in form.permissions.value|default_if_none:"" %}checked{% elif form.instance.pk and perm in form.instance.permissions.all %}checked{% endif %} style="margin-top:3px;">
-                        <span>{{ perm.name }}</span>
-                    </label>
-                    {% endfor %}
-                </fieldset>
-                {% endfor %}
+
+            {# Bulk-toggle helpers — quick checkall per section #}
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                <button type="button" class="btn btn-clear" data-perm-toggle="all"
+                        style="font-size:12px; padding:6px 12px;">Select all</button>
+                <button type="button" class="btn btn-clear" data-perm-toggle="none"
+                        style="font-size:12px; padding:6px 12px;">Clear all</button>
+                <button type="button" class="btn btn-clear" data-perm-toggle="view-only"
+                        style="font-size:12px; padding:6px 12px;">View-only preset</button>
             </div>
+
+            {% for section_label, section_desc, models in perm_sections %}
+            <fieldset style="border:1px solid var(--border-default); border-radius:10px; padding:16px 18px; margin-bottom:16px;">
+                <legend style="padding:0 10px; font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:600; color:var(--text-primary);">{{ section_label }}</legend>
+                <p style="margin:0 0 14px; font-size:12px; color:var(--text-secondary);">{{ section_desc }}</p>
+
+                <div style="display:grid; grid-template-columns:1fr; gap:10px;">
+                    {# Header row: visible only when section has at least one model #}
+                    <div style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; padding:0 4px; font-size:10px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; color:var(--text-secondary);">
+                        <div>Model</div>
+                        <div style="text-align:center;">View</div>
+                        <div style="text-align:center;">Add</div>
+                        <div style="text-align:center;">Change</div>
+                        <div style="text-align:center;">Delete</div>
+                    </div>
+
+                    {% for model_label, perms in models %}
+                    <div style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; align-items:center; padding:8px 4px; border-top:1px solid var(--border-subtle);">
+                        <div style="font-size:13px; color:var(--text-primary); font-weight:500;">{{ model_label }}</div>
+                        {% for perm in perms %}
+                        <div style="text-align:center;">
+                            <label title="{{ perm.codename }} — {{ perm.name }}" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+                                <input type="checkbox" name="permissions" value="{{ perm.pk }}"
+                                       data-perm-codename="{{ perm.codename }}"
+                                       {% if perm.pk in selected_perm_ids %}checked{% endif %}>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            {% endfor %}
         </div>
+
+        <script>
+            // Bulk-toggle handlers — keep the form usable when an admin
+            // wants to start from "view everything" or wipe a role's perms.
+            (function() {
+                var boxes = document.querySelectorAll('input[type=checkbox][name=permissions]');
+                document.querySelectorAll('[data-perm-toggle]').forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var mode = btn.dataset.permToggle;
+                        boxes.forEach(function(b) {
+                            if (mode === 'all') b.checked = true;
+                            else if (mode === 'none') b.checked = false;
+                            else if (mode === 'view-only') {
+                                b.checked = (b.dataset.permCodename || '').indexOf('view_') === 0;
+                            }
+                        });
+                    });
+                });
+            })();
+        </script>
 
         <div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end;">
             <a href="{% url 'inventory:role_list' %}" class="btn btn-clear">Cancel</a>

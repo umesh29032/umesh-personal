@@ -21,7 +21,7 @@
                         · <code style="background:var(--cream-2); padding:1px 6px; border-radius:4px; font-size:11px;">{{ e.field_name }}</code>: {{ e.old_value|default:"—" }} → {{ e.new_value|default:"—" }}
                     {% endif %}
                     {% if e.note %} · <em style="color:var(--stone);">{{ e.note }}</em>{% endif %}
-                    <div class="actor">by {{ e.actor.email }}</div>
+                    <div class="actor">by {{ e.actor.get_full_name|default:e.actor.email }}</div>
                 </div>
             </li>
         {% endfor %}

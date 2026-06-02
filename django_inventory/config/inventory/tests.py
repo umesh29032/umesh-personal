@@ -67,14 +67,14 @@ class UserDashboardHelperTests(TestCase):
                                 is_super=True, skill_names=['cutting_master'])
 
     def test_non_helper_user_has_no_helper_data(self):
-        karigar = _make_user('k@dash.test', role_code='karigar')
+        karigar = _make_user('k@dash.test', role_code='worker')
         self.client.force_login(karigar)
         resp = self.client.get(reverse('inventory:user_dashboard'))
         self.assertEqual(resp.status_code, 200)
         self.assertIsNone(resp.context.get('helper_data'))
 
     def test_helper_user_sees_helper_data_with_active_layering(self):
-        helper = _make_user('h@dash.test', role_code='karigar',
+        helper = _make_user('h@dash.test', role_code='worker',
                             skill_names=['cutting_master_helper'])
         self.client.force_login(helper)
         # Spin up an active layering elsewhere — helper not assigned, but should still see it.
@@ -90,7 +90,7 @@ class UserDashboardHelperTests(TestCase):
         self.assertEqual(data['completed_count'], 0)
 
     def test_helper_stats_update_after_completion(self):
-        helper = _make_user('h2@dash.test', role_code='karigar',
+        helper = _make_user('h2@dash.test', role_code='worker',
                             skill_names=['cutting_master_helper'])
         adda, _sr, entry = _start_layering_on_new_adda(self.admin)
         # Leftover mandatory (Phase 6) — record before complete
@@ -113,3 +113,34 @@ class UserDashboardHelperTests(TestCase):
         self.assertEqual(data['total_minutes'], 22)
         # Layering is finished → no active layerings
         self.assertEqual(len(data['active_layering']), 0)
+
+
+class AccessControlHubTests(TestCase):
+    """The unified RBAC overview page: renders for super_admin, 403 for others
+    (direct-URL protection — fails safe, not just sidebar-hidden)."""
+
+    def setUp(self):
+        self.admin = _make_user('ac-admin@test.test', role_code='super_admin', is_super=True)
+        self.manager = _make_user('ac-mgr@test.test', role_code='manager')
+        self.karigar = _make_user('ac-kar@test.test', role_code='worker')
+
+    def test_super_admin_sees_all_matrices(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(reverse('inventory:access-control'))
+        self.assertEqual(resp.status_code, 200)
+        for key in ('roles', 'page_sections', 'stage_rows', 'user_rows', 'role_summary'):
+            self.assertIn(key, resp.context)
+        # Page-visibility matrix is built from the SIDEBAR registry.
+        self.assertTrue(resp.context['page_sections'])
+
+    def test_manager_denied_direct_url(self):
+        self.client.force_login(self.manager)
+        # Managed panel item → SidebarAccessMiddleware redirects (302) with a
+        # message, rather than a bare 403. Denied either way.
+        self.assertEqual(self.client.get(reverse('inventory:access-control')).status_code, 302)
+
+    def test_karigar_denied_direct_url(self):
+        self.client.force_login(self.karigar)
+        # Managed panel item → SidebarAccessMiddleware redirects (302) with a
+        # message, rather than a bare 403. Denied either way.
+        self.assertEqual(self.client.get(reverse('inventory:access-control')).status_code, 302)

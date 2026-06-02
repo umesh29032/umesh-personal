@@ -1,13 +1,27 @@
 """Admin registration for tracking models."""
 from django.contrib import admin
 
-from tracking.models import AddaHistory, BatchBarcode, ClothRollHistory, ProductHistory
+from tracking.models import AddaHistory, BarcodeBatch, BatchBarcode, ClothRollHistory, ProductHistory
+
+
+@admin.register(BarcodeBatch)
+class BarcodeBatchAdmin(admin.ModelAdmin):
+    list_display = (
+        'adda', 'product', 'bundle', 'size', 'color',
+        'start_seq', 'end_seq', 'total_pieces',
+    )
+    list_filter = ('product', 'size', 'color')
+    search_fields = ('adda__code',)
+    readonly_fields = ('start_seq', 'end_seq', 'total_pieces', 'created_at')
 
 
 @admin.register(BatchBarcode)
 class BatchBarcodeAdmin(admin.ModelAdmin):
-    list_display = ('value', 'adda', 'piece_seq', 'status', 'last_scanned_at')
-    list_filter = ('status', 'adda')
+    list_display = (
+        'value', 'adda', 'piece_seq', 'pattern', 'size', 'color',
+        'status', 'last_scanned_at',
+    )
+    list_filter = ('status', 'pattern', 'size', 'color', 'adda')
     search_fields = ('value',)
     readonly_fields = ('value', 'piece_seq', 'adda', 'created_at')
 

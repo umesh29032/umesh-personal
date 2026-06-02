@@ -130,6 +130,19 @@
     .product-flow .access-pill.skill { background: var(--success-bg); color: var(--success); border-color: rgba(5,150,105,0.30); }
     .product-flow .access-pill.role  { background: rgba(184,115,51,0.10); color: var(--copper); border-color: rgba(184,115,51,0.30); }
     .product-flow .access-pill.empty { background: transparent; color: var(--stone); border-color: var(--border-subtle); font-style: italic; }
+    /* Cost editor (PR-3 stage costing) */
+    .product-flow .flow-cost { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .product-flow .cost-tag { font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 600; border: 1px solid; }
+    .product-flow .cost-tag.priced  { background: var(--success-bg); color: var(--success); border-color: rgba(5,150,105,0.30); }
+    .product-flow .cost-tag.grouped { background: rgba(184,115,51,0.10); color: var(--copper); border-color: rgba(184,115,51,0.30); }
+    .product-flow .cost-tag.unpriced { background: #fef2f2; color: #b91c1c; border-color: rgba(185,28,28,0.30); }
+    .product-flow .cost-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 6px; padding: 10px; background: var(--cream); border: 1px solid var(--border-subtle); border-radius: 10px; }
+    .product-flow .cost-field { display: flex; flex-direction: column; gap: 3px; }
+    .product-flow .cost-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--stone); font-weight: 700; }
+    .product-flow .cost-form select, .product-flow .cost-form input { padding: 8px 10px; font-size: 13px; border: 1.5px solid var(--border-subtle); border-radius: 8px; background: #fff; }
+    .product-flow .cost-form input[type=number] { width: 120px; }
+    .product-flow .cost-form input:focus, .product-flow .cost-form select:focus { outline: none; border-color: var(--copper); }
+    .product-flow .cost-save { font-size: 13px; padding: 9px 16px; border-radius: 8px; border: none; background: var(--copper); color: #fff; cursor: pointer; font-weight: 600; }
 
     .product-flow .row-actions {
         display: flex; gap: 4px;
@@ -242,6 +255,46 @@
                         {% if not ws.stage.access_by_skill.all and not ws.stage.access_by_role.all %}
                             <span class="access-pill empty">management-only</span>
                         {% endif %}
+                    </div>
+                    {% comment %}Cost editor — set rate/method or bill at a later stage{% endcomment %}
+                    <div class="flow-cost">
+                        {% if ws.cost_billed_at_id %}
+                            <span class="cost-tag grouped">Billed at: {{ ws.cost_billed_at.stage.name }}</span>
+                        {% elif ws.cost_rate %}
+                            <span class="cost-tag priced">{{ ws.get_cost_method_display }} · ₹{{ ws.cost_rate }}</span>
+                        {% else %}
+                            <span class="cost-tag unpriced">Unpriced — set a rate</span>
+                        {% endif %}
+                        <form method="post" class="cost-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="set_cost">
+                            <input type="hidden" name="workflow_stage_id" value="{{ ws.pk }}">
+                            <label class="cost-field">
+                                <span class="cost-label">Method</span>
+                                <select name="cost_method">
+                                    {% for val, label in cost_methods %}
+                                        <option value="{{ val }}" {% if ws.cost_method == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <label class="cost-field">
+                                <span class="cost-label">Rate (₹ per unit)</span>
+                                <input type="number" name="cost_rate" step="0.0001" min="0" placeholder="e.g. 2.50"
+                                       value="{{ ws.cost_rate|default_if_none:'' }}">
+                            </label>
+                            <label class="cost-field">
+                                <span class="cost-label">Paid at</span>
+                                <select name="cost_billed_at">
+                                    <option value="">— this stage (self-paid) —</option>
+                                    {% for other in flow_rows %}
+                                        {% if other.pk != ws.pk and other.order > ws.order and not other.cost_billed_at_id %}
+                                            <option value="{{ other.pk }}" {% if ws.cost_billed_at_id == other.pk %}selected{% endif %}>bill at {{ other.stage.name }}</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <button type="submit" class="cost-save">Save cost</button>
+                        </form>
                     </div>
                 </div>
                 <div class="row-actions">

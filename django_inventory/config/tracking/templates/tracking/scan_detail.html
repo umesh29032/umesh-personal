@@ -44,6 +44,11 @@
                 <dt>Adda</dt><dd><a href="{% url 'production:adda-detail' barcode.adda.code %}">{{ barcode.adda.code }}</a></dd>
                 <dt>Product</dt><dd>{{ barcode.adda.product.name }}</dd>
                 <dt>Piece</dt><dd>#{{ barcode.piece_seq }}</dd>
+                {% if batch %}
+                    {% if batch.size %}<dt>Size</dt><dd><strong>{{ batch.size.code|upper }}</strong> {{ batch.size.label }}</dd>{% endif %}
+                    {% if batch.color %}<dt>Color</dt><dd>{{ batch.color.name }}</dd>{% endif %}
+                    <dt>Batch range</dt><dd><code>{{ batch.start_value }}</code> – <code>{{ batch.end_value }}</code> ({{ batch.total_pieces }} pieces)</dd>
+                {% endif %}
                 <dt>Status</dt><dd>{{ barcode.get_status_display }}</dd>
                 <dt>First scan</dt><dd>{{ barcode.last_scanned_at|date:"d M Y H:i" }}</dd>
                 <dt>Scanned by</dt><dd>{{ barcode.last_scanned_by.email }}</dd>

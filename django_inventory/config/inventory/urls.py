@@ -16,4 +16,7 @@ urlpatterns = [
 
     # Sidebar Access Control (Super Admin only) — edits SidebarItemRule rows.
     path('sidebar-access/', views.SidebarAccessListView.as_view(), name='sidebar-access'),
+
+    # Access Control hub (Super Admin only) — read-only RBAC overview matrices.
+    path('access/', views.AccessControlHubView.as_view(), name='access-control'),
 ]

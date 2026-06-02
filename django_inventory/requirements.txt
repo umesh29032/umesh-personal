@@ -6,3 +6,5 @@ dj-database-url==2.2.0
 Pillow==10.2.0
 whitenoise==6.6.0
 qrcode[pil]==7.4.2
+openpyxl==3.1.2    # Excel barcode exports (PR-D 2026-05-29)
+reportlab==4.1.0   # PDF barcode summary exports (PR-D 2026-05-29)

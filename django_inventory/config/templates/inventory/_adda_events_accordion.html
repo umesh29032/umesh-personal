@@ -23,7 +23,7 @@
                     {% endif %}
                     {% if e.roll %} · roll <code style="font-family:monospace;">{{ e.roll.roll_id }}</code><span style="color:var(--stone);"> · {{ e.roll.cloth_type.name }} · {{ e.roll.cloth_color.name }}{% if e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}</span>{% endif %}
                     {% if e.note %} · <em style="color:var(--stone);">{{ e.note }}</em>{% endif %}
-                    <div class="actor">by {{ e.actor.email }}</div>
+                    <div class="actor">by {{ e.actor.get_full_name|default:e.actor.email }}</div>
                 </div>
             </li>
         {% endfor %}

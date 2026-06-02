@@ -23,7 +23,7 @@ from django.test import TestCase
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.models import (
-    Adda, AddaStageRecord, LayeringRollEntry, Product, RemainingClothOfClothRoll,
+    AddaStageRecord, LayeringRollEntry, Product, RemainingClothOfClothRoll,
 )
 from production.services import (
     attach_roll_to_layering, complete_layering, create_adda,
@@ -72,19 +72,19 @@ class StartLayeringTests(TestCase):
         admin = _user('mgr@s.test', skills=['cutting_master'])
         adda, _ = _seed_rolls_and_adda(admin)
         # Karigar role — not management
-        karigar = _user('k@s.test', role_code='karigar', is_super=False,
+        karigar = _user('k@s.test', role_code='worker', is_super=False,
                         skills=['cutting_master'])
         with self.assertRaises(PermissionDenied):
             start_layering(adda=adda, worker_ids=[karigar.pk], user=karigar)
 
     def test_requires_cutting_master_worker(self):
         # Need ≥1 skilled user in DB so create_adda passes the pool check
-        _user('seed@s.test', role_code='karigar', is_super=False,
+        _user('seed@s.test', role_code='worker', is_super=False,
               skills=['cutting_master'])
         admin = _user('a2@s.test')   # super_admin
         adda, _ = _seed_rolls_and_adda(admin)
         # start_layering with worker_ids who have NO cutting_master skill → reject
-        nonskilled = _user('ns@s.test', role_code='karigar', is_super=False)
+        nonskilled = _user('ns@s.test', role_code='worker', is_super=False)
         with self.assertRaises(ValidationError):
             start_layering(adda=adda, worker_ids=[nonskilled.pk], user=admin)
 
@@ -121,7 +121,7 @@ class AttachRollTests(TestCase):
     def test_skill_gate_rejects_unrelated_user(self):
         # Karigar role (NOT management) + not on workers list → must reject.
         # Manager role would bypass via _ensure_assigned_worker — that's by design.
-        outsider = _user('o@s.test', role_code='karigar', is_super=False)
+        outsider = _user('o@s.test', role_code='worker', is_super=False)
         with self.assertRaises(PermissionDenied):
             attach_roll_to_layering(
                 stage_record=self.sr, roll=self.rolls[0],

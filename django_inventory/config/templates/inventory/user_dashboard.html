@@ -214,10 +214,29 @@
                         {% include 'production/_layering_summary.html' with snap=a.layering_snap style='compact' %}
                     </div>
                     {% endif %}
-                    {% if is_skilled_user and a.current_stage %}
+                    {% if is_skilled_user %}
+                        {% comment %}Completed stages — revisit accordion. Lets workers/management
+                        see locked stage data (e.g. layering roll table) even after the Adda
+                        has moved on. Iframes are lazy-loaded so closed accordions cost nothing.{% endcomment %}
+                        {% for d in a.done_stages %}
+                            <details class="adda-stage-acc">
+                                <summary>✓ View {{ d.label }} (completed)</summary>
+                                <div class="iframe-wrap">
+                                    <iframe class="adda-stage-iframe"
+                                            data-stage="{{ d.stage_type }}"
+                                            data-code="{{ a.code }}"
+                                            src="{% url 'production:stage-panel' a.code d.stage_type %}?embedded=1"
+                                            title="{{ d.label }} (completed) for {{ a.code }}"
+                                            loading="lazy"
+                                            style="width:100%; border:none; min-height:300px;"></iframe>
+                                    <a href="{% url 'production:stage-panel' a.code d.stage_type %}" target="_blank" rel="noopener" class="open-new">Open in new window ↗</a>
+                                </div>
+                            </details>
+                        {% endfor %}
+                        {% if a.current_stage %}
                         {% comment %}Accordion: tap to expand inline iframe of the current stage panel.{% endcomment %}
                         <details class="adda-stage-acc">
-                            <summary>Open {{ a.current_stage.get_stage_type_display }} workspace</summary>
+                            <summary>▸ Open {{ a.current_stage.get_stage_type_display }} workspace</summary>
                             <div class="iframe-wrap">
                                 <iframe class="adda-stage-iframe"
                                         data-stage="{{ a.current_stage.stage_type }}"
@@ -229,6 +248,7 @@
                                 <a href="{% url 'production:stage-panel' a.code a.current_stage.stage_type %}" target="_blank" rel="noopener" class="open-new">Open in new window ↗</a>
                             </div>
                         </details>
+                        {% endif %}
                     {% endif %}
                 </li>
             {% endfor %}
@@ -317,14 +337,17 @@
     </div>
     {% endif %}
 
-    {# My Recent Activity — per-user timeline across all Addas (spec D14). #}
+    {% comment %}My Recent Activity — per-user timeline across all Addas (spec D14).
+       PR17: collapsed by default to reduce visual noise on dashboard.{% endcomment %}
     {% if my_activity %}
-    <div class="card" style="margin-top: 18px;">
-        <div class="card-header"><div class="card-title">My Recent Activity</div></div>
+    <details class="card" style="margin-top: 18px;">
+        <summary class="card-header" style="cursor:pointer; list-style:none;">
+            <div class="card-title">My Recent Activity ({{ my_activity|length }})</div>
+        </summary>
         <div class="card-body">
             {% include 'production/_activity_feed.html' with activity=my_activity show_adda_code=True %}
         </div>
-    </div>
+    </details>
     {% endif %}
 </div>
 
@@ -357,7 +380,14 @@
     // on load / details-toggle / resize. Listener grows the matching iframe so the
     // panel doesn't show an inner scrollbar.
     window.addEventListener('message', function(ev) {
-        if (!ev.data || ev.data.type !== 'stage-panel-resize') return;
+        if (!ev.data) return;
+        // Stage completed inside an iframe → reload dashboard so the Adda card
+        // reflects the new current_stage + freshly-completed accordion.
+        if (ev.data.type === 'stage-advanced') {
+            window.location.reload();
+            return;
+        }
+        if (ev.data.type !== 'stage-panel-resize') return;
         const code = ev.data.code, h = ev.data.height;
         document.querySelectorAll('.adda-stage-iframe').forEach(f => {
             if (f.dataset.code === code) {

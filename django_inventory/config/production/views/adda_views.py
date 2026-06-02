@@ -11,6 +11,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.generic import DetailView, FormView, ListView
 
 from production.forms import AddaCreateForm
@@ -45,7 +47,7 @@ class AddaListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         # Use Stage rows as filter options (replaces hardcoded StageType enum).
         from production.models import Stage
         ctx['stage_types'] = list(
-            Stage.objects.filter(is_active=True).values_list('code', 'name').order_by('name')
+            Stage.active.values_list('code', 'name').order_by('name')
         )
         ctx['status_choices'] = Adda.Status.choices
         return ctx
@@ -66,6 +68,7 @@ class AddaCreateView(LoginRequiredMixin, ProductionRoleMixin, FormView):
         return redirect('production:adda-detail', code=adda.code)
 
 
+@method_decorator(xframe_options_sameorigin, name='dispatch')
 class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
     """Adda detail = tabbed dashboard (Phase 4).
 
@@ -73,6 +76,11 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
     completed, default = last stage. Activity feed at bottom (all users on this Adda).
 
     All tab content is pre-rendered server-side; JS toggles visibility (decision D12).
+
+    @xframe_options_sameorigin: defense-in-depth — when a stage-panel iframe POSTs
+    Complete and its redirect somehow lands here (legacy or fallback path), the
+    iframe should be allowed to render the parent page rather than break with
+    a "refused to connect" browser error.
     """
 
     template_name = 'production/adda_detail.html'
@@ -89,10 +97,12 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         adda = self.object
         stages = list(adda.product.workflow_stages.order_by('order'))
 
-        # ── Per-stage RBAC gate (DB-driven via StageAccessRule) ──────────────
-        # access_service.stage_access_map reads StageAccessRule rows; super_admin
-        # + manager always pass (built-in defense). Admins edit rules at
-        # /production/stage-access/.
+        # ── Per-stage RBAC gate (SKILL-driven via the Stage model) ───────────
+        # access_service.stage_access_map reads Stage.access_by_skill (+ optional
+        # access_by_role), OR semantics; super_admin + manager always pass
+        # (built-in defense). Admins edit access on the Stage library
+        # (/production/stages/). (Old StageAccessRule table was dropped in
+        # migration 0011.)
         from inventory.services import MANAGEMENT_ROLES, user_has_role
         from production.services import stage_access_map
 
@@ -137,9 +147,43 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
             default_tab = ''
 
         # Lazy import — activity_service depends on tracking models
-        from production.services import adda_activity, get_layering_snapshot
+        from production.services import (
+            adda_activity, get_layering_snapshot, get_pattern_snapshot,
+        )
         activity = adda_activity(adda, limit=50)
         layering_snap = get_layering_snapshot(adda)
+        pattern_snap = get_pattern_snapshot(adda)
+
+        # Per-stage snapshot map — drives the "Stages Overview" panel above
+        # the flow card. Each stage's headline metrics get a compact tile.
+        # Template iterates `stages_overview` (in flow order). Adding a new
+        # stage = just register a snapshot here.
+        snap_by_type = {
+            'layering': layering_snap,
+            'cutting_pattern': pattern_snap,
+        }
+        stages_overview = []
+        for s in stages:
+            snap = snap_by_type.get(s.stage_type)
+            sr = sr_by_type.get(s.stage_type)
+            # state = 'completed' | 'in_progress' | 'pending'
+            if sr and sr.completed_at:
+                state = 'completed'
+            elif adda.current_stage and adda.current_stage.order == s.order:
+                state = 'in_progress'
+            elif adda.current_stage and adda.current_stage.order > s.order:
+                state = 'completed'
+            else:
+                state = 'pending'
+            stages_overview.append({
+                'workflow_stage': s,
+                'stage_type': s.stage_type,
+                'label': s.get_stage_type_display(),
+                'state': state,
+                'snap': snap,
+                'sr': sr,
+                'has_access': s.has_access,
+            })
 
         ctx.update({
             'rolls': (
@@ -152,6 +196,8 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
             'default_tab': default_tab,
             'activity': activity,
             'layering_snap': layering_snap,
+            'pattern_snap': pattern_snap,
+            'stages_overview': stages_overview,
             'is_management': is_management,
             'has_layering_access': has_layering_access,
             'can_act_on_current': can_act_on_current,

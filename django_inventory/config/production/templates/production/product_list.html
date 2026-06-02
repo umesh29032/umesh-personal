@@ -10,7 +10,7 @@
             <h1>Products</h1>
             <p>Factory products. Each has its own workflow + Adda code prefix.</p>
         </div>
-        {% if request.user.is_superuser or current_role_code == 'super_admin' %}
+        {% if can_add_product %}
             <a href="{% url 'production:product-create' %}" class="btn btn-primary">+ Add Product</a>
         {% endif %}
     </div>
@@ -36,6 +36,8 @@
                         <td data-label="Actions" class="td-actions">
                             <a href="{% url 'production:product-update' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Edit</a>
                             <a href="{% url 'production:product-flow' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Flow</a>
+                            <a href="{% url 'production:product-patterns' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Patterns</a>
+                            <a href="{% url 'production:product-sizes' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Sizes</a>
                             <a href="{% url 'production:product-archive' p.pk %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Archive</a>
                         </td>
                     </tr>

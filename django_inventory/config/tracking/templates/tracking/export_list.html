@@ -1,0 +1,63 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Barcode Exports{% endblock %}
+
+{% block content %}
+{% comment %}Recent BarcodeExportBatch manifest rows. Re-download regenerates file
+   from live BarcodeBatch data — see barcode_export_service.{% endcomment %}
+<div class="export-list">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>Barcode Exports</h1>
+            <p>Manifest-tracked exports across all Addas. Re-download regenerates from live data.</p>
+        </div>
+    </div>
+
+    {% if messages %}{% for m in messages %}<div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>{% endfor %}{% endif %}
+
+    <div class="card card-clip">
+        <div class="table-responsive">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Adda</th>
+                        <th>Product</th>
+                        <th>Method</th>
+                        <th>Labels</th>
+                        <th>By</th>
+                        <th>Created</th>
+                        <th data-orderable="false">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for exp in exports %}
+                    <tr>
+                        <td data-label="Code"><code><strong>{{ exp.export_code }}</strong></code></td>
+                        <td data-label="Adda"><code>{{ exp.adda.code }}</code></td>
+                        <td data-label="Product">{{ exp.product.name }}</td>
+                        <td data-label="Method"><span class="badge badge-active">{{ exp.get_export_method_display }}</span></td>
+                        <td data-label="Labels" style="font-variant-numeric: tabular-nums;">{{ exp.total_labels }}</td>
+                        <td data-label="By">{{ exp.exported_by.get_full_name|default:exp.exported_by.email }}</td>
+                        <td data-label="Created">{{ exp.created_at|date:"d M Y H:i" }}</td>
+                        <td data-label="Actions" class="td-actions">
+                            <a href="{% url 'tracking:export-download' exp.export_code %}" class="btn btn-ghost" style="padding:4px 10px; font-size:12px;">Download</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="empty-state-row">No exports yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if is_paginated %}
+    <div style="display:flex; gap:6px; justify-content:center; margin-top:14px;">
+        {% if page_obj.has_previous %}<a class="page-link" href="?page={{ page_obj.previous_page_number }}">← Prev</a>{% endif %}
+        <span class="page-link current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a class="page-link" href="?page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

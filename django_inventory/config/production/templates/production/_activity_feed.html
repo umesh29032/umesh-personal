@@ -12,7 +12,7 @@ Caller wraps this in a <details>/<section> as desired. No outer markup here.
     <li class="activity-row">
         <div class="activity-time">{{ e.at|date:"d M H:i" }}</div>
         <div class="activity-body">
-            <strong>{{ e.actor.email|default:"system" }}</strong>
+            <strong>{% if e.actor %}{{ e.actor.get_full_name|default:e.actor.email }}{% else %}system{% endif %}</strong>
             <span class="activity-verb">{{ e.verb }}</span>
             <span class="activity-target">{{ e.target }}</span>
             {% if show_adda_code %}<span class="activity-adda">· {{ e.adda_code }}</span>{% endif %}

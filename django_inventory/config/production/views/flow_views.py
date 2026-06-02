@@ -20,11 +20,12 @@ from django.urls import reverse
 from django.views.generic import TemplateView
 
 from inventory.services import ROLE_SUPER_ADMIN, user_has_role
-from production.models import Product, Stage, WorkflowStage
+from production.models import CostMethod, Product, Stage, WorkflowStage
 from production.services import (
     add_stage_to_product_flow,
     move_stage_in_product_flow,
     remove_stage_from_product_flow,
+    set_stage_cost,
 )
 
 
@@ -53,7 +54,7 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
         used_stage_ids = {ws.stage_id for ws in flow_rows}
         # Library — only ACTIVE stages NOT already in this product's flow.
         available_stages = (
-            Stage.objects.filter(is_active=True)
+            Stage.active
             .exclude(id__in=used_stage_ids)
             .order_by('name')
         )
@@ -62,6 +63,7 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
             'flow_rows': flow_rows,
             'available_stages': available_stages,
             'flow_count': len(flow_rows),
+            'cost_methods': CostMethod.choices,
         })
         return ctx
 
@@ -90,6 +92,18 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
                 move_stage_in_product_flow(
                     user=request.user, workflow_stage=ws, direction=direction,
                 )
+
+            elif action == 'set_cost':
+                ws_id = int(request.POST.get('workflow_stage_id') or 0)
+                ws = get_object_or_404(WorkflowStage, pk=ws_id, product=product)
+                billed_raw = request.POST.get('cost_billed_at') or ''
+                set_stage_cost(
+                    user=request.user, workflow_stage=ws,
+                    cost_method=request.POST.get('cost_method') or '',
+                    cost_rate=request.POST.get('cost_rate'),
+                    cost_billed_at_id=int(billed_raw) if billed_raw.isdigit() else None,
+                )
+                messages.success(request, f"Updated cost for '{ws.stage.name}'.")
 
             else:
                 messages.error(request, f"Unknown action: {action!r}")

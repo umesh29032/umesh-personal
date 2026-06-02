@@ -1,9 +1,9 @@
 # Kapil Enterprises Inventory — Project Architecture
 
 **Stack:** Django 5.2 + PostgreSQL 14+
-**Status:** Production tracking (Stage 1 Layering shipped end-to-end). 74 tests green. `manage.py check` clean.
+**Status (2026-06-02):** 4 production stages live (layering · cutting_pattern · cutting · barcode_generation) + stage costing + worker payroll/settlement (`expense` app) + unified RBAC (Access Control hub + URL-level `SidebarAccessMiddleware`). **292 tests green.** `manage.py check` clean. Authoritative current design: [../SYSTEM_DESIGN.md](../SYSTEM_DESIGN.md).
 
-End-to-end factory tracking app: cloth intake → Adda (production batch) → Layering → Cutting → barcode generation → future packing/dispatch.
+End-to-end factory tracking app: cloth intake → Adda (production batch) → layering → cutting-pattern → cutting → barcode generation → (future packing/dispatch), with per-stage costing feeding worker payroll.
 
 ---
 
@@ -12,10 +12,11 @@ End-to-end factory tracking app: cloth intake → Adda (production batch) → La
 | App | Owns | Imports | Exports |
 |---|---|---|---|
 | `accounts` | `User` (email login), `Skill`, signals | `inventory.Role` | auth, skill helpers |
-| `inventory` | `Role`, `Permission` constants, RBAC service, sidebar registry, dashboard view | `accounts` | `permission_service`, `user_dashboard` |
+| `inventory` | `Role`, `Permission` constants, RBAC service, sidebar registry, `SidebarItemRule`, Access Control hub, `SidebarAccessMiddleware`, dashboard view | `accounts` | `permission_service`, `can_access_url_name`, `user_dashboard` |
 | `raw_materials` | `ClothType`, `ClothColor`, `StorageLocation`, `ClothRoll` | `inventory.services` (RBAC) | roll services, master CRUD |
 | `production` | `Product`, `WorkflowStage`, `Adda`, `AddaStageRecord`, `LayeringRecord`, `LayeringRollEntry`, `RemainingClothOfClothRoll`, `CuttingRecord` | `accounts.skills`, `inventory.services`, `raw_materials.*` | adda + stage services, activity timeline |
 | `tracking` | `BatchBarcode`, `ClothRollHistory`, `AddaHistory`, `ProductHistory` | upstream apps | barcode generator, history loggers |
+| `expense` | `StageWorkAssignment`, `WorkerLedgerEntry`, `WorkerAdvance`, `WorkerProfile`, `PayrollSettlement(+Item)` | `production`, `inventory.services` | allocation / ledger / advance / payroll / settlement services |
 | `storefront` | featured products, categories | `inventory` (roles) | listing CRUD |
 
 **Cross-app FK direction:** downstream only.
@@ -83,13 +84,13 @@ Add new stage = `forms/<stage>.py` + `services/<stage>_service.py` + `_stage_pan
 |---|---|
 | `super_admin` | universal escape hatch |
 | `manager` | production CRUD, worker assignment |
-| `karigar` | floor worker (scoped views) |
+| `worker` | floor worker (scoped views; was `karigar`) |
 | `accountant` | view + edit financial fields (supplier, cost_per_kg) |
 | `listing_team` | storefront only |
 
 Convenience sets:
 - `MANAGEMENT_ROLES = {super_admin, manager}`
-- `PRODUCTION_ROLES = {super_admin, manager, karigar}`
+- `PRODUCTION_ROLES = {super_admin, manager, worker}`
 - `FINANCIAL_ROLES = {super_admin, accountant}`
 
 ### Skills (independent axis from role)

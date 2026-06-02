@@ -20,7 +20,7 @@ def _superuser():
 
 
 def _karigar_user(suffix=''):
-    role = Role.objects.get(code='karigar')
+    role = Role.objects.get(code='worker')
     u = User.objects.create_user(email=f'k{suffix}@t.test', password='x')
     u.role = role
     u.save()

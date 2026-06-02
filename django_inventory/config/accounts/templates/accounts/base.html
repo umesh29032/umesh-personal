@@ -27,6 +27,22 @@
         ══════════════════════════════════════════════════════════════ */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* ── Cross-document View Transitions ─────────────────────────────
+           Same-origin page navigations animate smoothly instead of a hard
+           full-window reload flash. The sidebar + topbar are pinned with a
+           stable view-transition-name so they stay STATIC across navigation —
+           only the main content transitions, giving an SPA-like feel ("only
+           the page changes, not the whole window"). Progressive: a silent
+           no-op on browsers without cross-document VT (they fall back to
+           normal nav + the existing sidebar scroll/accordion persistence).
+           Pure CSS — zero JS, no per-page regression risk. */
+        @view-transition { navigation: auto; }
+        @media (prefers-reduced-motion: reduce) {
+            ::view-transition-group(*),
+            ::view-transition-old(*),
+            ::view-transition-new(*) { animation: none !important; }
+        }
+
         :root {
             /* Brand colours */
             --ink:       #0e0b09;
@@ -202,6 +218,9 @@
             height: 100%;
             z-index: 200;
             box-shadow: var(--sidebar-shadow);
+            /* Pin as a static element across page navigations — the sidebar
+               does not re-animate/reload, only the main content transitions. */
+            view-transition-name: ke-sidebar;
         }
 
         /* Subtle warm texture — hidden in light, visible in dark */
@@ -487,6 +506,7 @@
             justify-content: space-between;
             z-index: 100;
             flex-shrink: 0;
+            view-transition-name: ke-topbar;   /* stays static across nav */
             box-shadow: 0 1px 0 var(--cream-3), 0 2px 12px rgba(14,11,9,0.05);
         }
 
@@ -1405,6 +1425,49 @@
         .empty-icon svg { width: 24px; height: 24px; color: var(--smoke); }
         .empty-state h3 { font-family: inherit; font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
         .empty-state p { font-size: 13px; color: var(--stone); margin-bottom: 20px; }
+        /* Table-row variant — single <td colspan="N" class="empty-state-row">
+           use karo jab table mein "no rows yet" message dikhana ho. Pehle
+           5+ templates inline `padding:24px; text-align:center; color:var(--stone);`
+           duplicate karte the (audit 2026-05-29 finding). */
+        .empty-state-row {
+            padding: 24px;
+            text-align: center;
+            color: var(--stone);
+            font-size: 13px;
+        }
+
+        /* ── Hero strip ─────────────────────────────────────────────────
+           Reusable page hero. Pehle inventory + production + storefront
+           form pages mein same gradient inline duplicate ho raha tha.
+           Use: <section class="hero-strip"><h1>...</h1><p>...</p></section>
+           Pages can override with `.hero-strip` modifier on a page-class
+           wrapper (e.g. `.adda-detail .hero-strip { ... }`). */
+        .hero-strip {
+            background: linear-gradient(135deg, #0a1628 0%, #1a2a4a 50%, var(--copper) 100%);
+            color: #fff;
+            padding: 28px 32px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-card);
+        }
+        .hero-strip h1 {
+            font-family: inherit;
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 0 6px;
+        }
+        .hero-strip p {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.82);
+            margin: 0;
+            max-width: 720px;
+        }
+        @media (max-width: 600px) {
+            .hero-strip { padding: 20px 18px; border-radius: 10px; }
+            .hero-strip h1 { font-size: 20px; }
+            .hero-strip p { font-size: 13px; }
+        }
 
         /* ── Tabs ───────────────────────────────────────────────────── */
         .tabs {

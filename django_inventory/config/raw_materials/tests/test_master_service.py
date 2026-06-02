@@ -1,5 +1,5 @@
 """Tests for raw_materials master service (archive/restore/hard_delete)."""
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 
 from accounts.models import User

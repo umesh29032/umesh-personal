@@ -11,7 +11,7 @@ ROLE_ACCOUNTANT = 'accountant'
 ADMIN_ROLES      = {ROLE_SUPER_ADMIN}
 MANAGEMENT_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER}
 FINANCIAL_ROLES  = {ROLE_SUPER_ADMIN, ROLE_ACCOUNTANT}   # view + edit Supplier, Cost Per KG
-PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_KARIGAR}
+PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_WORKER}  # ROLE_WORKER == 'worker' (renamed from ROLE_KARIGAR/'karigar' 2026-06-02)
 ```
 
 Super Admin keeps universal visibility — every role set includes `ROLE_SUPER_ADMIN`.
@@ -132,3 +132,18 @@ def reverse(apps, schema_editor):
 ```
 
 Additive, reversible, no FK reshuffle.
+
+## Access Control hub (`/inventory/access/`)
+
+A super-admin-only, **read-only** overview that consolidates the whole RBAC
+picture in one page: Roles × Sidebar Pages, Production Stages × skills/roles,
+Users roster, and a Roles summary — each deep-linking to its editor (Sidebar
+Access / Stages / Team Members / Roles). It does NOT replace those editors; it's
+the single landing surface the master spec asked for. The three concepts stay
+separate and are labelled on the page:
+
+- **User Type** — 1:1, display/baseline only, never gates access.
+- **Roles** (M2M) — grant module/page/admin/sidebar access.
+- **Skills** (M2M) — grant production-stage work capability.
+
+Full page contract: `docs/PAGES/ACCESS_CONTROL.md`.
