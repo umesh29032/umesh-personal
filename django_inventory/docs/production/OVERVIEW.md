@@ -1,8 +1,8 @@
 # Production Tracking — Overview
 
-**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]). 196/196 tests green. `manage.py check` clean.  Last touched 2026-05-29.
+**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]) + **stage costing** + **worker payroll** (`expense` app). 292 tests green. `manage.py check` clean. Last touched 2026-06-02.
 
-End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake → batch (Adda) production → layering → cutting-pattern design → cutting → barcode generation → export to vendor. Replaces the gutted batch/cloth code in the old `inventory` app (which now only owns RBAC + dashboard).
+End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake → batch (Adda) production → layering → cutting-pattern design → cutting → barcode generation → export to vendor. Each priced stage freezes a `processing_cost` on advance (`cost_service`); worker earnings flow to the `expense` app's ledger. Replaces the gutted batch/cloth code in the old `inventory` app (which now owns RBAC + dashboard + the Access Control hub).
 
 ## Three-app split
 
@@ -11,7 +11,7 @@ End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake �
 | `raw_materials` | Cloth inventory + master data | `ClothType`, `ClothColor`, `StorageLocation`, `ClothRoll` |
 | `production` | Products, patterns, sizes, stages, workflows, stage records | `Product`, `ProductPattern`, `ProductPatternAssignment`, `ProductSize`, `Stage`, `WorkflowStage`, `Adda`, `AddaStageRecord`, `LayeringRecord`, `LayeringRollEntry`, `RemainingClothOfClothRoll`, `CuttingPatternRecord`, `CuttingPatternPhoto`, `CuttingPatternVerification`, `CuttingPatternSizeAllocation`, `CuttingRecord`, `CuttingPieceBreakup`, `CuttingBundle`, `CuttingBundleItem`, **`AddaProductSizeColorPieceBreakdown`**, **`BarcodeGenerationRecord`**, **`LabelPrintQueue`** (stub) |
 | `tracking` | Barcodes + exports + per-domain audit history | `BarcodeBatch`, `BatchBarcode`, **`BarcodeExportBatch`**, `ClothRollHistory`, `AddaHistory`, `ProductHistory` |
-| `expense` (future) | Worker payment ledger | placeholder only; `AddaStageRecord.workers` M2M migrates to `through='expense.StageWorkAssignment'` later |
+| `expense` | Worker payroll: earnings ledger, advances, settlement | `StageWorkAssignment` (standalone FK allocation — NOT an M2M `through`), `WorkerLedgerEntry` (append-only), `WorkerAdvance`, `WorkerProfile`, `PayrollSettlement`, `PayrollSettlementItem`. `AddaStageRecord.workers` stays a bare M2M (roster); earnings tracked on `StageWorkAssignment`. |
 
 **Boundary rule**: cross-app FKs point downstream only.
 - `raw_materials.ClothRoll.adda → 'production.Adda'` (string FK, no import cycle)
@@ -82,11 +82,11 @@ Adda(product=T-SHIRT, current_stage=WorkflowStage[order=1])
 |---|---|---|
 | `super_admin` | existing | universal access (implicit bypass everywhere) |
 | `manager` | existing | production CRUD |
-| `karigar` | existing | floor worker, scoped views |
+| `worker` | existing (was `karigar`) | floor worker, scoped views |
 | `accountant` | seeded by `inventory/0013` | view + edit Supplier + Cost Per KG |
 | `listing_team` | existing | storefront CRUD |
 
-`PRODUCTION_ROLES = {super_admin, manager, karigar}`
+`PRODUCTION_ROLES = {super_admin, manager, worker}`
 `MANAGEMENT_ROLES = {super_admin, manager}`
 `FINANCIAL_ROLES = {super_admin, accountant}`
 

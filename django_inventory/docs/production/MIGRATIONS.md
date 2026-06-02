@@ -127,8 +127,26 @@ INSTALLED_APPS = [
     'raw_materials',
     'production',
     'tracking',
-    # 'expense',   # future
+    'expense',   # worker payroll (shipped 2026-06-02)
 ]
 ```
+
+---
+
+## Current migration state (2026-06-02)
+
+The table above is the original plan. Live counts per app now:
+
+| App | Latest | Notable later migrations |
+|---|---|---|
+| `accounts` | 0011 | `0011_alter_user_user_type` — user_type spec set + assigns explicit Role to every `role=None` user (so the karigar→worker rename can't strip access) |
+| `inventory` | 0019 | `0014`/`0015`/`0016` SidebarItemRule + seed; `0017` rename stage-access rule; `0018` tighten Products to management + seed Access-Control-hub rule; **`0019` rename Role code `karigar`→`worker`** |
+| `production` | 0025 | `0024` AddaStageRecord frozen-cost fields; `0025` `WorkflowStageRoleRate` |
+| `tracking` | 0011 | `0010` `AddaHistory.metadata`; `0011` `AddaHistory.stage_record` FK |
+| `expense` | 0005 | `0001`–`0003` payroll core; `0004` clean legacy payment rows (dev-data, irreversible); `0005` settlement models |
+
+Seed/data migrations to preserve (do NOT squash away the RunPython): inventory
+`0010` (roles), `0015` (sidebar rules), `0018`/`0019` (RBAC), accounts `0011`
+(role backfill + user_type rename). No migration drift as of 2026-06-02.
 
 App labels match directory names. Use `default_auto_field = 'django.db.models.BigAutoField'` in each `apps.py` to match the project default.

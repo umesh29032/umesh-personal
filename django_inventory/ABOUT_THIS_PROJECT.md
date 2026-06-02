@@ -4,6 +4,14 @@ A narrative companion to [ARCHITECTURE.md](ARCHITECTURE.md).
 ARCHITECTURE explains **what** the system is. This file explains **why** it
 exists, **how** it grew, and **what I'm learning** as I build it.
 
+> **Where it is now (2026-06-02):** 7 apps. Beyond the tracking flow below, the
+> system now has **stage costing** (each production stage can carry a rate that
+> freezes onto the Adda), a **worker-payroll** subsystem (the `expense` app:
+> per-piece earnings ledger, advances, owner-run settlements), and a hardened
+> **access-control** layer (one Access Control hub + URL-level enforcement, with
+> User Type / Role / Skill kept as three separate concepts; the worker role is
+> now literally called `worker`). Authoritative current picture: [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+
 ---
 
 ## 1. The story

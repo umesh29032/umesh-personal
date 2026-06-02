@@ -1,8 +1,10 @@
 # Kapil Enterprises Inventory
 
 Django 5.2 + PostgreSQL ERP for a garment manufacturing factory.
-Tracks cloth rolls, production stages (layering → cutting pattern → cutting),
-bundles, barcodes, and the storefront listings.
+Tracks cloth rolls, production stages (layering → cutting pattern → cutting →
+barcode generation), bundles, barcodes, **per-stage costing**, **worker
+earnings/advances/settlement (payroll)**, role/skill access control, and the
+storefront listings.
 
 > Personal project. Owner: Umesh. Solo maintainer.
 
@@ -36,8 +38,9 @@ env/bin/python config/manage.py test production tracking accounts \
     --settings=config.settings.local
 ```
 
-Current: **150+ tests** (production + tracking + accounts + storefront).
-Mirror tests for invariants, RBAC, barcodes, form validation.
+Current: **292 tests** (production + tracking + accounts + storefront + expense + inventory).
+Run from anywhere; discovery needs the `config/` dir on path (`cd config && ../env/bin/python manage.py test`).
+Mirror tests for invariants, RBAC (role + skill + URL enforcement), barcodes, payroll/settlement math, form validation.
 
 ---
 
@@ -47,8 +50,12 @@ Lazy-load only what you need:
 
 | File | When to read |
 |------|-------------|
+| [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | **Current full system design** — most up-to-date big picture. |
 | [CLAUDE.md](CLAUDE.md) | Working rules for AI agents + shortcuts. Always-on. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Models, services, ER, security, perf. Read before non-trivial changes. |
+| [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) · [SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md) · [STAGE_COSTING_PLAN.md](docs/production/STAGE_COSTING_PLAN.md) | `expense` app: earnings ledger, advances, settlement + stage costing. |
+| [docs/production/RBAC.md](docs/production/RBAC.md) | Roles/skills, Access Control hub, sidebar + URL enforcement. |
+| [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) · [docs/QA/](docs/QA/) | Changelog, per-page contracts, flows, audit/bug/fix logs. |
 | [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) | Why + how + learning map for a junior Django dev. |
 | [UI_COMPONENTS.md](UI_COMPONENTS.md) | Component vocabulary + design tokens. Read before writing CSS. |
 | [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md) | Production tracking subsystem (rolls + Adda + stages). |
@@ -65,11 +72,12 @@ Lazy-load only what you need:
 
 | App | Responsibility |
 |-----|----------------|
-| `config/accounts` | User auth, OTP, password reset, signup adapter, Skill model. Argon2 + rate-limited. |
-| `config/inventory` | RBAC core: Role model + `permission_service` + sidebar builder. |
+| `config/accounts` | User auth, OTP, password reset, signup adapter, Skill model, user_type. Argon2 + rate-limited. |
+| `config/inventory` | RBAC core: Role model + `permission_service` + sidebar builder + `SidebarItemRule` + **Access Control hub** + **`SidebarAccessMiddleware`** (URL enforcement). |
 | `config/raw_materials` | Cloth rolls master data: ClothType, ClothColor, StorageLocation, ClothRoll. |
-| `config/production` | Product, Stage library, WorkflowStage, Adda, AddaStageRecord, layering + cutting + cutting-pattern records. |
-| `config/tracking` | Barcodes (BarcodeBatch + lazy BatchBarcode) + scan endpoint + history audit trails. |
+| `config/production` | Product, Stage library, WorkflowStage, Adda, AddaStageRecord, layering/cutting/cutting-pattern/barcode-gen records, **stage costing** (`cost_service`). |
+| `config/tracking` | Barcodes (BarcodeBatch + lazy BatchBarcode) + scan endpoint + history audit trails (`AddaHistory`). |
+| `config/expense` | **Worker payroll**: allocation-driven earnings (`StageWorkAssignment`), immutable `WorkerLedgerEntry`, advances, on-demand `PayrollSettlement`. |
 | `config/storefront` | Public-facing listings (categories, featured products, homepage CMS). |
 
 Strict rule (CLAUDE.md #4): **service layer owns all multi-row writes.**
@@ -115,15 +123,18 @@ Defined in `config/inventory/services/permission_service.py`:
 
 | Role | Capability |
 |------|-----------|
-| `super_admin` | All sections; can manage roles, users, sidebar visibility. Bypass for all gates. |
-| `manager` | All production stages + raw materials + reports. |
-| `karigar` | Factory floor — production stages they have skill access to. |
+| `super_admin` | All sections; can manage roles, users, skills, sidebar visibility, stages. Bypass for all gates. |
+| `manager` | All production stages + raw materials + payroll + reports. |
+| `worker` | Factory floor — production stages they have **skill** access to. (Renamed from `karigar` 2026-06-02.) |
 | `listing_team` | Storefront listings only. |
-| `accountant` | Financial views (stocks, dispatch values). |
+| `accountant` | Financial views (supplier + cost-per-kg on cloth rolls). |
 
-Per-stage access is **additive via skills + roles M2M** on each `Stage` row.
-A user gets stage access if their `role` OR any skill matches the Stage's
-`access_by_role` / `access_by_skill`.
+**Three separate concepts** (never mixed): **User Type** (1:1, display only) ·
+**Role** (M2M → page/module/sidebar access) · **Skill** (M2M → production-stage
+work capability). Per-stage access is additive via `Stage.access_by_skill` /
+`access_by_role` (OR semantics; management bypass). Menu items + their URLs are
+gated together by `SidebarItemRule` + `SidebarAccessMiddleware`, with a read-only
+**Access Control hub** at `/inventory/access/`.
 
 ---
 
@@ -157,8 +168,12 @@ A user gets stage access if their `role` OR any skill matches the Stage's
 
 ## Recent Major Changes
 
-See [git log](https://github.com/) for full history. Headline items:
+See [git log](https://github.com/) for full history + [CHANGELOG.md](CHANGELOG.md). Headline items:
 
+- **2026-06-02** — Stage costing + worker payroll/settlement (`expense` app);
+  unified Access Control hub + `SidebarAccessMiddleware` (URL-level RBAC);
+  stage views skill-gated; user-type spec set + role `karigar`→`worker`;
+  dead-code cleanup. 292 tests.
 - **2026-05-29** — Audit (`AUDIT_2026_05_29.md`); composite indexes;
   invariant tests; service-boundary fixes; `ActiveManager` opt-in.
 - **2026-05-28** — Cutting-pattern stage + ProductPattern + reopen +

@@ -6,8 +6,14 @@
 
 This document is the technical contract. If something here disagrees with the code, the **code wins** — open a PR to update this doc.
 
-> **Last refreshed:** 2026-05-28 (post cutting_pattern stage + ProductPattern library + Layering/Pattern reopen + curated role editor).
-> For per-subsystem deep dives see `docs/production/OVERVIEW.md`.
+> **Last refreshed:** 2026-06-02. **For the authoritative current design read [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).** Older sections below are updated incrementally.
+>
+> **Current state (2026-06-02), additive to the below:**
+> - **7 apps** — added `expense` (worker payroll: allocation-driven earnings ledger, advances, on-demand settlement).
+> - **Stage costing** — `WorkflowStage` rate fields + `WorkflowStageRoleRate`; `AddaStageRecord` freezes `processing_cost` on advance (cleared on reopen); `cost_service`; super-admin `/production/costing/`.
+> - **RBAC** — unified **Access Control hub** (`/inventory/access/`); `SidebarItemRule` enforced at the **URL level** by `inventory.middleware.SidebarAccessMiddleware` (hiding a menu item blocks its URL); stage **views** skill-gated (`StageViewAccessMixin`). Three separate concepts: User Type (1:1 display) / Role (M2M access) / Skill (M2M stage work). Role **`karigar` renamed to `worker`**; user_type set = superadmin/admin/worker/supplier/normal.
+> - **Tracking** — `AddaHistory.metadata` + `stage_record` FK.
+> - 292 tests green. Deep dives: `docs/production/OVERVIEW.md`; payroll/costing: `docs/production/PAYROLL_ARCHITECTURE.md` + `STAGE_COSTING_PLAN.md`.
 
 ---
 
@@ -179,11 +185,11 @@ inventory.Role
 accounts.Skill                              cutting_master / cutting_master_helper / …
 ```
 
-5 seeded roles: `super_admin`, `manager`, `karigar`, `accountant`, `listing_team`.
+5 seeded roles: `super_admin`, `manager`, `worker` (was `karigar`), `accountant`, `listing_team`.
 
 Convenience sets in `permission_service`:
 - `MANAGEMENT_ROLES = {super_admin, manager}`
-- `PRODUCTION_ROLES = {super_admin, manager, karigar}`
+- `PRODUCTION_ROLES = {super_admin, manager, worker}`
 - `FINANCIAL_ROLES = {super_admin, accountant}`
 - `STOREFRONT_ROLES = {super_admin, listing_team}`
 
