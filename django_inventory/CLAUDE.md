@@ -1,11 +1,12 @@
 # CLAUDE.md — Kapil Enterprises Inventory
 
-Django 5.2 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
+Django 5.0 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 
-**7 apps:** accounts, inventory, raw_materials, production, tracking, **expense** (worker payroll/settlement), storefront.
+**7 domain apps:** accounts, inventory, raw_materials, production, tracking, **expense** (worker payroll/settlement), storefront. Plus **`core`** — infra app holding shared abstract base models (`TimeStampedModel`, `ActiveManager`); no tables.
 
 **Deep context lives in lazy-load docs — read them only when needed:**
 - [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) — **current full system design** (most up-to-date; read first for the big picture)
+- [GLOSSARY.md](GLOSSARY.md) — domain-term glossary (Adda, layering, bundle, settlement…) + core-model ER diagram. **Read first if new to the codebase.**
 - [ARCHITECTURE.md](ARCHITECTURE.md) — models, services, ER, security, perf
 - [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) — why + how + learning map
 - [UI_COMPONENTS.md](UI_COMPONENTS.md) — component vocabulary, design tokens, DataTables/fancy-select usage
@@ -18,8 +19,8 @@ Django 5.2 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 1. Terse. No greetings, no summaries unless asked.
 2. Junior-Django mode: 1-line "why" comments naming Django/PG primitive on first touch.
 3. Plan before ≥3-file edits. Use Edit not Write for existing files.
-4. **Service layer owns all multi-row writes** (`config/inventory/services/`). Views call services. No signals.
-5. `StockService.log(...)` is the only writer to `StockLedger`.
+4. **Service layer owns all multi-row writes** (`config/<app>/services/`). Views call services. No signals.
+5. **Single-writer discipline:** each ledger/audit table has exactly ONE writer service — `ledger_service` for `WorkerLedgerEntry`, `history_service` for the `*History` tables. (Legacy `StockService`/`StockLedger` were removed 2026-05-19.)
 6. Permissions via `permission_service` (`user_has_perm` / `user_has_role`). No raw `is_superuser` checks in views. **RBAC roles: super_admin, manager, worker** (renamed from `karigar` 2026-06-02), listing_team, accountant. Production-STAGE access is **skill**-gated (`access_service.user_can_access_stage`), not role. Menu items + their URLs are gated together by `SidebarItemRule` via `inventory.middleware.SidebarAccessMiddleware` — hiding a menu item also blocks its URL.
 7. Shadow `.py` files (inventory views/services/forms + `config/settings.py`) were deleted 2026-05-16. Only package forms exist. If you ever see a duplicate `.py` next to a same-named package dir, flag it.
 8. gstack installed — route ship/review/qa/etc. to matching gstack skill. Don't auto-trigger.

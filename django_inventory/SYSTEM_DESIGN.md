@@ -15,12 +15,12 @@ upcoming stage-system redesign.
 ## Table of Contents
 
 1. [System Overview](#1-system-overview)
-2. [Six-App Architecture & Boundary Rules](#2-six-app-architecture--boundary-rules)
+2. [Seven-App Architecture & Boundary Rules](#2-seven-app-architecture--boundary-rules)
 3. [Entity-Relationship Map](#3-entity-relationship-map)
 4. [Production Flow (End-to-End)](#4-production-flow-end-to-end)
 5. [The Repeating Stage Pattern](#5-the-repeating-stage-pattern)
 6. [Model Reference (every model, every field)](#6-model-reference)
-   - 6.1 accounts · 6.2 inventory · 6.3 raw_materials · 6.4 production · 6.5 tracking · 6.6 storefront
+   - 6.1 accounts · 6.2 inventory · 6.3 raw_materials · 6.4 production · 6.5 tracking · 6.6 storefront · 6.7 expense
 7. [Service Layer Reference](#7-service-layer-reference)
 8. [Single-Writer Discipline](#8-single-writer-discipline)
 9. [URL & View Surface](#9-url--view-surface)
@@ -67,7 +67,7 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 
 ---
 
-## 2. Six-App Architecture & Boundary Rules
+## 2. Seven-App Architecture & Boundary Rules
 
 ```
 ┌─────────────┐     ┌─────────────┐
@@ -82,7 +82,7 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 ┌──────────────────────────────────────────────┐
 │ raw_materials   ──string FK──▶  production     │
 │ ClothType,ClothColor,           Product,Stage, │
-│ StorageLocation,ClothRoll       Adda, 18 more  │
+│ StorageLocation,ClothRoll       Adda, 20 more  │
 │      ▲                              │          │
 │      └────────── string FK ─────────┘          │
 └──────────────────────┬─────────────────────────┘
@@ -94,6 +94,16 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
               │ *History,       │
               │ ExportBatch     │
               └─────────────────┘
+                       │ string FK (AddaStageRecord, bundles) + worker User
+                       ▼
+              ┌─────────────────┐
+              │    expense      │   DOWNSTREAM — worker payroll. Reads
+              │ StageWork-      │   production + accounts; NEVER writes them.
+              │ Assignment,     │   Allocation-driven immutable earnings
+              │ WorkerLedger-   │   ledger (balance always derived, never
+              │ Entry, Advance, │   stored).
+              │ Settlement      │
+              └─────────────────┘
 
 ┌─────────────┐
 │ storefront  │   INDEPENDENT — public marketing CMS, no production FKs
@@ -102,8 +112,14 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 
 **Boundary rule (strict):** `raw_materials` imports nothing from `production`/`tracking`.
 `production` references `raw_materials` via string FK (`'raw_materials.ClothColor'`).
-`tracking` references both upstream apps via string FK. This keeps the dependency graph acyclic
+`tracking` references both upstream apps via string FK; `expense` is downstream of both
+`production` and `accounts` and writes neither. This keeps the dependency graph acyclic
 so migrations and app loading never deadlock.
+
+**`core` (infra app, not shown above):** holds shared **abstract** base models —
+`TimeStampedModel` (created_at/updated_at) and `ActiveManager` (the `.active` soft-archive
+manager). Abstract = no tables, no migrations. Every domain app imports from `core` instead
+of redefining these (they used to be copy-pasted in 4 apps).
 
 | App | Responsibility | Owns |
 |---|---|---|
@@ -376,7 +392,7 @@ Roll ID from Postgres `cloth_roll_seq` via `roll_service._next_roll_id()` only. 
 Indexes: `status`; `(cloth_type, cloth_color)`; `(storage_location, status)`; `(adda, status)`.
 Property `display_summary` → `"CR-000142 · Cotton · Red - 42 inch"`.
 
-### 6.4 `production` (22 models — the heart)
+### 6.4 `production` (23 models — the heart)
 
 #### `Product`
 | Field | Type | Notes |
@@ -534,6 +550,24 @@ File content is **regenerated on download** (not stored) — storage stays lean;
 | `WhyUsCard` | "Why choose us" feature cards |
 | `FooterLink` | Footer links grouped by column (products/company/access) |
 | `NavLink` | Public navbar links |
+
+---
+
+### 6.7 `expense` (6 models — worker payroll, downstream of production)
+
+> Added 2026-06-02. Full field-level design lives in
+> [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) +
+> [docs/production/SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md).
+> Settlement-based (NOT monthly). Balance is ALWAYS derived, never stored.
+
+| Model | Purpose |
+|---|---|
+| `StageWorkAssignment` | A worker's allocated slice of a stage's work. Standalone FK row (NOT an M2M `through`). `earning = allocated_quantity × earning_rate_snapshot`, frozen at allocation. |
+| `WorkerLedgerEntry` | Append-only, immutable money ledger — the financial source of truth. `amount` always positive; direction = `entry_type` (credit/debit). Payable = SUM(credit) − SUM(debit). |
+| `WorkerAdvance` | Cash given before earnings — a SEPARATE loan pool. Does NOT post to the payable ledger; recovered at settlement by owner's choice. |
+| `PayrollSettlement` | On-demand payout event. Clears (part of) payable + recovers (part of) advances. Snapshots state for audit; balances still derived live. |
+| `PayrollSettlementItem` | One per-advance recovery line of a settlement (owner-controlled). |
+| `WorkerProfile` | Per-worker payroll metadata (bank/UPI, opening_advance). No stored totals. |
 
 ---
 
@@ -809,7 +843,9 @@ env/bin/python config/manage.py test production tracking accounts   # 196/196
 - Dashboard perf unprofiled under 40-user load; sidebar build not cached.
 - Storefront has zero test coverage; legacy `barcode_export_csv` view untested.
 - ffmpeg video recompression for cutting_pattern uploads deferred.
-- Future-arch scaffolds (feature flags, machine tracking, `expense` app) not started.
+- Future-arch scaffolds (feature flags, machine tracking) not started. (The `expense`
+  payroll app SHIPPED 2026-06-02 — see docs/production/PAYROLL_ARCHITECTURE.md +
+  SETTLEMENT_ARCHITECTURE.md; it is not yet detailed in §6 below.)
 
 ---
 
