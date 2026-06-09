@@ -56,6 +56,9 @@ from .barcode import (
     BarcodeGenerationRecord,
     LabelPrintQueue,
 )
+from .worker_task import (
+    WorkerStageTask,
+)
 
 __all__ = [
     'CostMethod',
@@ -82,6 +85,7 @@ __all__ = [
     'AddaProductSizeColorPieceBreakdown',
     'BarcodeGenerationRecord',
     'LabelPrintQueue',
+    'WorkerStageTask',
     '_cutting_pattern_video_path',
     '_cutting_pattern_photo_path',
 ]

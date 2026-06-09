@@ -213,7 +213,8 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
         raise PermissionDenied("only management can start the cutting_pattern stage")
     sr = get_or_create_pattern_stage_record(adda, user)
     # .set() = M2M replace (delete extras + add missing). Idempotent.
-    sr.workers.set(list(worker_ids))
+    from production.services.worker_task_service import set_stage_workers
+    set_stage_workers(sr, worker_ids)   # dual-write: M2M (authoritative) + WorkerStageTask
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])

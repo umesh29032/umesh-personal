@@ -231,7 +231,8 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
     if not created and sr.started_at is None:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
-    sr.workers.set(worker_ids)
+    from production.services.worker_task_service import set_stage_workers
+    set_stage_workers(sr, worker_ids)   # dual-write: M2M (authoritative) + WorkerStageTask
     from tracking.services import log_adda
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
@@ -257,8 +258,9 @@ def sync_layering_workers_for_skill(user) -> int:
         adda__status=Adda.Status.IN_PROGRESS,
     )
     count = 0
+    from production.services.worker_task_service import add_stage_worker
     for sr in active_srs:
-        sr.workers.add(user)
+        add_stage_worker(sr, user)   # additive dual-write (re-tag); not a full replace
         count += 1
     logger.info("layering.workers_retro_tag worker_id=%s tagged_stage_records=%s", user.pk, count)
     return count

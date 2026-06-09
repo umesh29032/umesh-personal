@@ -116,7 +116,9 @@ def create_adda(user, *, product: Product) -> Adda:
             adda=adda, workflow_stage=first_stage,
             started_at=timezone.now(),
         )
-        sr.workers.set(skilled_pks)   # M2M snapshot — manager refine kar sakta
+        # Dual-write chokepoint: M2M (authoritative) + WorkerStageTask (V2-1a).
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, skilled_pks)   # M2M snapshot — manager refine kar sakta
 
     # tracking app ka lazy import — production pe ulta depend karta hai
     from tracking.services import log_adda

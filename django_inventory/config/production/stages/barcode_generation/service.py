@@ -209,7 +209,8 @@ def start_barcode_generation(
     sr = get_or_create_barcode_stage_record(adda, user)
     if sr.completed_at is not None:
         raise ValidationError("Stage already completed.")
-    sr.workers.set(list(worker_ids))
+    from production.services.worker_task_service import set_stage_workers
+    set_stage_workers(sr, worker_ids)   # dual-write: M2M (authoritative) + WorkerStageTask
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])

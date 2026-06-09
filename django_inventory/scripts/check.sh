@@ -14,24 +14,33 @@ COVERAGE_FLOOR=65          # baseline 67% (2026-06-09); ratchet up as coverage g
 fail=0
 
 echo "──────────── BLOCKING ────────────"
-echo "[1/3] import-linter · foundation-purity (core + accounts import no domain app)"
+echo "[1/4] import-linter · foundation-purity (core + accounts import no domain app)"
 ( cd config && ../$PY/lint-imports --contract foundation-purity ) >/tmp/check_il.log 2>&1 \
   && echo "  ✓ foundation-purity KEPT" \
   || { echo "  ✗ foundation-purity BROKEN"; tail -20 /tmp/check_il.log; fail=1; }
 
-echo "[2/3] tests + coverage run"
+echo "[2/4] tests + coverage run"
 $PY/coverage run --source=config \
   --omit='*/migrations/*,*/tests/*,*/tests.py,*/apps.py,config/config/*,*/admin.py' \
   config/manage.py test $APPS --settings=$SETTINGS >/tmp/check_test.log 2>&1 \
   && echo "  ✓ $(grep -E '^Ran [0-9]+ test' /tmp/check_test.log) — OK" \
   || { echo "  ✗ tests FAILED"; tail -30 /tmp/check_test.log; fail=1; }
 
-echo "[3/3] coverage floor ≥ ${COVERAGE_FLOOR}%"
+echo "[3/4] coverage floor ≥ ${COVERAGE_FLOOR}%"
 $PY/coverage report >/tmp/check_cov.log 2>&1
 if $PY/coverage report --fail-under=$COVERAGE_FLOOR >/dev/null 2>&1; then
   echo "  ✓ $(tail -1 /tmp/check_cov.log)"
 else
   echo "  ✗ coverage below ${COVERAGE_FLOOR}%: $(tail -1 /tmp/check_cov.log)"; fail=1
+fi
+
+echo "[4/4] worker M2M single-writer (V2-1a: no .workers.set/.add outside the chokepoint)"
+strays=$(grep -rn "\.workers\.set(\|\.workers\.add(" config --include=*.py \
+  | grep -v "worker_task_service.py" | grep -vE "/tests/|/migrations/")
+if [ -z "$strays" ]; then
+  echo "  ✓ worker_task_service is the sole AddaStageRecord.workers writer"
+else
+  echo "  ✗ stray M2M writes (route through worker_task_service):"; echo "$strays"; fail=1
 fi
 
 echo ""

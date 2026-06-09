@@ -418,7 +418,8 @@ def start_cutting(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaStageRe
         raise PermissionDenied("only management can start the cutting stage")
     sr = _get_or_create_cutting_stage_record(adda)
     worker_id_list = list(worker_ids)
-    sr.workers.set(worker_id_list)
+    from production.services.worker_task_service import set_stage_workers
+    set_stage_workers(sr, worker_id_list)   # dual-write: M2M (authoritative) + WorkerStageTask
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
@@ -980,7 +981,8 @@ def complete_cutting_legacy(
         started_at=timezone.now(),
         completed_at=timezone.now(), completed_by=user,
     )
-    sr.workers.set(worker_ids or [])
+    from production.services.worker_task_service import set_stage_workers
+    set_stage_workers(sr, worker_ids or [])   # dual-write (legacy complete: tasks seed 'completed')
 
     cr = CuttingRecord.objects.create(
         stage_record=sr, pieces_cut=pieces_cut, notes=notes,

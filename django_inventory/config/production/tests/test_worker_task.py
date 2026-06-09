@@ -1,0 +1,213 @@
+"""V2-1a: WorkerStageTask model constraints + the 0032 M2M→Task backfill logic.
+
+The dev DB is empty of production rows, so the clone rehearsal only proves
+migration mechanics. THIS is where the backfill logic is exercised with synthetic
+fixtures (completed / active / legacy-null-started) per V2_1_REVIEW §10.7.
+"""
+import importlib
+from decimal import Decimal
+
+from django.apps import apps as django_apps
+from django.db import IntegrityError, transaction
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from accounts.models import User
+from production.models import (
+    Adda, AddaStageRecord, Product, Stage, WorkflowStage, WorkerStageTask,
+)
+from production.services.worker_task_service import add_stage_worker, set_stage_workers
+
+
+def _active_task_workers(sr):
+    return set(
+        WorkerStageTask.objects.filter(stage_record=sr)
+        .exclude(status=WorkerStageTask.Status.CANCELLED)
+        .values_list('worker_id', flat=True))
+
+
+def _m2m_workers(sr):
+    return set(sr.workers.values_list('pk', flat=True))
+
+# 0032's module name starts with a digit → import via importlib (not `import`).
+_backfill_mod = importlib.import_module(
+    'production.migrations.0032_backfill_worker_tasks')
+
+
+class WorkerStageTaskModelTest(TestCase):
+    def setUp(self):
+        self.product = Product.objects.create(code='WST', name='WST Product')
+        self.stage = Stage.objects.create(code='wst_stage', name='WST Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='WST-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.worker = User.objects.create_user(email='wst-worker@test', password='x')
+
+    def test_one_active_task_per_stage_worker(self):
+        """Partial unique: a second ACTIVE task for the same (sr, worker) is rejected."""
+        WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+
+    def test_cancelled_does_not_block_reassign(self):
+        """Cancel → re-assign is allowed (the partial unique excludes cancelled)."""
+        t = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+        t.status = WorkerStageTask.Status.CANCELLED
+        t.save(update_fields=['status'])
+        # A fresh active task for the same pair must NOT collide.
+        again = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+        self.assertEqual(again.status, WorkerStageTask.Status.ASSIGNED)
+        self.assertEqual(
+            WorkerStageTask.objects.filter(stage_record=self.sr, worker=self.worker).count(), 2)
+
+    def test_invalid_status_rejected(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                WorkerStageTask.objects.create(
+                    stage_record=self.sr, worker=self.worker, status='bogus')
+
+
+class BackfillLogicTest(TestCase):
+    def setUp(self):
+        self.product = Product.objects.create(code='BF', name='BF Product')
+        # 3 distinct stages → 3 distinct WorkflowStages → 3 stage records under one Adda.
+        self.s1 = Stage.objects.create(code='bf_done', name='BF Done')
+        self.s2 = Stage.objects.create(code='bf_active', name='BF Active')
+        self.s3 = Stage.objects.create(code='bf_legacy', name='BF Legacy')
+        ws = lambda s, o: WorkflowStage.objects.create(
+            product=self.product, stage=s, order=o, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='BF-001', product=self.product)
+        now = timezone.now()
+        # completed stage → expect task 'completed'
+        self.sr_done = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws(self.s1, 1), started_at=now, completed_at=now)
+        # active stage → expect 'assigned' (roster ≠ started work)
+        self.sr_active = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws(self.s2, 2), started_at=now)
+        # legacy completed stage with NULL started_at → 'completed', started_at None
+        self.sr_legacy = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws(self.s3, 3), started_at=None, completed_at=now)
+        self.w1 = User.objects.create_user(email='bf-w1@test', password='x')
+        self.w2 = User.objects.create_user(email='bf-w2@test', password='x')
+        for sr in (self.sr_done, self.sr_active, self.sr_legacy):
+            sr.workers.add(self.w1, self.w2)
+
+    def _run_backfill(self):
+        _backfill_mod.backfill(django_apps, None)
+
+    def test_backfill_creates_tasks_with_correct_status_and_timestamps(self):
+        self._run_backfill()
+        # 3 stage records × 2 workers = 6 tasks
+        self.assertEqual(WorkerStageTask.objects.count(), 6)
+        done = WorkerStageTask.objects.get(stage_record=self.sr_done, worker=self.w1)
+        active = WorkerStageTask.objects.get(stage_record=self.sr_active, worker=self.w1)
+        legacy = WorkerStageTask.objects.get(stage_record=self.sr_legacy, worker=self.w1)
+        self.assertEqual(done.status, 'completed')
+        self.assertIsNotNone(done.completed_at)
+        self.assertEqual(active.status, 'assigned')      # roster of active stage ≠ in_progress
+        self.assertIsNone(active.completed_at)
+        self.assertEqual(legacy.status, 'completed')
+        self.assertIsNone(legacy.started_at)             # don't fabricate a start time
+        self.assertIsNotNone(legacy.completed_at)
+
+    def test_backfill_is_idempotent(self):
+        self._run_backfill()
+        self._run_backfill()                              # second run must not duplicate
+        self.assertEqual(WorkerStageTask.objects.count(), 6)
+
+    def test_unbackfill_clears_tasks(self):
+        self._run_backfill()
+        _backfill_mod.unbackfill(django_apps, None)
+        self.assertEqual(WorkerStageTask.objects.count(), 0)
+
+    def test_empty_roster_creates_no_tasks(self):
+        """A stage record with no M2M members yields no tasks."""
+        empty_sr = AddaStageRecord.objects.create(
+            adda=self.adda,
+            workflow_stage=WorkflowStage.objects.create(
+                product=self.product,
+                stage=Stage.objects.create(code='bf_empty', name='BF Empty'),
+                order=4, cost_rate=Decimal('0')),
+            started_at=timezone.now())
+        self._run_backfill()
+        self.assertFalse(WorkerStageTask.objects.filter(stage_record=empty_sr).exists())
+
+
+class DualWriteChokepointTest(TestCase):
+    """V2-1a dual-write: set_stage_workers / add_stage_worker keep WorkerStageTask
+    in lockstep with the M2M (the authoritative source in V2-1a)."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='DW', name='DW Product')
+        self.stage = Stage.objects.create(code='dw_stage', name='DW Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='DW-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.w1 = User.objects.create_user(email='dw1@test', password='x')
+        self.w2 = User.objects.create_user(email='dw2@test', password='x')
+        self.w3 = User.objects.create_user(email='dw3@test', password='x')
+
+    def _assert_parity(self):
+        self.assertEqual(_m2m_workers(self.sr), _active_task_workers(self.sr))
+
+    def test_set_creates_matching_active_tasks(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        self.assertEqual(_active_task_workers(self.sr), {self.w1.pk, self.w2.pk})
+        self._assert_parity()
+
+    def test_set_cancels_removed_never_deletes(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk])          # drop w2
+        self._assert_parity()
+        self.assertEqual(_active_task_workers(self.sr), {self.w1.pk})
+        # w2's task is CANCELLED, not deleted — production history is immutable.
+        w2_task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w2)
+        self.assertEqual(w2_task.status, WorkerStageTask.Status.CANCELLED)
+
+    def test_set_idempotent(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        self.assertEqual(
+            WorkerStageTask.objects.filter(stage_record=self.sr).count(), 2)
+
+    def test_set_reactivates_after_cancel(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk])          # cancel w2
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])  # re-add w2
+        self._assert_parity()
+        # w2 now has 1 cancelled + 1 active row (re-assign allowed by partial unique).
+        self.assertEqual(
+            WorkerStageTask.objects.filter(stage_record=self.sr, worker=self.w2).count(), 2)
+
+    def test_add_is_additive_and_ensures_task(self):
+        set_stage_workers(self.sr, [self.w1.pk])
+        add_stage_worker(self.sr, self.w2)                # additive — does NOT drop w1
+        self.assertEqual(_active_task_workers(self.sr), {self.w1.pk, self.w2.pk})
+        self._assert_parity()
+
+    def test_add_reactivates_after_cancel(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk])          # cancel w2
+        add_stage_worker(self.sr, self.w2)                # re-tag w2
+        self.assertIn(self.w2.pk, _active_task_workers(self.sr))
+        self._assert_parity()
+
+    def test_completed_stage_seeds_completed_status(self):
+        self.sr.completed_at = timezone.now()
+        self.sr.save(update_fields=['completed_at'])
+        set_stage_workers(self.sr, [self.w1.pk])
+        t = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w1)
+        self.assertEqual(t.status, WorkerStageTask.Status.COMPLETED)
+
+    @override_settings(WORKER_TASK_DUAL_WRITE=False)
+    def test_flag_off_writes_no_tasks(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        add_stage_worker(self.sr, self.w3)
+        self.assertEqual(WorkerStageTask.objects.filter(stage_record=self.sr).count(), 0)
+        # M2M still updated (authoritative) even with dual-write off.
+        self.assertEqual(_m2m_workers(self.sr), {self.w1.pk, self.w2.pk, self.w3.pk})
