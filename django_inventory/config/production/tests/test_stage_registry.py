@@ -15,7 +15,6 @@ class _DummyHandler(StageHandler):
     code = 'dummy_stage'
     name = 'Dummy'
     template_partial = 'x.html'
-    pays_workers = True
 
     def snapshot(self, adda):
         return {}

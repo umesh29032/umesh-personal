@@ -8,9 +8,9 @@ complete() delegates to the MODERN workspace path (complete_cutting_from_bundles
 The legacy form path (complete_cutting_legacy) is still wired in stage_views and is
 handled there until the dispatch switch (M2.6) reconciles both.
 
-pays_workers=True: cutting is where worker earnings are allocated — but allocation
-is currently a SEPARATE manual step (the PAY-2 gap), so complete() returns no
-allocations yet. M2.7 folds allocation into the base service's completion path.
+Cutting is where worker earnings are allocated (payability = WorkflowStage.credits_workers,
+seeded True for cutting). Allocation is currently a SEPARATE manual step, so complete()
+returns no allocations yet; the PAY-2 guard (M2.7) blocks completing without one.
 """
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ class CuttingHandler(StageHandler):
     code = STAGE_CUTTING
     name = 'Cutting'
     template_partial = 'production/_stage_panel_cutting.html'
-    pays_workers = True
 
     def snapshot(self, adda):
         from production.services import get_cutting_snapshot

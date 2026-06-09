@@ -31,7 +31,6 @@ class BarcodeGenerationHandlerParityTest(TestCase):
     def test_autodiscover_registered_handler(self):
         handler = base.get(STAGE_BARCODE_GENERATION)
         self.assertIsInstance(handler, BarcodeGenerationHandler)
-        self.assertFalse(handler.pays_workers)
         self.assertEqual(handler.template_partial, 'production/_stage_panel_barcode_gen.html')
 
     def test_snapshot_delegates_to_service(self):

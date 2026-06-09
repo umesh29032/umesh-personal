@@ -1,6 +1,6 @@
 """M2.4: CuttingHandler adapter parity.
 
-Registered + pays_workers True; panel_context delegates to the cutting snapshot;
+Registered; panel_context delegates to the cutting snapshot;
 complete() delegates to complete_cutting_from_bundles (proven via patch to avoid
 cutting's heavy bundle/breakdown setup — the delegation pattern itself is already
 exercised end-to-end by the layering/pattern handler tests).
@@ -31,7 +31,6 @@ class CuttingHandlerParityTest(TestCase):
     def test_autodiscover_registered_handler(self):
         handler = base.get(STAGE_CUTTING)
         self.assertIsInstance(handler, CuttingHandler)
-        self.assertTrue(handler.pays_workers)
         self.assertEqual(handler.template_partial, 'production/_stage_panel_cutting.html')
 
     def test_snapshot_delegates_to_service(self):

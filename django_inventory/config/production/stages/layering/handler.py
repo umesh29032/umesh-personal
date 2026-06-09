@@ -22,9 +22,6 @@ class LayeringHandler(StageHandler):
     code = STAGE_LAYERING
     name = 'Layering'
     template_partial = 'production/_stage_panel_layering.html'
-    # Layering assigns workers (M2M) but books NO allocation-driven earnings today
-    # — worker pay is allocated at the cutting stage — so it credits no one here.
-    pays_workers = False
 
     def snapshot(self, adda):
         from production.services import get_layering_snapshot

@@ -58,7 +58,6 @@ class LayeringHandlerParityTest(TestCase):
     def test_autodiscover_registered_layering_handler(self):
         handler = base.get(STAGE_LAYERING)
         self.assertIsInstance(handler, LayeringHandler)
-        self.assertFalse(handler.pays_workers)
         self.assertEqual(handler.template_partial, 'production/_stage_panel_layering.html')
 
     def test_snapshot_matches_service(self):

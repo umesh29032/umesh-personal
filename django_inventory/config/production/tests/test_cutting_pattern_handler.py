@@ -66,7 +66,6 @@ class CuttingPatternHandlerParityTest(TestCase):
     def test_autodiscover_registered_handler(self):
         handler = base.get(STAGE_CUTTING_PATTERN)
         self.assertIsInstance(handler, CuttingPatternHandler)
-        self.assertFalse(handler.pays_workers)
 
     def test_snapshot_delegates_to_service(self):
         adda, sr = self._ready_adda()

@@ -14,7 +14,6 @@ class CuttingPatternHandler(StageHandler):
     code = STAGE_CUTTING_PATTERN
     name = 'Cutting Pattern'
     template_partial = 'production/_stage_panel_cutting_pattern.html'
-    pays_workers = False   # verification stage — no allocation-driven earnings
 
     def snapshot(self, adda):
         from production.services import get_pattern_snapshot

@@ -45,7 +45,7 @@
 ## M1 — Correctness Hardening  *(surgical, high-trust)*
 - **P1.1 Lock stage completion/advance (WF-4).** select_for_update Adda + re-check under lock. Concurrency test.
 - **P1.2 Reopen voids worker credits (PAY-3).**
-- **P1.3 Allocation↔completion contract pt.1 (PAY-2).** `pays_workers` semantics; block completing a paying stage with no allocations.
+- **P1.3 Allocation↔completion contract pt.1 (PAY-2).** DONE in M2.7 — payability via `WorkflowStage.credits_workers` (data, not a handler flag); block completing a payable stage with no allocations.
 - **P1.4 Reconciliation report (PAY-4).** Σ earnings vs processing_cost, per Adda/stage.
 
 ## M2 — The Stage Engine  *(KEYSTONE — biggest multi-dimension lift)*

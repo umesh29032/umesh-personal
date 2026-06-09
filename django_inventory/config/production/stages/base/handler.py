@@ -38,7 +38,7 @@ class WorkerAllocation:
 class CompletionResult:
     """What a stage's complete() returns. The base StageService consumes it to book
     worker earnings and advance the Adda. Empty allocations = the stage credits no
-    worker; the base service enforces `pays_workers` against this in M2.7."""
+    worker; payability is enforced via WorkflowStage.credits_workers (M2.7)."""
 
     allocations: list[WorkerAllocation] = field(default_factory=list)
     notes: str = ''
@@ -62,14 +62,15 @@ class StageHandler(ABC):
       template_partial path to the stage's panel partial
       required_skill  skill code gating the stage, or None (data-driven via
                       production.Stage.access_by_skill is preferred — see M3.1)
-      pays_workers    whether completing this stage must credit workers (M2.7)
+
+    Payability (does completing this stage credit workers?) is NOT a handler
+    attribute — it lives on WorkflowStage.credits_workers (data). See cost/credit.
     """
 
     code: str = ''
     name: str = ''
     template_partial: str = ''
     required_skill: str | None = None
-    pays_workers: bool = False
 
     @abstractmethod
     def snapshot(self, adda) -> dict:

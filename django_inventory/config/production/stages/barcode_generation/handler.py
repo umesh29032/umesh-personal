@@ -18,7 +18,6 @@ class BarcodeGenerationHandler(StageHandler):
     code = STAGE_BARCODE_GENERATION
     name = 'Barcode Generation'
     template_partial = 'production/_stage_panel_barcode_gen.html'
-    pays_workers = False
 
     def snapshot(self, adda):
         from production.services import get_barcode_snapshot

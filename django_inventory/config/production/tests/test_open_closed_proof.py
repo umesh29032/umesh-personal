@@ -11,10 +11,10 @@ Paths verified: registry dispatch (panel context) · costing (quantity via the
 handler) · payability (driven by WorkflowStage.credits_workers DATA, not the handler
 flag) · stage advance + cost freeze · overview snapshot pickup.
 
-FINDING (reported, not fixed): handler.pays_workers is DEAD post-M2.7 — payability
-is decided by WorkflowStage.credits_workers. The proof stage leaves pays_workers at
-its default False yet is correctly enforced as payable via the data flag, proving
-the handler attribute is a vestigial second source of truth (cleanup candidate).
+Payability here is driven entirely by WorkflowStage.credits_workers (data) — the proof
+stage declares no payability flag yet is correctly enforced as payable. (The dead
+handler.pays_workers attribute this proof originally surfaced was removed in the
+follow-up cleanup commit.)
 """
 from decimal import Decimal
 
@@ -40,8 +40,7 @@ class _ProofStageHandler(StageHandler):
     code = 'proof_stage'
     name = 'Proof Stage'
     template_partial = 'production/_stage_panel_proof.html'   # never rendered here
-    # pays_workers intentionally left at its default (False) — payability is driven
-    # by WorkflowStage.credits_workers (data), NOT this handler attribute.
+    # No payability flag on the handler — payability is data (WorkflowStage.credits_workers).
 
     def snapshot(self, adda):
         return {'state': 'proof', 'stage': self.code}
@@ -111,9 +110,8 @@ class OpenClosedProofTest(TestCase):
         self.assertEqual(self.sr.cost_quantity_snapshot, PROOF_QTY)
         self.assertEqual(self.sr.processing_cost, Decimal('50.00'))   # rate 10 x qty 5
 
-    def test_payability_is_data_driven_not_handler_flag(self):
-        """credits_workers (data) makes it payable even though handler.pays_workers is False."""
-        self.assertFalse(_ProofStageHandler.pays_workers)            # the dead flag
+    def test_payability_is_data_driven(self):
+        """credits_workers (data) makes the stage payable — no handler flag involved."""
         self.adda.current_stage = self.proof_ws
         self.adda.save(update_fields=['current_stage'])
         with self.assertRaisesMessage(ValidationError, 'allocate at least one worker'):
