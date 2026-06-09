@@ -42,7 +42,9 @@ from production.models import (
 )
 from production.services.adda_service import advance_to_next_stage
 
-from ._shared import (
+# Absolute import — _shared stays in production/services/ (shared across stages);
+# this module moved into stages/layering/ (M2.8).
+from production.services._shared import (
     _ensure_assigned_worker,
     _ensure_can_complete_layering,
     _ensure_can_manage,

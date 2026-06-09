@@ -19,7 +19,7 @@ from .product_size_service import (
     add_product_size, archive_product_size, reactivate_product_size,
     update_product_size,
 )
-from .layering_service import (
+from production.stages.layering.service import (
     attach_roll_to_layering,
     complete_layering,
     detach_roll_from_layering,
