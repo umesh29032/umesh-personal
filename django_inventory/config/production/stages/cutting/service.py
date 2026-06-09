@@ -53,7 +53,7 @@ from production.models import (
 )
 from production.services.adda_service import advance_to_next_stage
 
-from ._shared import _ensure_can_manage, reopen_stage_record
+from production.services._shared import _ensure_can_manage, reopen_stage_record
 
 # Module logger — debug fan-out of multi-table / cross-app cutting writes.
 logger = logging.getLogger(__name__)

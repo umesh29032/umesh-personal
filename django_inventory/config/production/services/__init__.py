@@ -33,7 +33,7 @@ from production.stages.layering.service import (
     sync_layering_workers_for_skill,
     update_layering_roll_entry,
 )
-from .cutting_service import (
+from production.stages.cutting.service import (
     add_bundle_item,
     add_item_to_bundle,
     add_pieces_to_bundle,
@@ -53,7 +53,7 @@ from .cutting_service import (
     start_cutting,
     upsert_breakup_row,
 )
-from .cutting_pattern_service import (
+from production.stages.cutting_pattern.service import (
     attach_photo as attach_pattern_photo,
     complete_pattern_stage,
     ensure_pattern_record,
@@ -66,7 +66,7 @@ from .cutting_pattern_service import (
     unverify_pattern,
     verify_pattern,
 )
-from .barcode_generation_service import (
+from production.stages.barcode_generation.service import (
     complete_barcode_generation,
     generate_barcodes,
     get_barcode_snapshot,
