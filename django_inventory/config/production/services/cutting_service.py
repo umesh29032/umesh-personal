@@ -1034,7 +1034,9 @@ def complete_cutting_from_bundles(*, adda: Adda, user) -> CuttingRecord:
         raise ValidationError("Adda is not at the cutting stage.")
 
     try:
-        sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=wf)
+        # WF-4: lock the stage row so a concurrent completer blocks here and then
+        # sees completed_at set below — prevents double-advance / double-freeze.
+        sr = AddaStageRecord.objects.select_for_update().get(adda=adda, workflow_stage=wf)
     except AddaStageRecord.DoesNotExist:
         raise ValidationError("Stage not started — assign workers first.")
     if sr.completed_at is not None:

@@ -660,7 +660,9 @@ def complete_layering(
         raise ValidationError("layer_length_meters must be > 0")
 
     try:
-        sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=stage)
+        # WF-4: lock the stage row so a concurrent completer blocks here and then
+        # sees completed_at set below — prevents double-advance / double-freeze.
+        sr = AddaStageRecord.objects.select_for_update().get(adda=adda, workflow_stage=stage)
     except AddaStageRecord.DoesNotExist:
         raise ValidationError("Layering stage hasn't been started yet")
     if sr.completed_at is not None:
