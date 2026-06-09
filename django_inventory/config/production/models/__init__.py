@@ -58,6 +58,7 @@ from .barcode import (
 )
 from .worker_task import (
     WorkerStageTask,
+    WorkerStageContribution,
 )
 
 __all__ = [
@@ -86,6 +87,7 @@ __all__ = [
     'BarcodeGenerationRecord',
     'LabelPrintQueue',
     'WorkerStageTask',
+    'WorkerStageContribution',
     '_cutting_pattern_video_path',
     '_cutting_pattern_photo_path',
 ]

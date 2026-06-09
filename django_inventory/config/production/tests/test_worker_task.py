@@ -14,7 +14,8 @@ from django.utils import timezone
 
 from accounts.models import User
 from production.models import (
-    Adda, AddaStageRecord, Product, Stage, WorkflowStage, WorkerStageTask,
+    Adda, AddaStageRecord, Product, Stage, WorkflowStage,
+    WorkerStageTask, WorkerStageContribution,
 )
 from production.services.worker_task_service import add_stage_worker, set_stage_workers
 
@@ -247,3 +248,43 @@ class ReadHelpersTest(TestCase):
         self.assertEqual(
             set(self.sr.active_worker_tasks().values_list('worker_id', flat=True)),
             {self.w1.pk})
+
+
+class ContributionModelTest(TestCase):
+    """V2-1c-i: WorkerStageContribution model + constraints (no UI/freeze yet)."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='CN', name='CN Product')
+        self.stage = Stage.objects.create(code='cn_stage', name='CN Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='CN-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.worker = User.objects.create_user(email='cn-worker@test', password='x')
+        self.task = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+
+    def test_reported_quantity_must_be_positive(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                WorkerStageContribution.objects.create(
+                    task=self.task, reported_quantity=Decimal('0'))
+
+    def test_multiple_lines_per_task(self):
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('120'))
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('80'))
+        self.assertEqual(self.task.contributions.count(), 2)
+
+    def test_expected_fields_null_until_frozen(self):
+        c = WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('5'))
+        # Option B: no money at report time — expected_* freeze only at complete (V2-1c-ii).
+        self.assertIsNone(c.expected_rate)
+        self.assertIsNone(c.expected_earning)
+        self.assertIsNone(c.verified_quantity)
+
+    def test_verified_quantity_negative_rejected(self):
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                WorkerStageContribution.objects.create(
+                    task=self.task, reported_quantity=Decimal('5'),
+                    verified_quantity=Decimal('-1'))
