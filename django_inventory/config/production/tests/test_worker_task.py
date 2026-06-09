@@ -8,6 +8,7 @@ import importlib
 from decimal import Decimal
 
 from django.apps import apps as django_apps
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -17,7 +18,9 @@ from production.models import (
     Adda, AddaStageRecord, Product, Stage, WorkflowStage,
     WorkerStageTask, WorkerStageContribution,
 )
-from production.services.worker_task_service import add_stage_worker, set_stage_workers
+from production.services.worker_task_service import (
+    add_stage_worker, complete_worker_task, report_contributions, set_stage_workers,
+)
 
 
 def _active_task_workers(sr):
@@ -288,3 +291,67 @@ class ContributionModelTest(TestCase):
                 WorkerStageContribution.objects.create(
                     task=self.task, reported_quantity=Decimal('5'),
                     verified_quantity=Decimal('-1'))
+
+
+class LifecycleServiceTest(TestCase):
+    """V2-1c-ii: report_contributions + complete_worker_task (expected_* freeze).
+    Option B — completion freezes a visibility snapshot, NEVER a ledger entry."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='LC', name='LC Product')
+        self.stage = Stage.objects.create(code='lc_stage', name='LC Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+        self.adda = Adda.objects.create(code='LC-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.worker = User.objects.create_user(email='lc-worker@test', password='x')
+        self.other = User.objects.create_user(email='lc-other@test', password='x')
+        self.task = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+
+    def test_report_creates_lines_and_sets_in_progress(self):
+        report_contributions(self.task, [{'reported_quantity': '120'},
+                                         {'reported_quantity': '80'}], actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.IN_PROGRESS)
+        self.assertEqual(self.task.contributions.count(), 2)
+
+    def test_report_non_actor_denied(self):
+        with self.assertRaises(PermissionDenied):
+            report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.other)
+
+    def test_report_zero_qty_rejected(self):
+        with self.assertRaises(ValidationError):
+            report_contributions(self.task, [{'reported_quantity': '0'}], actor=self.worker)
+
+    def test_complete_freezes_expected_no_ledger(self):
+        report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        complete_worker_task(self.task, actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)
+        self.assertIsNotNone(self.task.completed_at)
+        c = self.task.contributions.get()
+        self.assertEqual(c.expected_rate, Decimal('10.0000'))
+        self.assertEqual(c.expected_earning, Decimal('50.00'))   # 5 × 10
+
+    def test_frozen_expected_immutable_to_rate_change(self):
+        report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        complete_worker_task(self.task, actor=self.worker)
+        # Owner edits the rate-card LATER — the frozen snapshot must NOT move.
+        self.ws.cost_rate = Decimal('99')
+        self.ws.save(update_fields=['cost_rate'])
+        c = self.task.contributions.get()
+        c.refresh_from_db()
+        self.assertEqual(c.expected_rate, Decimal('10.0000'))
+        self.assertEqual(c.expected_earning, Decimal('50.00'))
+
+    def test_report_rejected_after_complete(self):
+        report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        complete_worker_task(self.task, actor=self.worker)
+        with self.assertRaises(ValidationError):
+            report_contributions(self.task, [{'reported_quantity': '3'}], actor=self.worker)
+
+    def test_complete_twice_rejected(self):
+        complete_worker_task(self.task, actor=self.worker)
+        with self.assertRaises(ValidationError):
+            complete_worker_task(self.task, actor=self.worker)

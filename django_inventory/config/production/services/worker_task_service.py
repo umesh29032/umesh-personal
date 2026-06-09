@@ -19,8 +19,12 @@ the active tasks with select_for_update. `add_stage_worker` is additive and
 lock-free (the skill-sync retro-tag path is not atomic).
 """
 import logging
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +97,80 @@ def add_stage_worker(stage_record, worker):
     if not has_active:
         WorkerStageTask.objects.create(
             stage_record=stage_record, worker_id=wid, **_new_task_kwargs(stage_record))
+
+
+# ── V2-1c: worker self-report + complete-freeze (Option B: NO ledger here) ──────
+
+def _ensure_task_actor(task, user):
+    """The task's own worker (reports/completes own work) OR management."""
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    if user_has_role(user, MANAGEMENT_ROLES):
+        return
+    if task.worker_id != getattr(user, 'pk', None):
+        raise PermissionDenied("not your task")
+
+
+@transaction.atomic
+def report_contributions(task, lines, *, actor):
+    """Worker submits reported production lines (append-only) for their task.
+
+    Each line = {reported_quantity, color_id?, size_id?, bundle_item_id?}. Creates
+    WorkerStageContribution rows; `expected_*` stay NULL (frozen later at complete —
+    Option B, no money here). Moves an `assigned` task to `in_progress`. Rejected
+    once the task is completed/verified/cancelled (locked after submit).
+    """
+    from production.models import WorkerStageContribution, WorkerStageTask
+    _ensure_task_actor(task, actor)
+    locked = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED,
+              WorkerStageTask.Status.CANCELLED)
+    if task.status in locked:
+        raise ValidationError("Cannot report on a completed or cancelled task.")
+    created = []
+    for line in lines:
+        qty = Decimal(str(line['reported_quantity']))
+        if qty <= 0:
+            raise ValidationError("reported_quantity must be greater than 0.")
+        created.append(WorkerStageContribution.objects.create(
+            task=task,
+            reported_quantity=qty,
+            color_id=line.get('color_id'),
+            size_id=line.get('size_id'),
+            bundle_item_id=line.get('bundle_item_id'),
+        ))
+    if task.status == WorkerStageTask.Status.ASSIGNED:
+        task.status = WorkerStageTask.Status.IN_PROGRESS
+        if task.started_at is None:
+            task.started_at = timezone.now()
+        task.save(update_fields=['status', 'started_at', 'updated_at'])
+    logger.info("worker_task.report task=%s lines=%s", task.pk, len(created))
+    return created
+
+
+@transaction.atomic
+def complete_worker_task(task, *, actor):
+    """Worker marks their task complete → FREEZE `expected_*` on each contribution
+    (`reported_quantity × the stage rate snapshot for this worker`). NO ledger entry
+    (Option B — payable is decided at Adda settlement). Immutable: a later rate edit
+    never rewrites these. Verification is OPTIONAL and does NOT gate this.
+    """
+    from production.models import WorkerStageTask
+    from production.services import cost_service
+    _ensure_task_actor(task, actor)
+    if task.status in (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED):
+        raise ValidationError("Task already completed.")
+    if task.status == WorkerStageTask.Status.CANCELLED:
+        raise ValidationError("Cannot complete a cancelled task.")
+    ws = task.stage_record.workflow_stage
+    # Same rate source as allocation_service: per-role override, else the stage rate.
+    rate = cost_service.role_rate_for(ws, task.worker.role) or ws.cost_rate or Decimal('0')
+    for c in task.contributions.all():
+        c.expected_rate = rate
+        c.expected_earning = (c.reported_quantity * rate).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_UP)
+        c.save(update_fields=['expected_rate', 'expected_earning', 'updated_at'])
+    task.status = WorkerStageTask.Status.COMPLETED
+    task.completed_at = timezone.now()
+    task.save(update_fields=['status', 'completed_at', 'updated_at'])
+    logger.info("worker_task.complete task=%s contributions=%s rate=%s",
+                task.pk, task.contributions.count(), rate)
+    return task
