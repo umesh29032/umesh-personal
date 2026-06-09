@@ -120,6 +120,17 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     from production.services.cost_service import clear_stage_cost
     clear_stage_cost(sr)
 
+    # PAY-3: reopen also reverses the allocation-driven WORKER EARNINGS for this
+    # stage. The frozen manufacturing cost is cleared above; the worker ledger
+    # credits must be voided too, else reopening leaves payable overstated.
+    # Re-complete re-allocates. (production -> expense, the allowed one-way edge.)
+    from expense.models import StageWorkAssignment
+    from expense.services import void_allocation
+    for assignment in list(
+        StageWorkAssignment.objects.filter(stage_record=sr, voided_at__isnull=True)
+    ):
+        void_allocation(assignment, user=user)
+
     adda.current_stage = wf
     adda.status = Adda.Status.IN_PROGRESS
     adda.completed_at = None
