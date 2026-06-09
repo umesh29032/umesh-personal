@@ -39,33 +39,26 @@ _CENT = Decimal('0.01')
 
 
 def _quantity_for(sr, method: str) -> Decimal | None:
-    """Resolve the cost quantity from the typed stage record by method.
+    """Resolve the cost quantity from the stage's HANDLER (registry-driven, M2.10#2).
 
-    per_layer  → LayeringRecord.lay_count
-    per_bundle → CuttingBundle row count for the cutting record
-    per_piece  → CuttingRecord.pieces_cut OR BarcodeGenerationRecord.total_barcodes
-    fixed_cost → None (cost = rate, quantity-independent)
+    Delegates to the stage handler's cost_quantity (which reads the typed record):
+      per_layer  → LayeringRecord.lay_count
+      per_bundle → CuttingBundle row count
+      per_piece  → CuttingRecord.pieces_cut OR BarcodeGenerationRecord.total_barcodes
+      fixed_cost → None (quantity-independent)
 
-    Returns None when the stage has no matching typed record (treated as
-    unpriced → processing_cost stays NULL, never 0).
+    Returns None when no quantity is available (unpriced → processing_cost stays
+    NULL, never 0) OR when the stage has no registered handler (preserves the
+    pre-M2.10 fallback). NULL != 0.00 — see compute_processing_cost.
     """
     if method == CostMethod.FIXED:
         return None
-    if method == CostMethod.PER_LAYER:
-        lr = getattr(sr, 'layering', None)
-        return Decimal(lr.lay_count) if lr is not None and lr.lay_count is not None else None
-    if method == CostMethod.PER_BUNDLE:
-        cr = getattr(sr, 'cutting', None)
-        return Decimal(cr.bundles.count()) if cr is not None else None
-    if method == CostMethod.PER_PIECE:
-        cr = getattr(sr, 'cutting', None)
-        if cr is not None and cr.pieces_cut is not None:
-            return Decimal(cr.pieces_cut)
-        bg = getattr(sr, 'barcode_generation', None)
-        if bg is not None and bg.total_barcodes is not None:
-            return Decimal(bg.total_barcodes)
+    # Import-safe here: production.stages.base does not back-import cost_service.
+    from production.stages import base as stage_registry
+    code = sr.workflow_stage.stage.code
+    if not stage_registry.has(code):
         return None
-    return None
+    return stage_registry.get(code).cost_quantity(sr)
 
 
 def compute_processing_cost(sr) -> tuple[str, Decimal | None, Decimal | None, Decimal | None]:

@@ -5,8 +5,6 @@ into this package only after dispatch is migrated and proven (post-M2.6).
 """
 from __future__ import annotations
 
-from decimal import Decimal
-
 from production.constants import STAGE_CUTTING_PATTERN
 from production.stages.base import CompletionResult, ReopenResult, StageHandler, register
 
@@ -46,5 +44,5 @@ class CuttingPatternHandler(StageHandler):
         return ReopenResult()
 
     def cost_quantity(self, record):
-        # Verification stage — no per-unit quantity (fixed / unpriced).
-        return Decimal('0')
+        # Verification stage — no per-unit quantity. None = unpriced (NULL), not 0.
+        return None

@@ -66,4 +66,4 @@ class LayeringHandler(StageHandler):
         # Priced per_layer → quantity = LayeringRecord.lay_count (mirrors
         # cost_service._quantity_for's per_layer branch).
         lr = getattr(record, 'layering', None)
-        return Decimal(lr.lay_count) if lr is not None and lr.lay_count is not None else Decimal('0')
+        return Decimal(lr.lay_count) if lr is not None and lr.lay_count is not None else None

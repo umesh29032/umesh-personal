@@ -69,8 +69,8 @@ class CuttingHandler(StageHandler):
     def cost_quantity(self, record):
         cr = getattr(record, 'cutting', None)
         if cr is None:
-            return Decimal('0')
+            return None   # no record -> unpriced (NULL), not 0
         # Mirrors cost_service._quantity_for: per_bundle -> bundle count, else pieces.
         if record.workflow_stage.cost_method == 'per_bundle':
             return Decimal(cr.bundles.count())
-        return Decimal(cr.pieces_cut) if cr.pieces_cut is not None else Decimal('0')
+        return Decimal(cr.pieces_cut) if cr.pieces_cut is not None else None

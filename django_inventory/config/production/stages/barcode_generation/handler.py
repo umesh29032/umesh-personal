@@ -50,4 +50,4 @@ class BarcodeGenerationHandler(StageHandler):
     def cost_quantity(self, record):
         # Priced per_piece → quantity = BarcodeGenerationRecord.total_barcodes.
         bg = getattr(record, 'barcode_generation', None)
-        return Decimal(bg.total_barcodes) if bg is not None and bg.total_barcodes is not None else Decimal('0')
+        return Decimal(bg.total_barcodes) if bg is not None and bg.total_barcodes is not None else None

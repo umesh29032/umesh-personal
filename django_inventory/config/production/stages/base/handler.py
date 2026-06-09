@@ -96,9 +96,11 @@ class StageHandler(ABC):
         """Stage-specific teardown for reopening (delete/reset typed child rows)."""
 
     @abstractmethod
-    def cost_quantity(self, record) -> Decimal:
+    def cost_quantity(self, record) -> Decimal | None:
         """The quantity this stage's processing cost is computed against
-        (pieces / bundles / layers), read from the typed record."""
+        (pieces / bundles / layers), read from the typed record. Returns None when
+        no quantity is available (unpriced) — NOT 0, so processing_cost stays NULL
+        (NULL = unpriced; 0.00 = priced-zero / grouped). See cost_service."""
 
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<StageHandler {self.code!r}>"
