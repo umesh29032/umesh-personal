@@ -103,5 +103,34 @@ class StageHandler(ABC):
         no quantity is available (unpriced) — NOT 0, so processing_cost stays NULL
         (NULL = unpriced; 0.00 = priced-zero / grouped). See cost_service."""
 
+    def contribution_schema(self, adda) -> dict:
+        """Declare the fields a WORKER reports for this stage's contribution lines —
+        the open-closed seam that keeps the worker report form stage-agnostic.
+
+        Default = a single quantity. A stage OVERRIDES to add dimensions/measures
+        (Cutting adds colour + size). The report view + template render + parse
+        generically from this schema; adding a stage needs NO worker-UI edit.
+
+        Shape:
+            {'line_label': str,
+             'fields': [{'key', 'kind', 'label', 'required', ...}, ...]}
+        `kind`: 'choice' (→ chip-picker; carries 'options':[{value,label,swatch?}])
+                | 'quantity' (→ numeric input; carries 'unit').
+        `key` maps 1:1 to the generic `lines` dict the services accept
+        (color_id / size_id / reported_quantity / bundle_item_id).
+
+        Stage-specific measures beyond today's columns (machine hours, defect count,
+        roll weight…) are a LOCKED future extension: a nullable `attributes` JSONB
+        on WorkerStageContribution + schema fields that map into it — added additively
+        when a real stage needs it. See docs/V2_FOUNDATION_REVIEW.md (F1, locked).
+        """
+        return {
+            'line_label': 'line',
+            'fields': [
+                {'key': 'reported_quantity', 'kind': 'quantity',
+                 'label': 'Quantity', 'required': True, 'unit': 'pieces'},
+            ],
+        }
+
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<StageHandler {self.code!r}>"

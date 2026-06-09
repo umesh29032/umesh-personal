@@ -73,3 +73,27 @@ class CuttingHandler(StageHandler):
         if record.workflow_stage.cost_method == 'per_bundle':
             return Decimal(cr.bundles.count())
         return Decimal(cr.pieces_cut) if cr.pieces_cut is not None else None
+
+    def contribution_schema(self, adda):
+        """REFERENCE impl of the open-closed worker-contribution schema: Cutting
+        workers report pieces per colour + size. Colours = active cloth palette;
+        sizes = the product's active ProductSizes. (Not the final shape of all
+        stages — a later stage-taxonomy review may revise this; the FRAMEWORK is the
+        point. Default base schema = quantity-only.)"""
+        from raw_materials.models import ClothColor
+        from production.models import ProductSize
+        colors = ClothColor.active.all().order_by('name')
+        sizes = ProductSize.objects.filter(
+            product=adda.product, is_active=True).order_by('display_order')
+        return {
+            'line_label': 'piece line',
+            'fields': [
+                {'key': 'color_id', 'kind': 'choice', 'label': 'Colour', 'required': False,
+                 'options': [{'value': c.pk, 'label': c.name, 'swatch': c.hex_code or ''}
+                             for c in colors]},
+                {'key': 'size_id', 'kind': 'choice', 'label': 'Size', 'required': False,
+                 'options': [{'value': s.pk, 'label': s.label} for s in sizes]},
+                {'key': 'reported_quantity', 'kind': 'quantity', 'label': 'Quantity',
+                 'required': True, 'unit': 'pieces'},
+            ],
+        }

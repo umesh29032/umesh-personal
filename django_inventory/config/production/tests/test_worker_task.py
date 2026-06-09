@@ -401,6 +401,46 @@ class DraftTest(TestCase):
             save_draft_contributions(self.task, [{'reported_quantity': '1'}], actor=self.worker)
 
 
+class ContributionSchemaTest(TestCase):
+    """V2-1c-iii: the worker report form is STAGE-DRIVEN (open-closed). Base default
+    = quantity-only; Cutting (reference impl) adds colour + size. A new stage needs
+    NO worker-UI edit — just its own schema."""
+
+    def test_base_default_is_quantity_only(self):
+        from production.stages.base import CompletionResult, ReopenResult, StageHandler
+
+        class _Bare(StageHandler):           # a stage that doesn't override the schema
+            code = 'bare'; name = 'Bare'; template_partial = 'x'
+            def snapshot(self, adda): return {}
+            def panel_context(self, request, adda, record): return {}
+            def start(self, *, user_id, adda, record, data): return record
+            def complete(self, *, user_id, adda, record, data): return CompletionResult()
+            def reopen(self, *, user_id, record): return ReopenResult()
+            def cost_quantity(self, record): return None
+
+        schema = _Bare().contribution_schema(adda=None)
+        keys = [f['key'] for f in schema['fields']]
+        self.assertEqual(keys, ['reported_quantity'])          # qty only, no colour/size
+
+    def test_cutting_reference_schema_has_colour_size_qty(self):
+        from raw_materials.models import ClothColor
+        from production.models import ProductSize
+        from production.stages.cutting.handler import CuttingHandler
+        product = Product.objects.create(code='CS', name='CS Product')
+        adda = Adda.objects.create(code='CS-001', product=product)
+        ClothColor.objects.get_or_create(name='Red', defaults={'hex_code': '#c0392b'})
+        ProductSize.objects.create(product=product, code='m', label='M', display_order=1)
+
+        schema = CuttingHandler().contribution_schema(adda)
+        by_key = {f['key']: f for f in schema['fields']}
+        self.assertEqual(set(by_key), {'color_id', 'size_id', 'reported_quantity'})
+        self.assertEqual(by_key['color_id']['kind'], 'choice')
+        self.assertEqual(by_key['reported_quantity']['kind'], 'quantity')
+        # options come from real data — open-closed render source
+        self.assertTrue(any(o['label'] == 'Red' for o in by_key['color_id']['options']))
+        self.assertTrue(any(o['label'] == 'M' for o in by_key['size_id']['options']))
+
+
 class IsolationGateTest(TestCase):
     """V2-1c-iv: a skilled worker may open a stage view ONLY if actively assigned
     (skill alone is not enough). Management bypasses. (The HIGH leak fix.)"""
