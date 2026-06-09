@@ -284,14 +284,6 @@ SESSION_COOKIE_SAMESITE = "Lax"   # cookie sirf same-site requests pe jaayegi �
 # request.session.modified = True whenever they mutate session data.
 SESSION_SAVE_EVERY_REQUEST = False  # performance: sirf tab DB write karo jab session data badla ho
 
-# ─── Stage engine (M2) ──────────────────────────────────────────────────────────
-# Strangler flag: when True, StagePanelView dispatches per-stage panel context
-# through the stage handler registry (production.stages) instead of the legacy
-# if/elif. Flipped ON 2026-06-09 after parity was proven
-# (test_stage_dispatch_parity); the legacy branch stays as a fallback until it is
-# removed in M2.6c, then this flag goes away.
-STAGE_REGISTRY_ENABLED = True
-
 # ─── Logging ──────────────────────────────────────────────────────────────────
 # Logging — ensure the logs directory exists before Django tries to write to it
 _LOG_DIR = BASE_DIR / 'logs'

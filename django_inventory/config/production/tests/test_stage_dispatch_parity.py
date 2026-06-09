@@ -1,14 +1,13 @@
-"""M2.6: StagePanelView dispatch parity (strangler).
+"""M2.6: StagePanelView registry dispatch.
 
-Proves the registry-driven panel context (STAGE_REGISTRY_ENABLED=True) is identical
-to the legacy if/elif (flag off), and that the registry path renders end-to-end.
-The handler's panel_context delegates to the same _build_*_context the legacy branch
-calls, so parity is structural — this guards against that ever drifting.
+The legacy if/elif was removed in M2.6c after parity was proven; StagePanelView now
+builds per-stage context only through the registry. This guards that the registry
+dispatch yields the stage builder's context and renders end-to-end.
 """
 from datetime import date
 from decimal import Decimal
 
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from accounts.models import Skill, User
@@ -48,26 +47,28 @@ class StageDispatchParityTest(TestCase):
                 entry=e, remaining_weight_kg=Decimal('0'),
                 remaining_length_meters=Decimal('0'), user=self.user)
 
-    def _panel_ctx(self, enabled):
+    def _panel_ctx(self):
         view = StagePanelView()
         view.kwargs = {'code': self.adda.code, 'stage_type': 'layering'}
         req = RequestFactory().get('/')
         req.user = self.user
         view.request = req
-        with override_settings(STAGE_REGISTRY_ENABLED=enabled):
-            return view.get_context_data()
+        return view.get_context_data()
 
-    def test_registry_and_legacy_same_context_keys(self):
-        legacy = self._panel_ctx(False)
-        registry = self._panel_ctx(True)
-        self.assertEqual(set(legacy.keys()), set(registry.keys()))
-        self.assertEqual(registry['stage_type'], 'layering')
-        self.assertEqual(registry['adda'].pk, self.adda.pk)
+    def test_registry_dispatch_builds_stage_context(self):
+        from production.views.stage_views import _build_layering_context
+        ctx = self._panel_ctx()
+        req = RequestFactory().get('/')
+        req.user = self.user
+        builder_keys = set(_build_layering_context(req, self.adda).keys())
+        # Registry-driven panel context includes the stage builder's keys + base.
+        self.assertTrue(builder_keys <= set(ctx.keys()))
+        self.assertEqual(ctx['stage_type'], 'layering')
+        self.assertEqual(ctx['adda'].pk, self.adda.pk)
 
     def test_registry_path_renders_200(self):
         self.client.force_login(self.user)
         url = reverse('production:stage-panel',
                       kwargs={'code': self.adda.code, 'stage_type': 'layering'})
-        with override_settings(STAGE_REGISTRY_ENABLED=True):
-            resp = self.client.get(url + '?embedded=1')
+        resp = self.client.get(url + '?embedded=1')
         self.assertEqual(resp.status_code, 200)

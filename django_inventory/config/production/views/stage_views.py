@@ -289,38 +289,13 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin,
         ctx['adda'] = adda
         ctx['stage_type'] = stage_type
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
-        # Stage panel context. Strangler (M2.6): when the flag is on AND a handler
-        # is registered for this stage, dispatch through the registry — its
-        # panel_context delegates to the SAME _build_*_context below, so the context
-        # is identical (proven by test_stage_dispatch_parity). Otherwise the legacy
-        # if/elif runs unchanged.
-        from django.conf import settings as _settings
-        if getattr(_settings, 'STAGE_REGISTRY_ENABLED', False):
-            from production.stages import base as stage_registry
-            if stage_registry.has(stage_type):
-                ctx.update(stage_registry.get(stage_type).panel_context(self.request, adda, None))
-                return ctx
-        if stage_type == STAGE_LAYERING:
-            ctx.update(_build_layering_context(self.request, adda))
-        elif stage_type == 'cutting_pattern':
-            # Lazy import — pattern_stage_views depends on services that
-            # touch Pillow / FileField storage; only loaded when this branch hits.
-            from production.views.pattern_stage_views import _build_pattern_context
-            ctx.update(_build_pattern_context(self.request, adda))
-        elif stage_type == STAGE_CUTTING:
-            # New cutting workspace context (PR3). Legacy CuttingForm
-            # still in context for products without cutting_pattern stage.
-            ctx['cutting_form'] = CuttingForm()
-            ctx['can_complete_cutting'] = (
-                user_has_role(self.request.user, MANAGEMENT_ROLES)
-                and adda.current_stage is not None
-                and adda.current_stage.stage_type == STAGE_CUTTING
-            )
-            ctx.update(_build_cutting_context(self.request, adda))
-        elif stage_type == 'barcode_generation':
-            # Lazy import to avoid touching tracking models at startup.
-            from production.views.barcode_gen_views import _build_barcode_gen_context
-            ctx.update(_build_barcode_gen_context(self.request, adda))
+        # Per-stage panel context via the stage handler registry (M2.6c — the
+        # legacy if/elif was removed once the registry path was proven at parity).
+        # Each handler's panel_context owns its stage's render context; an unknown
+        # stage (no registered handler) just gets the base context.
+        from production.stages import base as stage_registry
+        if stage_registry.has(stage_type):
+            ctx.update(stage_registry.get(stage_type).panel_context(self.request, adda, None))
         return ctx
 
 
