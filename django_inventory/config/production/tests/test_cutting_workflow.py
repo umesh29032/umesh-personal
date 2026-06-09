@@ -89,6 +89,11 @@ class CuttingWorkflowFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises cutting mechanics, not payroll.
+        # Cutting is seeded credits_workers=True (mig 0030); the worker-allocation
+        # guard is covered separately by test_stage_credit. Not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         # Patterns + Assignments
         ProductPatternAssignment.objects.filter(product=cls.product).delete()

@@ -97,6 +97,11 @@ class _BgWorkflowFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises barcode-gen mechanics, not payroll.
+        # Cutting is seeded credits_workers=True (mig 0030) -> would otherwise need a
+        # worker allocation to complete. Not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         # Attach barcode_generation Stage to T-SHIRT workflow as last stage
         bg_stage = Stage.objects.get(code=STAGE_BARCODE_GENERATION)

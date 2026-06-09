@@ -998,7 +998,9 @@ def complete_cutting_legacy(
         from tracking.services import generate_for_cutting
         generate_for_cutting(cr)
 
-    advance_to_next_stage(adda, user)
+    # Legacy compatibility path opts OUT of PAY-2 worker-credit enforcement
+    # (decision: legacy flows are not part of the new payroll architecture).
+    advance_to_next_stage(adda, user, enforce_worker_credit=False)
     logger.info(
         "cutting.complete path=legacy adda=%s cutting_record=%s pieces_cut=%s "
         "worker_count=%s inline_barcodes=%s",

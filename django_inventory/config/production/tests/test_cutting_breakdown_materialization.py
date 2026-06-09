@@ -87,6 +87,10 @@ class _WorkspaceCuttingFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises breakdown/barcode mechanics, not
+        # payroll. Cutting is seeded credits_workers=True (mig 0030); not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         ProductPatternAssignment.objects.filter(product=cls.product).delete()
         cls.front = ProductPattern.objects.get_or_create(

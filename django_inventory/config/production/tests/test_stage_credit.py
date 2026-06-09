@@ -62,3 +62,29 @@ class StageCreditTest(TestCase):
         self.ws.credits_workers = False
         self.ws.save(update_fields=['credits_workers'])
         ensure_worker_credit(self.sr)   # no raise even with zero allocations
+
+    # ── M2.7c wiring: advance_to_next_stage enforces the guard ───────────────
+    def test_advance_blocks_payable_stage_without_allocation(self):
+        from production.services import advance_to_next_stage
+        self.adda.current_stage = self.ws
+        self.adda.save(update_fields=['current_stage'])
+        with self.assertRaisesMessage(ValidationError, 'allocate at least one worker'):
+            advance_to_next_stage(self.adda, self.mgr)
+
+    def test_advance_passes_with_allocation(self):
+        from production.services import advance_to_next_stage
+        allocate_stage_work(
+            user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=2)
+        self.adda.current_stage = self.ws
+        self.adda.save(update_fields=['current_stage'])
+        advance_to_next_stage(self.adda, self.mgr)            # no raise
+        self.adda.refresh_from_db()
+        self.assertEqual(self.adda.status, self.adda.Status.COMPLETED)   # only stage -> done
+
+    def test_advance_legacy_optout_skips_guard(self):
+        from production.services import advance_to_next_stage
+        self.adda.current_stage = self.ws
+        self.adda.save(update_fields=['current_stage'])
+        advance_to_next_stage(self.adda, self.mgr, enforce_worker_credit=False)   # no raise
+        self.adda.refresh_from_db()
+        self.assertEqual(self.adda.status, self.adda.Status.COMPLETED)

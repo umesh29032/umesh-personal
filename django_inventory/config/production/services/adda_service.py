@@ -133,8 +133,13 @@ def create_adda(user, *, product: Product) -> Adda:
 
 
 @transaction.atomic
-def advance_to_next_stage(adda: Adda, user) -> Adda:
+def advance_to_next_stage(adda: Adda, user, *, enforce_worker_credit: bool = True) -> Adda:
     """Adda ko next WorkflowStage pe move karta hai. Last stage ke baad COMPLETED.
+
+    enforce_worker_credit: PAY-2 (M2.7c). When True (default), a PAYABLE stage being
+    left (WorkflowStage.credits_workers + self-paid) must have >=1 non-voided worker
+    allocation or completion is blocked. Legacy paths pass False to opt out
+    (compatibility-only flow, per the payroll architecture decision).
 
     Stage services (complete_layering / complete_cutting, in layering_service /
     cutting_service) iss helper ko call karte hain typed record save hone ke baad.
@@ -161,6 +166,12 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     # the same atomic block, so the quantity is authoritative here.
     from production.services.cost_service import freeze_stage_cost
     leaving_sr = AddaStageRecord.objects.filter(adda=adda, workflow_stage=cur).first()
+    # PAY-2 (M2.7c): block completing a payable stage with zero worker allocations.
+    # Runs BEFORE the freeze so nothing is mutated on rejection. No-op for
+    # non-payable stages; legacy callers opt out via enforce_worker_credit=False.
+    if enforce_worker_credit and leaving_sr is not None:
+        from production.stages.base import ensure_worker_credit
+        ensure_worker_credit(leaving_sr)
     if leaving_sr is not None:
         freeze_stage_cost(leaving_sr, user=user)
 

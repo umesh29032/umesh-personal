@@ -86,6 +86,10 @@ class _ExportFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises barcode-export mechanics, not payroll.
+        # Cutting is seeded credits_workers=True (mig 0030); not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
         bg_stage = Stage.objects.get(code=STAGE_BARCODE_GENERATION)
         max_order = WorkflowStage.objects.filter(product=cls.product).count()
         cls.bg_wf, _ = WorkflowStage.objects.get_or_create(
