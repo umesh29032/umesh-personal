@@ -89,6 +89,14 @@ class WorkerStageTask(TimeStampedModel):
         ]
         ordering = ['stage_record', 'worker']
 
+    @property
+    def is_draft(self) -> bool:
+        """True while the worker's submission is still a DRAFT (not yet completed).
+        Draft lines are operational convenience only — EXCLUDED from business truth
+        (costing/settlement/earnings/readiness, which read only completed tasks).
+        Business truth begins at complete (verification keeps it truth too)."""
+        return self.status not in (self.Status.COMPLETED, self.Status.VERIFIED)
+
     def __str__(self):
         return f'{self.worker_id} @ {self.stage_record_id} ({self.status})'
 

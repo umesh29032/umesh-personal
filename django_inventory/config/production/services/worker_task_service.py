@@ -147,6 +147,26 @@ def report_contributions(task, lines, *, actor):
 
 
 @transaction.atomic
+def save_draft_contributions(task, lines, *, actor):
+    """Save the worker's DRAFT contribution lines — operational convenience, NOT
+    business truth. REPLACES the task's current draft lines (so a worker can keep
+    editing); allowed only while the task is not completed/cancelled. Drafts are
+    excluded from costing/settlement/earnings/readiness (those read only COMPLETED
+    tasks via `task.is_draft`). Business truth begins at complete_worker_task().
+
+    Drafts are not history → clearing + rewriting them is safe (unlike completed
+    work, which is immutable).
+    """
+    from production.models import WorkerStageTask
+    _ensure_task_actor(task, actor)
+    if task.status in (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED,
+                       WorkerStageTask.Status.CANCELLED):
+        raise ValidationError("Cannot edit a completed or cancelled submission.")
+    task.contributions.all().delete()           # draft ≠ history → safe to replace
+    return report_contributions(task, lines, actor=actor)
+
+
+@transaction.atomic
 def complete_worker_task(task, *, actor):
     """Worker marks their task complete → FREEZE `expected_*` on each contribution
     (`reported_quantity × the stage rate snapshot for this worker`). NO ledger entry

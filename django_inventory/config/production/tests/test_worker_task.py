@@ -19,7 +19,8 @@ from production.models import (
     WorkerStageTask, WorkerStageContribution,
 )
 from production.services.worker_task_service import (
-    add_stage_worker, complete_worker_task, report_contributions, set_stage_workers,
+    add_stage_worker, complete_worker_task, report_contributions,
+    save_draft_contributions, set_stage_workers,
 )
 
 
@@ -355,6 +356,49 @@ class LifecycleServiceTest(TestCase):
         complete_worker_task(self.task, actor=self.worker)
         with self.assertRaises(ValidationError):
             complete_worker_task(self.task, actor=self.worker)
+
+
+class DraftTest(TestCase):
+    """V2-1c-iii: lightweight drafts (no engine). Draft = task not completed →
+    editable + excluded from business truth; truth begins at Submit & Complete."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='DR', name='DR Product')
+        self.stage = Stage.objects.create(code='dr_stage', name='DR Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+        self.adda = Adda.objects.create(code='DR-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.worker = User.objects.create_user(email='dr-worker@test', password='x')
+        self.task = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
+
+    def test_draft_saves_lines_and_is_draft(self):
+        save_draft_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.IN_PROGRESS)
+        self.assertTrue(self.task.is_draft)                       # not business truth yet
+        self.assertEqual(self.task.contributions.count(), 1)
+
+    def test_draft_replaces_not_appends(self):
+        save_draft_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        save_draft_contributions(self.task, [{'reported_quantity': '7'},
+                                             {'reported_quantity': '9'}], actor=self.worker)
+        # Replaced, not appended — only the latest draft survives.
+        qs = self.task.contributions.all()
+        self.assertEqual(qs.count(), 2)
+        self.assertEqual(set(qs.values_list('reported_quantity', flat=True)),
+                         {Decimal('7'), Decimal('9')})
+
+    def test_submit_after_draft_freezes_and_locks(self):
+        save_draft_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
+        complete_worker_task(self.task, actor=self.worker)       # Submit & Complete
+        self.task.refresh_from_db()
+        self.assertFalse(self.task.is_draft)                      # now business truth
+        c = self.task.contributions.get()
+        self.assertEqual(c.expected_earning, Decimal('50.00'))    # frozen 5 × 10
+        with self.assertRaises(ValidationError):                  # locked
+            save_draft_contributions(self.task, [{'reported_quantity': '1'}], actor=self.worker)
 
 
 class IsolationGateTest(TestCase):
