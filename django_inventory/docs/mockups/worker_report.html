@@ -105,6 +105,22 @@
 
   .mock-note{max-width:760px; margin:0 auto 16px; font-size:12px; color:var(--stone);
         background:#fff8e6; border:1px dashed var(--copper); border-radius:10px; padding:8px 12px;}
+  .state-tag{max-width:760px; margin:26px auto 12px; font-size:11px; font-weight:700;
+        letter-spacing:.08em; text-transform:uppercase; color:var(--copper);}
+
+  /* ── Locked / read-only (post Submit & Complete) ───────────────────────────── */
+  .submitted-chip{background:rgba(22,128,80,.22)!important; border-color:rgba(22,128,80,.45)!important; color:#bff0d4!important;}
+  .status-banner{background:rgba(22,128,80,.10); border:1px solid rgba(22,128,80,.35); color:#15663f;
+        border-radius:12px; padding:14px 18px; margin-bottom:18px; display:flex; gap:10px; align-items:flex-start; font-size:13.5px;}
+  .status-banner b{color:#0f4d2f;}
+  .ro-line{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px;
+        background:var(--surface-2); border:1px solid var(--border-card); border-radius:12px; margin-bottom:10px;}
+  .ro-dims{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .ro-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 11px; background:var(--cream);
+        border:1px solid var(--border-card); border-radius:999px; font-size:13px; color:var(--ink);}
+  .ro-qty{font-family:'Cormorant Garamond',Georgia,serif; font-size:22px; font-weight:700; color:var(--ink); white-space:nowrap;}
+  .ro-qty small{font-family:inherit; font-size:11px; color:var(--stone); font-weight:400;}
+  .locked-foot{margin-top:16px; font-size:12.5px; color:var(--stone); text-align:center;}
 
   @media (max-width:600px){
     body{padding:14px 10px;}
@@ -117,7 +133,9 @@
 </head>
 <body>
 
-<div class="mock-note">🎨 MOCKUP · V2-1c-iii worker self-report — static preview for review. Wires to <code>report_contributions()</code> + <code>complete_worker_task()</code> (built + tested). No money shown (Option B); no factory totals / other workers (isolation).</div>
+<div class="mock-note">🎨 MOCKUP · V2-1c-iii worker self-report — static preview for review. <b>This is a CUTTING-stage EXAMPLE</b>, not a universal form: the contribution schema (here colour/size/qty) is <b>stage-driven</b> — the stage engine stays open-closed, so future stages declare their own fields. Wires to <code>save_draft_contributions()</code> + <code>complete_worker_task()</code> (built + tested). No money shown (Option B); no factory totals / other workers (isolation). Shows two states below: <b>① editable draft</b> and <b>② submitted (locked)</b>.</div>
+
+<div class="state-tag">STATE ① — EDITABLE (draft / not yet submitted)</div>
 
 <div class="form-shell">
 
@@ -229,7 +247,7 @@
         </div>
         <div class="next-note">
           <span>ℹ️</span>
-          <span>Once you <b>submit &amp; complete</b>, this is your final report for the Cutting stage. Your pay is settled later when the Adda is closed — you don't need to do anything else here.</span>
+          <span>Once you <b>submit &amp; complete</b>, this report will be used for production tracking and future Adda settlement. <b>Payment is processed separately.</b></span>
         </div>
       </div>
     </div>
@@ -239,6 +257,58 @@
   <div class="sticky-actions">
     <button class="btn btn-ghost">Save draft</button>
     <button class="btn btn-primary">Submit &amp; complete work</button>
+  </div>
+
+</div>
+
+<!-- ════════════════ STATE ② — SUBMITTED (locked) ════════════════ -->
+<div class="state-tag">STATE ② — SUBMITTED (locked / read-only after Submit &amp; Complete)</div>
+<div class="form-shell">
+
+  <div class="hero">
+    <h1>Cutting</h1>
+    <p>Your work for this stage has been submitted.</p>
+    <span class="hero-chip submitted-chip">✓ SUBMITTED · T-SHIRT-001</span>
+  </div>
+
+  <div class="status-banner">
+    <span>✅</span>
+    <span>Your work report has been submitted. This report will be used for production tracking and future Adda settlement. <b>Payment is processed separately.</b><br>
+      <span style="opacity:.8">Waiting for stage completion.</span></span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">1</div><div class="panel-title">Your reported work</div></div>
+    <div class="panel-body">
+      <p class="panel-sub">Locked after submit — this is your final report. Need a change? Ask your manager.</p>
+      <div class="ro-line">
+        <div class="ro-dims">
+          <span class="ro-pill"><span class="swatch" style="background:#c0392b"></span>Red</span>
+          <span class="ro-pill">M</span>
+        </div>
+        <div class="ro-qty">120 <small>pcs</small></div>
+      </div>
+      <div class="ro-line">
+        <div class="ro-dims">
+          <span class="ro-pill"><span class="swatch" style="background:#2c5aa0"></span>Blue</span>
+          <span class="ro-pill">L</span>
+        </div>
+        <div class="ro-qty">80 <small>pcs</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">2</div><div class="panel-title">Your total</div></div>
+    <div class="panel-body">
+      <div class="stage-summary">
+        <div class="summary-grid">
+          <div><span class="lbl">Pieces you reported</span><span class="val">200</span></div>
+          <div><span class="lbl">Lines</span><span class="val">2</span></div>
+        </div>
+      </div>
+      <div class="locked-foot">No buttons here — your report is final. Only a manager can correct it if needed.</div>
+    </div>
   </div>
 
 </div>
