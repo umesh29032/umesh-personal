@@ -42,7 +42,17 @@ FINANCIAL_ROLES = {ROLE_SUPER_ADMIN, ROLE_ACCOUNTANT}
 # ── Permission helpers ──────────────────────────────────────────────────────
 
 def user_role_code(user) -> str | None:
-    """Return the user's primary Role.code, falling back to the legacy user_type field."""
+    """Return the user's access role code.
+
+    Only two things grant access:
+      1. is_superuser → ROLE_SUPER_ADMIN (always wins)
+      2. user.role FK → role.code
+
+    UserType does NOT grant access — it is display/classification only (a
+    role-less user gets no privileged role, no matter their type). This is the
+    architecture rule: "Role grants access, never User Type." A user with no
+    Role can log in and see the Dashboard, nothing more.
+    """
     if not user or not user.is_authenticated:
         return None
     if user.is_superuser:
@@ -50,15 +60,7 @@ def user_role_code(user) -> str | None:
     role = getattr(user, 'role', None)
     if role:
         return role.code
-    legacy = getattr(user, 'user_type', None)
-    # Spec user_type set (2026-06-02). 'supplier'/'normal' map to None — no
-    # privileged role; such users log in + see Dashboard only. This is a SAFETY
-    # fallback only: every existing role=None user was assigned an explicit Role
-    # in accounts 0011, and the create form requires a Role, so new users always
-    # have one. user_type does NOT gate access — Role does.
-    legacy_map = {'superadmin': ROLE_SUPER_ADMIN, 'admin': ROLE_SUPER_ADMIN,
-                  'worker': ROLE_WORKER, 'supplier': None, 'normal': None}
-    return legacy_map.get(legacy)
+    return None
 
 
 def user_role_codes(user) -> set[str]:
@@ -134,6 +136,48 @@ def user_has_perm(user, perm_codename: str) -> bool:
         return True
     # Django default check — groups + user_permissions M2M.
     return user.has_perm(perm_codename)
+
+
+def user_principal(user) -> dict:
+    """Resolve + request-cache the user's RBAC identity: {role_ids, skill_ids}.
+
+    The user's roles/skills don't change within a single request, but the sidebar
+    build, the URL access-check, and SidebarAccessMiddleware each need them — so
+    we compute the id-sets ONCE and stash them on the user instance (which is
+    request-scoped). This is the single source of "who is this user, RBAC-wise",
+    so stage access + sidebar + middleware all agree.
+
+    Tolerates anonymous users and bare-ORM mock users (tests) by returning
+    empty sets and skipping the cache when the attribute can't be set.
+    """
+    cached = getattr(user, '_rbac_principal', None)
+    if cached is not None:
+        return cached
+
+    role_ids: set[int] = set()
+    skill_ids: set[int] = set()
+    if user and getattr(user, 'is_authenticated', False):
+        if getattr(user, 'role_id', None):
+            role_ids.add(user.role_id)
+        extra = getattr(user, 'extra_roles', None)
+        if extra is not None:
+            try:
+                role_ids.update(extra.values_list('id', flat=True))
+            except (AttributeError, TypeError):
+                pass
+        skills = getattr(user, 'skills', None)
+        if skills is not None:
+            try:
+                skill_ids.update(skills.values_list('id', flat=True))
+            except (AttributeError, TypeError):
+                pass
+
+    principal = {'role_ids': role_ids, 'skill_ids': skill_ids}
+    try:
+        user._rbac_principal = principal
+    except (AttributeError, TypeError):
+        pass  # immutable / mock user — fine, just don't cache
+    return principal
 
 
 # ── Menu registry ───────────────────────────────────────────────────────────
@@ -304,7 +348,7 @@ def _db_visible_url_names(user) -> tuple[set[str], set[str]] | None:
         return (set(), set())
 
     # Lazy import — permission_service is imported very early in app startup.
-    from inventory.models import SidebarItemRule
+    from accounts.models import SidebarItemRule
 
     rules = list(
         SidebarItemRule.objects.prefetch_related('allowed_roles', 'allowed_skills').all()
@@ -312,22 +356,21 @@ def _db_visible_url_names(user) -> tuple[set[str], set[str]] | None:
     if not rules:
         return None  # table empty → fall back to hardcoded predicate
 
-    user_role_ids: set[int] = set()
-    if getattr(user, 'role_id', None):
-        user_role_ids.add(user.role_id)
-    user_role_ids.update(user.extra_roles.values_list('id', flat=True))
-    user_skill_ids: set[int] = set(user.skills.values_list('id', flat=True))
+    principal = user_principal(user)
+    user_role_ids = principal['role_ids']
+    user_skill_ids = principal['skill_ids']
 
     visible: set[str] = set()
     managed: set[str] = set()
     for rule in rules:
         managed.add(rule.url_name)
-        allowed_role_ids = set(rule.allowed_roles.values_list('id', flat=True))
-        if allowed_role_ids & user_role_ids:
+        # `.all()` reads the prefetch_related cache (0 extra queries). Using
+        # `.values_list()` here would IGNORE the prefetch and fire a fresh query
+        # PER rule — the N+1 that made every page render ~50+ RBAC queries.
+        if {r.id for r in rule.allowed_roles.all()} & user_role_ids:
             visible.add(rule.url_name)
             continue
-        allowed_skill_ids = set(rule.allowed_skills.values_list('id', flat=True))
-        if allowed_skill_ids & user_skill_ids:
+        if {s.id for s in rule.allowed_skills.all()} & user_skill_ids:
             visible.add(rule.url_name)
     return (visible, managed)
 
@@ -427,26 +470,54 @@ def can_access_url_name(user, url_name: str) -> bool:
     if user_has_role(user, {ROLE_SUPER_ADMIN}):
         return True
 
-    from inventory.models import SidebarItemRule
-    rule = (
-        SidebarItemRule.objects
-        .filter(url_name=url_name)
-        .prefetch_related('allowed_roles', 'allowed_skills')
-        .first()
-    )
+    from accounts.models import SidebarItemRule
+    rule = SidebarItemRule.objects.filter(url_name=url_name).first()
     if rule is None:
         return True
 
-    role_ids: set[int] = set()
-    if getattr(user, 'role_id', None):
-        role_ids.add(user.role_id)
-    role_ids.update(user.extra_roles.values_list('id', flat=True))
-    if set(rule.allowed_roles.values_list('id', flat=True)) & role_ids:
+    # Reuse the request-cached principal (this runs in middleware for both the
+    # target URL and the referer on every request — don't re-query the user's
+    # roles/skills each time).
+    principal = user_principal(user)
+    if {r.id for r in rule.allowed_roles.all()} & principal['role_ids']:
         return True
-    skill_ids = set(user.skills.values_list('id', flat=True))
-    if set(rule.allowed_skills.values_list('id', flat=True)) & skill_ids:
+    if {s.id for s in rule.allowed_skills.all()} & principal['skill_ids']:
         return True
     return False
+
+
+def explain_visibility(user, url_name: str) -> str:
+    """Diagnostic: explain WHY `user` can / can't see the item under `url_name`.
+
+    Mirrors the same 3-layer precedence as build_menu_for / can_access_url_name
+    (super-admin bypass → DB SidebarItemRule → in-code predicate fallback), so
+    "why can't X see Y?" is a one-call answer instead of a manual trace through
+    the code predicate + the DB rule + the middleware. Surface on the Access hub.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return f"'{url_name}': hidden — anonymous (login required)."
+    if user_has_role(user, {ROLE_SUPER_ADMIN}):
+        return f"'{url_name}': visible — Super Admin sees everything (built-in bypass)."
+
+    from accounts.models import SidebarItemRule
+    rule = SidebarItemRule.objects.filter(url_name=url_name).first()
+    if rule is None:
+        return (
+            f"'{url_name}': no SidebarItemRule row (unmanaged) — NOT governed by "
+            f"the Access Control panel; falls back to the in-code menu predicate "
+            f"and the view's own permission mixin."
+        )
+    principal = user_principal(user)
+    rule_role_ids = {r.id for r in rule.allowed_roles.all()}
+    rule_skill_ids = {s.id for s in rule.allowed_skills.all()}
+    if rule_role_ids & principal['role_ids']:
+        return f"'{url_name}': visible — DB rule role overlap (user role ∈ {sorted(rule_role_ids)})."
+    if rule_skill_ids & principal['skill_ids']:
+        return f"'{url_name}': visible — DB rule skill overlap (user skill ∈ {sorted(rule_skill_ids)})."
+    return (
+        f"'{url_name}': hidden — a SidebarItemRule exists but the user matches "
+        f"none of its roles {sorted(rule_role_ids)} or skills {sorted(rule_skill_ids)}."
+    )
 
 
 # ── View-layer helpers ──────────────────────────────────────────────────────
@@ -510,8 +581,8 @@ ROLE_EDITOR_SECTIONS: tuple[tuple[str, str, tuple[tuple[str, str], ...]], ...] =
         'Administration',
         'Roles, sidebar visibility rules, and reusable Skills.',
         (
-            ('inventory', 'role'),
-            ('inventory', 'sidebaritemrule'),
+            ('accounts', 'role'),
+            ('accounts', 'sidebaritemrule'),
             ('accounts', 'skill'),
         ),
     ),

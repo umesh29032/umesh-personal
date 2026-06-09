@@ -103,7 +103,7 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         # (built-in defense). Admins edit access on the Stage library
         # (/production/stages/). (Old StageAccessRule table was dropped in
         # migration 0011.)
-        from inventory.services import MANAGEMENT_ROLES, user_has_role
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
         from production.services import stage_access_map
 
         user = self.request.user

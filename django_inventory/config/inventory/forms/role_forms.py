@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import Permission
 
 from ..models import Role
-from ..services.permission_service import (
+from accounts.services.permission_service import (
     ROLE_EDITABLE_APPS,
     ROLE_EDITABLE_MODELS_EXCLUDED,
 )

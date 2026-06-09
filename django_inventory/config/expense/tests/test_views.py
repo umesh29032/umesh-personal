@@ -68,7 +68,8 @@ class ExpenseViewTests(TestCase):
         adda = create_adda(self.mgr, product=Product.objects.get(code='NIKKAR'))
         sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         ws = sr.workflow_stage
-        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_rate'])
+        ws.cost_billed_at = None  # ungroup layering (migration 0026) to price it for earning tests
+        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_billed_at', 'cost_rate'])
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.worker, allocated_quantity=10)  # payable 20
         adv = record_advance(user=self.mgr, worker=self.worker, amount=8)                                # outstanding 8
 
@@ -116,7 +117,8 @@ class PayrollDataIsolationTests(TestCase):
         adda = create_adda(self.mgr, product=Product.objects.get(code='NIKKAR'))
         sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         ws = sr.workflow_stage
-        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_rate'])
+        ws.cost_billed_at = None  # ungroup layering (migration 0026) to price it for earning tests
+        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_billed_at', 'cost_rate'])
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.a, allocated_quantity=10)  # A earns 20
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.b, allocated_quantity=7)   # B earns 14
 

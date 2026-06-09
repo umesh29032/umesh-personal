@@ -8,7 +8,7 @@ test_func() False → 403 Forbidden.
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 
-from inventory.services import (
+from accounts.services import (
     MANAGEMENT_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role,
 )
 

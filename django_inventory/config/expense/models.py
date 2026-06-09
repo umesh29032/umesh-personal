@@ -28,13 +28,8 @@ Discipline (mirrors history_service):
 from django.conf import settings
 from django.db import models
 
-
-class TimeStampedModel(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
+# Shared base — created_at/updated_at. Single source in core (was duplicated per app).
+from core.models import TimeStampedModel
 
 
 class StageWorkAssignment(TimeStampedModel):
@@ -101,6 +96,22 @@ class StageWorkAssignment(TimeStampedModel):
             models.Index(fields=['stage_record']),
         ]
         ordering = ['-created_at']
+        constraints = [
+            # You always allocate SOME work; rate/amount may be 0 for grouped /
+            # zero-cost stages (cost rolled up to a paying stage) but never < 0.
+            models.CheckConstraint(
+                check=models.Q(allocated_quantity__gt=0),
+                name='expense_swa_quantity_positive',
+            ),
+            models.CheckConstraint(
+                check=models.Q(earning_rate_snapshot__gte=0),
+                name='expense_swa_rate_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(earning_amount_snapshot__gte=0),
+                name='expense_swa_amount_nonneg',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.worker} · {self.allocated_quantity} × {self.earning_rate_snapshot} = {self.earning_amount_snapshot}"
@@ -168,6 +179,10 @@ class WorkerLedgerEntry(TimeStampedModel):
             models.Index(fields=['worker', '-created_at']),
             models.Index(fields=['worker', 'entry_type']),
             models.Index(fields=['worker', 'category']),
+            # Ledger is append-only — grows forever. Statements/settlement
+            # windows filter by entry_date, so index it (per-worker + global).
+            models.Index(fields=['worker', 'entry_date']),
+            models.Index(fields=['entry_date']),
         ]
         ordering = ['-created_at']
         permissions = [
@@ -181,6 +196,12 @@ class WorkerLedgerEntry(TimeStampedModel):
             models.UniqueConstraint(
                 fields=['reverses'], condition=models.Q(reverses__isnull=False),
                 name='uniq_one_reversal_per_entry',
+            ),
+            # amount is ALWAYS positive — direction lives in entry_type. DB
+            # backstop mirroring ledger_service._create_entry (rejects amt<=0).
+            models.CheckConstraint(
+                check=models.Q(amount__gt=0),
+                name='expense_ledgerentry_amount_positive',
             ),
         ]
 
@@ -206,8 +227,19 @@ class WorkerAdvance(TimeStampedModel):
     )
 
     class Meta:
-        indexes = [models.Index(fields=['worker', '-advance_date'])]
+        indexes = [
+            models.Index(fields=['worker', '-advance_date']),
+            # Cross-worker reports ("all advances this month") filter advance_date.
+            models.Index(fields=['advance_date']),
+        ]
         ordering = ['-advance_date', '-created_at']
+        constraints = [
+            # An advance is cash handed over — must be a positive amount.
+            models.CheckConstraint(
+                check=models.Q(amount__gt=0),
+                name='expense_advance_amount_positive',
+            ),
+        ]
 
     def __str__(self):
         return f"Advance {self.amount} → {self.worker} on {self.advance_date}"
@@ -254,12 +286,32 @@ class PayrollSettlement(TimeStampedModel):
     class Meta:
         indexes = [models.Index(fields=['worker', '-settlement_date'])]
         ordering = ['-settlement_date', '-created_at']
+        constraints = [
+            # All settlement money snapshots are non-negative (amount_paid can be
+            # 0 when a settlement only recovers advances; never < 0).
+            models.CheckConstraint(
+                check=models.Q(amount_paid__gte=0),
+                name='expense_settlement_paid_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(advance_deducted__gte=0),
+                name='expense_settlement_advdeducted_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(payable_before__gte=0),
+                name='expense_settlement_payablebefore_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(advance_outstanding_before__gte=0),
+                name='expense_settlement_advoutstanding_nonneg',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.reference} · {self.worker} · paid {self.amount_paid}"
 
 
-class PayrollSettlementItem(models.Model):
+class PayrollSettlementItem(TimeStampedModel):
     """One advance-recovery line of a settlement — owner-controlled (D3).
 
     The settlement screen lists every outstanding advance; the owner types how
@@ -277,6 +329,13 @@ class PayrollSettlementItem(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=['advance'])]
+        constraints = [
+            # A recovery line only exists to recover a positive amount.
+            models.CheckConstraint(
+                check=models.Q(amount_recovered__gt=0),
+                name='expense_settlementitem_recovered_positive',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.settlement.reference}: −{self.amount_recovered} from adv#{self.advance_id}"

@@ -10,7 +10,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.views.generic import TemplateView
 
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.models import Adda, AddaStageRecord
 from expense.models import StageWorkAssignment
 
@@ -28,6 +28,9 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         ctx = super().get_context_data(**kwargs)
         addas = list(
             Adda.objects.select_related('product', 'current_stage__stage')
+            # Annotate pieces in ONE query — shadows the Adda.total_pieces
+            # property so we don't fire a per-Adda aggregate in the loop (N+1).
+            .annotate(pieces=Sum('barcode_batches__total_pieces'))
             .order_by('-started_at')[:200]
         )
         # Total manufacturing cost per Adda (only frozen+priced stage rows).
@@ -57,7 +60,7 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             rows.append({
                 'adda': a,
                 'current_stage': a.current_stage.stage.name if a.current_stage else '—',
-                'pieces': a.total_pieces,
+                'pieces': a.pieces or 0,   # annotation (see queryset), not the N+1 property
                 'total_cost': cost,
                 'worker_earnings': earn_map.get(a.pk, 0),
                 'unpriced': unpriced_map.get(a.pk, 0),

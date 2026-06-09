@@ -21,11 +21,14 @@ complete_* funnels through). Clear site: har `reopen_*`.
 """
 from __future__ import annotations
 
+import logging  # module logger — debug-trace money writes (cost freeze/clear)
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 
 from production.models import CostMethod
+
+logger = logging.getLogger(__name__)
 
 # Columns this module owns — written together as one atomic UPDATE.
 _COST_FIELDS = [
@@ -99,6 +102,14 @@ def freeze_stage_cost(sr, *, user=None):
     Idempotent — safe to re-run on re-complete after a reopen; overwrites the
     snapshot and advances cost_frozen_at. Does its OWN save(update_fields=[...])
     so it never depends on the caller's narrow update_fields list.
+
+    Side effects:
+      • Writes AddaStageRecord cost columns (cost_method_snapshot,
+        cost_rate_snapshot, cost_quantity_snapshot, processing_cost,
+        cost_frozen_at, updated_at) — the frozen money snapshot.
+      • Reads WorkflowStage (method/rate/cost_billed_at) + typed stage records
+        (LayeringRecord/CuttingRecord/CuttingBundle/BarcodeGenerationRecord) via
+        compute_processing_cost for the quantity. No cross-app service calls.
     """
     method, rate, qty, cost = compute_processing_cost(sr)
     sr.cost_method_snapshot = method
@@ -107,12 +118,24 @@ def freeze_stage_cost(sr, *, user=None):
     sr.processing_cost = cost
     sr.cost_frozen_at = timezone.now()
     sr.save(update_fields=_COST_FIELDS)
+    logger.info(
+        "cost.freeze adda=%s stage_record=%s workflow_stage=%s method=%s "
+        "rate=%s qty=%s processing_cost=%s user=%s",
+        getattr(sr, 'adda_id', None), sr.pk, sr.workflow_stage_id,
+        method or None, rate, qty, cost, getattr(user, 'pk', None),
+    )
     return sr
 
 
 def clear_stage_cost(sr):
     """Wipe the cost snapshot (for reopen). A reopened-but-not-recompleted
     stage must carry NO money; re-complete re-freezes via advance_to_next_stage.
+
+    Side effects:
+      • Writes AddaStageRecord cost columns (cost_method_snapshot,
+        cost_rate_snapshot, cost_quantity_snapshot, processing_cost,
+        cost_frozen_at, updated_at) back to empty/NULL — clears the money
+        snapshot. No reads of other models, no cross-app service calls.
     """
     sr.cost_method_snapshot = ''
     sr.cost_rate_snapshot = None
@@ -120,6 +143,10 @@ def clear_stage_cost(sr):
     sr.processing_cost = None
     sr.cost_frozen_at = None
     sr.save(update_fields=_COST_FIELDS)
+    logger.info(
+        "cost.clear adda=%s stage_record=%s workflow_stage=%s",
+        getattr(sr, 'adda_id', None), sr.pk, sr.workflow_stage_id,
+    )
     return sr
 
 

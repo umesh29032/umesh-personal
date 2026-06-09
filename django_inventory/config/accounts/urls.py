@@ -22,7 +22,8 @@ from .views import (
     LoginView, VerifyOTPView, HomeView, LogoutView, ResendOTPView,
     UserListView, UserCreateView, UserUpdateView, UserDeleteView, PasswordLoginView,
     SignupView, SignupVerifyView, ForgotPasswordView, ResetPasswordVerifyView, ResendSignupOTPView,
-    SkillListView, SkillCreateView, SkillUpdateView, SkillDeleteView
+    SkillListView, SkillCreateView, SkillUpdateView, SkillDeleteView,
+    UserTypeListView, UserTypeCreateView, UserTypeUpdateView, UserTypeDeleteView,
 )
 
 app_name = "accounts"
@@ -60,4 +61,10 @@ urlpatterns = [
     path("skills/add/", SkillCreateView.as_view(), name="skill_add"),
     path("skills/<int:pk>/edit/", SkillUpdateView.as_view(), name="skill_edit"),
     path("skills/<int:pk>/delete/", SkillDeleteView.as_view(), name="skill_delete"),
+
+    # ── User Type management (Super Admin only) ───────────────────────────────
+    path("user-types/", UserTypeListView.as_view(), name="usertype_list"),
+    path("user-types/add/", UserTypeCreateView.as_view(), name="usertype_add"),
+    path("user-types/<int:pk>/edit/", UserTypeUpdateView.as_view(), name="usertype_edit"),
+    path("user-types/<int:pk>/delete/", UserTypeDeleteView.as_view(), name="usertype_delete"),
 ]

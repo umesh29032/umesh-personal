@@ -3,7 +3,7 @@
 YEH FILE KYU HAI?
 ─────────────────
 Layering workflow ke saare HTTP entry points yahan hain. Saara business logic
-production.services.stage_service mein hai — views sirf:
+production.services (layering_service / cutting_service) mein hai — views sirf:
   1. Form render karna
   2. POST validate karna
   3. Service call karna
@@ -25,6 +25,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -33,7 +34,7 @@ from django.views.generic import FormView, TemplateView
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.forms import (
     AttachRollForm, CompleteLayeringForm, CuttingDraftForm,
     CuttingForm, CuttingStartForm, EditRollEntryForm, StartLayeringForm,
@@ -45,7 +46,8 @@ from production.models import (
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle,
-    attach_roll_to_layering, complete_cutting, complete_layering,
+    attach_roll_to_layering, complete_cutting_from_bundles,
+    complete_cutting_legacy, complete_layering,
     create_bundle_with_pieces, delete_breakup_row, delete_bundle,
     delete_bundle_item, detach_roll_from_layering, get_cutting_snapshot,
     get_layering_snapshot, get_suggested_breakup, preview_barcode_batches,
@@ -192,7 +194,7 @@ def _build_layering_context(request, adda: Adda) -> dict:
 
     # Master data for filter dropdowns + quick-create form pre-fill
     from raw_materials.models import ClothColor, ClothType, StorageLocation
-    from inventory.services import user_can_edit_financials
+    from accounts.services import user_can_edit_financials
     cloth_colors = ClothColor.active.order_by('name')
     cloth_types = ClothType.active.order_by('name')
     storage_locations = StorageLocation.active.order_by('name')
@@ -215,7 +217,6 @@ def _build_layering_context(request, adda: Adda) -> dict:
         # Pre-populated from stage_record.draft_* fields persisted by save_layering_draft.
         'complete_form': CompleteLayeringForm(initial={
             'layer_length_meters': sr.draft_layer_length_meters if sr else None,
-            'duration_minutes': sr.draft_duration_minutes if sr else None,
             'notes': sr.draft_notes if sr else '',
         }) if can_draft else None,
         'can_assign': can_assign,
@@ -756,7 +757,6 @@ class LayeringCompleteView(_LayeringActionBase):
         # only apply on action=complete and are enforced server-side below.
         form.is_valid()
         layer_length = form.cleaned_data.get('layer_length_meters')
-        duration = form.cleaned_data.get('duration_minutes')
         notes = form.cleaned_data.get('notes', '')
 
         per_entry = self._parse_per_entry_data(request)
@@ -770,7 +770,7 @@ class LayeringCompleteView(_LayeringActionBase):
             save_layering_draft(
                 adda=adda,
                 layer_length_meters=layer_length,
-                duration_minutes=duration,
+                duration_minutes=None,            # duration auto-computed at complete
                 notes=notes,
                 per_entry_data=per_entry_normalized,
                 user=request.user,
@@ -816,10 +816,14 @@ class LayeringCompleteView(_LayeringActionBase):
             return redirect(self.workspace_url(code, request))
 
         per_entry_layers = {e.pk: e.layers_on_roll for e in entries}
+        # Duration auto-calculated from timestamps (stage-duration-rule): layering
+        # duration = now − adda.started_at, in whole minutes (min 1). No manual input.
+        elapsed_min = (timezone.now() - adda.started_at).total_seconds() / 60
+        auto_duration = max(1, round(elapsed_min))
         try:
             complete_layering(
                 adda=adda,
-                duration_minutes=duration,
+                duration_minutes=auto_duration,
                 layer_length_meters=layer_length,
                 per_entry_layers=per_entry_layers,
                 notes=notes,
@@ -872,7 +876,7 @@ class CuttingCompleteView(LoginRequiredMixin, ProductionRoleMixin, FormView):
     def form_valid(self, form):
         adda = self.get_adda()
         try:
-            cr = complete_cutting(
+            cr = complete_cutting_legacy(
                 adda=adda,
                 pieces_cut=form.cleaned_data['pieces_cut'],
                 worker_ids=[u.pk for u in form.cleaned_data.get('workers') or []],
@@ -1156,7 +1160,7 @@ class CuttingWorkspaceCompleteView(_CuttingActionBase):
     def post(self, request, code):
         adda = _get_adda(code)
         try:
-            cr = complete_cutting(adda=adda, user=request.user)
+            cr = complete_cutting_from_bundles(adda=adda, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))

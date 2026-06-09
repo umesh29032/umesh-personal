@@ -31,6 +31,7 @@ PERMISSIONS:
 """
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -40,7 +41,7 @@ from django.utils import timezone
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
 from production.constants import (
     STAGE_BARCODE_GENERATION, STAGE_CUTTING, STAGE_CUTTING_PATTERN,
 )
@@ -52,7 +53,10 @@ from production.models import (
 )
 from production.services.adda_service import advance_to_next_stage
 
-from ._shared import _ensure_can_manage
+from ._shared import _ensure_can_manage, reopen_stage_record
+
+# Module logger — debug fan-out of multi-table / cross-app cutting writes.
+logger = logging.getLogger(__name__)
 
 
 # ── Auth gates ─────────────────────────────────────────────────────────────
@@ -69,7 +73,7 @@ def _ensure_cutting_skill(user):
 
 def _ensure_can_complete_cutting(user):
     """Complete + advance — helper skill or super_admin only."""
-    if user_has_role(user, {'super_admin'}):
+    if user_has_role(user, {ROLE_SUPER_ADMIN}):
         return
     if not user_has_skill(user, SKILL_CUTTING_MASTER_HELPER):
         raise PermissionDenied(
@@ -152,6 +156,10 @@ def _materialize_breakdown(cr: CuttingRecord, user) -> int:
     (unique_together cutting_record + size + color).
 
     Returns: total breakdown rows materialised.
+
+    Side effects:
+      • Writes AddaProductSizeColorPieceBreakdown rows (get_or_create per
+        (size, color), or one NULL/NULL legacy row from pieces_cut).
     """
     from collections import defaultdict
     adda = cr.stage_record.adda
@@ -179,6 +187,10 @@ def _materialize_breakdown(cr: CuttingRecord, user) -> int:
                     'created_by': user,
                 },
             )
+        logger.info(
+            "cutting.materialize_breakdown adda=%s cutting_record=%s rows=%s mode=bundles",
+            adda.code, cr.id, len(agg),
+        )
         return len(agg)
     # Legacy: no bundle items → single (NULL, NULL) row from pieces_cut.
     if cr.pieces_cut > 0:
@@ -189,6 +201,11 @@ def _materialize_breakdown(cr: CuttingRecord, user) -> int:
                 'verified_piece_count': cr.pieces_cut,
                 'created_by': user,
             },
+        )
+        logger.info(
+            "cutting.materialize_breakdown adda=%s cutting_record=%s rows=1 "
+            "mode=legacy pieces_cut=%s",
+            adda.code, cr.id, cr.pieces_cut,
         )
         return 1
     return 0
@@ -391,18 +408,28 @@ def _get_layering_record_for_adda(adda: Adda):
 
 @transaction.atomic
 def start_cutting(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaStageRecord:
-    """Manager workers assign karta hai → stage formally start."""
+    """Manager workers assign karta hai → stage formally start.
+
+    Side effects:
+      • Writes AddaStageRecord (lazy get_or_create) + its workers M2M.
+      • Calls tracking.log_adda → writes AddaHistory (WORKERS_ASSIGNED).
+    """
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied("only management can start the cutting stage")
     sr = _get_or_create_cutting_stage_record(adda)
-    sr.workers.set(list(worker_ids))
+    worker_id_list = list(worker_ids)
+    sr.workers.set(worker_id_list)
     if not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
     from tracking.services import log_adda
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
-             stage_record=sr, metadata={'worker_ids': list(worker_ids)})
+             stage_record=sr, metadata={'worker_ids': worker_id_list})
+    logger.info(
+        "cutting.start adda=%s stage_record=%s worker_count=%s worker_ids=%s",
+        adda.code, sr.id, len(worker_id_list), worker_id_list,
+    )
     return sr
 
 
@@ -433,6 +460,11 @@ def create_bundle(
 
     Idempotent: same size → returns existing bundle (and updates bundle_number
     if newly provided). Doesn't create any items.
+
+    Side effects:
+      • Writes CuttingBundle (get_or_create per (cutting_record, size)).
+      • Lazy-creates AddaStageRecord + CuttingRecord if missing.
+      • On first create: calls tracking.log_adda → AddaHistory (BUNDLE_CREATED).
     """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
@@ -459,6 +491,10 @@ def create_bundle(
         from tracking.models import AddaHistory
         log_adda(adda, AddaHistory.ChangeType.BUNDLE_CREATED, user,
                  stage_record=sr, metadata={'bundle_id': bundle.id, 'size_id': size_id})
+    logger.info(
+        "cutting.create_bundle adda=%s bundle=%s size_id=%s created=%s",
+        adda.code, bundle.id, size_id, created,
+    )
     return bundle
 
 
@@ -528,6 +564,11 @@ def add_pieces_to_bundle(
       • increment breakup.consumed_count
 
     Atomic — any over-take rejects the whole batch.
+
+    Side effects:
+      • Writes CuttingBundleItem rows (get_or_create / count increment).
+      • Updates CuttingPieceBreakup.consumed_count (locked rows).
+      • Recomputes + writes CuttingBundle.total_pieces.
     """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
@@ -585,6 +626,12 @@ def add_pieces_to_bundle(
         raise ValidationError("No valid selections (all take counts were zero).")
 
     _recompute_bundle_total(bundle)
+    logger.info(
+        "cutting.add_pieces_to_bundle adda=%s bundle=%s items=%s "
+        "breakups_touched=%s bundle_total=%s",
+        adda.code, bundle.id, len(created_items),
+        len(breakup_to_recompute), bundle.total_pieces,
+    )
     return created_items
 
 
@@ -597,6 +644,11 @@ def add_item_to_bundle(
 
     Idempotent: same (bundle, pattern, color) → count UPDATE.
     Validates bundle belongs to this adda's cutting record.
+
+    Side effects:
+      • Writes CuttingBundleItem (update_or_create).
+      • If item sourced from a breakup: recomputes CuttingPieceBreakup.consumed_count.
+      • Recomputes + writes CuttingBundle.total_pieces.
     """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
@@ -629,6 +681,12 @@ def add_item_to_bundle(
     if item.source_breakup_id is not None:
         _recompute_breakup_consumed(item.source_breakup)
     _recompute_bundle_total(bundle)
+    logger.info(
+        "cutting.add_item_to_bundle adda=%s bundle=%s item=%s pattern_id=%s "
+        "color_id=%s count=%s bundle_total=%s",
+        adda.code, bundle.id, item.id, pattern_id, color_id, count,
+        bundle.total_pieces,
+    )
     return item
 
 
@@ -642,6 +700,14 @@ def add_bundle_item(
     Bundle (per-size header) lazy-created on first item for that size.
     bundle_number, if passed, updates the bundle's label (last write wins).
     Same (bundle, pattern, color) duplicate → count UPDATE.
+
+    Side effects:
+      • Lazy-creates AddaStageRecord + CuttingRecord if missing.
+      • Writes CuttingBundle (get_or_create per (cutting_record, size)).
+      • Writes CuttingBundleItem (update_or_create).
+      • On bundle create: calls tracking.log_adda → AddaHistory (BUNDLE_CREATED).
+      • If item sourced from a breakup: recomputes CuttingPieceBreakup.consumed_count.
+      • Recomputes + writes CuttingBundle.total_pieces.
     """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
@@ -687,13 +753,25 @@ def add_bundle_item(
     if item.source_breakup_id is not None:
         _recompute_breakup_consumed(item.source_breakup)
     _recompute_bundle_total(bundle)
+    logger.info(
+        "cutting.add_bundle_item adda=%s bundle=%s item=%s size_id=%s "
+        "pattern_id=%s color_id=%s count=%s bundle_total=%s",
+        adda.code, bundle.id, item.id, size_id, pattern_id, color_id, count,
+        bundle.total_pieces,
+    )
     return item
 
 
 @transaction.atomic
 def delete_bundle_item(*, adda: Adda, item_id: int, user) -> None:
     """Remove one line item. Restores consumed_count on source breakup row.
-    Auto-deletes parent bundle if empty."""
+    Auto-deletes parent bundle if empty.
+
+    Side effects:
+      • Deletes CuttingBundleItem row.
+      • If sourced from a breakup: recomputes CuttingPieceBreakup.consumed_count.
+      • Recomputes CuttingBundle.total_pieces; deletes the bundle if now empty.
+    """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
     if sr.completed_at is not None:
@@ -719,13 +797,24 @@ def delete_bundle_item(*, adda: Adda, item_id: int, user) -> None:
     if source is not None:
         _recompute_breakup_consumed(source)
     _recompute_bundle_total(bundle)
-    if bundle.total_pieces == 0:
+    bundle_deleted = bundle.total_pieces == 0
+    if bundle_deleted:
         bundle.delete()
+    logger.info(
+        "cutting.delete_bundle_item adda=%s bundle=%s item=%s "
+        "bundle_deleted=%s",
+        adda.code, bundle.id, item_id, bundle_deleted,
+    )
 
 
 @transaction.atomic
 def delete_bundle(*, adda: Adda, bundle_id: int, user) -> None:
-    """Remove entire bundle. Restores consumed_count on all source breakup rows."""
+    """Remove entire bundle. Restores consumed_count on all source breakup rows.
+
+    Side effects:
+      • Deletes CuttingBundle (cascades its CuttingBundleItem rows).
+      • Recomputes CuttingPieceBreakup.consumed_count for each source breakup.
+    """
     _ensure_cutting_skill(user)
     sr = _get_or_create_cutting_stage_record(adda)
     if sr.completed_at is not None:
@@ -753,6 +842,10 @@ def delete_bundle(*, adda: Adda, bundle_id: int, user) -> None:
     # Recompute consumed_count on each source breakup row.
     for sb in CuttingPieceBreakup.objects.filter(pk__in=source_ids):
         _recompute_breakup_consumed(sb)
+    logger.info(
+        "cutting.delete_bundle adda=%s bundle=%s source_breakups_recomputed=%s",
+        adda.code, bundle_id, len(source_ids),
+    )
 
 
 @transaction.atomic
@@ -831,36 +924,48 @@ def save_cutting_draft(
     return cr
 
 
-@transaction.atomic
 def complete_cutting(
     *, adda: Adda, user,
     pieces_cut: int | None = None,
     worker_ids: Iterable[int] | None = None,
     notes: str | None = None,
 ) -> CuttingRecord:
-    """Cutting stage finalize → barcodes generate → advance.
+    """Back-compat DISPATCHER — prefer the two explicit entry points below.
 
-    DUAL PATH:
-      • LEGACY (pieces_cut int passed): single-shot — creates sr + cr
-        from scratch, ignores breakup rows. Sequential barcodes.
-        Used by tests + products without cutting_pattern stage.
-      • WORKSPACE (pieces_cut=None): expects breakup rows pre-saved.
-        Strict validation per design doc §7.2. pieces_cut auto-derived.
-
-    Both paths advance stage.
+    Kept so existing callers (mostly tests) keep working, but NEW code should
+    call the named function for the path it means, so the permission gate +
+    validation regime are obvious at the call site (no sentinel-overload):
+      • `complete_cutting_legacy(...)`       — pieces_cut given; MANAGEMENT gate;
+                                               single-shot (NIKKAR-style / tests).
+      • `complete_cutting_from_bundles(...)` — pieces_cut=None; HELPER-SKILL gate;
+                                               validates pre-saved bundle rows.
+    Each path function owns its own @transaction.atomic.
     """
     if pieces_cut is not None:
-        return _complete_cutting_legacy(
+        return complete_cutting_legacy(
             adda=adda, pieces_cut=pieces_cut,
             worker_ids=worker_ids or [], notes=notes or '', user=user,
         )
-    return _complete_cutting_from_breakup(adda=adda, user=user)
+    return complete_cutting_from_bundles(adda=adda, user=user)
 
 
-def _complete_cutting_legacy(
+@transaction.atomic
+def complete_cutting_legacy(
     *, adda: Adda, pieces_cut: int, worker_ids: list[int], notes: str, user,
 ) -> CuttingRecord:
-    """Legacy single-shot — NIKKAR-style products with simple flow."""
+    """Legacy single-shot completion (pieces_cut given) — NIKKAR-style products
+    with a simple flow + the test fixtures. MANAGEMENT-role gated. Public so the
+    legacy CuttingCompleteView calls it explicitly (was `_complete_cutting_legacy`).
+
+    Side effects:
+      • Writes AddaStageRecord (created complete) + its workers M2M.
+      • Writes CuttingRecord (pieces_cut, notes).
+      • _materialize_breakdown → writes AddaProductSizeColorPieceBreakdown rows.
+      • If product has no barcode_generation stage: calls
+        tracking.generate_for_cutting → writes BarcodeBatch / barcode rows.
+      • advance_to_next_stage → mutates Adda.current_stage/status, may freeze
+        stage cost + write AddaHistory (cross-app: tracking + cost_service).
+    """
     _ensure_can_manage(user)
     stage = adda.current_stage
     if stage is None or stage.stage_type != STAGE_CUTTING:
@@ -888,17 +993,37 @@ def _complete_cutting_legacy(
 
     # Same back-compat branch as workspace path — products without
     # barcode_generation stage in workflow get inline barcode generation.
-    if not _product_has_barcode_gen_stage(adda):
+    inline_barcodes = not _product_has_barcode_gen_stage(adda)
+    if inline_barcodes:
         from tracking.services import generate_for_cutting
         generate_for_cutting(cr)
 
     advance_to_next_stage(adda, user)
+    logger.info(
+        "cutting.complete path=legacy adda=%s cutting_record=%s pieces_cut=%s "
+        "worker_count=%s inline_barcodes=%s",
+        adda.code, cr.id, pieces_cut, len(worker_ids or []), inline_barcodes,
+    )
     return cr
 
 
-def _complete_cutting_from_breakup(*, adda: Adda, user) -> CuttingRecord:
-    """Workspace path — actual CuttingBundle rows drive validation + barcode
-    generation. CuttingPieceBreakup is informational (verified plan only).
+@transaction.atomic
+def complete_cutting_from_bundles(*, adda: Adda, user) -> CuttingRecord:
+    """Workspace-path completion (pieces_cut=None). HELPER-SKILL gated. Public so
+    CuttingWorkspaceCompleteView calls it explicitly (was
+    `_complete_cutting_from_breakup`). Actual CuttingBundle rows drive validation
+    + barcode generation; CuttingPieceBreakup is informational (verified plan only).
+
+    Side effects (biggest fan-out in the codebase — completes + advances Cutting):
+      • Updates CuttingRecord.pieces_cut (denormalized total from bundle items).
+      • Stamps AddaStageRecord.completed_at / completed_by (state transition).
+      • _materialize_breakdown → writes AddaProductSizeColorPieceBreakdown rows.
+      • If product has no barcode_generation stage: calls cross-app
+        tracking.generate_for_cutting → writes BarcodeBatch + barcode rows.
+      • advance_to_next_stage → mutates Adda.current_stage/status, freezes the
+        stage's processing cost (cost_service, money write) and writes
+        AddaHistory via tracking (cross-app). Next stage's AddaStageRecord may
+        be lazy-created downstream.
     """
     _ensure_can_complete_cutting(user)
 
@@ -982,11 +1107,17 @@ def _complete_cutting_from_breakup(*, adda: Adda, user) -> CuttingRecord:
     # hai (legacy NIKKAR-style products), to barcodes yahin inline generate
     # ho jaate hain. Naye products jo bg stage include karte hain wo apne
     # barcode_generation stage par generate karenge.
-    if not _product_has_barcode_gen_stage(adda):
+    inline_barcodes = not _product_has_barcode_gen_stage(adda)
+    if inline_barcodes:
         from tracking.services import generate_for_cutting
         generate_for_cutting(cr)
 
     advance_to_next_stage(adda, user)
+    logger.info(
+        "cutting.complete path=workspace adda=%s cutting_record=%s "
+        "stage_record=%s pieces_cut=%s item_count=%s inline_barcodes=%s",
+        adda.code, cr.id, sr.id, total, len(items), inline_barcodes,
+    )
     return cr
 
 
@@ -1008,74 +1139,51 @@ def reopen_cutting(*, adda: Adda, user) -> AddaStageRecord:
       • Clear sr.completed_at + completed_by.
       • Adda.current_stage → cutting wf, status → IN_PROGRESS.
       • AddaHistory.STAGE_REOPENED entry.
+
+    Side effects:
+      • Deletes AddaProductSizeColorPieceBreakdown + BarcodeBatch rows.
+      • Clears AddaStageRecord.completed_at / completed_by (state transition).
+      • cost_service.clear_stage_cost → unfreezes the stage's processing cost
+        (money write, cross-app).
+      • Mutates Adda.current_stage / status / completed_at.
+      • tracking.log_adda → writes AddaHistory (STAGE_REOPENED).
     """
-    if not user_has_role(user, MANAGEMENT_ROLES):
-        raise PermissionDenied("only super_admin or manager can reopen the cutting stage")
-
-    wf = _cutting_workflow_stage(adda)
-    if wf is None:
-        raise ValidationError("This product has no cutting stage configured.")
-
-    try:
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=wf,
-        )
-    except AddaStageRecord.DoesNotExist:
-        raise ValidationError("Cutting stage has never been started.")
-    if sr.completed_at is None:
-        raise ValidationError("Cutting stage is already open for edits.")
-
-    from tracking.models import BarcodeBatch, BatchBarcode, BarcodeExportBatch
-
-    # Guard 1: any scanned piece blocks reopen
-    if BatchBarcode.objects.filter(adda=adda).exists():
-        raise ValidationError(
-            "Cannot reopen — at least one barcode has been scanned in production."
-        )
-
-    # Guard 2: downstream barcode_generation stage started/completed blocks
-    bg_wf = adda.product.workflow_stages.filter(
-        stage__code=STAGE_BARCODE_GENERATION,
-    ).first()
-    if bg_wf is not None:
-        bg_sr = AddaStageRecord.objects.filter(
+    def _guard(adda, sr, wf):
+        from tracking.models import BatchBarcode, BarcodeExportBatch
+        # 1: any scanned piece blocks reopen.
+        if BatchBarcode.objects.filter(adda=adda).exists():
+            raise ValidationError(
+                "Cannot reopen — at least one barcode has been scanned in production."
+            )
+        # 2: downstream barcode_generation started/completed blocks (partial
+        #    rollback would corrupt downstream state).
+        bg_wf = adda.product.workflow_stages.filter(
+            stage__code=STAGE_BARCODE_GENERATION,
+        ).first()
+        if bg_wf is not None and AddaStageRecord.objects.filter(
             adda=adda, workflow_stage=bg_wf,
-        ).exclude(started_at__isnull=True).first()
-        if bg_sr is not None:
+        ).exclude(started_at__isnull=True).exists():
             raise ValidationError(
                 "Cannot reopen — Barcode Generation stage has already been "
                 "started. Reopen Barcode Generation first."
             )
+        # 3: any export blocks reopen — vendor may have printed labels.
+        if BarcodeExportBatch.objects.filter(adda=adda).exists():
+            raise ValidationError(
+                "Cannot reopen — barcode exports exist. Cancel exports first."
+            )
 
-    # Guard 3: any export blocks reopen — vendor may have printed labels
-    if BarcodeExportBatch.objects.filter(adda=adda).exists():
-        raise ValidationError(
-            "Cannot reopen — barcode exports exist. Cancel exports first."
-        )
+    def _teardown(sr):
+        # Delete the materialised breakdown (re-made on re-complete) + all
+        # BarcodeBatch rows (one-shot regeneration rule).
+        from tracking.models import BarcodeBatch
+        AddaProductSizeColorPieceBreakdown.objects.filter(
+            cutting_record=sr.cutting,
+        ).delete()
+        BarcodeBatch.objects.filter(adda=sr.adda).delete()
+        return []
 
-    # Clear downstream artefacts. Breakdown rows materialised at completion
-    # — delete them so re-complete re-materialises fresh from current bundles.
-    AddaProductSizeColorPieceBreakdown.objects.filter(
-        cutting_record=sr.cutting,
-    ).delete()
-    # Delete BarcodeBatch rows so re-generation works (one-shot rule).
-    BarcodeBatch.objects.filter(adda=adda).delete()
-
-    sr.completed_at = None
-    sr.completed_by = None
-    sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
-
-    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
-    from production.services.cost_service import clear_stage_cost
-    clear_stage_cost(sr)
-
-    adda.current_stage = wf
-    adda.status = Adda.Status.IN_PROGRESS
-    adda.completed_at = None
-    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
-
-    from tracking.models import AddaHistory
-    from tracking.services import log_adda
-    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=wf)
-
-    return sr
+    return reopen_stage_record(
+        adda=adda, stage_code=STAGE_CUTTING, stage_label='Cutting',
+        user=user, guard=_guard, teardown=_teardown,
+    )

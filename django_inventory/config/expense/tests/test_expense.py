@@ -34,8 +34,11 @@ class ExpenseCoreTests(TestCase):
         self.sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         # Price the stage so allocation has a rate.
         ws = self.sr.workflow_stage
+        # Layering ships grouped-at-cutting (migration 0026). These earning tests
+        # use it as a priced vehicle, so ungroup + price it.
+        ws.cost_billed_at = None
         ws.cost_rate = Decimal('2')
-        ws.save(update_fields=['cost_rate'])
+        ws.save(update_fields=['cost_billed_at', 'cost_rate'])
 
     def test_allocation_is_quantity_driven_and_credits_ledger(self):
         a = allocate_stage_work(user=self.mgr, stage_record=self.sr,

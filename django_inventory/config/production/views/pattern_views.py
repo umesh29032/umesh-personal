@@ -37,7 +37,7 @@ from django.views.generic import (
     CreateView, DeleteView, ListView, TemplateView, UpdateView,
 )
 
-from inventory.services import user_has_perm
+from accounts.services import user_has_perm
 from production.models import Product, ProductPattern, ProductPatternAssignment
 
 

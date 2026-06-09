@@ -19,7 +19,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from accounts.models import Skill
 from inventory.models import Role
-from inventory.services import ROLE_SUPER_ADMIN, user_has_perm
+from accounts.services import ROLE_SUPER_ADMIN, user_has_perm
 from production.models import Stage, WorkflowStage
 
 

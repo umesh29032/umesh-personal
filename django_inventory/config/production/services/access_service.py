@@ -13,24 +13,9 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from inventory.services import MANAGEMENT_ROLES, user_has_role
-
-
-def _user_skill_ids(user) -> set[int]:
-    if not user or not user.is_authenticated:
-        return set()
-    return set(user.skills.values_list('id', flat=True))
-
-
-def _user_role_ids(user) -> set[int]:
-    """Primary role + extra_roles M2M combined into one set."""
-    if not user or not user.is_authenticated:
-        return set()
-    ids: set[int] = set()
-    if user.role_id:
-        ids.add(user.role_id)
-    ids.update(user.extra_roles.values_list('id', flat=True))
-    return ids
+# Stage access reuses the SAME request-cached identity resolver as the sidebar
+# (inventory.user_principal) — one definition of "who is this user, RBAC-wise".
+from accounts.services import MANAGEMENT_ROLES, user_has_role, user_principal
 
 
 def user_can_access_stage(user, stage_code: str) -> bool:
@@ -62,14 +47,12 @@ def user_can_access_stage(user, stage_code: str) -> bool:
     if stage is None:
         return False
 
-    allowed_skill_ids = set(stage.access_by_skill.values_list('id', flat=True))
-    if allowed_skill_ids & _user_skill_ids(user):
+    principal = user_principal(user)
+    # `.all()` uses the prefetch_related cache; `.values_list()` would re-query.
+    if {s.id for s in stage.access_by_skill.all()} & principal['skill_ids']:
         return True
-
-    allowed_role_ids = set(stage.access_by_role.values_list('id', flat=True))
-    if allowed_role_ids & _user_role_ids(user):
+    if {r.id for r in stage.access_by_role.all()} & principal['role_ids']:
         return True
-
     return False
 
 
@@ -93,8 +76,9 @@ def stage_access_map(user, stage_codes: Iterable[str]) -> dict[str, bool]:
         .filter(code__in=codes, is_active=True)
         .prefetch_related('access_by_skill', 'access_by_role')
     }
-    user_skills = _user_skill_ids(user)
-    user_roles = _user_role_ids(user)
+    principal = user_principal(user)
+    user_skills = principal['skill_ids']
+    user_roles = principal['role_ids']
 
     out: dict[str, bool] = {}
     for code in codes:
@@ -102,10 +86,9 @@ def stage_access_map(user, stage_codes: Iterable[str]) -> dict[str, bool]:
         if stage is None:
             out[code] = False
             continue
-        allowed_skills = set(stage.access_by_skill.values_list('id', flat=True))
-        if allowed_skills & user_skills:
+        # `.all()` uses the prefetch cache (0 extra queries per stage).
+        if {s.id for s in stage.access_by_skill.all()} & user_skills:
             out[code] = True
             continue
-        allowed_roles = set(stage.access_by_role.values_list('id', flat=True))
-        out[code] = bool(allowed_roles & user_roles)
+        out[code] = bool({r.id for r in stage.access_by_role.all()} & user_roles)
     return out

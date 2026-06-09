@@ -6,7 +6,7 @@ Skill checks alag se rakhe hain RBAC se. `inventory.services.permission_service`
 role-based gating handle karta hai — yahan `accounts.Skill` M2M ke checks.
 
 Future stage transitions (layering → cutting, cutting → packing, ...) skill
-type pe depend karte hain (production.services.stage_service yeh helpers call karta hai).
+type pe depend karte hain (production's stage services yeh helpers call karte hain).
 """
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from typing import Iterable
 
 
 # Skill name constants — string literals scatter na ho, isliye ek hi jagah.
-# Values match accounts.models.Skill.SKILL_TYPE_CHOICES.
+# Values must match the `Skill.name` slug stored in the DB (Skill is a model now,
+# not the old SKILL_TYPE_CHOICES enum).
 SKILL_CUTTING_MASTER = 'cutting_master'
 SKILL_CUTTING_MASTER_HELPER = 'cutting_master_helper'
 

@@ -4,36 +4,13 @@ Each form attaches the CroppableImageWidget with the correct dimensions
 and processes the image on save using Pillow.
 """
 from django import forms
-from django.core.files.uploadedfile import UploadedFile
 
 from .models import (
     HomePageConfig, Category, FeaturedProduct,
     HeroShowcaseCard, WhyUsCard,
 )
 from .widgets import CroppableImageWidget
-from .processors import process_image
-
-
-# ── Helper to build a save that processes image fields ────────────────────────
-
-def _process_image_fields(form, instance, field_specs):
-    """
-    For each (field_name, width, height) in field_specs, check if a new file
-    was uploaded, process it with Pillow, and assign back to the instance.
-    """
-    for field_name, target_w, target_h in field_specs:
-        uploaded = form.cleaned_data.get(field_name)
-        # Only process actual new uploads — not existing FieldFile references.
-        # UploadedFile = InMemoryUploadedFile or TemporaryUploadedFile (new upload).
-        # FieldFile = existing file on the model (not a new upload).
-        if not isinstance(uploaded, UploadedFile):
-            continue
-
-        crop_data_key = field_name + '_crop_data'
-        crop_json = form.data.get(crop_data_key, '')
-
-        processed = process_image(uploaded, crop_json, target_w, target_h)
-        setattr(instance, field_name, processed)
+from .services import image_service
 
 
 # ── HomePageConfig ───────────────────────────────────────────────────────────
@@ -49,10 +26,11 @@ class HomePageConfigForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        _process_image_fields(self, instance, [
-            ('hero_background_image', 1440, 600),
-            ('brand_logo', 200, 80),
-        ])
+        image_service.process_and_attach(
+            instance,
+            [('hero_background_image', 1440, 600), ('brand_logo', 200, 80)],
+            cleaned_data=self.cleaned_data, form_data=self.data,
+        )
         if commit:
             instance.save()
         return instance
@@ -70,9 +48,10 @@ class CategoryForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        _process_image_fields(self, instance, [
-            ('image', 400, 200),
-        ])
+        image_service.process_and_attach(
+            instance, [('image', 400, 200)],
+            cleaned_data=self.cleaned_data, form_data=self.data,
+        )
         if commit:
             instance.save()
         return instance
@@ -90,9 +69,10 @@ class FeaturedProductForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        _process_image_fields(self, instance, [
-            ('image', 400, 300),
-        ])
+        image_service.process_and_attach(
+            instance, [('image', 400, 300)],
+            cleaned_data=self.cleaned_data, form_data=self.data,
+        )
         if commit:
             instance.save()
         return instance
@@ -110,9 +90,10 @@ class HeroShowcaseCardForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        _process_image_fields(self, instance, [
-            ('image', 200, 200),
-        ])
+        image_service.process_and_attach(
+            instance, [('image', 200, 200)],
+            cleaned_data=self.cleaned_data, form_data=self.data,
+        )
         if commit:
             instance.save()
         return instance
@@ -130,9 +111,10 @@ class WhyUsCardForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        _process_image_fields(self, instance, [
-            ('image', 200, 200),
-        ])
+        image_service.process_and_attach(
+            instance, [('image', 200, 200)],
+            cleaned_data=self.cleaned_data, form_data=self.data,
+        )
         if commit:
             instance.save()
         return instance

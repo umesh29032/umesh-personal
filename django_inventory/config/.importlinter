@@ -1,0 +1,64 @@
+# Import-linter contract — enforces the acyclic app layering established in the
+# 2026-06 architecture remediation. Run from this directory (apps are importable
+# as top-level packages here):
+#
+#     pip install import-linter
+#     cd config && lint-imports
+#
+# A lightweight subset (foundation purity) is ALSO enforced in the test suite
+# without this dependency — see core/tests.py::FoundationPurityTests.
+
+[importlinter]
+root_packages =
+    core
+    accounts
+    inventory
+    raw_materials
+    production
+    tracking
+    expense
+    storefront
+
+# ── Contract 1: foundation apps depend on nothing higher ─────────────────────
+[importlinter:contract:foundation-purity]
+name = core + accounts import no domain app (module level)
+type = forbidden
+source_modules =
+    core
+    accounts
+forbidden_modules =
+    raw_materials
+    production
+    tracking
+    expense
+    inventory
+    storefront
+# accounts.services.user_service does a LAZY (function-body) production import for
+# the skill→layering retro-tag — intentional, not an import-load cycle.
+ignore_imports =
+    accounts.services.user_service -> production.services
+
+# ── Contract 2: target acyclic layering (top imports down, never up) ─────────
+# core (bottom) ← accounts ← raw_materials ← production ← tracking/expense ← apps
+[importlinter:contract:acyclic-layers]
+name = Acyclic app layering (target)
+type = layers
+layers =
+    storefront : expense : inventory
+    tracking
+    production
+    raw_materials
+    accounts
+    core
+# KNOWN EXCEPTION (TODO, deferred high-risk move): tracking.services still read
+# production models for barcode generation/export. The clean fix is to move the
+# barcode-generation ASSEMBLY into production and leave tracking a dumb barcode
+# range/scan + history primitive (takes plain IDs/values, imports no production).
+# Until then these upward edges are ignored so the rest of the layering is enforced:
+ignore_imports =
+    tracking.services.barcode_service -> production.models
+    tracking.services.barcode_export_service -> production.models
+    tracking.views.barcode_views -> production.models
+    tracking.views.export_views -> production.models
+    tracking.views.history_views -> production.models
+    tracking.views.dashboard -> production.models

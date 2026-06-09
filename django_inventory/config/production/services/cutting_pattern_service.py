@@ -42,6 +42,8 @@ from __future__ import annotations
 
 # io = in-memory binary buffer; Pillow ka compressed JPEG yahan likhte hain
 import io
+# logging = Python stdlib structured logger; debug ke liye multi-table ops trace
+import logging
 from typing import Iterable
 
 # Django ke standard exception types — view inhe pakad ke user-friendly
@@ -66,7 +68,7 @@ from accounts.skills import (
 )
 # RBAC helpers — MANAGEMENT_ROLES = {super_admin, manager}. Management bypass
 # har skill check pe (super admins always wins).
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
 # Hardcoded Stage.code constant. Service kis WorkflowStage ko lookup kare —
 # wo Stage row jiska code='cutting_pattern'.
 from production.constants import STAGE_CUTTING_PATTERN
@@ -79,6 +81,10 @@ from production.models import (
 # Stage advancement helper — yeh function `adda.current_stage` ko next
 # WorkflowStage pe move karta hai (or completes Adda agar last stage).
 from production.services.adda_service import advance_to_next_stage
+from production.services._shared import downstream_started_guard, reopen_stage_record
+
+# Module logger — __name__ se per-module namespace milta hai (production.services.*)
+logger = logging.getLogger(__name__)
 
 
 # Pillow tunables — JPEG quality 80 ≈ visually lossless for photos, ~70%
@@ -110,7 +116,7 @@ def _ensure_can_complete_pattern(user):
     helper skill matlab quality check pass kar chukka user; wahi finalise
     kar sake. Master photo upload kar sakta hai but advance helper hi karega.
     """
-    if user_has_role(user, {'super_admin'}):
+    if user_has_role(user, {ROLE_SUPER_ADMIN}):
         return
     if not user_has_skill(user, SKILL_CUTTING_MASTER_HELPER):
         raise PermissionDenied(
@@ -197,6 +203,11 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
 
     Workers M2M is reset (`workers.set(...)`) — call again with different
     list to swap workers. started_at sirf pehli baar set hota hai.
+
+    Side effects:
+      • AddaStageRecord — lazy get_or_create + started_at set
+      • AddaStageRecord.workers (M2M) — full replace via .set()
+      • AddaHistory (tracking app) — WORKERS_ASSIGNED entry via log_adda
     """
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied("only management can start the cutting_pattern stage")
@@ -210,6 +221,11 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
              stage_record=sr, metadata={'worker_ids': list(worker_ids)})
+    worker_id_list = list(worker_ids)
+    logger.info(
+        "cutting_pattern.start adda=%s stage_record=%s worker_count=%s worker_ids=%s user=%s",
+        adda.id, sr.id, len(worker_id_list), worker_id_list, getattr(user, 'id', None),
+    )
     return sr
 
 
@@ -422,6 +438,15 @@ def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
       • sr.completed_at + completed_by stamp
       • advance_to_next_stage → adda.current_stage agle WorkflowStage pe
         (e.g. cutting) OR Adda COMPLETED agar last stage tha
+
+    Side effects:
+      • AddaStageRecord — completed_at + completed_by stamp (this stage)
+      • Adda — current_stage advanced (+ status/completed_at if last) via
+        adda_service.advance_to_next_stage (cross-service)
+      • AddaHistory (tracking app) — stage-advance entry logged inside
+        advance_to_next_stage
+      • Stage processing cost freeze happens inside advance_to_next_stage
+        (cost_service) when configured
     """
     _ensure_can_complete_pattern(user)
 
@@ -486,6 +511,13 @@ def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
     # adda.current_stage ko agle WorkflowStage pe set karta hai aur
     # tracking.AddaHistory entry log karta hai.
     advance_to_next_stage(adda, user)
+    logger.info(
+        "cutting_pattern.complete adda=%s stage_record=%s from_stage=%s "
+        "verified=%s/%s allocations=%s user=%s",
+        adda.id, sr.id, wf.id,
+        len(verified_assignment_ids), len(expected_assignment_ids),
+        len(allocations), getattr(user, 'id', None),
+    )
     return record
 
 
@@ -502,63 +534,22 @@ def reopen_pattern_stage(*, adda: Adda, user) -> AddaStageRecord:
       • CuttingPatternRecord + photos preserved (master re-completes with
         corrected uploads which simply replace/append on existing record)
       • Audit via AddaHistory.STAGE_REOPENED
+
+    Side effects:
+      • AddaStageRecord — completed_at + completed_by cleared (this stage)
+      • Frozen stage processing cost cleared via cost_service.clear_stage_cost
+        (cross-service, money)
+      • Adda — current_stage reset to pattern wf, status → IN_PROGRESS,
+        completed_at cleared
+      • AddaHistory (tracking app) — STAGE_REOPENED entry via log_adda
     """
-    # Management role gate.
-    if not user_has_role(user, MANAGEMENT_ROLES):
-        raise PermissionDenied(
-            "only super_admin or manager can reopen the cutting_pattern stage"
-        )
-
-    wf = _pattern_workflow_stage(adda)
-    if wf is None:
-        raise ValidationError("This product has no cutting_pattern stage configured.")
-
-    # select_for_update lock prevents parallel reopen races.
-    try:
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=wf,
-        )
-    except AddaStageRecord.DoesNotExist:
-        raise ValidationError("Cutting Pattern stage has never been started.")
-    if sr.completed_at is None:
-        raise ValidationError("Cutting Pattern is already open for edits.")
-
-    # Refuse if any later stage (cutting) has started — partial rollback
-    # unsafe. Admin must unwind downstream first.
-    downstream = (
-        AddaStageRecord.objects
-        .filter(adda=adda, workflow_stage__order__gt=wf.order)
-        .exclude(started_at__isnull=True)
-        .exists()
+    # Pattern stage keeps its CuttingPatternRecord (video + notes) + photos on
+    # reopen — the master can replace them on re-complete — so there is NO
+    # teardown. Its only delta from the shared skeleton is the downstream guard.
+    return reopen_stage_record(
+        adda=adda, stage_code=STAGE_CUTTING_PATTERN, stage_label='Cutting Pattern',
+        user=user, guard=downstream_started_guard,
     )
-    if downstream:
-        raise ValidationError(
-            "Cannot reopen Cutting Pattern — a downstream stage has already started. "
-            "Reopen requires no later stages to have been touched."
-        )
-
-    # Note: unlike Layering (which has a typed LayeringRecord summary with
-    # header fields), CuttingPatternRecord just hosts video + notes which
-    # we keep. Photos also kept. Master can replace any of them on re-complete.
-    sr.completed_at = None
-    sr.completed_by = None
-    sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
-
-    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
-    from production.services.cost_service import clear_stage_cost
-    clear_stage_cost(sr)
-
-    adda.current_stage = wf
-    adda.status = Adda.Status.IN_PROGRESS
-    adda.completed_at = None
-    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
-
-    # Audit log.
-    from tracking.models import AddaHistory
-    from tracking.services import log_adda
-    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=wf)
-
-    return sr
 
 
 def get_pattern_snapshot(adda: Adda) -> dict:

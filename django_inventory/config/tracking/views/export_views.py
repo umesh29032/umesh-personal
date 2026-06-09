@@ -26,7 +26,7 @@ from django.shortcuts import get_object_or_404
 from django.views import View
 from django.views.generic import ListView
 
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
 from tracking.models import BarcodeExportBatch
 from tracking.services import (

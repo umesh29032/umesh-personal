@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView
 
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
 from raw_materials.models import ClothRoll
 from tracking.models import AddaHistory, ClothRollHistory

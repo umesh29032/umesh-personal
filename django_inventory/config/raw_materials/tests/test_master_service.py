@@ -2,7 +2,7 @@
 from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 
-from accounts.models import User
+from accounts.models import User, UserType
 from inventory.models import Role
 from raw_materials.models import ClothColor, ClothType
 from raw_materials.services import archive_master, hard_delete_master, restore_master
@@ -14,8 +14,11 @@ class MasterServiceTests(TestCase):
         self.admin = User.objects.create_user(email='admin@test.com', password='x', is_superuser=True, is_staff=True)
         self.admin.role = super_admin_role
         self.admin.save()
-        # A nobody user with no role at all. user_type=normal maps to None role.
-        self.no_role = User.objects.create_user(email='nobody@test.com', password='x', user_type='normal')
+        # A nobody user with no role at all. UserType 'normal' maps to None role.
+        normal_type = UserType.objects.filter(code='normal').first()
+        self.no_role = User.objects.create_user(email='nobody@test.com', password='x')
+        self.no_role.user_type = normal_type
+        self.no_role.save(update_fields=['user_type'])
 
     def test_archive_flips_is_active(self):
         ct = ClothType.objects.create(name='SilkSample')

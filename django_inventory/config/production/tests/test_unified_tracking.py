@@ -62,6 +62,12 @@ class UnifiedTrackingTests(TestCase):
 
     def test_advance_logs_cost_frozen_and_stage_advanced(self):
         adda = create_adda(self.user, product=self.product)
+        # Ungroup layering (migration 0026 groups it) to exercise the honest
+        # unpriced->None freeze path this test asserts below.
+        wf = adda.current_stage
+        if wf.cost_billed_at_id is not None:
+            wf.cost_billed_at = None
+            wf.save(update_fields=['cost_billed_at'])
         advance_to_next_stage(adda, self.user)
         types = self._types(adda)
         self.assertIn('cost_frozen', types)

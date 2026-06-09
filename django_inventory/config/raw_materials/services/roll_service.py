@@ -12,6 +12,7 @@ Sirf `_next_roll_id()` use karta hai — admin/model/client kabhi roll_id set na
 """
 from __future__ import annotations
 
+import logging
 from datetime import date
 from decimal import Decimal
 from typing import Iterable
@@ -20,10 +21,13 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
 from django.utils import timezone
 
-from inventory.services import user_can_edit_financials
+from accounts.services import user_can_edit_financials
 from raw_materials.models import ClothRoll, ClothType, StorageLocation
 # tracking.services ka import yahan TOP-level pe NAHI hai — circular import bachne ke liye
 # functions ke andar lazy-import karte hain.
+
+# Module logger — structured debug trail for multi-row / cross-app roll ops
+logger = logging.getLogger(__name__)
 
 
 # ── Roll ID allocation ──────────────────────────────────────────────────────
@@ -65,6 +69,11 @@ def bulk_create_rolls(
         supplier + cost_per_kg sirf ACCOUNTANT/SUPER_ADMIN bhej sakte hain.
         Form layer pe bhi gate hai (defence in depth) — service yahan re-check karta hai
         taa-ke admin / shell / API se bhi koi bypass na kar paaye.
+
+    Side effects:
+        • ClothRoll — bulk INSERT of N rows (one per qty in breakup)
+        • cloth_roll_seq (Postgres sequence) — advanced once per roll via _next_roll_id()
+        • ClothRollHistory — one CREATED row per roll (via tracking.services.log_roll)
     """
     # Financial fields ka first gate — non-financial role ne supplier/cost daal diya to reject
     if (supplier or cost_per_kg is not None) and not user_can_edit_financials(user):
@@ -107,6 +116,11 @@ def bulk_create_rolls(
     from tracking.models import ClothRollHistory
     for r in created:
         log_roll(r, ClothRollHistory.ChangeType.CREATED, user, note='Bulk intake')
+    logger.info(
+        "roll.bulk_create count=%s cloth_type=%s location=%s has_cost=%s user=%s",
+        len(created), cloth_type.pk, storage_location.pk,
+        cost_per_kg is not None, getattr(user, 'pk', None),
+    )
     return created
 
 
@@ -138,6 +152,10 @@ def update_roll_details(
     Each changed field writes a ClothRollHistory row (audit trail). Update is
     field-level — pass None to leave unchanged. Empty string clears supplier;
     None means "no change".
+
+    Side effects:
+        • ClothRoll — single-row UPDATE of only the changed columns (save update_fields=dirty)
+        • ClothRollHistory — one audit row per changed field (via tracking.services.log_roll)
     """
     # Refresh from DB FIRST. Why?
     # ModelForm caller (RollUpdateView) is an UpdateView. Django's _post_clean()
@@ -224,6 +242,10 @@ def update_roll_details(
 
     if dirty:
         roll.save(update_fields=dirty)
+    logger.info(
+        "roll.update_details roll=%s changed=%s fields=%s user=%s",
+        roll.roll_id, len(dirty), ','.join(dirty) or '-', getattr(user, 'pk', None),
+    )
     return roll
 
 
@@ -237,6 +259,11 @@ def assign_roll_to_adda(user, *, roll: ClothRoll, adda, weight_kg: Decimal, widt
         • roll.status NOT_USED hona chahiye (already-used roll re-assign nahi)
         • adda IN_PROGRESS + Layering stage pe hona chahiye
     Saare guards ValidationError throw karte hain — form upar pe message dikhaata hai.
+
+    Side effects:
+        • ClothRoll — single-row UPDATE (adda, weight_kg, width_inch, status, used_at, used_by)
+        • ClothRollHistory — one STATUS_CHANGED row (via tracking.services.log_roll)
+        • AddaHistory — one ROLL_ASSIGNED row (via tracking.services.log_adda)
     """
     # Lazy import — production app ke models import yahan, taa-ke top-level circular na ho
     from production.constants import STAGE_LAYERING
@@ -269,4 +296,8 @@ def assign_roll_to_adda(user, *, roll: ClothRoll, adda, weight_kg: Decimal, widt
         note=f"assigned to {adda.code}",
     )
     log_adda(adda, AddaHistory.ChangeType.ROLL_ASSIGNED, user, roll=roll)
+    logger.info(
+        "roll.assign_to_adda roll=%s adda=%s weight_kg=%s width_inch=%s user=%s",
+        roll.roll_id, adda.code, weight_kg, width_inch, getattr(user, 'pk', None),
+    )
     return roll

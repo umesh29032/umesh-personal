@@ -20,14 +20,18 @@ bachna chahiye (spec D1 + D5 + D6).
 """
 from __future__ import annotations
 
+import logging
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.constants import STAGE_LAYERING
 from production.models import Adda, AddaStageRecord, Product
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_can_manage(user):
@@ -68,6 +72,12 @@ def create_adda(user, *, product: Product) -> Adda:
         • Helpers ko ye Adda dashboard pe turant dikhega (spec D1).
 
     Resulting code: {Product.code}-{counter:03d}  e.g. 'T-SHIRT-001'.
+
+    Side effects:
+        • UPDATE Product.adda_counter (locked row, atomic increment).
+        • INSERT Adda (new batch row).
+        • INSERT AddaStageRecord + set workers M2M — only when first stage is Layering.
+        • tracking.services.log_adda → INSERT AddaHistory (CREATED, + WORKERS_ASSIGNED if Layering).
     """
     _ensure_can_manage(user)
     if not product.is_active:
@@ -115,6 +125,10 @@ def create_adda(user, *, product: Product) -> Adda:
     if first_stage.stage_type == STAGE_LAYERING:
         log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
                  stage_record=sr, metadata={'worker_ids': list(skilled_pks)})
+    logger.info(
+        "adda.create code=%s adda_id=%s product=%s first_stage=%s worker_count=%d",
+        adda.code, adda.pk, prod.code, first_stage.stage_type, len(skilled_pks),
+    )
     return adda
 
 
@@ -128,6 +142,13 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     Last-stage handling:
         nxt=None    → Adda completed, current_stage=None set, completed_at stamp
         nxt set hai → current_stage update
+
+    Side effects:
+        • production.services.cost_service.freeze_stage_cost → writes frozen
+          processing_cost + cost_*_snapshot on the leaving AddaStageRecord (MONEY).
+        • UPDATE Adda (current_stage; + status/completed_at when last stage).
+        • tracking.services.log_adda → INSERT AddaHistory (COST_FROZEN if leaving record,
+          STAGE_ADVANCED, + COMPLETED on final stage).
     """
     cur = adda.current_stage
     if cur is None:
@@ -173,4 +194,10 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     log_adda(adda, AddaHistory.ChangeType.STAGE_ADVANCED, user, stage_from=cur, stage_to=nxt)
     if nxt is None:
         log_adda(adda, AddaHistory.ChangeType.COMPLETED, user)
+    logger.info(
+        "adda.advance code=%s adda_id=%s stage_from=%s stage_to=%s frozen_cost=%s status=%s",
+        adda.code, adda.pk, cur.stage_type, (nxt.stage_type if nxt is not None else None),
+        (str(leaving_sr.processing_cost) if leaving_sr is not None else None),
+        adda.status,
+    )
     return adda

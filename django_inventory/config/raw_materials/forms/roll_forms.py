@@ -15,7 +15,7 @@ from datetime import date
 
 from django import forms
 
-from inventory.services import user_can_edit_financials
+from accounts.services import user_can_edit_financials
 from raw_materials.models import ClothColor, ClothType, ClothRoll, StorageLocation, WIDTH_CHOICES
 
 

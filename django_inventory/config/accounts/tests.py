@@ -103,13 +103,15 @@ class UserCreateFormTests(BaseSecurityTest):
 class UserEditFormTests(BaseSecurityTest):
     def setUp(self):
         super().setUp()
+        from accounts.models import UserType
+        self.worker_type = UserType.objects.get(code='worker')
         self.user = User.objects.create_user(email="edit@t.com", password="Str0ngP@ssw0rd!", first_name="A")
         self.other = User.objects.create_user(email="other@t.com", password="Str0ngP@ssw0rd!")
 
     def test_blocks_weak_new_password(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "worker", "new_password": "abc"},
+            data={"email": "edit@t.com", "user_type": self.worker_type.pk, "new_password": "abc"},
         )
         self.assertFalse(f.is_valid())
         self.assertIn("new_password", f.errors)
@@ -118,14 +120,14 @@ class UserEditFormTests(BaseSecurityTest):
         # Empty new_password should NOT trigger validator.
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "worker", "new_password": ""},
+            data={"email": "edit@t.com", "user_type": self.worker_type.pk, "new_password": ""},
         )
         self.assertTrue(f.is_valid(), f.errors)
 
     def test_rejects_email_collision_with_other_user(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "other@t.com", "user_type": "worker"},
+            data={"email": "other@t.com", "user_type": self.worker_type.pk},
         )
         self.assertFalse(f.is_valid())
         self.assertIn("email", f.errors)
@@ -133,7 +135,7 @@ class UserEditFormTests(BaseSecurityTest):
     def test_allows_keeping_own_email(self):
         f = UserEditForm(
             instance=self.user,
-            data={"email": "edit@t.com", "user_type": "worker"},
+            data={"email": "edit@t.com", "user_type": self.worker_type.pk},
         )
         self.assertTrue(f.is_valid(), f.errors)
 

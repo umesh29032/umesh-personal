@@ -32,11 +32,12 @@ from django.views.decorators.cache import never_cache
 from django.views import View
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
-from .forms import SignupForm, SkillForm, UserCreateForm, UserEditForm
-from .models import Skill, User
+from .forms import SignupForm, SkillForm, UserCreateForm, UserEditForm, UserTypeForm
+from .models import Skill, User, UserType
+from .services import auth_service, user_service
 from .throttle import check_throttle, reset_throttle, format_retry
 # Centralised RBAC helper — replaces raw `is_superuser` checks (CLAUDE.md rule #6).
-from inventory.services import user_has_role, ROLE_SUPER_ADMIN
+from accounts.services.permission_service import user_has_role, ROLE_SUPER_ADMIN
 
 security_logger = logging.getLogger("accounts.security")
 from .utils import (
@@ -44,9 +45,6 @@ from .utils import (
     can_resend_otp,
     check_otp_from_session,
     clear_otp_session,
-    generate_otp,
-    send_otp_email,
-    store_otp_in_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,15 +82,11 @@ class LoginView(View):
         # Only send OTP to existing users — don't auto-create accounts.
         # Always show the same redirect to prevent account enumeration.
         if User.objects.filter(email=email).exists():
-            otp = generate_otp()
-            store_otp_in_session(request, otp, prefix="otp")
             request.session["otp_email"] = email
-            request.session.modified = True
-
-            try:
-                send_otp_email(email, otp, subject=f"Your Login OTP — {settings.SITE_NAME}")
-            except Exception:
-                logger.exception("Failed to send login OTP email to %s", email)
+            if not auth_service.issue_otp(
+                request, email=email, prefix="otp",
+                subject=f"Your Login OTP — {settings.SITE_NAME}",
+            ):
                 messages.error(request, "Failed to send OTP. Please try again.")
                 return render(request, "accounts/login.html")
         else:
@@ -125,14 +119,10 @@ class ResendOTPView(View):
         # Only send OTP if the user actually exists — mirrors LoginView logic.
         # For non-existent emails we still redirect to the OTP page (anti-enumeration).
         if User.objects.filter(email=email).exists():
-            otp = generate_otp()
-            store_otp_in_session(request, otp, prefix="otp")
-            request.session.modified = True
-
-            try:
-                send_otp_email(email, otp, subject=f"Your New Login OTP — {settings.SITE_NAME}")
-            except Exception:
-                logger.exception("Failed to resend login OTP email to %s", email)
+            if not auth_service.issue_otp(
+                request, email=email, prefix="otp",
+                subject=f"Your New Login OTP — {settings.SITE_NAME}",
+            ):
                 messages.error(request, "Failed to resend OTP. Please try again.")
 
         return redirect("accounts:verify_otp")
@@ -280,6 +270,9 @@ class UserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        # Skills saved by ModelForm.save_m2m → retro-tag onto active layerings
+        # (explicit; replaces the removed m2m_changed signal).
+        user_service.sync_user_skills(self.object)
         messages.success(self.request, f"User {self.object.email} created.")
         return response
 
@@ -298,19 +291,16 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         editing_self = self.object == self.request.user
-        # Self-lockout protection — a Super Admin must not be able to demote
-        # themselves or deactivate their own account in the same request.
-        # Doing so would orphan the system (no remaining admin to fix it).
+        # Self-lockout protection — rule lives in user_service (testable, reused).
+        # A Super Admin must not demote/deactivate/role-drop themselves in one
+        # request and orphan the system (no remaining admin to fix it).
         if editing_self:
-            blockers = []
-            if not form.cleaned_data.get("is_superuser") and self.request.user.is_superuser:
-                blockers.append("revoke your own superuser flag")
-            if not form.cleaned_data.get("is_active"):
-                blockers.append("deactivate your own account")
-            new_role = form.cleaned_data.get("role")
-            current_role_code = getattr(self.request.user.role, "code", None)
-            if current_role_code == "super_admin" and (new_role is None or new_role.code != "super_admin"):
-                blockers.append("change your own RBAC role away from Super Admin")
+            blockers = user_service.self_edit_blockers(
+                self.request.user,
+                new_is_superuser=form.cleaned_data.get("is_superuser"),
+                new_is_active=form.cleaned_data.get("is_active"),
+                new_role=form.cleaned_data.get("role"),
+            )
             if blockers:
                 messages.error(
                     self.request,
@@ -320,6 +310,8 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
                 return self.form_invalid(form)
 
         response = super().form_valid(form)
+        # Skills may have changed → retro-tag (explicit; replaces the signal).
+        user_service.sync_user_skills(self.object)
         if editing_self and form.cleaned_data.get("new_password"):
             update_session_auth_hash(self.request, self.object)
         messages.success(self.request, "User updated successfully.")
@@ -332,20 +324,15 @@ class UserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     success_url = reverse_lazy("accounts:user_list")
 
     def form_valid(self, form):
-        # Self-delete protection — leaving the system with zero Super Admins
-        # would require shell access to recover. Block at the view layer.
-        if self.object == self.request.user:
-            messages.error(self.request, "You cannot delete your own account.")
+        # Self-delete + last-admin protection live in user_service.delete_user —
+        # race-safe (advisory lock) and enforced on every path, not just here.
+        try:
+            user_service.delete_user(self.object, actor=self.request.user)
+        except ValidationError as e:
+            messages.error(self.request, e.messages[0] if e.messages else str(e))
             return redirect("accounts:user_edit", pk=self.object.pk)
-        # Last-superuser protection — refuse to remove the only remaining
-        # Super Admin so the platform is never left unmanageable.
-        if self.object.is_superuser:
-            remaining = User.objects.filter(is_superuser=True, is_active=True).exclude(pk=self.object.pk).count()
-            if remaining == 0:
-                messages.error(self.request, "Refused: this is the only active Super Admin. Promote another user first.")
-                return redirect("accounts:user_edit", pk=self.object.pk)
         messages.success(self.request, "User deleted successfully.")
-        return super().form_valid(form)
+        return redirect(self.get_success_url())
 
 
 # ─── Password Login ───────────────────────────────────────────────────────────
@@ -411,13 +398,10 @@ class SignupView(FormView):
         self.request.session["signup_token"] = signed_password
         self.request.session.modified = True
 
-        otp = generate_otp()
-        store_otp_in_session(self.request, otp, prefix="signup")
-
-        try:
-            send_otp_email(email, otp, subject=f"Verify your Account — {settings.SITE_NAME}")
-        except Exception:
-            logger.exception("Failed to send signup OTP email to %s", email)
+        if not auth_service.issue_otp(
+            self.request, email=email, prefix="signup",
+            subject=f"Verify your Account — {settings.SITE_NAME}",
+        ):
             messages.error(self.request, "Failed to send verification email. Please try again.")
             return self.form_invalid(form)
 
@@ -509,14 +493,10 @@ class ResendSignupOTPView(View):
             messages.warning(request, f"Please wait {OTP_RESEND_COOLDOWN} seconds before resending.")
             return redirect("accounts:signup_verify")
 
-        otp = generate_otp()
-        store_otp_in_session(request, otp, prefix="signup")
-        request.session.modified = True
-
-        try:
-            send_otp_email(email, otp, subject=f"Resend: Verify your Account — {settings.SITE_NAME}")
-        except Exception:
-            logger.exception("Failed to resend signup OTP to %s", email)
+        if not auth_service.issue_otp(
+            request, email=email, prefix="signup",
+            subject=f"Resend: Verify your Account — {settings.SITE_NAME}",
+        ):
             messages.error(request, "Failed to resend OTP.")
 
         messages.success(request, "OTP resent successfully.")
@@ -540,14 +520,11 @@ class ForgotPasswordView(View):
 
         # Don't reveal whether the email exists (prevents account enumeration)
         if User.objects.filter(email=email).exists():
-            otp = generate_otp()
-            store_otp_in_session(request, otp, prefix="reset")
             request.session["reset_email"] = email
-            request.session.modified = True
-            try:
-                send_otp_email(email, otp, subject=f"Password Reset OTP — {settings.SITE_NAME}")
-            except Exception:
-                logger.exception("Failed to send password reset OTP to %s", email)
+            if not auth_service.issue_otp(
+                request, email=email, prefix="reset",
+                subject=f"Password Reset OTP — {settings.SITE_NAME}",
+            ):
                 messages.error(request, "Failed to send reset email. Please try again.")
                 return redirect("accounts:forgot_password")
 
@@ -662,4 +639,50 @@ class SkillDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         messages.success(self.request, "Skill deleted.")
+        return super().form_valid(form)
+
+
+# ─── User Type Management ─────────────────────────────────────────────────────
+# Super Admin can create/edit/delete User Types from UI — no code changes needed.
+
+class UserTypeListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+    model = UserType
+    template_name = "accounts/usertype_list.html"
+    context_object_name = "user_types"
+    ordering = ["label"]
+
+
+class UserTypeCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    model = UserType
+    form_class = UserTypeForm
+    template_name = "accounts/usertype_form.html"
+    success_url = reverse_lazy("accounts:usertype_list")
+
+    def form_valid(self, form):
+        messages.success(self.request, f"User type '{form.instance.label}' created.")
+        return super().form_valid(form)
+
+
+class UserTypeUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+    model = UserType
+    form_class = UserTypeForm
+    template_name = "accounts/usertype_form.html"
+    success_url = reverse_lazy("accounts:usertype_list")
+
+    def form_valid(self, form):
+        messages.success(self.request, f"User type '{form.instance.label}' updated.")
+        return super().form_valid(form)
+
+
+class UserTypeDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    model = UserType
+    template_name = "accounts/usertype_confirm_delete.html"
+    success_url = reverse_lazy("accounts:usertype_list")
+
+    def form_valid(self, form):
+        # Block delete if users are assigned to this type
+        if self.get_object().users.exists():
+            messages.error(self.request, "Cannot delete — users are assigned to this type. Reassign first.")
+            return redirect("accounts:usertype_list")
+        messages.success(self.request, "User type deleted.")
         return super().form_valid(form)

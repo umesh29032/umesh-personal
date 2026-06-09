@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
 from tracking.models import BatchBarcode
 from tracking.services import get_or_create_piece, qr_data_uri, resolve_value

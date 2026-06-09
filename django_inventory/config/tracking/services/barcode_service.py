@@ -26,12 +26,16 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 from collections import defaultdict
 
 from django.db import IntegrityError, transaction
 from django.urls import reverse
 
 from tracking.models import BarcodeBatch, BatchBarcode
+
+# Module logger — for debugging cross-app barcode-range writes + scan state.
+logger = logging.getLogger(__name__)
 
 
 def _compact_code(s: str, max_len: int = 8) -> str:
@@ -77,6 +81,11 @@ def generate_for_cutting(cutting_record) -> int:
 
     Returns: total pieces covered across all batches.
     Raises IntegrityError if any BarcodeBatch already exists for this Adda.
+
+    Side effects:
+      - Writes BarcodeBatch rows (bulk_create, one per (size, color) combo;
+        or a single legacy batch via _generate_legacy_batch).
+      - Reads production.CuttingBundleItem (cross-app) to source per-combo counts.
     """
     adda = cutting_record.stage_record.adda
     if BarcodeBatch.objects.filter(adda=adda).exists():
@@ -128,13 +137,22 @@ def generate_for_cutting(cutting_record) -> int:
             next_seq = end + 1
 
         BarcodeBatch.objects.bulk_create(batches)
-        return next_seq - 1
+        total = next_seq - 1
+        logger.info(
+            "barcode.generate_for_cutting adda=%s batches=%s pieces=%s source=workspace",
+            adda.code, len(batches), total,
+        )
+        return total
 
     return _generate_legacy_batch(cutting_record, adda)
 
 
 def _generate_legacy_batch(cutting_record, adda) -> int:
-    """Legacy single-batch path for simple flows (NIKKAR, no breakup)."""
+    """Legacy single-batch path for simple flows (NIKKAR, no breakup).
+
+    Side effects:
+      - Writes one BarcodeBatch row covering 1..pieces_cut.
+    """
     count = cutting_record.pieces_cut
     if count <= 0:
         return 0
@@ -142,6 +160,10 @@ def _generate_legacy_batch(cutting_record, adda) -> int:
         adda=adda, product=adda.product,
         color=None, size=None,
         start_seq=1, end_seq=count, total_pieces=count,
+    )
+    logger.info(
+        "barcode.generate_for_cutting adda=%s batches=1 pieces=%s source=legacy",
+        adda.code, count,
     )
     return count
 
@@ -256,11 +278,14 @@ def get_or_create_piece(batch: BarcodeBatch, seq: int) -> BatchBarcode:
     """Lazy-create BatchBarcode scan-state row for piece `seq` in `batch`.
 
     Idempotent: existing row returned. Pre-condition: seq ∈ batch range.
+
+    Side effects:
+      - May write one BatchBarcode row (get_or_create) for piece `seq`.
     """
     if not (batch.start_seq <= seq <= batch.end_seq):
         raise ValueError(f"seq {seq} not in batch {batch.start_seq}..{batch.end_seq}")
     value = batch.value_for_seq(seq)
-    obj, _ = BatchBarcode.objects.get_or_create(
+    obj, created = BatchBarcode.objects.get_or_create(
         adda=batch.adda, piece_seq=seq,
         defaults={
             'value': value,
@@ -274,6 +299,11 @@ def get_or_create_piece(batch: BarcodeBatch, seq: int) -> BatchBarcode:
     if obj.batch_id is None:
         obj.batch = batch
         obj.save(update_fields=['batch'])
+    if created:
+        logger.info(
+            "barcode.piece_created adda=%s seq=%s value=%s batch_id=%s",
+            batch.adda.code, seq, value, batch.id,
+        )
     return obj
 
 
@@ -317,6 +347,10 @@ def mark_status(user, barcode_value: str, status: str) -> BatchBarcode:
 
     Accepts value string. Resolves via batch, lazy-creates BatchBarcode row
     if absent.
+
+    Side effects:
+      - Writes BatchBarcode.status (and may create the row via
+        get_or_create_piece).
     """
     if status not in dict(BatchBarcode.Status.choices):
         from django.core.exceptions import ValidationError
@@ -329,4 +363,8 @@ def mark_status(user, barcode_value: str, status: str) -> BatchBarcode:
     piece = get_or_create_piece(batch, seq)
     piece.status = status
     piece.save(update_fields=['status'])
+    logger.info(
+        "barcode.mark_status user=%s adda=%s seq=%s value=%s status=%s",
+        getattr(user, 'id', None), batch.adda.code, seq, barcode_value, status,
+    )
     return piece

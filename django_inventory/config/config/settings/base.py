@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  # specifically Google OAuth
 
     # local apps — hamara apna code
+    'core',           # shared abstract base models (TimeStampedModel, ActiveManager) — no tables
     'accounts',       # custom User model, RBAC roles
     'inventory',      # RBAC roles + dashboards (production lifecycle moved out 2026-05-19)
     'storefront',     # customer-facing pages

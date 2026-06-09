@@ -7,7 +7,9 @@ Pattern (Phase 6+):
   services/adda_service.py        — Adda lifecycle (create + advance)
   services/product_service.py     — Product CRUD
   services/activity_service.py    — Activity timeline derivation
-  services/stage_service.py       — back-compat shim re-exporting everything
+
+This package __init__ is the public facade — it re-exports each stage's
+entry points so callers do `from production.services import complete_layering`.
 
 Future stages = drop in services/<stage>_service.py + re-export here.
 """
@@ -36,6 +38,8 @@ from .cutting_service import (
     add_item_to_bundle,
     add_pieces_to_bundle,
     complete_cutting,
+    complete_cutting_from_bundles,
+    complete_cutting_legacy,
     create_bundle,
     create_bundle_with_pieces,
     delete_breakup_row,
@@ -115,6 +119,8 @@ __all__ = [
     'delete_bundle',
     'save_cutting_draft',
     'complete_cutting',
+    'complete_cutting_from_bundles',
+    'complete_cutting_legacy',
     'reopen_cutting',
     'get_cutting_snapshot',
     'get_suggested_breakup',

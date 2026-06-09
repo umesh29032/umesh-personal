@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 
-from inventory.services import MANAGEMENT_ROLES, user_has_perm, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_perm, user_has_role
 from expense.models import (
     PayrollSettlement, PayrollSettlementItem, StageWorkAssignment,
     WorkerAdvance, WorkerLedgerEntry,
@@ -157,6 +157,50 @@ def worker_summary(worker, *, since=None, until=None) -> dict:
         'pending_payable': credits - debits,
         'earnings_in_window': (agg['earned_window'] or _ZERO) - (agg['earned_window_reversed'] or _ZERO),
         'last_settlement': last_settlement,
+    }
+
+
+def worker_balance_breakdown(worker) -> dict:
+    """Itemized derivation of a worker's payable — for reconciliation / disputes.
+
+    Same bottom line as worker_summary's pending_payable, but broken into the
+    components that net to it, so "why is the balance ₹X?" is a single call
+    instead of re-doing the reversal-netting math by hand over raw ledger rows.
+    All live sums (nothing stored); debits grouped by category.
+
+    Shape:
+      gross_earnings     — Σ earning credits (before reversal)
+      earnings_reversed  — Σ reversal of earning rows (voided allocations)
+      net_earnings       — gross − reversed
+      debits_by_category — {category: Σ amount} across every DEBIT category
+      total_credits / total_debits
+      pending_payable    — credits − debits (the bottom line)
+    """
+    qs = WorkerLedgerEntry.objects.filter(worker=worker)
+    earn_q = Q(entry_type=_ET.CREDIT, category__in=_EARNING_CATS)
+    earn_rev_q = Q(category=_CAT.REVERSAL, reverses__category__in=_EARNING_CATS)
+    agg = qs.aggregate(
+        gross=Sum('amount', filter=earn_q),
+        earn_reversed=Sum('amount', filter=earn_rev_q),
+        credits=Sum('amount', filter=Q(entry_type=_ET.CREDIT)),
+        debits=Sum('amount', filter=Q(entry_type=_ET.DEBIT)),
+    )
+    debits_by_cat = {
+        r['category']: r['s'] for r in
+        qs.filter(entry_type=_ET.DEBIT).values('category').annotate(s=Sum('amount'))
+    }
+    gross = agg['gross'] or _ZERO
+    earn_reversed = agg['earn_reversed'] or _ZERO
+    credits = agg['credits'] or _ZERO
+    debits = agg['debits'] or _ZERO
+    return {
+        'gross_earnings': gross,
+        'earnings_reversed': earn_reversed,
+        'net_earnings': gross - earn_reversed,
+        'debits_by_category': debits_by_cat,
+        'total_credits': credits,
+        'total_debits': debits,
+        'pending_payable': credits - debits,
     }
 
 

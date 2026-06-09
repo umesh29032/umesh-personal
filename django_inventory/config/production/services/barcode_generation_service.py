@@ -29,6 +29,7 @@ DOWNSTREAM-SAFE REOPEN:
 """
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -38,13 +39,17 @@ from django.utils import timezone
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
 from production.constants import STAGE_BARCODE_GENERATION, STAGE_CUTTING
 from production.models import (
     Adda, AddaProductSizeColorPieceBreakdown, AddaStageRecord,
     BarcodeGenerationRecord, CuttingRecord, WorkflowStage,
 )
 from production.services.adda_service import advance_to_next_stage
+from production.services._shared import reopen_stage_record
+
+# Module logger — debug multi-table / cross-app barcode stage transitions.
+logger = logging.getLogger(__name__)
 
 
 # ── Auth gates ─────────────────────────────────────────────────────────────
@@ -189,7 +194,14 @@ def get_barcode_snapshot(adda: Adda) -> dict:
 def start_barcode_generation(
     *, adda: Adda, worker_ids: Iterable[int], user,
 ) -> AddaStageRecord:
-    """Mgmt assigns workers → stage formally started."""
+    """Mgmt assigns workers → stage formally started.
+
+    Side effects:
+      • AddaStageRecord row get_or_create + started_at set
+      • AddaStageRecord.workers M2M set
+      • BarcodeGenerationRecord row lazy-create (OneToOne)
+      • tracking.services.log_adda → AddaHistory (WORKERS_ASSIGNED)
+    """
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied(
             "only management can start the barcode_generation stage"
@@ -206,6 +218,11 @@ def start_barcode_generation(
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
              stage_record=sr, metadata={'worker_ids': list(worker_ids)})
+    worker_id_list = list(worker_ids)
+    logger.info(
+        "barcode.start adda=%s sr_id=%s worker_count=%s worker_ids=%s user=%s",
+        adda.code, sr.id, len(worker_id_list), worker_id_list, getattr(user, 'id', None),
+    )
     return sr
 
 
@@ -217,6 +234,11 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
     Use reopen_barcode_generation to re-run after correction.
 
     Updates BarcodeGenerationRecord.total_barcodes + generated_at.
+
+    Side effects:
+      • tracking.services.generate_from_breakdown → bulk_create BarcodeBatch rows (cross-app)
+      • BarcodeGenerationRecord.total_barcodes + generated_at updated
+      • tracking.services.log_adda → AddaHistory (BARCODES_GENERATED)
     """
     _ensure_barcode_skill(user)
     wf = _barcode_workflow_stage(adda)
@@ -248,6 +270,10 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
     from tracking.models import AddaHistory
     log_adda(adda, AddaHistory.ChangeType.BARCODES_GENERATED, user,
              stage_record=sr, metadata={'total_barcodes': total})
+    logger.info(
+        "barcode.generate adda=%s sr_id=%s rec_id=%s total_barcodes=%s user=%s",
+        adda.code, sr.id, rec.id, total, getattr(user, 'id', None),
+    )
     return rec
 
 
@@ -262,6 +288,11 @@ def complete_barcode_generation(*, adda: Adda, user) -> BarcodeGenerationRecord:
          AND == BarcodeGenerationRecord.total_barcodes
 
     Refuses on mismatch — operator must reopen + regenerate.
+
+    Side effects:
+      • AddaStageRecord.completed_at + completed_by set
+      • production.services.adda_service.advance_to_next_stage (advances Adda;
+        freezes stage cost + writes AddaHistory cross-stage)
     """
     _ensure_can_complete_barcode(user)
 
@@ -310,6 +341,11 @@ def complete_barcode_generation(*, adda: Adda, user) -> BarcodeGenerationRecord:
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
 
     advance_to_next_stage(adda, user)
+    logger.info(
+        "barcode.complete adda=%s sr_id=%s batch_total=%s breakdown_total=%s "
+        "from_stage=%s user=%s",
+        adda.code, sr.id, batch_total, breakdown_total, wf.id, getattr(user, 'id', None),
+    )
     return rec
 
 
@@ -327,62 +363,40 @@ def reopen_barcode_generation(*, adda: Adda, user) -> AddaStageRecord:
       • Delete all BarcodeBatch rows (one-shot regeneration rule)
       • Reset BarcodeGenerationRecord (clear generated_at + total_barcodes)
       • AddaHistory.STAGE_REOPENED log
+
+    Side effects:
+      • BarcodeBatch rows deleted (cross-app tracking)
+      • BarcodeGenerationRecord reset (total_barcodes=0, generated_at=None)
+      • AddaStageRecord.completed_at + completed_by cleared
+      • production.services.cost_service.clear_stage_cost (unfreeze stage cost)
+      • Adda.current_stage / status / completed_at updated
+      • tracking.services.log_adda → AddaHistory (STAGE_REOPENED)
     """
-    if not user_has_role(user, MANAGEMENT_ROLES):
-        raise PermissionDenied(
-            "only super_admin or manager can reopen the barcode_generation stage"
-        )
+    def _guard(adda, sr, wf):
+        # Refuse if any piece was scanned, or any export exists (vendor has labels).
+        from tracking.models import BatchBarcode, BarcodeExportBatch
+        if BatchBarcode.objects.filter(adda=adda).exists():
+            raise ValidationError(
+                "Cannot reopen — at least one barcode has been scanned in production."
+            )
+        if BarcodeExportBatch.objects.filter(adda=adda).exists():
+            raise ValidationError(
+                "Cannot reopen — barcode exports exist. Cancel exports first."
+            )
 
-    wf = _barcode_workflow_stage(adda)
-    if wf is None:
-        raise ValidationError(
-            "This product has no barcode_generation stage configured."
-        )
+    def _teardown(sr):
+        # One-shot regeneration rule: drop all batches + reset the gen record so
+        # re-complete regenerates from scratch.
+        from tracking.models import BarcodeBatch
+        BarcodeBatch.objects.filter(adda=sr.adda).delete()
+        rec = getattr(sr, 'barcode_generation', None)
+        if rec is not None:
+            rec.total_barcodes = 0
+            rec.generated_at = None
+            rec.save(update_fields=['total_barcodes', 'generated_at', 'updated_at'])
+        return []
 
-    try:
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=wf,
-        )
-    except AddaStageRecord.DoesNotExist:
-        raise ValidationError("Barcode generation stage has never been started.")
-    if sr.completed_at is None:
-        raise ValidationError("Barcode generation is already open for edits.")
-
-    from tracking.models import BarcodeBatch, BatchBarcode, BarcodeExportBatch
-
-    if BatchBarcode.objects.filter(adda=adda).exists():
-        raise ValidationError(
-            "Cannot reopen — at least one barcode has been scanned in production."
-        )
-    if BarcodeExportBatch.objects.filter(adda=adda).exists():
-        raise ValidationError(
-            "Cannot reopen — barcode exports exist. Cancel exports first."
-        )
-
-    # Clear barcode artefacts so regeneration works.
-    BarcodeBatch.objects.filter(adda=adda).delete()
-
-    rec = getattr(sr, 'barcode_generation', None)
-    if rec is not None:
-        rec.total_barcodes = 0
-        rec.generated_at = None
-        rec.save(update_fields=['total_barcodes', 'generated_at', 'updated_at'])
-
-    sr.completed_at = None
-    sr.completed_by = None
-    sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
-
-    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it.
-    from production.services.cost_service import clear_stage_cost
-    clear_stage_cost(sr)
-
-    adda.current_stage = wf
-    adda.status = Adda.Status.IN_PROGRESS
-    adda.completed_at = None
-    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
-
-    from tracking.models import AddaHistory
-    from tracking.services import log_adda
-    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=wf)
-
-    return sr
+    return reopen_stage_record(
+        adda=adda, stage_code=STAGE_BARCODE_GENERATION, stage_label='Barcode generation',
+        user=user, guard=_guard, teardown=_teardown,
+    )

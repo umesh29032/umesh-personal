@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from expense.forms import AdvanceForm, SettlementForm, WorkerProfileForm
 from expense.models import StageWorkAssignment, WorkerLedgerEntry, WorkerProfile
 from expense.services import (

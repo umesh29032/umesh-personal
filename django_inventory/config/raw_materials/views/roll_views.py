@@ -17,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, FormView, ListView, UpdateView
 
-from inventory.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
 from raw_materials.forms import BulkRollForm, RollEditForm
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls, update_roll_details

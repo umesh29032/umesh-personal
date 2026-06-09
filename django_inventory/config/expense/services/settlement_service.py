@@ -14,6 +14,7 @@ for audit, but never read those snapshots back as the source of truth.
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
@@ -26,6 +27,9 @@ from expense.models import (
 )
 from expense.services import ledger_service, payroll_service
 from ._shared import _ensure_management
+
+# Module logger — debuggability for money writes (settlement + ledger debits).
+logger = logging.getLogger(__name__)
 
 _ZERO = Decimal('0.00')
 _CAT = WorkerLedgerEntry.Category
@@ -65,6 +69,13 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
     Each amount must be ≤ that advance's remaining (recomputed under lock).
     Invariant: amount_paid + Σrecoveries ≤ current payable (can't settle more
     than is owed). Equality = full settlement (payable → 0).
+
+    Side effects (money / multi-write):
+      • Acquires a PG transaction-scoped advisory lock (settlement-ref serialization).
+      • Row-locks WorkerProfile (get_or_create may INSERT it) + the worker's WorkerAdvance rows (FOR UPDATE).
+      • Writes PayrollSettlement (1 row) + PayrollSettlementItem (1 per recovery).
+      • Calls ledger_service.log_debit → writes WorkerLedgerEntry (settlement_payment and/or advance_recovery debit).
+      • Reads (no write) ledger_service.worker_balance + payroll_service.advance_remaining/advance_outstanding.
     """
     _ensure_management(user)
 
@@ -154,4 +165,10 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
             entry_date=when, created_by=user, settlement=settlement,
             notes=f"Advance recovery in {settlement.reference}",
         )
+    logger.info(
+        "expense.settle ref=%s settlement_id=%s worker_id=%s paid=%s "
+        "advance_recovered=%s total_settled=%s payable_before=%s recoveries=%s",
+        settlement.reference, settlement.id, worker.id, paid, advance_deducted,
+        total_settled, payable_before, len(cleaned),
+    )
     return settlement

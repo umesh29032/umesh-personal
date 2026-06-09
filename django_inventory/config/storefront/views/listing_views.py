@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import (
     CreateView, DeleteView, ListView, UpdateView,
@@ -19,8 +18,7 @@ from django.views.generic import (
 
 from ..models import Category, FeaturedProduct
 from ..forms import CategoryForm, FeaturedProductForm
-from ..services import ListingService
-from inventory.services import user_has_role, ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM
+from accounts.services import user_has_role, ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM
 
 
 class ListingTeamMixin(UserPassesTestMixin):
@@ -103,10 +101,13 @@ class ProductDeleteView(LoginRequiredMixin, ListingTeamMixin, DeleteView):
     success_url = reverse_lazy('storefront:product_list')
 
     def form_valid(self, form):
+        # Single-row delete — Django's DeleteView does it. (The removed
+        # ListingService was a cargo-culted pass-through; rule #4 is for
+        # multi-row invariant-bearing writes, not one-row CMS deletes.)
         name = self.object.name
-        ListingService.delete_product(self.object)
+        response = super().form_valid(form)
         messages.success(self.request, f'Product "{name}" deleted.')
-        return redirect(self.success_url)
+        return response
 
 
 # ── Category ──────────────────────────────────────────────────────────────────
@@ -174,7 +175,8 @@ class CategoryDeleteView(LoginRequiredMixin, ListingTeamMixin, DeleteView):
     success_url = reverse_lazy('storefront:category_list')
 
     def form_valid(self, form):
+        # Single-row delete via Django's DeleteView (see ProductDeleteView note).
         name = self.object.name
-        ListingService.delete_category(self.object)
+        response = super().form_valid(form)
         messages.success(self.request, f'Category "{name}" deleted.')
-        return redirect(self.success_url)
+        return response

@@ -34,6 +34,12 @@ class FreezeStageCostTests(TestCase):
     def _new_adda_at_layering(self):
         adda = create_adda(self.user, product=self.product)
         layering_wf = adda.current_stage
+        # Layering ships grouped-at-cutting (migration 0026 → priced-zero). These
+        # are cost-ENGINE unit tests, so ungroup the stage first; each test sets
+        # the grouping it wants (test_grouped_stage_freezes_zero re-groups it).
+        if layering_wf.cost_billed_at_id is not None:
+            layering_wf.cost_billed_at = None
+            layering_wf.save(update_fields=['cost_billed_at'])
         sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=layering_wf)
         return adda, layering_wf, sr
 

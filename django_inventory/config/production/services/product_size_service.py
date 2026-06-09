@@ -21,7 +21,7 @@ import re
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
-from inventory.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_has_role
 from production.models import Product, ProductSize
 
 

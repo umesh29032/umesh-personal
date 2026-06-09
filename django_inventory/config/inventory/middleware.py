@@ -23,7 +23,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve, reverse
 
-from inventory.services import MANAGEMENT_ROLES, can_access_url_name, user_has_role
+from accounts.services import MANAGEMENT_ROLES, can_access_url_name, user_has_role
 
 # Landing pages — never blocked. The management vs user dashboard split is
 # cosmetic (both @login_required), and exempting them prevents redirect loops

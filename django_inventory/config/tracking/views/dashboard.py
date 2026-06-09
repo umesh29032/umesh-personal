@@ -18,7 +18,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
 from django.db.models import Sum
 from tracking.models import BarcodeBatch, BatchBarcode

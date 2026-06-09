@@ -238,10 +238,14 @@ class CompleteBarcodeGenerationTests(_BgWorkflowFixture):
 
     def test_complete_refuses_on_count_mismatch(self):
         generate_barcodes(adda=self.adda, user=self.admin)
-        # Corrupt one batch: shrink total_pieces directly
-        batch = BarcodeBatch.objects.filter(adda=self.adda).first()
-        batch.total_pieces = 99
-        batch.save(update_fields=['total_pieces'])
+        # Simulate counter drift on the generation-record denorm so it disagrees
+        # with the actual barcode batches. (A batch's total_pieces is now
+        # DB-constrained to its seq-range width — tracking_batch_pieces_consistent
+        # — so we drift the record side instead, which is a reachable state.)
+        sr = AddaStageRecord.objects.get(adda=self.adda, workflow_stage=self.bg_wf)
+        rec = sr.barcode_generation
+        rec.total_barcodes = rec.total_barcodes + 1
+        rec.save(update_fields=['total_barcodes'])
         with self.assertRaises(ValidationError):
             complete_barcode_generation(adda=self.adda, user=self.admin)
 

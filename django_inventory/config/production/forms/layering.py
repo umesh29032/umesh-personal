@@ -107,24 +107,21 @@ class RemainingClothForm(forms.Form):
 
 
 class CompleteLayeringForm(forms.Form):
-    """Layering complete form — overall layer length + duration + notes.
+    """Layering complete form — overall layer length + notes.
 
-    Per-roll breakup (layers + leftover) lives on per-row inputs in the template,
-    parsed manually in the view. lay_count = sum, computed by service.
+    Per-roll breakup (layers + leftover weight) lives on per-row inputs in the
+    template, parsed manually in the view. lay_count = sum, computed by service.
 
-    Field-level required=False so DRAFT submits can omit values; the view path
-    differentiates draft vs complete and applies validation accordingly.
+    Duration is NOT entered here — it is auto-computed at completion from
+    timestamps (now − adda.started_at); see stage-duration-rule. Field-level
+    required=False so DRAFT submits can omit values; the view differentiates
+    draft vs complete and applies validation accordingly.
     """
     layer_length_meters = forms.DecimalField(
         required=False,
         min_value=0.01, max_digits=8, decimal_places=2,
         widget=forms.NumberInput(attrs={**_BASE, 'step': '0.01', 'placeholder': 'one layer length (m) — same for all rolls'}),
         help_text="Length of a single layer in meters. Same value applies to every roll.",
-    )
-    duration_minutes = forms.IntegerField(
-        required=False,
-        min_value=1,
-        widget=forms.NumberInput(attrs={**_BASE, 'placeholder': 'minutes'}),
     )
     notes = forms.CharField(
         required=False,

@@ -165,6 +165,13 @@
         .user-dash .hero-title { font-size: 24px; }
         .user-dash .stage-row, .user-dash .layering-row { padding: 12px 14px; }
         .user-dash .stage-row .since, .user-dash .layering-row .row-meta { width: 100%; }
+        /* Reclaim horizontal space for the embedded stage iframe on phones:
+           trim nested card padding + bleed the iframe to the adda-card edge so
+           the worker UI gets near-full width (was ~282px of 390). */
+        .user-dash .card-body { padding: 12px 8px; }
+        .user-dash .adda-card { padding: 12px 10px; }
+        .user-dash .iframe-wrap { margin-left: -10px; margin-right: -10px; }
+        .user-dash .adda-stage-iframe { border-radius: 0; }
     }
 </style>
 {% endblock %}

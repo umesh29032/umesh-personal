@@ -13,7 +13,7 @@ from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, TemplateView, UpdateView, View
 
-from inventory.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_has_role
 from production.forms import ProductForm
 from production.models import Product
 from production.services import (

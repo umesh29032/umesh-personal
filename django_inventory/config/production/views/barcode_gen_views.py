@@ -36,7 +36,7 @@ from django.views.generic import TemplateView
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_BARCODE_GENERATION
 from production.models import Adda, AddaStageRecord, WorkflowStage
 from production.services import (

@@ -17,7 +17,7 @@ from django import forms
 
 from accounts.models import User
 from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
-from inventory.services import PRODUCTION_ROLES
+from accounts.services import PRODUCTION_ROLES
 
 
 # Common widget attrs — every input across every stage gets same baseline class

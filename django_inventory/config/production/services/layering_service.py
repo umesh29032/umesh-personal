@@ -26,6 +26,7 @@ Side effects in save_layering_breakup / save_layering_draft / complete_layering:
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -47,7 +48,11 @@ from ._shared import (
     _ensure_can_manage,
     _ensure_layering_skill,
     _ensure_management,
+    downstream_started_guard,
+    reopen_stage_record,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ── Public summary helper (used by 3 dashboard surfaces) ────────────────────
@@ -233,7 +238,12 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
 
 
 def sync_layering_workers_for_skill(user) -> int:
-    """Retro-tag: new skilled user → added to workers M2M on every active Layering."""
+    """Retro-tag: new skilled user → added to workers M2M on every active Layering.
+
+    Side effects:
+      • AddaStageRecord.workers (M2M) — adds `user` to every active Layering stage_record
+      • Cross-app read: accounts.skills.user_has_skill (gate)
+    """
     from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill
     if not user_has_skill(user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]):
         return 0
@@ -248,6 +258,7 @@ def sync_layering_workers_for_skill(user) -> int:
     for sr in active_srs:
         sr.workers.add(user)
         count += 1
+    logger.info("layering.workers_retro_tag worker_id=%s tagged_stage_records=%s", user.pk, count)
     return count
 
 
@@ -264,7 +275,13 @@ def attach_roll_to_layering(
     notes: str = '',
     user,
 ) -> LayeringRollEntry:
-    """Worker attaches cloth roll. ClothRoll.status flips USED via shared service."""
+    """Worker attaches cloth roll. ClothRoll.status flips USED via shared service.
+
+    Side effects:
+      • LayeringRollEntry — created (one per attached roll)
+      • ClothRoll — status→USED, adda/used_at/used_by set (via raw_materials.assign_roll_to_adda)
+      • Cross-app service: raw_materials.services.assign_roll_to_adda (also logs ClothRollHistory)
+    """
     _ensure_assigned_worker(stage_record, user)
     _ensure_layering_skill(user)
 
@@ -285,7 +302,7 @@ def attach_roll_to_layering(
         weight_kg=Decimal(weight_verified_kg),
         width_inch=int(width_verified_inch),
     )
-    return LayeringRollEntry.objects.create(
+    entry = LayeringRollEntry.objects.create(
         stage_record=stage_record,
         roll=roll,
         width_verified_inch=int(width_verified_inch),
@@ -293,6 +310,12 @@ def attach_roll_to_layering(
         notes=notes or '',
         attached_by=user,
     )
+    logger.info(
+        "layering.roll_attach adda=%s roll=%s entry=%s width_inch=%s weight_kg=%s user_id=%s",
+        stage_record.adda.code, roll.roll_id, entry.pk,
+        int(width_verified_inch), Decimal(weight_verified_kg), user.pk,
+    )
+    return entry
 
 
 @transaction.atomic
@@ -343,7 +366,13 @@ def update_layering_roll_entry(
 
 @transaction.atomic
 def detach_roll_from_layering(*, entry: LayeringRollEntry, user) -> None:
-    """Deletes entry + flips ClothRoll.status back to NOT_USED."""
+    """Deletes entry + flips ClothRoll.status back to NOT_USED.
+
+    Side effects:
+      • ClothRoll — status→NOT_USED, adda/used_at/used_by cleared
+      • LayeringRollEntry — deleted
+      • Cross-app service: tracking.services.log_roll (ClothRollHistory) + log_adda (AddaHistory)
+    """
     _ensure_assigned_worker(entry.stage_record, user)
     _ensure_layering_skill(user)
     if entry.stage_record.completed_at is not None:
@@ -365,8 +394,12 @@ def detach_roll_from_layering(*, entry: LayeringRollEntry, user) -> None:
         note=f"detached from {entry.stage_record.adda.code} layering",
     )
     log_adda(
-        entry.stage_record.adda, AddaHistory.ChangeType.ROLL_ASSIGNED, user,
-        roll=roll, note='detached',
+        entry.stage_record.adda, AddaHistory.ChangeType.ROLL_REMOVED, user,
+        roll=roll, note='detached from layering',
+    )
+    logger.info(
+        "layering.roll_detach adda=%s roll=%s entry=%s user_id=%s",
+        entry.stage_record.adda.code, roll.roll_id, entry.pk, user.pk,
     )
     entry.delete()
 
@@ -380,15 +413,15 @@ def save_layering_breakup(
     entry: LayeringRollEntry,
     layers_on_roll: int,
     leftover_weight_kg: Decimal,
-    leftover_length_meters: Decimal,
+    leftover_length_meters: Decimal | None = None,
     notes: str = '',
     user,
 ) -> tuple[LayeringRollEntry, RemainingClothOfClothRoll]:
     """Single-shot save for one breakup row: layers + primary leftover.
 
-    Also denormalizes leftover values onto ClothRoll so dashboards / cloth
-    inventory tables can show "this roll has X m / Y KG leftover" without
-    joining RemainingClothOfClothRoll.
+    Worker screen captures leftover WEIGHT only (owner decision 2026-06-03);
+    `leftover_length_meters` is optional and defaults to 0. Denormalizes leftover
+    onto ClothRoll so cloth dashboards show it without joining RemainingCloth.
     """
     _ensure_assigned_worker(entry.stage_record, user)
     _ensure_layering_skill(user)
@@ -399,7 +432,9 @@ def save_layering_breakup(
         raise ValidationError("Layers must be >= 1")
     if leftover_weight_kg is None or Decimal(leftover_weight_kg) < 0:
         raise ValidationError("Leftover weight must be >= 0")
-    if leftover_length_meters is None or Decimal(leftover_length_meters) < 0:
+    # Length optional now (weight-only capture). Default 0; reject only negatives.
+    leftover_length_meters = Decimal(leftover_length_meters) if leftover_length_meters is not None else Decimal('0')
+    if leftover_length_meters < 0:
         raise ValidationError("Leftover length must be >= 0")
 
     entry.layers_on_roll = int(layers_on_roll)
@@ -501,10 +536,10 @@ def save_layering_draft(
             continue   # silently skip unknown entry pks
         entry = entries_by_pk[pk]
         layers = data.get('layers')
-        leftover_len = data.get('leftover_length')
+        leftover_len = data.get('leftover_length')   # optional now (weight-only capture)
         leftover_wt = data.get('leftover_weight')
-        # All three must be present + non-None to persist this row.
-        if layers is None or leftover_len is None or leftover_wt is None:
+        # Persist a row once we have layers + leftover weight; length defaults 0.
+        if layers is None or leftover_wt is None:
             continue
         try:
             save_layering_breakup(
@@ -533,7 +568,12 @@ def record_remaining_cloth(
     notes: str = '',
     user,
 ) -> RemainingClothOfClothRoll:
-    """Append an additional leftover piece. Used for multi-piece edge cases."""
+    """Append an additional leftover piece. Used for multi-piece edge cases.
+
+    Side effects:
+      • RemainingClothOfClothRoll — created (extra leftover piece)
+      • ClothRoll.remaining_length_meters / remaining_weight_kg — re-denormalized via _sync_roll_leftover
+    """
     _ensure_assigned_worker(entry.stage_record, user)
     _ensure_layering_skill(user)
 
@@ -553,6 +593,11 @@ def record_remaining_cloth(
     )
     # Re-denormalize the roll (this row may now be the most recent)
     _sync_roll_leftover(entry.roll, lo)
+    logger.info(
+        "layering.remaining_cloth_record adda=%s roll=%s entry=%s leftover=%s weight_kg=%s length_m=%s user_id=%s",
+        entry.stage_record.adda.code, entry.roll.roll_id, entry.pk, lo.pk,
+        Decimal(remaining_weight_kg), Decimal(remaining_length_meters), user.pk,
+    )
     return lo
 
 
@@ -591,6 +636,14 @@ def complete_layering(
     Validates: layers per entry, leftover per entry, layer_length, duration.
     Propagates layer metrics to each used ClothRoll. Clears stage draft_*
     fields. Creates LayeringRecord summary.
+
+    Side effects:
+      • LayeringRollEntry.layers_on_roll — set per entry
+      • ClothRoll.layers_on_roll / layer_length_meters — copied per used roll
+      • AddaStageRecord — completed_at/completed_by set, draft_* cleared
+      • LayeringRecord — created (summary) + rolls_used M2M set
+      • Cross-app/service: adda_service.advance_to_next_stage (advances Adda → Cutting;
+        also triggers stage cost freeze + AddaHistory logging downstream)
     """
     _ensure_can_manage(user)
     _ensure_can_complete_layering(user)
@@ -678,6 +731,12 @@ def complete_layering(
     lr.rolls_used.set(roll_ids)
 
     advance_to_next_stage(adda, user)
+    logger.info(
+        "layering.complete adda=%s record=%s lay_count=%s rolls=%s total_colors=%s "
+        "layer_length_m=%s duration_min=%s user_id=%s",
+        adda.code, lr.pk, lay_count_total, len(roll_ids), total_colors,
+        layer_length_dec, int(duration_minutes), user.pk,
+    )
     return lr
 
 
@@ -710,76 +769,32 @@ def reopen_layering(*, adda: Adda, user) -> AddaStageRecord:
       "duration_minutes must be >= 1" aata tha.)
 
     AUDIT: tracking.AddaHistory mein STAGE_REOPENED entry log hoti hai.
+
+    Side effects:
+      • AddaStageRecord — completed_at/completed_by cleared, draft_* restored
+      • LayeringRecord — deleted (summary; re-created on next complete)
+      • Adda — current_stage→Layering, status→IN_PROGRESS, completed_at cleared
+      • Cross-app/service: cost_service.clear_stage_cost (drops frozen processing cost)
+        + tracking.services.log_adda (AddaHistory STAGE_REOPENED)
     """
-    # Gate: sirf super_admin ya manager. Karigar reopen nahi kar sakta.
-    _ensure_management(user)
-
-    # Iss product ka Layering WorkflowStage row find karo (har product ka
-    # apna WorkflowStage row hota hai with order=1 typically).
-    layering_wf = adda.product.workflow_stages.filter(stage__code=STAGE_LAYERING).first()
-    if layering_wf is None:
-        raise ValidationError("This product has no Layering stage configured.")
-
-    # select_for_update() = SQL "FOR UPDATE" lock taaki parallel reopen
-    # race na ho. @transaction.atomic block ke andar mandatory.
-    try:
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=layering_wf,
-        )
-    except AddaStageRecord.DoesNotExist:
-        raise ValidationError("Layering stage has never been started.")
-    if sr.completed_at is None:
-        raise ValidationError("Layering is already open for edits.")
-
-    # Downstream check: agar koi later stage (cutting_pattern, cutting) ka
-    # AddaStageRecord pehle se started hai, reopen refuse karo. Reason —
-    # us stage ke data (workers, barcodes) ko bhi unwind karna padega which
-    # is out of scope yahan. Admin pehle manual cleanup kare.
-    downstream = (
-        AddaStageRecord.objects
-        .filter(adda=adda, workflow_stage__order__gt=layering_wf.order)
-        .exclude(started_at__isnull=True)
-        .exists()
-    )
-    if downstream:
-        raise ValidationError(
-            "Cannot reopen Layering — a downstream stage has already started. "
-            "Reopen requires no later stages to have been touched."
-        )
-
-    # Preserve header values BEFORE tearing down LayeringRecord. Without this,
-    # the reopened editor renders blank layer_length / duration / notes and the
-    # next Complete submit fails strict validation ("duration_minutes must be
-    # >= 1"). Copy the prior values back into the stage_record.draft_* fields
-    # so the form pre-fills them on re-render.
-    lr = LayeringRecord.objects.filter(stage_record=sr).first()
-    if lr is not None:
+    def _teardown(sr):
+        # Preserve header values BEFORE deleting the typed LayeringRecord, else
+        # the reopened editor renders blank layer_length/duration/notes and the
+        # next Complete fails strict validation ("duration_minutes must be >= 1").
+        # Copy them into sr.draft_* so the form pre-fills (bug found 2026-05-28).
+        lr = LayeringRecord.objects.filter(stage_record=sr).first()
+        if lr is None:
+            return []
         sr.draft_layer_length_meters = lr.layer_length_meters
         sr.draft_duration_minutes = lr.duration_minutes
         sr.draft_notes = lr.notes or ''
         lr.delete()
+        return ['draft_layer_length_meters', 'draft_duration_minutes', 'draft_notes']
 
-    sr.completed_at = None
-    sr.completed_by = None
-    sr.save(update_fields=[
-        'completed_at', 'completed_by',
-        'draft_layer_length_meters', 'draft_duration_minutes', 'draft_notes',
-        'updated_at',
-    ])
-
-    # Reopen clears the frozen manufacturing cost — re-complete re-freezes it
-    # against the current rate + corrected quantity (price-at-time-of-order).
-    from production.services.cost_service import clear_stage_cost
-    clear_stage_cost(sr)
-
-    adda.current_stage = layering_wf
-    adda.status = Adda.Status.IN_PROGRESS
-    adda.completed_at = None
-    adda.save(update_fields=['current_stage', 'status', 'completed_at'])
-
-    # Audit
-    from tracking.models import AddaHistory
-    from tracking.services import log_adda
-    log_adda(adda, AddaHistory.ChangeType.STAGE_REOPENED, user, stage_from=None, stage_to=layering_wf)
-
-    return sr
+    # Shared skeleton (mgmt gate, lock, already-open check, clear cost, reset
+    # Adda, STAGE_REOPENED log). Layering's deltas: downstream guard + draft
+    # preserve/teardown above. Workers + rolls + leftovers are kept.
+    return reopen_stage_record(
+        adda=adda, stage_code=STAGE_LAYERING, stage_label='Layering', user=user,
+        guard=downstream_started_guard, teardown=_teardown,
+    )

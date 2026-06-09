@@ -7,7 +7,7 @@ mixins.py se mirror kiya hai. test_func() False return kare to user ko 403 mileg
 """
 from django.contrib.auth.mixins import UserPassesTestMixin
 
-from inventory.services import (
+from accounts.services import (
     FINANCIAL_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role,
 )
 

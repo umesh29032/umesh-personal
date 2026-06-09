@@ -55,7 +55,10 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         for a in active_addas:
             pipeline = []
             done_stages = []  # (label, stage_type) for revisit links — dashboard accordion
-            for s in a.product.workflow_stages.order_by('order'):
+            # Use the prefetched workflow_stages (.all() hits the prefetch cache).
+            # `.order_by()` here would issue a FRESH query per Adda (N+1) — sort
+            # in Python on the cached rows instead.
+            for s in sorted(a.product.workflow_stages.all(), key=lambda ws: ws.order):
                 if a.current_stage and a.current_stage.order == s.order:
                     state = 'current'
                 elif a.current_stage and a.current_stage.order > s.order:
