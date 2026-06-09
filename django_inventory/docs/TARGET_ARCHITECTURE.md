@@ -195,6 +195,32 @@ leaks across sites). So the seam is:
   tables in one migration wave + flip the chokepoint from no-op to real filter. That migration
   is the *implementation*; today we only build the chokepoint it will plug into.
 
+## Stage payability — why `credits_workers` lives on WorkflowStage (M2.7)
+
+`credits_workers` (does completing a stage credit workers? → PAY-2 guard) lives on
+**`WorkflowStage`**, deliberately — do NOT move it.
+
+```
+Stage (global template)   →   WorkflowStage (binding config)   →   AddaStageRecord (frozen snapshot)
+ default_cost_rate (seed)      cost_rate, cost_method,                cost_rate_snapshot, ...
+                               cost_billed_at, credits_workers ◀HOME  (+ credits_workers_snapshot, FUTURE)
+```
+
+- **Not on `Stage` (global):** payability must vary per product (same reason `cost_rate`
+  isn't on Stage — a global value can't say "T-SHIRT cutting pays, product X cutting doesn't").
+- **Not on the snapshot (source):** the enforcement guard runs in `advance_to_next_stage`
+  **before** the snapshot freezes — payability is a config **input**, the snapshot is an
+  **output**. Source-on-snapshot would be the wrong timing.
+- **On `WorkflowStage`:** the binding-config layer, beside `cost_rate`. Readable at guard time,
+  per-product, and — the clincher — it mirrors how `cost_rate` already survived the snapshot
+  architecture **without moving**.
+- **Future (Adda-stage snapshots / Super-Admin per-Adda overrides):** payability gets
+  **frozen/copied onto the Adda layer like `cost_rate_snapshot`** — layered *on top of* the
+  WorkflowStage source, never relocating it. **Additive, not a move.**
+
+This is a permanent placement decision: future snapshot work must treat
+`WorkflowStage.credits_workers` as the source and copy it down, exactly as cost does.
+
 ## What stays untouched (already excellent — do not rewrite)
 Immutable worker ledger · single-writer services · frozen cost snapshots · PROTECT
 on_delete posture · data-driven flow composition · `core` abstract bases ·

@@ -161,6 +161,13 @@ class WorkflowStage(TimeStampedModel):
         'self', on_delete=models.SET_NULL,
         null=True, blank=True, related_name='billed_stages',
     )
+    # PAY-2 (M2.7): does completing this stage credit workers? Data-driven
+    # payability — NO hardcoded stage names. When True, the central guard in
+    # advance_to_next_stage blocks completion unless >=1 worker is allocated.
+    # This is the SOURCE config (binding layer, beside cost_rate); a future
+    # Adda-stage snapshot will freeze/copy it (like cost_rate_snapshot), never
+    # relocating this field.
+    credits_workers = models.BooleanField(default=False)
 
     class Meta:
         # Same product mein 2 stages same order ya same stage na ho
