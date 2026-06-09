@@ -147,20 +147,22 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
             default_tab = ''
 
         # Lazy import — activity_service depends on tracking models
-        from production.services import (
-            adda_activity, get_layering_snapshot, get_pattern_snapshot,
-        )
+        from production.services import adda_activity, get_layering_snapshot, get_pattern_snapshot
+        from production.stages import base as stage_registry
         activity = adda_activity(adda, limit=50)
+        # Consumed DIRECTLY by the layering + cutting-pattern panels in the
+        # template (separate from the overview tiles below); always present.
         layering_snap = get_layering_snapshot(adda)
         pattern_snap = get_pattern_snapshot(adda)
 
-        # Per-stage snapshot map — drives the "Stages Overview" panel above
-        # the flow card. Each stage's headline metrics get a compact tile.
-        # Template iterates `stages_overview` (in flow order). Adding a new
-        # stage = just register a snapshot here.
+        # Per-stage snapshot map — drives the "Stages Overview" panel above the
+        # flow card. Registry-driven (M2.6): every flow stage with a handler
+        # contributes its snapshot, so adding a stage needs no edit here. The
+        # template renders tiles only for the stages it knows; any extra snapshot
+        # is simply unused — rendered output is unchanged.
         snap_by_type = {
-            'layering': layering_snap,
-            'cutting_pattern': pattern_snap,
+            s.stage_type: stage_registry.get(s.stage_type).snapshot(adda)
+            for s in stages if stage_registry.has(s.stage_type)
         }
         stages_overview = []
         for s in stages:
