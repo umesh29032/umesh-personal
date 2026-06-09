@@ -93,6 +93,29 @@
 
 ---
 
+## Deferred architectural improvements
+
+### Hardcode #1 — first-stage auto-start (DEFERRED, decided 2026-06-09)
+`adda_service.create_adda` couples Adda creation to layering in two places:
+(a) lines 86-92 — unconditional cutting_master/helper requirement (refuse creation if none);
+(b) lines 114-127 — `if first_stage.stage_type == STAGE_LAYERING:` auto-create the stage
+record + assign the skilled pool + log WORKERS_ASSIGNED.
+
+**Deferred — not a blocker.** It only affects the FIRST stage; it does NOT block adding
+mid/end stages (those start manually). All current products start with Layering, the
+behaviour is correct and required, and the Adda-creation path is race-locked
+(SELECT FOR UPDATE) — refactoring it now is higher risk than value.
+
+**Trigger to revisit:** a product whose first stage is NOT layering, or a second
+stage type that needs auto-start.
+
+**Future migration path (designed, not built):** add a `StageHandler.on_adda_created(*, adda, user)`
+hook (default no-op); `create_adda` calls `registry.get(first_stage.code).on_adda_created(...)`.
+LayeringHandler owns the skilled-pool snapshot; the creation precondition (a) moves behind
+a handler-declared requirement so a future non-cutting first stage isn't wrongly blocked.
+Behaviour-preserving; needs golden tests on the creation path. Independent of payroll/costing
+(it assigns the worker M2M, not StageWorkAssignment).
+
 ## Scope focus
 The real business problems stay primary: **Adda · Stages · Payroll · Production Flow.**
 Critical path: **M0 → M1 → M2.** After M2 the system is already strong (most dimensions
