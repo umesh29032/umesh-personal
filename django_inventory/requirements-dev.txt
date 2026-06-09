@@ -1,0 +1,8 @@
+# Dev / local-gate tooling (M0.2). Runtime deps live in requirements.txt.
+# Install:  env/bin/pip install -r requirements-dev.txt
+# Gate:     bash scripts/check.sh
+ruff==0.15.16          # lint (lenient start; ratchet per REMEDIATION_PLAN)
+mypy==2.1.0            # type check (report-only start)
+coverage==7.14.1       # test coverage (--fail-under floor in check.sh)
+import-linter==2.11    # acyclic-layering contract (config/.importlinter)
+pre-commit==4.6.0      # enforce ruff on CHANGED files at commit time

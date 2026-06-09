@@ -1,0 +1,20 @@
+# Pre-commit — enforces ruff (lenient F set, autofix) on CHANGED Python files only.
+# Co-located in django_inventory/ because the git root is a multi-project monorepo;
+# this config never touches sibling projects.
+#
+# Activate (run from the git root /home/tech/umesh-personal):
+#   django_inventory/env/bin/pre-commit install --config django_inventory/.pre-commit-config.yaml
+# Run manually on everything:
+#   django_inventory/env/bin/pre-commit run --config django_inventory/.pre-commit-config.yaml --all-files
+# Uninstall:
+#   django_inventory/env/bin/pre-commit uninstall
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (changed files · autofix · lenient F set)
+        entry: django_inventory/env/bin/ruff check --force-exclude --fix
+        language: system
+        types: [python]
+        files: ^django_inventory/.*\.py$
+        exclude: ^django_inventory/(.*/migrations/|env/|staticfiles/)

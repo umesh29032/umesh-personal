@@ -1,0 +1,11 @@
+# Ruff config — LENIENT START (M0.2). Ratchet rules milestone by milestone.
+# Policy (per owner decision 2026-06-09): keep the gate GREEN from day one;
+# enforce on CHANGED/NEW code via pre-commit; do NOT red-wall on legacy debt.
+# Full-repo `ruff check` is REPORT-ONLY in scripts/check.sh.
+target-version = "py310"
+line-length = 100
+extend-exclude = ["*/migrations/*", "env", "media", "staticfiles", "*.pdf"]
+
+[lint]
+# Minimal high-value, mostly-autofixable set. Add "I" (isort), "UP", "B" after M2.
+select = ["F"]      # pyflakes: unused imports/vars, undefined names, redefinitions
