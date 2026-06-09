@@ -141,7 +141,7 @@ class AllocationTests(TestCase):
     def test_delete_item_with_live_allocation_refused_not_crash(self):
         """Deleting a bundle item that has a live worker allocation must raise a
         clean ValidationError, not a 500 ProtectedError (bundle_item is PROTECT)."""
-        from production.services.cutting_service import delete_bundle_item
+        from production.services import delete_bundle_item
         # delete_bundle_item resolves the SR from the Adda's current stage.
         self.adda.current_stage = self.cutting_sr.workflow_stage
         self.adda.save(update_fields=['current_stage'])
@@ -155,7 +155,7 @@ class AllocationTests(TestCase):
         """StageWorkAssignment is immutable (void only flags it), and bundle_item
         is PROTECT — so an item that was EVER allocated stays undeletable even
         after the allocation is voided. The pay audit trail is permanent."""
-        from production.services.cutting_service import delete_bundle_item
+        from production.services import delete_bundle_item
         self.adda.current_stage = self.cutting_sr.workflow_stage
         self.adda.save(update_fields=['current_stage'])
         a = allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,

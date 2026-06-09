@@ -75,6 +75,7 @@ from .barcode_generation_service import (
     reopen_barcode_generation,
     start_barcode_generation,
 )
+from .cost_service import clear_stage_cost
 from .activity_service import adda_activity, user_activity_across_addas
 from .access_service import user_can_access_stage, stage_access_map
 from .flow_service import (
@@ -115,6 +116,7 @@ __all__ = [
     'create_bundle_with_pieces',
     'add_bundle_item',
     'add_item_to_bundle',
+    'add_pieces_to_bundle',
     'delete_bundle_item',
     'delete_bundle',
     'save_cutting_draft',
@@ -145,6 +147,8 @@ __all__ = [
     'get_or_create_barcode_stage_record',
     'preview_barcode_counts',
     'get_barcode_snapshot',
+    # Stage costing
+    'clear_stage_cost',
     # Activity
     'adda_activity',
     'user_activity_across_addas',

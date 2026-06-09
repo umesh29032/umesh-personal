@@ -13,8 +13,7 @@ from inventory.models import Role
 from production.models import (
     AddaStageRecord, CostMethod, LayeringRecord, Product,
 )
-from production.services import advance_to_next_stage, create_adda
-from production.services.cost_service import clear_stage_cost
+from production.services import advance_to_next_stage, clear_stage_cost, create_adda
 
 
 def _superuser():
