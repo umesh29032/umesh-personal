@@ -10,6 +10,47 @@
 > Rev 2 fixes: R1 production↔expense earnings seam, R2 model-discovery mechanism, C2 factory
 > seam = chokepoint-only (no columns), + migration-safety + perf-baseline + strangler-cutover phases.
 
+## 🔄 Rev 3 — RE-BASELINED 2026-06-10 (against current architecture)
+Re-derived after the V2 worker-tracking foundation shipped + the owner paused for a **stage-domain
+review**. Suite now **389 green**, dev DB through `0033`. What changed vs Rev 2 and how it re-sequences:
+
+**DONE (committed):** M0 4/6 · **M1 4/4 ✅** · M2 7/10. (~16/33 sub-phases; the M0→M1→M2 critical path —
+the heavy dimension lift — is banked; most dimensions already ~8.5–9.5 per the plan.)
+
+**New facts that re-shape the remaining plan:**
+- **A stage-domain review is now a gating phase (NEW · owner-requested).** Stage taxonomy/responsibilities,
+  machine sub-stages, Missing-Piece + Alter/Rework lifecycles, costing/settlement/reporting implications
+  (see [STAGE_DOMAIN_REVIEW_AGENDA.md](STAGE_DOMAIN_REVIEW_AGENDA.md)). **This gates two M2 cleanups** —
+  P2.8 (dissolve `stage_views.py`) and P2.9 (draft `draft_*` polymorphic move) — because stage taxonomy may
+  reshape stage views + the draft model. Do P2.8/P2.9 **after** the stage review, not before.
+- **M4.1 is now UNBLOCKED.** It was deferred to post-V2-1; V2-1a/b/c (assignment foundation) are built, so the
+  accounts→production sync-edge relocation can proceed.
+- **V2 added new query surfaces** (`active_workers` in loops, dashboard task-scoping, `Exists` subquery) —
+  fold these into **M5/P5.1** N+1 audit (mostly pre-mitigated with prefetch, but verify with query counts).
+- **M6 docs grew** — the SYSTEM_DESIGN rewrite (P6.1) must now also fold in ARCHITECTURE_V2 + V2_1_REVIEW +
+  the foundation review. Bigger, but additive.
+- **P2.7 (move expense call into base StageService) is unaffected + still pending** — `stage_views.py` still
+  imports `expense` directly; independent of the stage review, can go anytime.
+
+**Re-sequenced remaining order (Rev 3):**
+1. **Finish M0** — P0.4 observability (Sentry/structured logging/request-id), P0.6 perf-baseline
+   (`assertNumQueries` on hot pages). *Independent — do anytime; P0.6 also seeds M5's regression oracle.*
+2. **P2.7** — relocate the `expense` earnings call into `stages/base/service.py` (one-way `production→expense`
+   in one file). *Independent of the stage review.*
+3. **🔶 Stage-domain review** (gating) — produces the locked stage taxonomy + Missing/Alter domain designs.
+4. **P2.8 + P2.9** — stage_views dissolution + draft polymorphic move, **now aligned with the new taxonomy**.
+5. **M3 — RBAC** — P3.1 unify skill-gating (delete hardcoded `SKILL_*`), P3.2 split `permission_service`,
+   P3.3 factory seam (chokepoint only), P3.4 sidebar dual-source.
+6. **M4 — Coupling** — P4.1 accounts→production (now unblocked), P4.2 production↔tracking cycle, P4.3 god-app
+   split, P4.4 strict import contract.
+7. **M5 — Scalability** — P5.1 N+1 + paginate (incl. the new V2 query surfaces), P5.2 ledger snapshots,
+   P5.3 denorm reconciliation.
+8. **M6 — Docs** — P6.1 SYSTEM_DESIGN rewrite (now incl. V2), P6.2 archive, P6.3 dead-weight, P6.4 coverage/types.
+9. **M7 — Verify** — P7.1 re-run the dimension review + load test, P7.2 scorecard sign-off.
+
+*(The V2 build track — pt.2b worker UI → V2-1d drop-M2M → V2-2 settlement → missing/alter modules — interleaves
+but is tracked separately in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md); the stage-domain review gates its resumption too.)*
+
 ## Governing principle
 > **Architect for multi-factory / async / scale. Do NOT implement them.** Seams, not features.
 > Target = **8.5–9/10 at low complexity**, NOT a forced 10/10.
