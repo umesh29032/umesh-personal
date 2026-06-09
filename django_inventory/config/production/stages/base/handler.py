@@ -72,8 +72,15 @@ class StageHandler(ABC):
     pays_workers: bool = False
 
     @abstractmethod
-    def panel_context(self, adda, record) -> dict:
-        """Template context for this stage's panel (read-only)."""
+    def snapshot(self, adda) -> dict:
+        """Lightweight, request-free stage state (drives the Adda overview tiles +
+        embedded mini-panels). Mirrors the service get_*_snapshot."""
+
+    @abstractmethod
+    def panel_context(self, request, adda, record) -> dict:
+        """Full render context for the stage's standalone/embedded panel
+        (request-coupled: forms, permissions). Delegates to the view builder in the
+        adapter phase; owns the logic after it moves into the package."""
 
     @abstractmethod
     def start(self, *, user_id: int, adda, record, data: dict):

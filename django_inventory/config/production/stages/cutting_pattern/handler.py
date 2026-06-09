@@ -18,9 +18,13 @@ class CuttingPatternHandler(StageHandler):
     template_partial = 'production/_stage_panel_cutting_pattern.html'
     pays_workers = False   # verification stage — no allocation-driven earnings
 
-    def panel_context(self, adda, record):
+    def snapshot(self, adda):
         from production.services import get_pattern_snapshot
         return get_pattern_snapshot(adda)
+
+    def panel_context(self, request, adda, record):
+        from production.views.pattern_stage_views import _build_pattern_context
+        return _build_pattern_context(request, adda)
 
     def start(self, *, user_id, adda, record, data):
         from accounts.models import User

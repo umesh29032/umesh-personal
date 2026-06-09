@@ -68,10 +68,10 @@ class CuttingPatternHandlerParityTest(TestCase):
         self.assertIsInstance(handler, CuttingPatternHandler)
         self.assertFalse(handler.pays_workers)
 
-    def test_panel_context_delegates_to_snapshot(self):
+    def test_snapshot_delegates_to_service(self):
         adda, sr = self._ready_adda()
-        ctx = base.get(STAGE_CUTTING_PATTERN).panel_context(adda, sr)
-        self.assertEqual(set(ctx.keys()), set(get_pattern_snapshot(adda).keys()))
+        snap = base.get(STAGE_CUTTING_PATTERN).snapshot(adda)
+        self.assertEqual(set(snap.keys()), set(get_pattern_snapshot(adda).keys()))
 
     def test_complete_via_handler_advances(self):
         adda, sr = self._ready_adda()

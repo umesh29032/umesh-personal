@@ -27,9 +27,25 @@ class CuttingHandler(StageHandler):
     template_partial = 'production/_stage_panel_cutting.html'
     pays_workers = True
 
-    def panel_context(self, adda, record):
+    def snapshot(self, adda):
         from production.services import get_cutting_snapshot
         return get_cutting_snapshot(adda)
+
+    def panel_context(self, request, adda, record):
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from production.forms import CuttingForm
+        from production.views.stage_views import _build_cutting_context
+        # Mirrors the legacy StagePanelView cutting branch exactly.
+        ctx = {
+            'cutting_form': CuttingForm(),
+            'can_complete_cutting': (
+                user_has_role(request.user, MANAGEMENT_ROLES)
+                and adda.current_stage is not None
+                and adda.current_stage.stage_type == self.code
+            ),
+        }
+        ctx.update(_build_cutting_context(request, adda))
+        return ctx
 
     def start(self, *, user_id, adda, record, data):
         from accounts.models import User

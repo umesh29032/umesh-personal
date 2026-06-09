@@ -20,9 +20,13 @@ class BarcodeGenerationHandler(StageHandler):
     template_partial = 'production/_stage_panel_barcode_gen.html'
     pays_workers = False
 
-    def panel_context(self, adda, record):
+    def snapshot(self, adda):
         from production.services import get_barcode_snapshot
         return get_barcode_snapshot(adda)
+
+    def panel_context(self, request, adda, record):
+        from production.views.barcode_gen_views import _build_barcode_gen_context
+        return _build_barcode_gen_context(request, adda)
 
     def start(self, *, user_id, adda, record, data):
         from accounts.models import User

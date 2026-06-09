@@ -61,14 +61,13 @@ class LayeringHandlerParityTest(TestCase):
         self.assertFalse(handler.pays_workers)
         self.assertEqual(handler.template_partial, 'production/_stage_panel_layering.html')
 
-    def test_panel_context_matches_service_snapshot(self):
+    def test_snapshot_matches_service(self):
         adda, sr, _ = self._ready_adda()
-        handler = base.get(STAGE_LAYERING)
-        ctx = handler.panel_context(adda, sr)
+        snap = base.get(STAGE_LAYERING).snapshot(adda)
         # Delegates to get_layering_snapshot — same dict shape (values include live
         # QuerySets, so compare keys, not the dicts directly).
-        self.assertEqual(set(ctx.keys()), set(get_layering_snapshot(adda).keys()))
-        self.assertEqual(ctx['state'], 'in_progress')
+        self.assertEqual(set(snap.keys()), set(get_layering_snapshot(adda).keys()))
+        self.assertEqual(snap['state'], 'in_progress')
 
     def test_complete_via_handler_advances_like_service(self):
         adda, sr, entries = self._ready_adda()

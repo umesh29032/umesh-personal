@@ -17,7 +17,10 @@ class _DummyHandler(StageHandler):
     template_partial = 'x.html'
     pays_workers = True
 
-    def panel_context(self, adda, record):
+    def snapshot(self, adda):
+        return {}
+
+    def panel_context(self, request, adda, record):
         return {}
 
     def start(self, *, user_id, adda, record, data):

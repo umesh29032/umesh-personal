@@ -26,9 +26,13 @@ class LayeringHandler(StageHandler):
     # — worker pay is allocated at the cutting stage — so it credits no one here.
     pays_workers = False
 
-    def panel_context(self, adda, record):
+    def snapshot(self, adda):
         from production.services import get_layering_snapshot
         return get_layering_snapshot(adda)
+
+    def panel_context(self, request, adda, record):
+        from production.views.stage_views import _build_layering_context
+        return _build_layering_context(request, adda)
 
     def start(self, *, user_id, adda, record, data):
         from accounts.models import User

@@ -289,6 +289,17 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin,
         ctx['adda'] = adda
         ctx['stage_type'] = stage_type
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
+        # Stage panel context. Strangler (M2.6): when the flag is on AND a handler
+        # is registered for this stage, dispatch through the registry — its
+        # panel_context delegates to the SAME _build_*_context below, so the context
+        # is identical (proven by test_stage_dispatch_parity). Otherwise the legacy
+        # if/elif runs unchanged.
+        from django.conf import settings as _settings
+        if getattr(_settings, 'STAGE_REGISTRY_ENABLED', False):
+            from production.stages import base as stage_registry
+            if stage_registry.has(stage_type):
+                ctx.update(stage_registry.get(stage_type).panel_context(self.request, adda, None))
+                return ctx
         if stage_type == STAGE_LAYERING:
             ctx.update(_build_layering_context(self.request, adda))
         elif stage_type == 'cutting_pattern':

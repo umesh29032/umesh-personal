@@ -34,9 +34,9 @@ class CuttingHandlerParityTest(TestCase):
         self.assertTrue(handler.pays_workers)
         self.assertEqual(handler.template_partial, 'production/_stage_panel_cutting.html')
 
-    def test_panel_context_delegates_to_snapshot(self):
-        ctx = base.get(STAGE_CUTTING).panel_context(self.adda, None)
-        self.assertEqual(set(ctx.keys()), set(get_cutting_snapshot(self.adda).keys()))
+    def test_snapshot_delegates_to_service(self):
+        snap = base.get(STAGE_CUTTING).snapshot(self.adda)
+        self.assertEqual(set(snap.keys()), set(get_cutting_snapshot(self.adda).keys()))
 
     def test_complete_delegates_to_from_bundles(self):
         with patch('production.services.complete_cutting_from_bundles') as m:
