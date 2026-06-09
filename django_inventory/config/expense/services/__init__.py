@@ -22,6 +22,7 @@ from .payroll_service import (
     worker_production_stats, worker_settlements, worker_stage_earnings,
     worker_summary,
 )
+from .reconciliation_service import reconcile_stage_pay, summarize as reconcile_summarize
 
 __all__ = [
     'ledger_service',
@@ -33,4 +34,6 @@ __all__ = [
     'worker_production_stats', 'worker_stage_earnings', 'worker_adda_earnings',
     'advance_outstanding', 'advance_remaining', 'outstanding_advances',
     'worker_advances', 'worker_settlements',
+    # PAY-4 reconciliation
+    'reconcile_stage_pay', 'reconcile_summarize',
 ]
