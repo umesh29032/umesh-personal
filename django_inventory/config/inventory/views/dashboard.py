@@ -14,7 +14,7 @@ Role-aware sections:
   • is_admin_view flag       — future admin-only metrics ke liye reserved
 """
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum
+from django.db.models import Count, Exists, OuterRef, Sum
 from django.shortcuts import render
 
 from ..services import MANAGEMENT_ROLES, user_has_role
@@ -43,9 +43,18 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             or user_has_role(request.user, MANAGEMENT_ROLES)
         )
 
-        # All in-progress Addas — annotated with rolls count + per-stage pipeline state.
+        # In-progress Addas — annotated with rolls count + per-stage pipeline state.
+        addas_qs = Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+        # V2-1c-iv isolation: a worker sees ONLY Addas they're actively assigned to
+        # (an active WorkerStageTask on any stage). Management sees all. Exists()
+        # avoids a join so the rolls_count annotation stays correct.
+        if not user_has_role(request.user, MANAGEMENT_ROLES):
+            assigned = WorkerStageTask.objects.filter(
+                stage_record__adda=OuterRef('pk'), worker=request.user,
+            ).exclude(status=WorkerStageTask.Status.CANCELLED)
+            addas_qs = addas_qs.filter(Exists(assigned))
         active_addas = list(
-            Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+            addas_qs
             .select_related('product', 'current_stage')
             .prefetch_related('stage_records__workflow_stage', 'product__workflow_stages')
             .annotate(rolls_count=Count('rolls'))

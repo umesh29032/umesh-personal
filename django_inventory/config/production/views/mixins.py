@@ -32,6 +32,17 @@ class StageViewAccessMixin:
         code = self.stage_code or kwargs.get('stage_type')
         if code and not user_can_access_stage(request.user, code):
             raise PermissionDenied(f"You lack the skill to access the '{code}' stage.")
+        # V2-1c-iv object-level ASSIGNMENT gate: a worker may open only stages they
+        # are ACTIVELY assigned to — skill alone is not enough (the prior leak).
+        # Management (super_admin/manager) bypasses, as with the skill gate above.
+        adda_code = kwargs.get('code')
+        if code and adda_code and not user_has_role(request.user, MANAGEMENT_ROLES):
+            from production.models import AddaStageRecord
+            sr = AddaStageRecord.objects.filter(
+                adda__code=adda_code, workflow_stage__stage__code=code,
+            ).first()
+            if sr is None or not sr.is_worker_assigned(request.user):
+                raise PermissionDenied("You are not assigned to this stage.")
         return super().dispatch(request, *args, **kwargs)
 
 

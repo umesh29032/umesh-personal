@@ -355,3 +355,59 @@ class LifecycleServiceTest(TestCase):
         complete_worker_task(self.task, actor=self.worker)
         with self.assertRaises(ValidationError):
             complete_worker_task(self.task, actor=self.worker)
+
+
+class IsolationGateTest(TestCase):
+    """V2-1c-iv: a skilled worker may open a stage view ONLY if actively assigned
+    (skill alone is not enough). Management bypasses. (The HIGH leak fix.)"""
+
+    def setUp(self):
+        from django.test import RequestFactory
+        from inventory.models import Role
+        from accounts.models import Skill
+        from production.views.stage_views import StagePanelView
+        self.factory = RequestFactory()
+        self.View = StagePanelView
+        self.product = Product.objects.create(code='IG', name='IG Product')
+        self.stage = Stage.objects.get_or_create(code='cutting', defaults={'name': 'Cutting'})[0]
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='IG-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        cm = Skill.objects.get_or_create(name='cutting_master', defaults={'label': 'Cutting Master'})[0]
+        # Non-management production worker WITH the cutting skill.
+        self.worker = User.objects.create_user(email='ig-worker@test', password='x')
+        self.worker.role = Role.objects.get(code='worker')
+        self.worker.save()
+        self.worker.skills.add(cm)
+        # Super-admin (management) — should bypass the assignment gate.
+        self.admin = User.objects.create_user(
+            email='ig-admin@test', password='x', is_superuser=True, is_staff=True)
+        self.admin.role = Role.objects.get(code='super_admin')
+        self.admin.save()
+        self.admin.skills.add(cm)
+
+    def _get_panel(self, user):
+        req = self.factory.get(f'/addas/{self.adda.code}/stage/cutting/')
+        req.user = user
+        return self.View.as_view()(req, code=self.adda.code, stage_type='cutting')
+
+    def test_skilled_but_unassigned_worker_denied(self):
+        with self.assertRaises(PermissionDenied):
+            self._get_panel(self.worker)
+
+    def test_assigned_worker_allowed(self):
+        set_stage_workers(self.sr, [self.worker.pk])     # active task created
+        resp = self._get_panel(self.worker)              # must NOT raise PermissionDenied
+        self.assertEqual(resp.status_code, 200)
+
+    def test_cancelled_task_worker_denied(self):
+        set_stage_workers(self.sr, [self.worker.pk])
+        set_stage_workers(self.sr, [])                   # cancel the worker's task
+        with self.assertRaises(PermissionDenied):
+            self._get_panel(self.worker)
+
+    def test_management_bypasses_assignment(self):
+        resp = self._get_panel(self.admin)               # not assigned, but management
+        self.assertEqual(resp.status_code, 200)
