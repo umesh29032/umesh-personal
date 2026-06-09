@@ -1,8 +1,18 @@
 # Worker Ledger + Settlement Architecture
 
-**Status:** PROPOSED — awaiting owner approval before any code.
+> ⚠️ **STATUS CORRECTION + SUPERSESSION (2026-06-09):** the models below (`PayrollSettlement`,
+> `PayrollSettlementItem`, ledger) are **BUILT and LIVE** (this header's "PROPOSED" is stale). This doc
+> describes the **worker-centric** settlement (1 worker : 1 payout, anytime). The **Adda-centric**
+> settlement direction is now LOCKED in [../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md) **§11** —
+> **Option B** (earnings booked only at settlement), **Model A** (settlement ≠ payment: settlement books
+> earning credit + advance-recovery debit; cash payout is the separate worker-centric flow here), and a
+> new `AddaSettlement` event that **WRAPS** this worker-centric `PayrollSettlement` (which becomes the
+> payment record). Where this doc and ARCHITECTURE_V2 §11 differ, **§11 is the locked target.**
+
+**Status:** BUILT/LIVE (worker-centric); Adda-centric direction LOCKED in ARCHITECTURE_V2 §11.
 **Supersedes:** the payment half of `PAYROLL_ARCHITECTURE.md` (`WorkerPayment` → `PayrollSettlement`).
-**Date:** 2026-06-02
+**Superseded-for-direction-by:** `ARCHITECTURE_V2.md` §11 (Adda-centric, Option B, Model A).
+**Date:** 2026-06-02 (banner updated 2026-06-09)
 
 This is **NOT** a monthly payroll system. Workers earn from production work; the
 owner settles **whenever they decide** (today / +10 days / month-end). The system

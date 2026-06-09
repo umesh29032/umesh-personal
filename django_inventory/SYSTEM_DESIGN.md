@@ -1,8 +1,15 @@
 # Kapil Enterprises Inventory — System Design & Architecture
 
-> **Single source of truth.** Generated 2026-06-01 by deep code dig.
-> Verified against live code: `git` clean at `4fd746d2`, `manage.py check` clean, 196/196 tests green.
-> Stack: **Django 5.2 + PostgreSQL**. Branch `new_flask_app`.
+> **Single source of truth for the CURRENTLY-BUILT system.** Generated 2026-06-01 by deep code dig.
+> Stack: **Django 5.0.1 + PostgreSQL** (use `CheckConstraint(check=...)`). Branch `new_flask_app`.
+>
+> ⚠️ **LOCKED REDESIGN IN PROGRESS — read [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) (§11 🔒LOCKED)
+> + [docs/V2_1_REVIEW.md](docs/V2_1_REVIEW.md).** The worker-tracking + settlement layer is being
+> rebuilt: per-worker `WorkerStageTask`/`WorkerStageContribution` (replacing the bare
+> `AddaStageRecord.workers` M2M), **Option B** (no ledger entry until settlement; `expected_*` frozen at
+> complete = visibility only), and an **Adda-centric `AddaSettlement`** that books earnings + advance
+> recovery (settlement ≠ payment). What this doc describes below = the *pre-V2 built state*; where it
+> conflicts with ARCHITECTURE_V2, V2 wins for the redesigned area.
 
 This document is the exhaustive reference for the whole project: every app, every model
 (with all fields, `on_delete` rules, indexes, and the *why*), every service-layer function,

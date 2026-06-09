@@ -5,7 +5,9 @@ Django 5.0 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 **7 domain apps:** accounts, inventory, raw_materials, production, tracking, **expense** (worker payroll/settlement), storefront. Plus **`core`** — infra app holding shared abstract base models (`TimeStampedModel`, `ActiveManager`); no tables.
 
 **Deep context lives in lazy-load docs — read them only when needed:**
-- [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) — **current full system design** (most up-to-date; read first for the big picture)
+- [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) — **🔒 LOCKED REDESIGN (worker-tracking + settlement).** Read FIRST before touching worker assignment, contributions, earnings, or settlement. Option B (no ledger until settlement; `expected_*` frozen = visibility), Adda-centric `AddaSettlement` (settlement ≠ payment), `WorkerStageTask`/`WorkerStageContribution` replacing the `AddaStageRecord.workers` M2M, `StageWorkAssignment` transitional. **In progress (V2-1a).**
+- [docs/V2_1_REVIEW.md](docs/V2_1_REVIEW.md) — V2-1 pre-implementation review: M2M→`WorkerStageTask` migration, §3.1 full dependency audit, §10 V2-1a deep dive (migration/dual-write/rollback/concurrency/tests).
+- [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) — full system design of the **currently-built** state (pre-V2; V2 wins where they conflict)
 - [GLOSSARY.md](GLOSSARY.md) — domain-term glossary (Adda, layering, bundle, settlement…) + core-model ER diagram. **Read first if new to the codebase.**
 - [ARCHITECTURE.md](ARCHITECTURE.md) — models, services, ER, security, perf
 - [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) — why + how + learning map

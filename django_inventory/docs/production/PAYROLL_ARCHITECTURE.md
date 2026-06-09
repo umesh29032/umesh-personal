@@ -1,5 +1,12 @@
 # Worker Payroll, Ledger & Expense App — Architecture Review
 
+> ⚠️ **SUPERSEDED-FOR-DIRECTION (2026-06-09) by [../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md) §11
+> (🔒LOCKED).** The expense app described here is BUILT, but its **earning-credit timing changes under
+> Option B**: today earnings credit at *allocation* (M2.7); V2 books them **only at Adda settlement**
+> (production `expected_*` is visibility, not money). `StageWorkAssignment` is **transitional** (candidate
+> to become the settlement earning line — not removed). The immutable single-writer ledger + advance-pool
+> machinery here is **reused as-is**. Read ARCHITECTURE_V2 §11 + V2_1_REVIEW before touching earnings.
+
 > **Status:** IMPLEMENTED (as of 2026-06-02) — all models, services, views, and tests live
 > (expense app migrations 0001–0005, 270+ tests). Original design produced 2026-06-01 by a 7-specialist debate
 > (Django Architecture · Manufacturing Workflow · Payroll · Accounting · Security · Mobile UX ·

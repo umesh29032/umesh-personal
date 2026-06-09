@@ -1,6 +1,10 @@
 # Architecture Remediation Plan — Kapil Enterprises ERP
 
 > Companion to [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md).
+> **Update 2026-06-09:** migrations `0029/0030` (`credits_workers`) **APPLIED** to dev DB (rehearsed on a
+> clone, round-trip verified, suite green). The worker-tracking + settlement redesign is now §11-LOCKED in
+> [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) + [V2_1_REVIEW.md](V2_1_REVIEW.md) — that V2 track runs alongside
+> these M-phases (P1.2/P1.4 + M4.1 intersect it; see V2_1_REVIEW §7).
 > Status: APPROVED 2026-06-09, **Rev 2 (pre-mortem fixes applied)**. Baseline: **305 tests green**
 > (~103s, settings=config.settings.local). Branch: new_flask_app.
 > Rev 2 fixes: R1 production↔expense earnings seam, R2 model-discovery mechanism, C2 factory
