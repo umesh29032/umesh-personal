@@ -142,7 +142,7 @@ def _build_layering_context(request, adda: Adda) -> dict:
     filter_width = _parse_int_param(request, 'fw')
 
     is_management = user_has_role(user, MANAGEMENT_ROLES)
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
     has_master_skill = user_has_skill(
         user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]
     )
@@ -210,7 +210,7 @@ def _build_layering_context(request, adda: Adda) -> dict:
         'roll_ids': [e.roll.roll_id for e in entries],
         'available_rolls_qs': filtered_rolls,
         'start_form': StartLayeringForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_assign else None,
         'attach_form': AttachRollForm(available_rolls_qs=filtered_rolls) if can_attach else None,
         # Section 04 form rendered for anyone who can draft (= anyone who can attach).
@@ -923,7 +923,7 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     has_helper_skill = user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)
 
     can_start = is_management
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
     can_edit_breakup = sr is not None and sr.completed_at is None and (
         is_management or (is_assigned and has_master_skill)
     )
@@ -938,7 +938,7 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     # (non-voided) allocations + how much of each item is still unallocated.
     # Form is gated on can_allocate; the read-only display always renders.
     can_allocate = is_management and sr is not None and sr.completed_at is None
-    allocation_workers = list(sr.workers.all()) if sr else []
+    allocation_workers = sr.active_workers if sr else []
     for b in bundles:
         ann = []
         for it in b.items.select_related('pattern', 'color').all():
@@ -1000,7 +1000,7 @@ def _build_cutting_context(request, adda: Adda) -> dict:
         'allocation_workers': allocation_workers,
         'next_stage_after_cutting': next_stage,
         'cutting_start_form': CuttingStartForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_start else None,
         'cutting_draft_form': CuttingDraftForm(initial={
             'notes': cutting_record.notes if cutting_record else '',

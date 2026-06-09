@@ -120,7 +120,7 @@ def get_layering_snapshot(adda) -> dict:
         AddaStageRecord.objects
         .filter(adda=adda, workflow_stage=layering_stage)
         .select_related('completed_by')
-        .prefetch_related('workers')
+        .prefetch_related('worker_tasks__worker')   # V2-1b: feeds active_workers (no N+1)
         .first()
     )
     if sr is None:
@@ -129,7 +129,7 @@ def get_layering_snapshot(adda) -> dict:
 
     snap['stage_record'] = sr
     snap['started_at'] = sr.started_at
-    snap['workers'] = sr.workers.all()
+    snap['workers'] = sr.active_workers   # V2-1b: live (non-cancelled) workers from tasks
 
     # Aggregates from entries (works pre + post complete)
     entry_agg = sr.layering_roll_entries.aggregate(

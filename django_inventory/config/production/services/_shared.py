@@ -40,7 +40,8 @@ def _ensure_assigned_worker(stage_record: AddaStageRecord, user):
     """User is assigned worker OR management. Super_admin bypasses via role."""
     if user_has_role(user, MANAGEMENT_ROLES):
         return
-    if not stage_record.workers.filter(pk=user.pk).exists():
+    # V2-1b: assignment = an active (non-cancelled) WorkerStageTask, not the M2M.
+    if not stage_record.is_worker_assigned(user):
         raise PermissionDenied("not assigned to this stage")
 
 

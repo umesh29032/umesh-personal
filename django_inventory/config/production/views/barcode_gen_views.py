@@ -107,7 +107,7 @@ def _build_barcode_gen_context(request, adda: Adda) -> dict:
         user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER],
     )
     has_helper_skill = user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
 
     can_start = is_management and sr is None
     can_generate = (
@@ -144,7 +144,7 @@ def _build_barcode_gen_context(request, adda: Adda) -> dict:
         'can_reopen': can_reopen,
         'next_stage': next_stage,
         'start_form': BarcodeGenStartForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if is_management else None,
     }
 

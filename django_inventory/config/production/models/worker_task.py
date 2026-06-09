@@ -37,6 +37,9 @@ class WorkerStageTask(TimeStampedModel):
         VERIFIED = 'verified', 'Verified'      # OPTIONAL — never a stage-advance gate
         CANCELLED = 'cancelled', 'Cancelled'   # terminal (un-assign)
 
+    # Live (non-cancelled) statuses — for read filters that replace the M2M (V2-1b).
+    ACTIVE_STATUSES = ('assigned', 'in_progress', 'completed', 'verified')
+
     # PROTECT mirrors SWA/AddaStageRecord: never orphan a task that may carry
     # contributions / feed a settlement later.
     stage_record = models.ForeignKey(

@@ -173,7 +173,7 @@ content. Same look as form-shell tables.
             </form>
         {% elif cutting_stage_record %}
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                {% for w in cutting_stage_record.workers.all %}
+                {% for w in cutting_stage_record.active_workers %}
                     <span class="roll-id-chip">{{ w.email }}</span>
                 {% empty %}
                     <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>

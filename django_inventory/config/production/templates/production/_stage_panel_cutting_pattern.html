@@ -240,7 +240,7 @@ Section header carries running count: "X of Y verified" (red if X < Y).
             </form>
         {% elif stage_record %}
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                {% for w in stage_record.workers.all %}
+                {% for w in stage_record.active_workers %}
                     <span class="roll-id-chip">{{ w.email }}</span>
                 {% empty %}
                     <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>

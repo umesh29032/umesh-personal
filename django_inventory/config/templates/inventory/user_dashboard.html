@@ -297,9 +297,9 @@
                         <div>
                             <a href="{% url 'production:layering-workspace' sr.adda.code %}" class="adda-link">{{ sr.adda.code }}</a>
                             · {{ sr.adda.product.name }}
-                            {% if request.user in sr.workers.all %}<span class="mine-pill">ASSIGNED</span>{% endif %}
+                            {% if request.user in sr.active_workers %}<span class="mine-pill">ASSIGNED</span>{% endif %}
                             <div class="workers-mini" style="margin-top: 6px;">
-                            {% for w in sr.workers.all %}
+                            {% for w in sr.active_workers %}
                                 <span class="worker-chip">{{ w.email }}</span>
                             {% endfor %}
                             </div>

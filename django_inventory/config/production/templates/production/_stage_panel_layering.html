@@ -95,7 +95,7 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
 <div class="panel">
   <div class="panel-head"><div class="panel-num">1</div><div class="panel-title">Workers</div></div>
   <div class="panel-body">
-    {% if stage_record %}{% for w in stage_record.workers.all %}<span class="chip">👤 {{ w.email }}</span>{% empty %}<span class="sub">No workers assigned yet.</span>{% endfor %}{% endif %}
+    {% if stage_record %}{% for w in stage_record.active_workers %}<span class="chip">👤 {{ w.email }}</span>{% empty %}<span class="sub">No workers assigned yet.</span>{% endfor %}{% endif %}
     {% if can_assign %}
       <form method="post" action="{% url 'production:layering-start' adda.code %}" style="margin-top:10px;">
         {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}

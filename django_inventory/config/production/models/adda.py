@@ -174,3 +174,21 @@ class AddaStageRecord(TimeStampedModel):
     def is_active(self) -> bool:
         """In-progress (started but not yet completed)."""
         return self.started_at is not None and self.completed_at is None
+
+    # ── V2-1b: live worker set reads come from WorkerStageTask, not the M2M ──────
+    # The `workers` M2M is still dual-written (until V2-1d drops it), but READS now
+    # trust the Task lifecycle (cancelled = un-assigned). See docs/V2_1_REVIEW.md §10.
+    def active_worker_tasks(self):
+        """Non-cancelled WorkerStageTask rows — the live assignment set."""
+        return self.worker_tasks.exclude(status='cancelled')
+
+    @property
+    def active_workers(self):
+        """Live (non-cancelled) worker Users. Reads the `worker_tasks` relation —
+        prefetch `worker_tasks__worker` in loops to avoid N+1; a single-record read
+        is one small query. Returns a list (drop-in for the old `workers.all()`)."""
+        return [t.worker for t in self.worker_tasks.all() if t.status != 'cancelled']
+
+    def is_worker_assigned(self, user) -> bool:
+        """True if `user` has an active (non-cancelled) task on this stage."""
+        return self.worker_tasks.filter(worker=user).exclude(status='cancelled').exists()

@@ -100,7 +100,7 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     {% if stage_record %}
-        {% with workers=stage_record.workers.all %}
+        {% with workers=stage_record.active_workers %}
         {% if workers %}
             <div class="chip-row">
                 {% for w in workers %}

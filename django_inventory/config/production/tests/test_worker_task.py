@@ -211,3 +211,39 @@ class DualWriteChokepointTest(TestCase):
         self.assertEqual(WorkerStageTask.objects.filter(stage_record=self.sr).count(), 0)
         # M2M still updated (authoritative) even with dual-write off.
         self.assertEqual(_m2m_workers(self.sr), {self.w1.pk, self.w2.pk, self.w3.pk})
+
+
+class ReadHelpersTest(TestCase):
+    """V2-1b: AddaStageRecord read helpers trust WorkerStageTask, not the M2M."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='RH', name='RH Product')
+        self.stage = Stage.objects.create(code='rh_stage', name='RH Stage')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='RH-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.w1 = User.objects.create_user(email='rh1@test', password='x')
+        self.w2 = User.objects.create_user(email='rh2@test', password='x')
+
+    def test_is_worker_assigned_reflects_active_task(self):
+        self.assertFalse(self.sr.is_worker_assigned(self.w1))      # no task
+        set_stage_workers(self.sr, [self.w1.pk])
+        self.assertTrue(self.sr.is_worker_assigned(self.w1))
+        set_stage_workers(self.sr, [])                              # cancel w1
+        self.assertFalse(self.sr.is_worker_assigned(self.w1))       # cancelled ≠ assigned
+
+    def test_active_workers_excludes_cancelled(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk])                    # cancel w2
+        actives = self.sr.active_workers
+        self.assertIn(self.w1, actives)
+        self.assertNotIn(self.w2, actives)                          # only w1 is live
+
+    def test_active_worker_tasks_excludes_cancelled(self):
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        set_stage_workers(self.sr, [self.w1.pk])
+        self.assertEqual(
+            set(self.sr.active_worker_tasks().values_list('worker_id', flat=True)),
+            {self.w1.pk})

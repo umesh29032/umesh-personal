@@ -128,7 +128,7 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
             adda.stage_records
             .select_related('workflow_stage', 'completed_by', 'layering', 'cutting')
             .prefetch_related(
-                'workers',
+                'worker_tasks__worker',   # V2-1b: feeds active_workers (no N+1) — replaces M2M prefetch
                 'layering__rolls_used__cloth_type',
                 'layering__rolls_used__cloth_color',
                 'layering_roll_entries__roll__cloth_type',

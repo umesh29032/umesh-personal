@@ -30,7 +30,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
 
     try:
         from production.constants import STAGE_LAYERING
-        from production.models import Adda, AddaStageRecord, LayeringRecord
+        from production.models import Adda, AddaStageRecord, LayeringRecord, WorkerStageTask
         from production.services import user_activity_across_addas
         from accounts.skills import (
             SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
@@ -82,11 +82,14 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
 
         my_active_stages = (
             AddaStageRecord.objects
-            .filter(workers=request.user,
+            # V2-1b: "assigned to me" = an active WorkerStageTask (not the M2M).
+            .filter(worker_tasks__worker=request.user,
+                    worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
                     completed_at__isnull=True,
                     adda__status=Adda.Status.IN_PROGRESS)
             .select_related('adda', 'workflow_stage', 'adda__product')
             .order_by('-created_at')
+            .distinct()
         )
         my_activity = user_activity_across_addas(request.user, limit=30)
 
@@ -100,14 +103,17 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     adda__status=Adda.Status.IN_PROGRESS,
                 )
                 .select_related('adda', 'workflow_stage', 'adda__product')
-                .prefetch_related('workers')
+                .prefetch_related('worker_tasks__worker')   # V2-1b: feeds active_workers (no N+1)
                 .annotate(rolls_count=Count('layering_roll_entries'))
                 .order_by('-started_at')
             )
             completed_qs = LayeringRecord.objects.filter(
                 stage_record__completed_by=request.user,
             )
-            active_assigned_qs = active_layering.filter(workers=request.user)
+            active_assigned_qs = active_layering.filter(
+                worker_tasks__worker=request.user,
+                worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
+            ).distinct()
             stats = completed_qs.aggregate(
                 total_layers=Sum('lay_count'),
                 total_minutes=Sum('duration_minutes'),
