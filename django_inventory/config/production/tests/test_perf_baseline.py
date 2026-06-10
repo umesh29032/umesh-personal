@@ -12,6 +12,7 @@ list, cutting workspace, allocation panel) as M5 progresses.
 from decimal import Decimal
 
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
@@ -68,6 +69,44 @@ class DashboardQueryBaselineTest(TestCase):
         # Management sees all in-progress Addas.
         with self.assertNumQueries(MANAGEMENT_DASHBOARD_QUERIES):
             self._ctx(self.admin, is_admin_view=True)
+
+
+class ListViewQueryBaselineTest(TestCase):
+    """P0.6: lock query counts for the management list/costing pages (full render,
+    so a future per-row template N+1 fails CI). Fixed fixture = 3 Addas."""
+
+    def setUp(self):
+        from django.test import Client
+        from inventory.models import Role
+        self.product = Product.objects.create(code='LV', name='LV Product')
+        cut = Stage.objects.get_or_create(code='cutting', defaults={'name': 'Cutting'})[0]
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=cut, order=1, cost_rate=Decimal('0'))
+        for i in (1, 2, 3):
+            adda = Adda.objects.create(
+                code=f'LV-00{i}', product=self.product, current_stage=self.ws)
+            AddaStageRecord.objects.create(
+                adda=adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.admin = User.objects.create_user(
+            email='lv-admin@test', password='x', is_superuser=True, is_staff=True)
+        self.admin.role = Role.objects.get(code='super_admin')
+        self.admin.save()
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def test_adda_list_query_count(self):
+        with self.assertNumQueries(ADDA_LIST_QUERIES):
+            self.client.get(reverse('production:adda-list'))
+
+    def test_costing_query_count(self):
+        with self.assertNumQueries(COSTING_QUERIES):
+            self.client.get(reverse('production:costing'))
+
+
+# Locked full-render baselines (3-Adda fixture; includes sidebar/menu overhead).
+# A silent move = a template/queryset N+1 regression — update CONSCIOUSLY.
+ADDA_LIST_QUERIES = 11
+COSTING_QUERIES = 9
 
 
 class BulkSnapshotN1Test(TestCase):
