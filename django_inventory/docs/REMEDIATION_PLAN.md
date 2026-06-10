@@ -57,6 +57,34 @@ but is tracked separately in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md); the stage
 > **Architect for multi-factory / async / scale. Do NOT implement them.** Seams, not features.
 > Target = **8.5–9/10 at low complexity**, NOT a forced 10/10.
 
+## ▶️ OPERATIVE phased execution (Rev 4 — 2026-06-10, gate removed)
+**Owner decision 2026-06-10:** finish ALL dimensions now — do NOT block on the stage-domain review.
+Stage-coupled work is done **against the CURRENT flow** (Layering · Cutting-Pattern · Cutting ·
+Barcode-Gen), kept **simple (no speculative multi-stage machinery)**, and every stage-coupled touch point
+gets a durable reminder: an inline **`# FUTURE-STAGE-REDESIGN:`** comment pointing to
+[STAGE_DOMAIN_REVIEW_AGENDA.md](STAGE_DOMAIN_REVIEW_AGENDA.md) (the living backlog). So the future
+"add stages + refactor" work has a checklist; nothing is over-built today.
+
+**Run one phase per `continue`. Each phase = shippable, gate-green, characterization-before-refactor,
+migrations rehearsed on a clone. Tech-giant discipline: small reversible PRs, simple > clever.**
+
+| Phase | Sub-phases | Lifts | Notes |
+|---|---|---|---|
+| **1 · Scalability — reads** | P5.1 (batch `get_layering_snapshot` + paginate lists) · finish P0.6 oracles | Scalability | in flight; current flow |
+| **2 · Scalability — infra** | P5.2 ledger closing-balance snapshots · P5.3 denorm-reconciliation command | Scalability, Data-Model | |
+| **3 · Observability** | P0.4 structured logging + rotation + request-id (Sentry optional/DSN) | Maintainability | |
+| **4 · RBAC — data-driven** | P3.1 unify skill-gating (delete hardcoded `SKILL_*`, gate mutations) · P3.4 sidebar single-source | RBAC | |
+| **5 · RBAC — structure** | P3.2 split `permission_service` + cache · P3.3 factory chokepoint (NO columns) | RBAC, Maintainability | seam only |
+| **6 · Coupling — edges** | P4.1 relocate accounts→production sync · P4.3 finalize production package · P2.7 confine expense edge | Coupling, Architecture | P2.7 current-flow + reminder (V2 reshapes later) |
+| **7 · Coupling — cycle** | P4.2 break production↔tracking cycle (cross-app migration) · P4.4 tighten `.importlinter` | Coupling | heaviest; migration |
+| **8 · Stage cleanups (current flow + reminders)** | P2.8 dissolve `stage_views.py` · P2.9 draft `draft_*` → per-handler storage | Tech-Debt, Architecture, Data-Model | done for the 4 current stages + `# FUTURE-STAGE-REDESIGN:` tags |
+| **9 · Docs** | P6.1 SYSTEM_DESIGN rewrite (incl. V2) · P6.2 archive/ADR · P6.3 dead-weight · P6.4 coverage/types | Maintainability | after structure settles |
+| **10 · Verify + re-score** | P7.1 re-run dimension review + load test + CSO · P7.2 scorecard sign-off | all | finale |
+
+*(The stage-domain review is no longer a blocking phase — it becomes the future backlog in
+STAGE_DOMAIN_REVIEW_AGENDA.md, fed by the `# FUTURE-STAGE-REDESIGN:` markers. The V2 build track stays
+separate; P2.8/P2.9 here are scoped to today's stages and stay V2-compatible.)*
+
 ## 🗺️ Completion roadmap — how to finish all 22 remaining (wave plan, 2026-06-10)
 Ordered by dependency + safety. **Waves A–C need NO stage-review** (run them now). **Wave D is the
 owner-gated design gate.** E–G follow. Each wave: one PR per sub-phase, gate green, characterization

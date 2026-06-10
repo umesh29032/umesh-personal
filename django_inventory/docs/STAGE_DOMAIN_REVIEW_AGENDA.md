@@ -1,9 +1,14 @@
-# Next Phase — Manufacturing Stage-Domain Review (agenda)
+# Manufacturing Stage-Domain Review — FUTURE backlog + live reminder log
 
-> Set 2026-06-10. The V2 **foundation is LOCKED + signed off** (see [V2_FOUNDATION_REVIEW.md](V2_FOUNDATION_REVIEW.md)).
-> Before resuming UI wiring (V2-1c-iii pt.2b) or the settlement build (V2-2), we review + redesign the
-> **manufacturing stage domain itself**. Cutting today = a REFERENCE implementation of the framework,
-> NOT the final definition of production stages.
+> Set 2026-06-10. The V2 **foundation is LOCKED + signed off** ([V2_FOUNDATION_REVIEW.md](V2_FOUNDATION_REVIEW.md)).
+> **This is now the LIVING future-reminder backlog** (owner decision 2026-06-10): remediation + V2 work
+> proceeds **against the current stage flow now** — we do NOT block on this review. Every stage-coupled touch
+> point in the code carries an inline **`# FUTURE-STAGE-REDESIGN: …`** comment pointing here, so when stages
+> are added/renamed/refactored later, this doc + a `grep -rn "FUTURE-STAGE-REDESIGN"` give the full checklist.
+> Cutting today = a REFERENCE implementation, NOT the final stage definition.
+>
+> **Convention:** stage-coupled code uses `# FUTURE-STAGE-REDESIGN: <what to revisit when stages change>`.
+> Accumulate notable markers under "§ Logged reminders" at the bottom as they're added.
 
 ## PRESERVE — locked foundation, do NOT revisit in this review (it's correct + built)
 - `WorkerStageTask` (lifecycle + assignment) + `WorkerStageContribution` (qty + frozen `expected_*`) — built.
@@ -38,6 +43,10 @@
 - Decisions on machine sub-stages (flat vs `parent` FK), costing/pay models per stage.
 - THEN resume: V2-1c-iii pt.2b (worker report UI, schema-driven) → pt.2c (dashboard badges) → V2-1d (drop
   M2M) → V2-2 (AddaSettlement build) → V2-3 (SWA repurpose) → Missing/Alter modules.
+
+## § Logged reminders (`# FUTURE-STAGE-REDESIGN:` markers added during remediation)
+> Appended as stage-coupled code is touched. `grep -rn "FUTURE-STAGE-REDESIGN" config` for the live set.
+- *(none yet — populated from Phase 6/8 onward)*
 
 ## Checkpoint state at pause (2026-06-10)
 Branch `new_flask_app`, working tree clean, **389 tests green**. V2 commits this run:
