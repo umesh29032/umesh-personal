@@ -57,6 +57,45 @@ but is tracked separately in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md); the stage
 > **Architect for multi-factory / async / scale. Do NOT implement them.** Seams, not features.
 > Target = **8.5–9/10 at low complexity**, NOT a forced 10/10.
 
+## 🗺️ Completion roadmap — how to finish all 22 remaining (wave plan, 2026-06-10)
+Ordered by dependency + safety. **Waves A–C need NO stage-review** (run them now). **Wave D is the
+owner-gated design gate.** E–G follow. Each wave: one PR per sub-phase, gate green, characterization
+before any refactor, migrations rehearsed on a clone (P0.5).
+
+**WAVE A — Safe scalability + observability** *(now · no gating · ~3–4 passes)* → Scalability, Maintainability
+- finish **P0.6** (add hot-page query oracles: costing, adda list, cutting workspace, allocation panel)
+- **P5.1** batch `get_layering_snapshot` (mgmt dashboard + `AddaDashboardView` ~72→handful) + paginate list pages
+- **P5.2** ledger closing-balance snapshots · **P5.3** denorm-reconciliation command
+- **P0.4** observability (structured logging + rotation + request-id; Sentry/GlitchTip when a DSN exists)
+
+**WAVE B — RBAC hardening** *(now · no gating · ~3 passes)* → RBAC, Maintainability
+- **P3.1** unify skill-gating data-driven (delete hardcoded `SKILL_*`; gate mutations) ·
+  **P3.2** split `permission_service` package + cache · **P3.4** sidebar single-source · **P3.3** factory chokepoint (no columns)
+
+**WAVE C — Coupling / cycle-breaks** *(now · heavier, migration-bearing · ~3–4 passes)* → Coupling, Architecture
+- **P4.1** relocate accounts→production sync edge *(unblocked post-V2-1)* · **P4.3** finalize production package split
+- **P4.2** break production↔tracking cycle (move barcode assembly — cross-app data migration) ·
+  **P4.4** tighten `.importlinter` (remove `ignore_imports`) — do LAST in this wave once edges are clean
+
+**WAVE D — 🔶 Stage-domain review** *(👤 owner-gated design exercise · the big one)* → unblocks E + V2
+- stage taxonomy/responsibilities · machine sub-stages · Missing-Piece + Alter/Rework lifecycles · packing/QC ·
+  costing + settlement + reporting implications → locked taxonomy + `MissingPieceCase`/`AlterCase` designs
+
+**WAVE E — Stage cleanups + V2 resume** *(after D)* → Tech-Debt, Architecture, Data-Model, Payroll
+- **P2.8** dissolve `stage_views.py` (per-stage views + formsets + N+1) · **P2.9** draft polymorphic-root move
+- *(V2 track resumes here: V2-1c-iii UI → V2-1d drop-M2M → V2-2 settlement [absorbs P2.7] → V2-3 SWA → Missing/Alter modules)*
+
+**WAVE F — Docs** *(after structure settles · ~2 passes)* → Maintainability
+- **P6.1** rewrite SYSTEM_DESIGN to reality (incl. V2) + doc-accuracy test · **P6.2** archive + ADRs ·
+  **P6.3** remove dead weight (legacy fallbacks, `stage_type` shim) · **P6.4** ~90% service coverage + mypy strictness
+
+**WAVE G — Verify + re-score** *(last)* → confirms all dimensions hit target
+- **P7.1** re-run the 10-dimension review + load test + CSO security pass · **P7.2** scorecard sign-off
+
+**Critical-path note:** A, B, C are independent of each other AND of the stage review — safe to run in any order
+now. D is the gate for E + the V2 build. F wants the structure final (after E). G is the finale. Doing A→B→C
+gets RBAC/Coupling/Scalability to target **without waiting on the stage review**.
+
 ## Revised dimension targets
 
 | Dimension | Now | Target | Main driver |
