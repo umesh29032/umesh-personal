@@ -73,5 +73,5 @@ class DashboardQueryBaselineTest(TestCase):
 # CONSCIOUSLY if a real change moves them — a silent move = an N+1 regression.
 # NOTE 2026-06-10: these are HIGH (per-Adda snapshot/pipeline work) — M5/P5.1 should
 # bring them down; when it does, lower these numbers in the same commit.
-WORKER_DASHBOARD_QUERIES = 20
-MANAGEMENT_DASHBOARD_QUERIES = 25
+WORKER_DASHBOARD_QUERIES = 14   # was 20 — P5.1 skip unrendered layering snapshot for non-skilled
+MANAGEMENT_DASHBOARD_QUERIES = 25   # TODO P5.1: batch the per-Adda layering snapshot (skilled path)
