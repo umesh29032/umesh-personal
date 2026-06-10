@@ -11,7 +11,7 @@ an import-load cycle — but should stay rare.)
 import ast
 import pathlib
 
-from django.test import SimpleTestCase
+from django.test import Client, SimpleTestCase, TestCase
 
 CONFIG_DIR = pathlib.Path(__file__).resolve().parent.parent  # .../config
 DOMAIN_APPS = {
@@ -61,3 +61,23 @@ class FoundationPurityTests(SimpleTestCase):
             f"core is the shared kernel — it must depend on nothing app-specific. "
             f"Offenders: {offenders}",
         )
+
+
+class ObservabilityTests(TestCase):
+    """P0.4: request-id correlation (core.observability)."""
+
+    def test_request_id_filter_injects_attribute(self):
+        import logging
+        from core.observability import RequestIDFilter
+        rec = logging.LogRecord('t', logging.INFO, __file__, 1, 'msg', None, None)
+        self.assertTrue(RequestIDFilter().filter(rec))
+        self.assertEqual(rec.request_id, '-')   # '-' outside a request
+
+    def test_response_carries_request_id_header(self):
+        resp = Client().get('/')
+        self.assertIn('X-Request-ID', resp)
+        self.assertTrue(resp['X-Request-ID'])   # non-empty id on every response
+
+    def test_inbound_request_id_is_honoured(self):
+        resp = Client().get('/', HTTP_X_REQUEST_ID='abc123')
+        self.assertEqual(resp['X-Request-ID'], 'abc123')
