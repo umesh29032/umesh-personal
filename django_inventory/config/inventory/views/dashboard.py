@@ -60,7 +60,6 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             .annotate(rolls_count=Count('rolls'))
             .order_by('-started_at')
         )
-        from production.services import get_layering_snapshot
         for a in active_addas:
             pipeline = []
             done_stages = []  # (label, stage_type) for revisit links — dashboard accordion
@@ -86,10 +85,15 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     })
             a.pipeline = pipeline
             a.done_stages = done_stages
-            # P5.1: the layering snapshot is rendered ONLY in the skilled-user accordion
-            # (user_dashboard.html guards it on is_skilled_user). Computing it per-Adda
-            # for everyone was an N+1 of never-rendered work — skip it when not shown.
-            a.layering_snap = get_layering_snapshot(a) if is_skilled_user else None
+        # P5.1: the layering snapshot is rendered ONLY in the skilled-user accordion.
+        # Bulk-attach it (a fixed handful of queries, N+1-free) for skilled users;
+        # skip entirely for everyone else (it's never rendered).
+        if is_skilled_user:
+            from production.services import attach_layering_snapshots
+            attach_layering_snapshots(active_addas)
+        else:
+            for a in active_addas:
+                a.layering_snap = None
 
         my_active_stages = (
             AddaStageRecord.objects

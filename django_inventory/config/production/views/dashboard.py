@@ -75,10 +75,10 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             .prefetch_related('product__workflow_stages')
             .order_by('-started_at')[:12]
         )
-        # Attach layering snapshot per Adda for the dashboard table
-        from production.services import get_layering_snapshot
-        for a in recent:
-            a.layering_snap = get_layering_snapshot(a)
+        # Attach layering snapshot per Adda for the dashboard table (P5.1: bulk,
+        # N+1-free — was one get_layering_snapshot() call per row).
+        from production.services import attach_layering_snapshots
+        attach_layering_snapshots(recent)
         ctx['recent'] = recent
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')

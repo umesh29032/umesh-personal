@@ -33,12 +33,12 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from django.db.models import Count, Sum
+from django.db.models import Sum
 
 from production.constants import STAGE_LAYERING
 from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
-    RemainingClothOfClothRoll,
+    RemainingClothOfClothRoll, WorkflowStage,
 )
 from production.services.adda_service import advance_to_next_stage
 
@@ -58,6 +58,56 @@ logger = logging.getLogger(__name__)
 
 
 # ── Public summary helper (used by 3 dashboard surfaces) ────────────────────
+
+
+_LAYERING_SR_LOADS = ('completed_by', 'layering')
+_LAYERING_SR_PREFETCH = ('worker_tasks__worker', 'layering_roll_entries')
+
+
+def _absent_layering_snap() -> dict:
+    """The default (state='absent') snapshot — shared by single + bulk paths."""
+    return {
+        'state': 'absent', 'stage_record': None, 'lay_count': None,
+        'layer_length': None, 'duration_min': None, 'total_colors': None,
+        'rolls_count': 0, 'leftover_length_sum': Decimal('0'),
+        'leftover_weight_sum': Decimal('0'), 'total_fabric_used': None,
+        'started_at': None, 'completed_at': None, 'completed_by': None,
+        'workers': AddaStageRecord.objects.none(), 'record': None,
+    }
+
+
+def _build_layering_snap(sr, *, leftover_len, leftover_wt) -> dict:
+    """Build the snapshot from an IN-MEMORY stage_record (sr not None). Reads
+    `sr.layering_roll_entries.all()` (prefetch-friendly → the bulk path is N+1-free)
+    and takes leftover sums as args. Shared by get_layering_snapshot (single) and
+    attach_layering_snapshots (bulk) so output stays identical."""
+    snap = _absent_layering_snap()
+    snap['stage_record'] = sr
+    snap['started_at'] = sr.started_at
+    snap['workers'] = sr.active_workers   # live (non-cancelled) workers from tasks
+    entries = list(sr.layering_roll_entries.all())
+    snap['rolls_count'] = len(entries)
+    layers = [e.layers_on_roll for e in entries if e.layers_on_roll is not None]
+    snap['lay_count'] = sum(layers) if layers else None
+    snap['leftover_length_sum'] = leftover_len or Decimal('0')
+    snap['leftover_weight_sum'] = leftover_wt or Decimal('0')
+    if sr.completed_at is None:
+        snap['state'] = 'in_progress'
+        snap['layer_length'] = sr.draft_layer_length_meters
+        snap['duration_min'] = sr.draft_duration_minutes
+        return snap
+    snap['state'] = 'completed'
+    snap['completed_at'] = sr.completed_at
+    snap['completed_by'] = sr.completed_by
+    lr = getattr(sr, 'layering', None)
+    if lr is not None:
+        snap['record'] = lr
+        snap['lay_count'] = lr.lay_count
+        snap['layer_length'] = lr.layer_length_meters
+        snap['duration_min'] = lr.duration_minutes
+        snap['total_colors'] = lr.total_colors
+        snap['total_fabric_used'] = lr.total_fabric_used_meters
+    return snap
 
 
 def get_layering_snapshot(adda) -> dict:
@@ -88,87 +138,87 @@ def get_layering_snapshot(adda) -> dict:
       workers         queryset       (assigned worker users)
       record          LayeringRecord | None  (only when completed)
     """
-    from decimal import Decimal
-
-    snap = {
-        'state': 'absent',
-        'stage_record': None,
-        'lay_count': None,
-        'layer_length': None,
-        'duration_min': None,
-        'total_colors': None,
-        'rolls_count': 0,
-        'leftover_length_sum': Decimal('0'),
-        'leftover_weight_sum': Decimal('0'),
-        'total_fabric_used': None,
-        'started_at': None,
-        'completed_at': None,
-        'completed_by': None,
-        'workers': AddaStageRecord.objects.none(),
-        'record': None,
-    }
-
-    # Locate the Layering stage_record (if any). If product has no layering stage,
-    # snapshot stays 'absent' — defensive for future workflow variants.
+    # Single-Adda path. For lists/dashboards use attach_layering_snapshots() (bulk,
+    # N+1-free) instead of calling this in a loop.
     layering_stage = adda.product.workflow_stages.filter(
         stage__code=STAGE_LAYERING
     ).first()
     if layering_stage is None:
-        return snap
+        return _absent_layering_snap()
 
     sr = (
         AddaStageRecord.objects
         .filter(adda=adda, workflow_stage=layering_stage)
-        .select_related('completed_by')
-        .prefetch_related('worker_tasks__worker')   # V2-1b: feeds active_workers (no N+1)
+        .select_related(*_LAYERING_SR_LOADS)
+        .prefetch_related(*_LAYERING_SR_PREFETCH)
         .first()
     )
     if sr is None:
+        snap = _absent_layering_snap()
         snap['state'] = 'not_started'
         return snap
 
-    snap['stage_record'] = sr
-    snap['started_at'] = sr.started_at
-    snap['workers'] = sr.active_workers   # V2-1b: live (non-cancelled) workers from tasks
-
-    # Aggregates from entries (works pre + post complete)
-    entry_agg = sr.layering_roll_entries.aggregate(
-        rolls=Count('id'),
-        layers=Sum('layers_on_roll'),
-    )
-    snap['rolls_count'] = entry_agg['rolls'] or 0
-    snap['lay_count'] = entry_agg['layers']  # may be None if no row has layers set yet
-
-    # Leftover aggregates across all attached entries' primary remaining_pieces
-    leftover_agg = RemainingClothOfClothRoll.objects.filter(
+    leftover = RemainingClothOfClothRoll.objects.filter(
         layering_entry__stage_record=sr,
     ).aggregate(
         len_sum=Sum('remaining_length_meters'),
         wt_sum=Sum('remaining_weight_kg'),
     )
-    snap['leftover_length_sum'] = leftover_agg['len_sum'] or Decimal('0')
-    snap['leftover_weight_sum'] = leftover_agg['wt_sum'] or Decimal('0')
+    return _build_layering_snap(
+        sr, leftover_len=leftover['len_sum'], leftover_wt=leftover['wt_sum'])
 
-    if sr.completed_at is None:
-        snap['state'] = 'in_progress'
-        # Show draft header values while in progress (so dashboards reflect WIP)
-        snap['layer_length'] = sr.draft_layer_length_meters
-        snap['duration_min'] = sr.draft_duration_minutes
-        return snap
 
-    # Completed branch
-    snap['state'] = 'completed'
-    snap['completed_at'] = sr.completed_at
-    snap['completed_by'] = sr.completed_by
-    lr = getattr(sr, 'layering', None)
-    if lr is not None:
-        snap['record'] = lr
-        snap['lay_count'] = lr.lay_count
-        snap['layer_length'] = lr.layer_length_meters
-        snap['duration_min'] = lr.duration_minutes
-        snap['total_colors'] = lr.total_colors
-        snap['total_fabric_used'] = lr.total_fabric_used_meters
-    return snap
+def attach_layering_snapshots(addas) -> None:
+    """Set `.layering_snap` on each Adda in `addas` with a FIXED handful of queries
+    (kills the per-Adda N+1 on the dashboards). Output mirrors get_layering_snapshot.
+
+    Queries: 1 (layering WorkflowStages) + 1 (stage records) + 2 prefetch
+    (worker_tasks, roll entries) + 1 (leftover sums) — independent of len(addas).
+    """
+    addas = list(addas)
+    if not addas:
+        return
+    product_ids = {a.product_id for a in addas}
+    has_layering = set(
+        WorkflowStage.objects.filter(
+            stage__code=STAGE_LAYERING, product_id__in=product_ids,
+        ).values_list('product_id', flat=True)
+    )
+    sr_by_adda = {
+        sr.adda_id: sr
+        for sr in (
+            AddaStageRecord.objects
+            .filter(adda__in=addas, workflow_stage__stage__code=STAGE_LAYERING)
+            .select_related(*_LAYERING_SR_LOADS)
+            .prefetch_related(*_LAYERING_SR_PREFETCH)
+        )
+    }
+    leftover_by_sr = {}
+    if sr_by_adda:
+        rows = (
+            RemainingClothOfClothRoll.objects
+            .filter(layering_entry__stage_record_id__in=[s.pk for s in sr_by_adda.values()])
+            .values('layering_entry__stage_record')
+            .annotate(
+                len_sum=Sum('remaining_length_meters'),
+                wt_sum=Sum('remaining_weight_kg'),
+            )
+        )
+        leftover_by_sr = {
+            r['layering_entry__stage_record']: (r['len_sum'], r['wt_sum']) for r in rows
+        }
+    for a in addas:
+        if a.product_id not in has_layering:
+            a.layering_snap = _absent_layering_snap()
+            continue
+        sr = sr_by_adda.get(a.pk)
+        if sr is None:
+            snap = _absent_layering_snap()
+            snap['state'] = 'not_started'
+            a.layering_snap = snap
+            continue
+        ll, lw = leftover_by_sr.get(sr.pk, (None, None))
+        a.layering_snap = _build_layering_snap(sr, leftover_len=ll, leftover_wt=lw)
 
 
 # ── Helpers internal to layering ─────────────────────────────────────────────

@@ -20,6 +20,7 @@ from .product_size_service import (
     update_product_size,
 )
 from production.stages.layering.service import (
+    attach_layering_snapshots,
     attach_roll_to_layering,
     complete_layering,
     detach_roll_from_layering,
@@ -108,6 +109,7 @@ __all__ = [
     'complete_layering',
     'reopen_layering',
     'get_layering_snapshot',
+    'attach_layering_snapshots',
     # Cutting stage
     'start_cutting',
     'upsert_breakup_row',

@@ -18,6 +18,7 @@ from accounts.models import User
 from inventory.models import Role
 from inventory.views.dashboard import _build_dashboard_context
 from production.models import Adda, AddaStageRecord, Product, Stage, WorkflowStage
+from production.services import attach_layering_snapshots
 from production.services.worker_task_service import set_stage_workers
 
 
@@ -69,9 +70,43 @@ class DashboardQueryBaselineTest(TestCase):
             self._ctx(self.admin, is_admin_view=True)
 
 
+class BulkSnapshotN1Test(TestCase):
+    """P5.1: attach_layering_snapshots is N+1-FREE — its query count must NOT grow
+    with the number of Addas (the whole point of the batch)."""
+
+    def _make_adda(self, code):
+        adda = Adda.objects.create(code=code, product=self.product, current_stage=self.ws)
+        AddaStageRecord.objects.create(
+            adda=adda, workflow_stage=self.ws, started_at=timezone.now())
+        return adda
+
+    def setUp(self):
+        self.product = Product.objects.create(code='BULK', name='Bulk Product')
+        lay = Stage.objects.get_or_create(code='layering', defaults={'name': 'Layering'})[0]
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=lay, order=1, cost_rate=Decimal('0'))
+
+    def test_query_count_is_flat_regardless_of_adda_count(self):
+        one = [self._make_adda('BULK-001')]
+        with self.assertNumQueries(BULK_SNAPSHOT_QUERIES):
+            attach_layering_snapshots(one)
+        # Same fixed cost for 3 Addas → no N+1.
+        three = [self._make_adda('BULK-002'), self._make_adda('BULK-003'),
+                 self._make_adda('BULK-004')]
+        with self.assertNumQueries(BULK_SNAPSHOT_QUERIES):
+            attach_layering_snapshots(three)
+        # And the snapshots are actually attached.
+        self.assertTrue(all(a.layering_snap['state'] == 'in_progress' for a in three))
+
+
+# attach_layering_snapshots is bounded: WorkflowStages + stage records + 2 prefetch
+# (worker_tasks, roll entries) + leftover sums = a FIXED count, NOT per-Adda.
+BULK_SNAPSHOT_QUERIES = 5
+
+
 # Locked baselines (FIXED fixture: 2 Addas at layering, 1 worker assigned). Update
 # CONSCIOUSLY if a real change moves them — a silent move = an N+1 regression.
 # NOTE 2026-06-10: these are HIGH (per-Adda snapshot/pipeline work) — M5/P5.1 should
 # bring them down; when it does, lower these numbers in the same commit.
-WORKER_DASHBOARD_QUERIES = 14   # was 20 — P5.1 skip unrendered layering snapshot for non-skilled
-MANAGEMENT_DASHBOARD_QUERIES = 25   # TODO P5.1: batch the per-Adda layering snapshot (skilled path)
+WORKER_DASHBOARD_QUERIES = 14   # P5.1: skip unrendered layering snapshot for non-skilled
+MANAGEMENT_DASHBOARD_QUERIES = 20   # was 25 — P5.1: bulk attach_layering_snapshots (N+1-free)
