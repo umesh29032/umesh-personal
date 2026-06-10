@@ -104,6 +104,27 @@ def user_can_edit_financials(user) -> bool:
     return user_has_role(user, FINANCIAL_ROLES)
 
 
+def _role_perm_codenames(user) -> set[str]:
+    """Request-cached set of the user's ROLE permission codenames (P3.2).
+
+    `user_has_perm` runs many times per request (every perm-gated view/action);
+    the role's permission set doesn't change mid-request, so compute it once and
+    stash it on the request-scoped user instance — same pattern as `user_principal`.
+    Tolerates anonymous / mock users (returns an empty set, skips the cache)."""
+    cached = getattr(user, '_rbac_perm_codes', None)
+    if cached is not None:
+        return cached
+    codes: set[str] = set()
+    role = getattr(user, 'role', None)
+    if role is not None:
+        codes = set(role.permissions.values_list('codename', flat=True))
+    try:
+        user._rbac_perm_codes = codes
+    except (AttributeError, TypeError):
+        pass  # bare-ORM mock users in tests — just skip caching
+    return codes
+
+
 def user_has_perm(user, perm_codename: str) -> bool:
     """User ke paas given Django permission hai ya nahi.
 
@@ -132,7 +153,7 @@ def user_has_perm(user, perm_codename: str) -> bool:
         return True
     # perm_codename "app.codename" format hai. Hum codename part match karte
     # hain (DB column codename store karta hai without app prefix).
-    if role and role.permissions.filter(codename=perm_codename.split('.')[-1]).exists():
+    if perm_codename.split('.')[-1] in _role_perm_codenames(user):
         return True
     # Django default check — groups + user_permissions M2M.
     return user.has_perm(perm_codename)
