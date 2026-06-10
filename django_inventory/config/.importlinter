@@ -35,8 +35,11 @@ forbidden_modules =
     storefront
 # accounts.services.user_service does a LAZY (function-body) production import for
 # the skill→layering retro-tag — intentional, not an import-load cycle.
+# accounts/tests.py imports inventory.Role inside setUp to exercise the
+# permission-cache against a seeded role — test-only, not a runtime layering edge.
 ignore_imports =
     accounts.services.user_service -> production.services
+    accounts.tests -> inventory.models
 
 # ── Contract 2: target acyclic layering (top imports down, never up) ─────────
 # core (bottom) ← accounts ← raw_materials ← production ← tracking/expense ← apps
