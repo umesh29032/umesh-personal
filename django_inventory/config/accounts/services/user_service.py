@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
-from accounts.models import User
+from accounts.models import Role, User
 from .permission_service import ROLE_SUPER_ADMIN
 
 # Stable 32-bit key for the txn-scoped advisory lock that serializes admin-set
@@ -27,7 +27,7 @@ from .permission_service import ROLE_SUPER_ADMIN
 _ADMIN_SET_LOCK = 0x4B41444D  # 'KADM'
 
 
-def _is_admin(user) -> bool:
+def _is_admin(user: User) -> bool:
     """A user is an admin if is_superuser OR holds the super_admin role.
 
     ONE definition so the access gate (role-based) and the last-admin guard
@@ -39,13 +39,13 @@ def _is_admin(user) -> bool:
     return bool(role and role.code == ROLE_SUPER_ADMIN)
 
 
-def _active_admin_qs():
+def _active_admin_qs() -> QuerySet[User]:
     return User.objects.filter(is_active=True).filter(
         Q(is_superuser=True) | Q(role__code=ROLE_SUPER_ADMIN)
     )
 
 
-def count_active_admins(*, exclude_pk=None) -> int:
+def count_active_admins(*, exclude_pk: int | None = None) -> int:
     """How many active Super Admins exist (is_superuser OR super_admin role)."""
     qs = _active_admin_qs()
     if exclude_pk is not None:
@@ -53,7 +53,9 @@ def count_active_admins(*, exclude_pk=None) -> int:
     return qs.distinct().count()
 
 
-def self_edit_blockers(actor, *, new_is_superuser, new_is_active, new_role) -> list[str]:
+def self_edit_blockers(
+    actor: User, *, new_is_superuser: bool, new_is_active: bool, new_role: Role | None,
+) -> list[str]:
     """Self-lockout rule (pure, no DB): actions a Super Admin must NOT do to
     their OWN profile in one request (would orphan the platform). Returns the
     list of attempted blocked actions — empty means the edit is allowed.
@@ -72,7 +74,7 @@ def self_edit_blockers(actor, *, new_is_superuser, new_is_active, new_role) -> l
 
 
 @transaction.atomic
-def delete_user(user_to_delete, *, actor) -> None:
+def delete_user(user_to_delete: User, *, actor: User) -> None:
     """Delete a user, enforcing self-delete + last-admin invariants atomically.
 
     Race-safe: a txn-scoped Postgres advisory lock serializes concurrent admin
@@ -92,7 +94,7 @@ def delete_user(user_to_delete, *, actor) -> None:
     user_to_delete.delete()
 
 
-def sync_user_skills(user) -> int:
+def sync_user_skills(user: User) -> int:
     """Retro-tag `user` onto active Layering rosters for their current skills.
 
     Replaces the old `accounts/signals.py` m2m_changed signal (CLAUDE.md rule #4).

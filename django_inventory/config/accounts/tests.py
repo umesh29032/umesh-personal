@@ -285,3 +285,87 @@ class UserHasPermCacheTest(TestCase):
 
 
 PERM_CACHE_QUERIES = 1   # role-perm set read ONCE; 2nd call cached (P3.2)
+
+
+class UserServiceTests(TestCase):
+    """P6.4: direct service-layer tests for the last-Super-Admin / self-lockout
+    safety rails. Previously asserted ONLY at the view layer (SelfProtectionTests)
+    — but delete_user / self_edit_blockers are the real invariant holders and any
+    future caller (admin, shell, API) must be protected, so test the service."""
+
+    def setUp(self):
+        from accounts.models import Role
+        self.super_role = Role.objects.get(code='super_admin')
+        self.worker_role = Role.objects.get(code='worker')
+        # Two independent active Super Admins (one is_superuser, one super_admin role).
+        self.admin = User.objects.create_superuser(email='svc-admin@t.com', password='x')
+        self.admin2 = User.objects.create_user(email='svc-admin2@t.com', password='x')
+        self.admin2.role = self.super_role
+        self.admin2.save()
+        self.worker = User.objects.create_user(email='svc-worker@t.com', password='x')
+        self.worker.role = self.worker_role
+        self.worker.save()
+
+    # ── count_active_admins ──────────────────────────────────────────────
+    def test_count_active_admins_counts_superuser_or_role(self):
+        from accounts.services.user_service import count_active_admins
+        # admin (is_superuser) + admin2 (super_admin role) = 2.
+        self.assertEqual(count_active_admins(), 2)
+        self.assertEqual(count_active_admins(exclude_pk=self.admin.pk), 1)
+
+    def test_count_active_admins_ignores_inactive(self):
+        from accounts.services.user_service import count_active_admins
+        self.admin2.is_active = False
+        self.admin2.save()
+        self.assertEqual(count_active_admins(), 1)
+
+    # ── self_edit_blockers (pure) ────────────────────────────────────────
+    def test_self_edit_blockers_flags_each_lockout_action(self):
+        from accounts.services.user_service import self_edit_blockers
+        blockers = self_edit_blockers(
+            self.admin2, new_is_superuser=False, new_is_active=False, new_role=self.worker_role)
+        # admin2 is super_admin-by-role (not is_superuser) → deactivate + role-drop blocked.
+        self.assertIn('deactivate your own account', blockers)
+        self.assertTrue(any('role away from Super Admin' in b for b in blockers))
+
+    def test_self_edit_blockers_allows_safe_edit(self):
+        from accounts.services.user_service import self_edit_blockers
+        blockers = self_edit_blockers(
+            self.admin, new_is_superuser=True, new_is_active=True, new_role=self.super_role)
+        self.assertEqual(blockers, [])
+
+    # ── delete_user ──────────────────────────────────────────────────────
+    def test_delete_user_blocks_self_delete(self):
+        from django.core.exceptions import ValidationError
+        from accounts.services.user_service import delete_user
+        with self.assertRaises(ValidationError):
+            delete_user(self.admin, actor=self.admin)
+        self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
+
+    def test_delete_user_allows_deleting_a_non_last_admin(self):
+        from accounts.services.user_service import delete_user
+        # admin deletes admin2 — one admin (admin) remains, so it's allowed.
+        delete_user(self.admin2, actor=self.admin)
+        self.assertFalse(User.objects.filter(pk=self.admin2.pk).exists())
+
+    def test_delete_user_blocks_deleting_the_last_admin(self):
+        from django.core.exceptions import ValidationError
+        from accounts.services.user_service import delete_user
+        # Demote admin2 so `admin` is the only active Super Admin left.
+        self.admin2.role = self.worker_role
+        self.admin2.save()
+        with self.assertRaises(ValidationError):
+            delete_user(self.admin, actor=self.admin2)
+        self.assertTrue(User.objects.filter(pk=self.admin.pk).exists())
+
+    def test_delete_user_allows_deleting_a_non_admin(self):
+        from accounts.services.user_service import delete_user
+        delete_user(self.worker, actor=self.admin)
+        self.assertFalse(User.objects.filter(pk=self.worker.pk).exists())
+
+    # ── sync_user_skills (the one accounts->production lazy edge) ─────────
+    def test_sync_user_skills_returns_count_and_is_safe_with_no_skills(self):
+        from accounts.services.user_service import sync_user_skills
+        # No skills + no active layering rosters → no retro-tag, returns 0 (no crash
+        # across the lazy accounts->production edge).
+        self.assertEqual(sync_user_skills(self.worker), 0)

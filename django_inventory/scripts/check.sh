@@ -49,8 +49,9 @@ echo "[ruff] full-repo legacy (changed code is enforced blocking by pre-commit):
 echo "       $($PY/ruff check config 2>&1 | tail -1)"
 echo "[import-linter] full acyclic-layers progress (this list IS the M4 worklist):"
 ( cd config && ../$PY/lint-imports 2>&1 | grep -E 'Contracts:' | tail -1 | sed 's/^/       /' ) || true
-echo "[mypy] lenient/report-only (tighten after M2/M3):"
+echo "[mypy] report-only — global lenient, service+stages typed island (P6.4 ratchet):"
 echo "       $($PY/mypy config --config-file mypy.ini 2>&1 | tail -1)"
+echo "       (full list: $PY/mypy config --config-file mypy.ini)"
 
 echo ""
 if [ "$fail" -eq 0 ]; then echo "GATE: ✓ PASS"; else echo "GATE: ✗ FAIL"; fi
