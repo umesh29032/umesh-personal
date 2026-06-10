@@ -495,3 +495,49 @@ class IsolationGateTest(TestCase):
     def test_management_bypasses_assignment(self):
         resp = self._get_panel(self.admin)               # not assigned, but management
         self.assertEqual(resp.status_code, 200)
+
+
+class ParityCommandTest(TestCase):
+    """SOAK_TRACKER §3: the V2-1d gate command detects M2M↔task divergence."""
+
+    def setUp(self):
+        self.product = Product.objects.create(code='PAR', name='Parity P')
+        self.stage, _ = Stage.objects.get_or_create(
+            code='parity_stage', defaults={'name': 'Parity'})
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('0'))
+        self.adda = Adda.objects.create(code='PAR-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        self.worker = User.objects.create_user(email='parity@test', password='x')
+
+    def _run(self):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        try:
+            call_command('check_worker_task_parity', stdout=out)
+            return 0, out.getvalue()
+        except SystemExit as exc:
+            return exc.code, out.getvalue()
+
+    def test_parity_ok_after_chokepoint_write(self):
+        set_stage_workers(self.sr, [self.worker.pk])
+        code, out = self._run()
+        self.assertEqual(code, 0)
+        self.assertIn('PARITY OK', out)
+
+    def test_divergence_detected_on_bypass_write(self):
+        # Simulate a write that bypassed the chokepoint (the exact failure
+        # mode the V2-1d gate exists to catch).
+        self.sr.workers.add(self.worker)
+        code, out = self._run()
+        self.assertEqual(code, 1)
+        self.assertIn('DIVERGED', out)
+        self.assertIn('PAR-001', out)
+
+    def test_cancelled_tasks_do_not_count(self):
+        set_stage_workers(self.sr, [self.worker.pk])
+        set_stage_workers(self.sr, [])   # un-assign → cancel + M2M clear
+        code, out = self._run()
+        self.assertEqual(code, 0, out)
