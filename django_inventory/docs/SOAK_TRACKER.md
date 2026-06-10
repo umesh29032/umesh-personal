@@ -1,5 +1,14 @@
 # P2→P3 Soak Tracker — Worker Reporting Under Real Usage
 
+**STATUS (owner clarification 2026-06-11): PRE-SOAK READINESS PHASE.** There is no
+deployed environment and no real factory users yet — the §1 criteria CANNOT be
+satisfied until deployment + onboarding. Until then this document is a
+**readiness checklist, not completed validation**: developer-discovered issues
+go in the §2 log, parity checks keep running (check.sh gate [5/5]), and **P3
+(V2-1d) stays gated**. The TRUE soak executes after deployment, with real-usage
+evidence filling §4. Implication: the PD deploy-blocker PR (review §5) now sits
+on V2-1d's critical path.
+
 **Opened:** 2026-06-11 (P2 shipped, commit dfcff6ca) · **Closes:** when ≥1 full Adda cycle has run through the worker report flow AND the soak review (§4) is written and owner-approved. **P3 (V2-1d M2M drop) is gated on this document.**
 Scope guard (owner): no settlement, no MissingPiece, no Alter/Rework work during soak.
 
