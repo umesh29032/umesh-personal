@@ -41,27 +41,32 @@ ignore_imports =
     accounts.services.user_service -> production.services
     accounts.tests -> inventory.models
 
-# ── Contract 2: target acyclic layering (top imports down, never up) ─────────
-# core (bottom) ← accounts ← raw_materials ← production ← tracking/expense ← apps
+# ── Contract 2: acyclic layering (top imports down, never up) ─────────────────
+# P4.2 (2026-06-11): tracking flipped BELOW production (D2). tracking is the
+# barcode range/scan/history PRIMITIVE — ID/value-addressed, string-FK'd,
+# imports no production. Production owns assembly/export/orchestration and
+# writes tracking rows (downward). The old tracking→production ignore block is
+# GONE — the relocated code made it unnecessary.
+# core (bottom) ← accounts ← raw_materials ← tracking ← production ← apps
 [importlinter:contract:acyclic-layers]
 name = Acyclic app layering (target)
 type = layers
 layers =
     storefront : expense : inventory
-    tracking
     production
+    tracking
     raw_materials
     accounts
     core
-# KNOWN EXCEPTION (TODO, deferred high-risk move): tracking.services still read
-# production models for barcode generation/export. The clean fix is to move the
-# barcode-generation ASSEMBLY into production and leave tracking a dumb barcode
-# range/scan + history primitive (takes plain IDs/values, imports no production).
-# Until then these upward edges are ignored so the rest of the layering is enforced:
+# This contract is REPORT-ONLY in scripts/check.sh — its violation list IS the
+# coupling worklist (M4). P4.2 (2026-06-11) cleared the tracking↔production
+# cycle: every former tracking RUNTIME edge is gone (code relocated), so the
+# old tracking ignore block is deleted. What the worklist still shows:
+#   • production → expense (SWA allocation/credit reads) — retires at V2-3
+#     (settlement earning line + one-file facade), FUTURE-STAGE-REDESIGN tagged.
+#   • raw_materials → production/tracking (roll-assign view + roll_service
+#     history logging) — relocation candidates, same pattern as P4.2.
+#   • *.tests → higher apps — test fixtures, noise; clean up opportunistically.
 ignore_imports =
-    tracking.services.barcode_service -> production.models
-    tracking.services.barcode_export_service -> production.models
-    tracking.views.barcode_views -> production.models
-    tracking.views.export_views -> production.models
-    tracking.views.history_views -> production.models
-    tracking.views.dashboard -> production.models
+    accounts.services.user_service -> production.services
+    accounts.tests -> inventory.models
