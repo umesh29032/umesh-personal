@@ -29,16 +29,18 @@ the heavy dimension lift — is banked; most dimensions already ~8.5–9.5 per t
   fold these into **M5/P5.1** N+1 audit (mostly pre-mitigated with prefetch, but verify with query counts).
 - **M6 docs grew** — the SYSTEM_DESIGN rewrite (P6.1) must now also fold in ARCHITECTURE_V2 + V2_1_REVIEW +
   the foundation review. Bigger, but additive.
-- **P2.7 (move expense call into base StageService) is unaffected + still pending** — `stage_views.py` still
-  imports `expense` directly; independent of the stage review, can go anytime.
+- **P2.7 is RESHAPED by V2 — do NOT execute standalone now.** Its Rev-2 premise (confine the
+  *complete()→expense earnings* edge into one base-service file) is **obsolete under Option B**: earnings no
+  longer book at stage-complete, they book at **settlement** (V2-2). The `expense` imports remaining in
+  `stage_views.py` are the **SWA-transitional allocation UI** (the old M2.7 allocate-time model) that V2 will
+  repoint/retire. → **Fold P2.7 into the V2 settlement build (V2-2/V2-3), not a standalone M2 step.**
 
 **Re-sequenced remaining order (Rev 3):**
-1. **Finish M0** — P0.4 observability (Sentry/structured logging/request-id), P0.6 perf-baseline
-   (`assertNumQueries` on hot pages). *Independent — do anytime; P0.6 also seeds M5's regression oracle.*
-2. **P2.7** — relocate the `expense` earnings call into `stages/base/service.py` (one-way `production→expense`
-   in one file). *Independent of the stage review.*
-3. **🔶 Stage-domain review** (gating) — produces the locked stage taxonomy + Missing/Alter domain designs.
-4. **P2.8 + P2.9** — stage_views dissolution + draft polymorphic move, **now aligned with the new taxonomy**.
+1. **Finish M0** — P0.6 perf-baseline (`assertNumQueries` on hot pages — *started 2026-06-10*), then
+   P0.4 observability (Sentry/structured logging/request-id). *Independent; P0.6 seeds M5's regression oracle.*
+2. **🔶 Stage-domain review** (gating) — produces the locked stage taxonomy + Missing/Alter domain designs.
+3. **P2.8 + P2.9** — stage_views dissolution + draft polymorphic move, **now aligned with the new taxonomy**.
+   *(P2.7 folds into the V2 settlement build — see note above — not a standalone M2 step.)*
 5. **M3 — RBAC** — P3.1 unify skill-gating (delete hardcoded `SKILL_*`), P3.2 split `permission_service`,
    P3.3 factory seam (chokepoint only), P3.4 sidebar dual-source.
 6. **M4 — Coupling** — P4.1 accounts→production (now unblocked), P4.2 production↔tracking cycle, P4.3 god-app
