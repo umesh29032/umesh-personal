@@ -25,6 +25,11 @@ Categories: `UX` worker feedback · `SCHEMA` contribution schema limitation · `
 | Date | Cat | Entry | Status |
 |---|---|---|---|
 | 2026-06-11 | — | Soak opened. P2 browser-verified pre-soak (draft/submit/locked/badges/mobile). | — |
+| 2026-06-11 | — | **§7 setup checklist EXECUTED via real admin UIs** (browser-driven): worker2 (worker+cutting_master), worker3 (worker, no skill — isolation probe), manager1 (manager); 3 ProductSizes (Free/1/2) for 3-PATTI; cutting rate ₹3.00/piece; barcode_generation appended to flow; Patti Panel pattern ×3 assigned; 4 Red rolls bulk-created (CR-000001..4); Adda **3-PATTI-001** created — 4-stage pipeline renders, layering workspace loads, zero console errors. cutting_pattern was already in flow (owner added it 2026-06-10 20:22 UTC after reading §7). | setup done |
+| 2026-06-11 | UX | User-create form: clicking "Create User" with an empty required field gives NO visible feedback in some cases (native HTML5 bubble only; my password value was cleared by the fancy-select re-render and the click died silently — no server POST). Real workers/admins may hit the same silent-stall. SETUP issue (admin surface), not architecture. | logged |
+| 2026-06-11 | UX | Bulk roll intake: "Create Rolls" stays disabled until "+ Add color row" is clicked — the filled color/qty inputs alone don't count. Reasonable design but not obvious; a hint near the button would help. SETUP issue. | logged |
+| 2026-06-11 | EDGE | Flow editor allowed appending cutting_pattern/barcode_generation UNPRICED (rate=None) with no warning. Correct per NULL=unpriced semantics (both stages are legitimately unpriced), but docs describe a "mandatory-rate flow editor" — guard appears scoped to priced methods only. Verify intent during validation. ARCHITECTURE observation (benign). | logged |
+| 2026-06-11 | SEC | Layering workspace worker-assignment list correctly shows only SKILLED users (utest, worker2); worker3 (no skill) absent — skill-filter works at the assignment UI level. First positive isolation evidence. | ✅ pass |
 
 ## 3) Pre-V2-1d worklist (kept visible per owner)
 | Item | Shape | Status |
