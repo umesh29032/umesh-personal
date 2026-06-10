@@ -11,8 +11,8 @@ them into this directory as they're revised; add new flows here directly.
 - **Production stage flow** — `docs/production/STAGE_FLOW.md` (Adda →
   WorkflowStage → AddaStageRecord; advance/reopen; `advance_to_next_stage` choke
   point; cost freeze/clear).
-- **Cutting → bundles → barcodes** — `docs/production/CUTTING_DESIGN.md`,
-  `BARCODE_GENERATION.md` (breakup → bundle items → barcode batches; consumed/
+- **Cutting → bundles → barcodes** — `docs/production/BARCODE_GENERATION.md`
+  (+ archived `docs/archive/production/CUTTING_DESIGN.md`) (breakup → bundle items → barcode batches; consumed/
   available counters; uniqueness + contiguity).
 - **Payroll / earnings ledger** — `docs/production/PAYROLL_ARCHITECTURE.md`
   (allocation → immutable ledger credit; advances as a separate loan pool).
@@ -23,4 +23,4 @@ them into this directory as they're revised; add new flows here directly.
 
 ## Open flow gaps (backlog)
 - `reverse_settlement` (compensating-item reversal) — not yet built; see
-  `docs/QA/bugs_found.md` #2.
+  `docs/archive/QA/bugs_found.md` #2.

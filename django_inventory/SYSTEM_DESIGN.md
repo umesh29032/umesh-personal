@@ -883,7 +883,7 @@ env/bin/python config/manage.py test accounts inventory raw_materials production
 6. Attach the stage to products via the flow editor (`/production/products/<pk>/flow/`).
 **No core/model changes to `Adda`, `WorkflowStage`, or `AddaStageRecord` are needed.**
 
-**Open follow-ups (from AUDIT_2026_05_29.md):**
+**Open follow-ups (from docs/archive/AUDIT_2026_05_29.md):**
 - CLAUDE.md rule #5 references dead `StockService`/`StockLedger` — should be corrected.
 - `LabelPrintQueue` is a stub (no service logic).
 - 5 forms still lack the mandatory form-shell; 19 templates have inline empty-state rows.
@@ -897,4 +897,4 @@ env/bin/python config/manage.py test accounts inventory raw_materials production
 ---
 
 *Generated from a full code dig on 2026-06-01. Cross-check against `docs/production/OVERVIEW.md`,
-`ARCHITECTURE.md`, and `AUDIT_2026_05_29.md` for sub-system deep dives.*
+`ARCHITECTURE.md`, and `docs/archive/AUDIT_2026_05_29.md` for sub-system deep dives.*

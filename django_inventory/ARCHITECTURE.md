@@ -109,7 +109,7 @@ django_inventory/
 │   ├── LAYERING_STAGE.md
 │   ├── CUTTING_PATTERN.md     ← NEW 2026-05-28
 │   ├── RBAC.md, MIGRATIONS.md, TESTS_AND_RISKS.md
-│   ├── DECISION_LOG.md, CHAT_LOG.md, UI_PATTERNS.md
+│   ├── DECISION_LOG.md, UI_PATTERNS.md   (CHAT_LOG.md → docs/archive/production/)
 ├── env/                       ← Python virtualenv (gitignored)
 ├── media/                     ← user-uploaded files (gitignored)
 └── config/                    ← Django project root
@@ -586,7 +586,7 @@ See `docs/production/TESTS_AND_RISKS.md` for the long version.
 
 For chronological design decisions (every "why we did X instead of Y") see:
 - `docs/production/DECISION_LOG.md`
-- `docs/production/CHAT_LOG.md`
+- `docs/archive/production/CHAT_LOG.md` *(archived)*
 - `docs/production/CUTTING_PATTERN.md` (latest stage)
 
 For repo-wide rules (service layer, no signals, RBAC discipline, mobile rules, form shell) see `CLAUDE.md`.

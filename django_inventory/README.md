@@ -55,16 +55,17 @@ Lazy-load only what you need:
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Models, services, ER, security, perf. Read before non-trivial changes. |
 | [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) · [SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md) · [STAGE_COSTING_PLAN.md](docs/production/STAGE_COSTING_PLAN.md) | `expense` app: earnings ledger, advances, settlement + stage costing. |
 | [docs/production/RBAC.md](docs/production/RBAC.md) | Roles/skills, Access Control hub, sidebar + URL enforcement. |
-| [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) · [docs/QA/](docs/QA/) | Changelog, per-page contracts, flows, audit/bug/fix logs. |
+| [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) | Changelog, per-page contracts, flows. |
+| [docs/adr/](docs/adr/) · [docs/archive/](docs/archive/) | Locked architecture decisions (ADRs); superseded/dated docs (audits, build logs). |
 | [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) | Why + how + learning map for a junior Django dev. |
 | [UI_COMPONENTS.md](UI_COMPONENTS.md) | Component vocabulary + design tokens. Read before writing CSS. |
 | [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md) | Production tracking subsystem (rolls + Adda + stages). |
 | [docs/production/CUTTING_PATTERN.md](docs/production/CUTTING_PATTERN.md) | Cutting-pattern stage: video, photos, verifications. |
-| [docs/production/CUTTING_DESIGN.md](docs/production/CUTTING_DESIGN.md) | Cutting design spec (ProductSize + breakup + bundles). |
-| [docs/production/BARCODE_STAGE_PLAN.md](docs/production/BARCODE_STAGE_PLAN.md) | Plan + decisions for barcode_generation stage extraction (2026-05-29). |
+| [docs/archive/production/CUTTING_DESIGN.md](docs/archive/production/CUTTING_DESIGN.md) | *(archived)* Cutting design spec — shipped; see OVERVIEW / CUTTING_PATTERN. |
+| [docs/archive/production/BARCODE_STAGE_PLAN.md](docs/archive/production/BARCODE_STAGE_PLAN.md) | *(archived)* barcode_generation plan — shipped; see BARCODE_GENERATION.md. |
 | [docs/production/BARCODE_GENERATION.md](docs/production/BARCODE_GENERATION.md) | Barcode Generation stage spec — flow, validation, reopen rules. |
 | [docs/tracking/EXPORTS.md](docs/tracking/EXPORTS.md) | Barcode export flow (CSV / XLSX / PDF) + future label tracking. |
-| [AUDIT_2026_05_29.md](AUDIT_2026_05_29.md) | Latest application audit report (read-only findings). |
+| [docs/archive/AUDIT_2026_05_29.md](docs/archive/AUDIT_2026_05_29.md) | *(archived)* 2026-05-29 audit findings — folded into the remediation plan. |
 
 ---
 

@@ -15,7 +15,8 @@ Django 5.0 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 - [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md) — production subsystem (raw_materials + production + tracking); load when touching cloth rolls, Adda batches, workflows, stage records, barcodes, **or stage costing**
 - [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) + [SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md) + [STAGE_COSTING_PLAN.md](docs/production/STAGE_COSTING_PLAN.md) — load when touching the `expense` app (earnings ledger, advances, settlement) or stage costing
 - [docs/production/RBAC.md](docs/production/RBAC.md) — roles/skills, Access Control hub, sidebar + URL enforcement
-- [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) · [docs/QA/](docs/QA/) — per-page contracts, flows, audit/bug/fix logs
+- [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) — per-page contracts, flows
+- [docs/adr/](docs/adr/) — locked architecture decisions (ADRs) · [docs/archive/](docs/archive/) — superseded/dated docs (audits, build logs, shipped plans)
 
 ## Rules
 1. Terse. No greetings, no summaries unless asked.

@@ -191,7 +191,7 @@ See [CUTTING_PATTERN.md](CUTTING_PATTERN.md) for full details. TL;DR:
 - [TESTS_AND_RISKS.md](TESTS_AND_RISKS.md) — coverage + edge cases
 - [DECISION_LOG.md](DECISION_LOG.md) — chronological brainstorm decisions
 - [UI_PATTERNS.md](UI_PATTERNS.md) — form shell, mobile rules, filter chips, accordions, QR print
-- [CHAT_LOG.md](CHAT_LOG.md) — design evolution log (chronological, for new-chat context)
+- [CHAT_LOG.md](../archive/production/CHAT_LOG.md) — design evolution log *(archived)*
 
 ## How to load this in a fresh session
 
@@ -206,7 +206,7 @@ For specific work, load only the relevant sub-doc:
   - role gating / accountant rule     → RBAC.md
   - migrations / seed data            → MIGRATIONS.md
   - tests / risks / edge cases        → TESTS_AND_RISKS.md
-  - chronological decisions           → DECISION_LOG.md, CHAT_LOG.md
+  - chronological decisions           → DECISION_LOG.md (CHAT_LOG.md archived)
 ```
 
 ## Verify

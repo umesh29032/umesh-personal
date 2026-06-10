@@ -395,5 +395,5 @@ env/bin/python config/manage.py runserver
 - `../docs/production/OVERVIEW.md` — subsystem index
 - `../docs/production/CUTTING_PATTERN.md` — cutting_pattern stage deep dive
 - `../docs/production/LAYERING_STAGE.md` — layering stage deep dive
-- `../docs/production/CHAT_LOG.md` — chronological design decisions
+- `../docs/archive/production/CHAT_LOG.md` — chronological design decisions *(archived)*
 - `../CLAUDE.md` — repo-wide rules (service layer, RBAC, no signals)
