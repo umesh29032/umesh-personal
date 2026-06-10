@@ -115,6 +115,10 @@ def reverse_entry(entry: WorkerLedgerEntry, *, actor=None, notes=''):
 
 
 def worker_balance(worker) -> Decimal:
+    # P5.2 (perf): ONE indexed conditional-aggregate (index worker,entry_type); the
+    # payroll overview reads all workers via a grouped aggregate. Both fine at current
+    # scale. A closing-balance SNAPSHOT table (O(1) at any size) is a DEFERRED seam,
+    # NOT premature infra -- don't add it speculatively.
     """Live payable = SUM(credits) − SUM(debits). Never stored."""
     agg = WorkerLedgerEntry.objects.filter(worker=worker).aggregate(
         credit=Sum('amount', filter=Q(entry_type=WorkerLedgerEntry.EntryType.CREDIT)),
