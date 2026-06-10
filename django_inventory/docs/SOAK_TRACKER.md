@@ -20,7 +20,7 @@ Categories: `UX` worker feedback · `SCHEMA` contribution schema limitation · `
 ## 3) Pre-V2-1d worklist (kept visible per owner)
 | Item | Shape | Status |
 |---|---|---|
-| **Parity assertion** | Management command `check_worker_task_parity`: for every AddaStageRecord assert M2M worker set == non-cancelled task worker set; report diffs; wire into `scripts/check.sh` as gate [5/5]. Run against DEV DB at soak end + immediately before the V2-1d migration. | TODO (build before V2-1d; small PR) |
+| **Parity assertion** | `check_worker_task_parity` command + check.sh gate [5/5] (runs against the dev DB on every check). Re-run at soak end + immediately before V2-1d. | ✅ BUILT 2026-06-11 (c851f902, 3 tests) |
 | Kill-switch semantics | Documented in V2_1_REVIEW §10 header (flag OFF ⇒ tasks stale ⇒ re-backfill before re-enable). | ✅ done (R0) |
 | Clone rehearsal | up→down→up of the drop migration on a dev-DB clone. | TODO (at V2-1d time) |
 | Stale docstrings (A8) | `worker_task.py:14` "deferred to V2-1c" + `adda.py:89-92` M2M note — fix inside the V2-1d PR (already on V2_1_REVIEW:218's list). | TODO (V2-1d PR) |
@@ -37,7 +37,7 @@ Categories: `UX` worker feedback · `SCHEMA` contribution schema limitation · `
 - **Registry restore footgun** (TRACK): `registry.clear()+autodiscover()` cannot restore handlers in-process (modules already in `sys.modules` → re-import no-op → registry left empty). Tests must snapshot/re-register (pattern in `test_worker_report_view.py`). Candidate hardening later: guard `clear()` behind test-only flag or make `autodiscover()` force-reload.
 - **Seed collisions** (TEST HYGIENE): seeded Stage codes / ClothColor names break naïve `objects.create` in tests — use `get_or_create` (helper pattern now exists).
 - **Perf-baseline semantics** (DOCUMENT ONLY): worker-dashboard baseline measures the context builder; lazy querysets count zero until materialized — documented in `test_perf_baseline.py`.
-- **Pre-existing foundation-purity gate failure** (from R0 §7): `accounts.tests → inventory.models` — one-line chore for the next code PR (P4.2 or the parity PR).
+- **Pre-existing foundation-purity gate failure**: ✅ FIXED 2026-06-11 (2399b044, P4.2 PR-0) — gate [1/5] KEPT.
 
 ## 6) P4.2 during soak — evaluation (owner asked)
 **Recommendation: YES, run P4.2 during the soak window**, with sequencing rules.
@@ -48,4 +48,9 @@ Against (mitigated): two things in flight muddies attribution if a barcode page 
 
 Suggested P4.2 PR order (from P4_2_BARCODE_DESIGN_REVIEW): characterization lock → relocate 3 assembly fns into `production/stages/barcode_generation/assembly.py` → relocate export production-reads + 4 views (D1: cross-cutting views → inventory/apps; stage panel stays production) → flip `.importlinter` layers (tracking BELOW production) + drop `ignore_imports` → `makemigrations --check` must say "No changes" at every step. Fold in the foundation-purity test-import chore.
 
-— Owner decision pending: start P4.2 now / after soak / not yet.
+— **Owner approved 2026-06-11 → ✅ P4.2 EXECUTED same day**, 4 commits, all gates green, `makemigrations --check` clean throughout (no data ever moved):
+  - PR-0 `2399b044` purity chore + characterization baseline
+  - PR-1 `23ba2b69` assembly (generate_for_cutting/_legacy/from_breakdown + _allocation_key) → `production/stages/barcode_generation/assembly.py`
+  - PR-2 `ce930ac1` export service → production stage pkg; 4 /tracking/ views → `inventory/views/tracking_*.py`; urls → `inventory/tracking_urls.py` (namespace + every path/name preserved)
+  - PR-3 `4b19fe01` layers flipped (tracking BELOW production), tracking ignore block deleted — **production↔tracking cycle GONE**; remaining worklist = production→expense (V2-3 facade) + raw_materials edges + test noise.
+  Rollback for any step = `git revert` (pure code moves).
