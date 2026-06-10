@@ -3,13 +3,16 @@
 > **Single source of truth for the CURRENTLY-BUILT system.** Generated 2026-06-01 by deep code dig.
 > Stack: **Django 5.0.1 + PostgreSQL** (use `CheckConstraint(check=...)`). Branch `new_flask_app`.
 >
-> ⚠️ **LOCKED REDESIGN IN PROGRESS — read [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) (§11 🔒LOCKED)
-> + [docs/V2_1_REVIEW.md](docs/V2_1_REVIEW.md).** The worker-tracking + settlement layer is being
-> rebuilt: per-worker `WorkerStageTask`/`WorkerStageContribution` (replacing the bare
-> `AddaStageRecord.workers` M2M), **Option B** (no ledger entry until settlement; `expected_*` frozen at
-> complete = visibility only), and an **Adda-centric `AddaSettlement`** that books earnings + advance
-> recovery (settlement ≠ payment). What this doc describes below = the *pre-V2 built state*; where it
-> conflicts with ARCHITECTURE_V2, V2 wins for the redesigned area.
+> ⚠️ **V2 worker-tracking — read [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) (§11 🔒LOCKED)
+> + [docs/V2_1_REVIEW.md](docs/V2_1_REVIEW.md).** Status (2026-06):
+> - **BUILT (V2-1a/1b/1c):** per-worker `WorkerStageTask` + `WorkerStageContribution` (migrations 0031–0033)
+>   replace the read-path of `AddaStageRecord.workers` (M2M still **dual-written** behind the
+>   `WORKER_TASK_DUAL_WRITE` flag until V2-1d drops it). `expected_*` frozen at complete = **Option B**
+>   visibility (no ledger entry until settlement).
+> - **DESIGN-ONLY (§11, LOCKED, not built):** the Adda-centric `AddaSettlement` that books earnings +
+>   advance recovery (settlement ≠ payment). Today earnings still credit at allocation via `expense`.
+>
+> Where this doc conflicts with ARCHITECTURE_V2, V2 wins for the redesigned area.
 
 This document is the exhaustive reference for the whole project: every app, every model
 (with all fields, `on_delete` rules, indexes, and the *why*), every service-layer function,
@@ -49,14 +52,14 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 
 | Property | Value |
 |---|---|
-| Framework | Django 5.2 |
+| Framework | Django 5.0.1 (pinned — uses `CheckConstraint(check=…)`, the 5.0 API) |
 | Database | PostgreSQL (hard requirement — uses `CREATE SEQUENCE` + `SELECT FOR UPDATE`) |
 | Auth | Custom `accounts.User` (email login), django-allauth, OTP + password fallback |
-| Apps | 6 (`accounts`, `inventory`, `raw_materials`, `production`, `tracking`, `storefront`) |
-| Concrete domain models | ~43 (49 incl. abstract bases + managers + Django auth) |
-| Service modules | 18 |
+| Apps | 8 — 7 domain (`accounts`, `inventory`, `raw_materials`, `production`, `tracking`, `expense`, `storefront`) + `core` (abstract bases, no tables) |
+| Concrete domain models | ~53 (`production` ≈ 25 — the bulk; incl. V2 `WorkerStageTask`/`WorkerStageContribution`) |
+| Service modules | 26 (`config/<app>/services/`) |
 | Live stages | 4 (Layering · Cutting Pattern · Cutting · Barcode Generation) |
-| Tests | 196 green |
+| Tests | 403 green |
 | Settings | split: `config/settings/{base,local,production}.py` |
 | Scale target | ~5k rolls/yr, ~50 Addas/mo, ~10 concurrent users |
 
@@ -64,9 +67,9 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 
 1. **Service layer owns ALL multi-row writes.** Views are thin POST parsers. Zero ORM writes in views.
 2. **No Django signals.** No `save()` overrides for business logic. State changes are explicit service calls.
-3. **`permission_service` is the only RBAC gate.** No raw `is_superuser` checks in views.
+3. **`permission_service` is the only RBAC gate** (lives in `accounts.services`). No raw `is_superuser` checks in views.
 4. **History tables written only via `history_service.log_*`.**
-5. **Cross-app FKs point downstream only** (string FKs avoid import cycles).
+5. **No *module-level* cross-app import between `raw_materials`/`production`/`tracking`** — real runtime coupling exists (and a bidirectional `raw_materials.ClothRoll ↔ production.Adda` FK), but every cross-app import is **deferred to function scope (lazy)** + string FKs, specifically to dodge the circular-import deadlock. The graph is *not* strictly acyclic; it is made *loadable* by lazy imports.
 6. **PROTECT on master FKs; soft-archive via `is_active` + `.active` manager** — real DELETE is rare.
 7. **IDs are service-generated** (`editable=False`): roll IDs from a PG sequence, Adda codes from a per-product counter under row lock.
 
@@ -77,21 +80,24 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 ## 2. Seven-App Architecture & Boundary Rules
 
 ```
-┌─────────────┐     ┌─────────────┐
-│  accounts   │     │  inventory  │      BASE LAYER (no upstream deps)
-│ User, Skill │     │ Role,       │
-│             │     │ SidebarRule,│
-│             │     │ permission_ │
-│             │     │ service     │
-└──────┬──────┘     └──────┬──────┘
-       │ AUTH_USER_MODEL   │ Role / Skill FKs
-       ▼                   ▼
+┌──────────────────────────────┐   ┌─────────────┐
+│           accounts            │   │  inventory  │   BASE LAYER (no upstream deps)
+│ User, UserType, Skill, Role,  │   │ dashboards, │
+│ SidebarItemRule,              │   │ Access-     │
+│ permission_service            │◀──│ Control UI, │   inventory owns NO domain
+│ (RBAC moved here 2026-06;     │   │ middleware, │   tables — RBAC models +
+│  inventory re-exports a shim) │   │ context-    │   service relocated to accounts
+└──────────────┬───────────────┘   │ processor   │   (inventory.{models,services}
+               │ AUTH_USER_MODEL   └─────────────┘    are re-export shims).
+               │ Role / Skill FKs
+               ▼
 ┌──────────────────────────────────────────────┐
 │ raw_materials   ──string FK──▶  production     │
 │ ClothType,ClothColor,           Product,Stage, │
-│ StorageLocation,ClothRoll       Adda, 20 more  │
+│ StorageLocation,ClothRoll       Adda, +22 more │
 │      ▲                              │          │
 │      └────────── string FK ─────────┘          │
+│  (lazy fn-scope imports BOTH ways — see law 5) │
 └──────────────────────┬─────────────────────────┘
                        ▼
               ┌─────────────────┐
@@ -117,11 +123,16 @@ cutting → barcode generation → export to vendor**, with per-piece QR barcode
 └─────────────┘
 ```
 
-**Boundary rule (strict):** `raw_materials` imports nothing from `production`/`tracking`.
-`production` references `raw_materials` via string FK (`'raw_materials.ClothColor'`).
-`tracking` references both upstream apps via string FK; `expense` is downstream of both
-`production` and `accounts` and writes neither. This keeps the dependency graph acyclic
-so migrations and app loading never deadlock.
+**Boundary rule (accurate):** there is **no module-level (top-level) import** between
+`raw_materials`, `production`, and `tracking` — but runtime coupling DOES exist in both
+directions, deferred to **function-scope (lazy) imports** + string FKs (e.g.
+`raw_materials.services.roll_service` lazily imports `production.models.Adda`; `production`
+lazily imports `tracking.services.log_adda` across ~10 files). `raw_materials.ClothRoll`
+even carries an **upstream** string FK to `production.Adda`. `expense` is downstream of
+`production`/`accounts` and writes neither. The lazy-import discipline is what keeps app
+loading + migrations from deadlocking — *not* a strictly-acyclic graph (cycles exist; they
+are broken at import time, not by design). A CI `import-linter` contract enforces the
+"no module-level cross-app import" rule.
 
 **`core` (infra app, not shown above):** holds shared **abstract** base models —
 `TimeStampedModel` (created_at/updated_at) and `ActiveManager` (the `.active` soft-archive
@@ -130,13 +141,13 @@ of redefining these (they used to be copy-pasted in 4 apps).
 
 | App | Responsibility | Owns |
 |---|---|---|
-| `accounts` | Identity + skills | `User` (custom, email login), `Skill` |
-| `inventory` | RBAC core + dashboards | `Role`, `SidebarItemRule`, `permission_service` |
+| `accounts` | Identity + **RBAC core** | `User` (custom, email login), `UserType`, `Skill`, `Role`, `SidebarItemRule`, `permission_service`, `user_service`, `auth_service` |
+| `inventory` | Dashboards + **Access-Control UI** + sidebar middleware | **No domain tables.** `_build_dashboard_context`, `SidebarAccessMiddleware`, the Access-Control hub + Sidebar-Access editor. `inventory.{models,services}` are re-export **shims** pointing at `accounts` (RBAC relocated 2026-06). |
 | `raw_materials` | Cloth inventory + master data | `ClothType`, `ClothColor`, `StorageLocation`, `ClothRoll` |
 | `production` | Products, patterns, sizes, stages, workflows, **all stage records** | `Product`, `ProductPattern`, `ProductPatternAssignment`, `ProductSize`, `Stage`, `WorkflowStage`, `Adda`, `AddaStageRecord`, + 4 typed stage records + cutting breakup/bundle/breakdown + `LabelPrintQueue` (stub) |
 | `tracking` | Barcodes + exports + audit history | `BarcodeBatch`, `BatchBarcode`, `BarcodeExportBatch`, `ClothRollHistory`, `AddaHistory`, `ProductHistory` |
 | `storefront` | Public marketing site CMS | `HomePageConfig`, `Category`, `FeaturedProduct`, `HeroShowcaseCard`, `WhyUsCard`, `FooterLink`, `NavLink` |
-| `expense` | Worker payroll: earnings ledger, advances, settlements | `StageWorkAssignment` (standalone FK allocation — NOT an M2M `through`), `WorkerLedgerEntry`, `WorkerAdvance`, `WorkerProfile`, `PayrollSettlement`, `PayrollSettlementItem`. `AddaStageRecord.workers` stays a bare M2M (roster only); earnings are tracked separately on `StageWorkAssignment`. |
+| `expense` | Worker payroll: earnings ledger, advances, settlements | `StageWorkAssignment` (standalone FK allocation — NOT an M2M `through`), `WorkerLedgerEntry`, `WorkerAdvance`, `WorkerProfile`, `PayrollSettlement`, `PayrollSettlementItem`. Earnings are allocation-driven on `StageWorkAssignment`. **Worker assignment** is now the V2 `production.WorkerStageTask`/`WorkerStageContribution` (the old `AddaStageRecord.workers` M2M is dual-written but reads go through `WorkerStageTask` — see §6.4 + ARCHITECTURE_V2). |
 
 ---
 
@@ -322,24 +333,30 @@ Custom user; **email is the login field** (`username` dropped). Two identity con
 | Field | Type | Notes |
 |---|---|---|
 | email | EmailField unique | `USERNAME_FIELD` |
-| user_type | Char choices | admin/manager/karigar/helper/normal — display only |
+| user_type | FK(`UserType`) SET_NULL null | **display label only** — admin-editable model (replaced the old Char choices); NEVER gates access |
 | first_name, last_name | Char(30) | |
 | is_active, is_staff, is_superuser | Bool | |
 | date_joined, created_at, updated_at | DateTime | |
 | phone_number | Char(15), validated | regex `+?1?\d{9,15}` |
-| birth_date, bio, profile_picture, salary | mixed | profile_picture→`profile_pics/`; salary Decimal(10,2) ≥0 |
+| birth_date, bio, profile_picture, salary | mixed | profile_picture→`profile_pics/`; salary Decimal(10,2) ≥0 (`CheckConstraint`) |
 | **skills** | M2M(Skill) | factory-floor capability gate |
-| **role** | FK(inventory.Role) SET_NULL null | primary RBAC role |
-| **extra_roles** | M2M(inventory.Role) | stacks additional access on top |
+| **role** | FK(`accounts.Role`) SET_NULL null | primary RBAC role |
+| **extra_roles** | M2M(`accounts.Role`) | stacks additional access on top |
 
-#### `Skill`
-| Field | Type | Notes |
-|---|---|---|
-| name | Char choices unique | cutting_master, **cutting_master_helper**, dhage_katne_wala, embroidery, tailoring, other |
+#### `UserType` / `Skill` (both admin-editable models, not Char choices)
+`UserType` is a display label (`code` slug + `label`); it never gates. `Skill` is the
+factory-floor capability (`name` slug = stable code, mirrors `accounts/skills.py`).
+Production-**stage** access is **skill-gated** via `access_service.user_can_access_stage`
+(reads `Stage.access_by_skill`/`access_by_role`), with **super_admin + manager hardcoded
+bypass** and fail-closed on a missing/inactive Stage — the SAME gate guards both the stage
+**view** (`StageViewAccessMixin`) and the **mutation** services. (No single skill is special
+anymore; the old "only `cutting_master_helper` can complete" rule is gone — it's data-driven.)
 
-`cutting_master_helper` is special: only this skill (or super_admin) can **complete & advance** stages.
+### 6.2 `accounts` RBAC models (relocated from `inventory` in 2026-06)
 
-### 6.2 `inventory`
+> `Role` + `SidebarItemRule` now live in `accounts.models`; `inventory.models` is a
+> re-export shim so legacy `from inventory.models import Role` still works. `inventory`
+> owns no tables.
 
 #### `Role`
 | Field | Type | Notes |
@@ -347,10 +364,10 @@ Custom user; **email is the login field** (`username` dropped). Two identity con
 | name | Char(64) unique | |
 | code | Slug(32) unique | stable identifier used in `permission_service` constants |
 | description | Text | |
-| is_system | Bool | system roles (admin/manager/karigar) cannot be deleted |
+| is_system | Bool | system roles (super_admin/manager/worker) cannot be deleted |
 | permissions | M2M(auth.Permission) | the actual grant set |
 
-Seeded: Super Admin, Manager, Karigar (+ Accountant via `inventory/0013`, Listing Team).
+Seeded: Super Admin, Manager, **Worker** (renamed from `karigar` 2026-06-02), Accountant, Listing Team.
 
 #### `SidebarItemRule`
 DB-driven per-menu-item visibility (admin-editable at `/inventory/sidebar-access/`).
@@ -399,7 +416,18 @@ Roll ID from Postgres `cloth_roll_seq` via `roll_service._next_roll_id()` only. 
 Indexes: `status`; `(cloth_type, cloth_color)`; `(storage_location, status)`; `(adda, status)`.
 Property `display_summary` → `"CR-000142 · Cotton · Red - 42 inch"`.
 
-### 6.4 `production` (23 models — the heart)
+### 6.4 `production` (≈25 models — the heart)
+
+> `production` is a **models package** (`config/production/models/{adda,core,cutting,layering,barcode,worker_task}.py`),
+> not a single `models.py`. Beyond the models documented below, it now also owns:
+> - **`WorkerStageTask`** — V2-1a per-worker assignment lifecycle (assigned→in_progress→completed→[verified]/cancelled),
+>   ≤1 active task per (stage_record, worker). Replaces the read-path of `AddaStageRecord.workers` (M2M still
+>   dual-written until V2-1d). **No money** (Option B).
+> - **`WorkerStageContribution`** — V2-1c dimensional line under a task (color/size/qty + **frozen `expected_rate`/
+>   `expected_earning` = visibility only**, never a ledger entry until settlement).
+> - **`WorkflowStageRoleRate`** — per-role override of a `WorkflowStage` cost rate (resolved by `cost_service.role_rate_for`).
+>
+> See [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) for the locked worker-tracking + settlement design.
 
 #### `Product`
 | Field | Type | Notes |
@@ -580,16 +608,19 @@ File content is **regenerated on download** (not stored) — storage stays lean;
 
 ## 7. Service Layer Reference
 
-18 service modules. Views call services; services own all multi-row writes and transactions.
+26 service modules across the apps (`accounts` 3 · `raw_materials` 2 · `production` 10 ·
+`tracking` 3 · `expense` 7 · `storefront` 1; `inventory` 0 — its `services/` is a re-export
+shim). Views call services; services own all multi-row writes and transactions.
 
-### `inventory/services/permission_service.py` — RBAC engine (read-only)
+### `accounts/services/permission_service.py` — RBAC engine (read-only)
 - `user_role_code(user)` / `user_role_codes(user)` — primary + extra_roles
 - `user_has_role(user, codes)` — any-overlap
 - `user_has_perm(user, 'app.codename')` — **canonical check**; order: not-auth→False → `is_superuser`→True → `role.code=='super_admin'`→True → `role.permissions.exists()` → Django fallback
 - `user_can_view_financials` / `user_can_edit_financials` — gate on `FINANCIAL_ROLES`
 - `build_menu_for(user, path)` — sidebar; super_admin→all, else `SidebarItemRule` DB rows, else hardcoded predicates
 - `permissions_sectioned_for_role_editor` — curated role editor (hides service-only join tables)
-- Constants: role codes, `MANAGEMENT_ROLES={super_admin,manager}`, `PRODUCTION_ROLES={…,karigar}`, `FINANCIAL_ROLES={super_admin,accountant}`, `STOREFRONT_ROLES`, the `SIDEBAR` registry
+- Constants: role codes, `MANAGEMENT_ROLES={super_admin,manager}`, `PRODUCTION_ROLES={super_admin,manager,worker}`, `FINANCIAL_ROLES={super_admin,accountant}`, `STOREFRONT_ROLES`, the `SIDEBAR` registry
+- Request-cached: `user_principal(user)` stashes `{role_ids, skill_ids}` on `user._rbac_principal`; `_role_perm_codenames` caches on `user._rbac_perm_codes` — computed once per request so the sidebar build, URL check, middleware + stage-access all agree without re-querying
 
 ### `raw_materials/services/roll_service.py`
 - `_next_roll_id()` — **sole** roll-ID allocator (`nextval('cloth_roll_seq')`)
@@ -681,10 +712,13 @@ No Django signals exist; `signals.py` is tombstoned with rationale. Counter drif
 ## 9. URL & View Surface
 
 Root mounts (`config/config/urls.py`): `/admin/`, `/` (public home), `/app/` (accounts),
-`/accounts/` (allauth), `/inventory/`, `/storefront/`, `/raw-materials/`, `/production/`, `/tracking/`.
+`/accounts/` (allauth), `/inventory/`, `/storefront/`, `/raw-materials/`, `/production/`,
+`/tracking/`, `/expense/` (worker payroll: My Earnings, advances, settlements).
 
-**~122 views total (~117 CBV, ~5 FBV).** All require login; gated by mixins
-(`ProductionRoleMixin`, `SuperAdminOnlyMixin`, perm/skill mixins).
+All views require login; gated by mixins (`ProductionRoleMixin`, `SuperAdminOnlyMixin`,
+`StageViewAccessMixin`, perm/skill mixins). The Access-Control hub + Sidebar-Access editor
+(`/inventory/`) edit `SidebarItemRule`, which the `SidebarAccessMiddleware` enforces at the
+URL layer (hiding a menu item also blocks its route).
 
 ### accounts (`/app/`)
 Auth: `login`, `verify_otp`, `resend_otp`, `login_password`, `signup`(+verify/resend),
@@ -718,6 +752,12 @@ Pattern per stage: `*-workspace` (GET) · `*-start` (POST mgmt) · `*-<action>` 
 `scan` (FBV — `resolve_value` + `get_or_create_piece`), `roll-history`, `adda-history`,
 exports: `export-list`, `export-csv/xlsx/pdf` (POST), `export-download` (re-download by code).
 
+### expense (`/expense/`) — worker payroll
+`my-earnings` (worker sees only their own; management sees all), payroll overview, worker
+detail; `advance-add` + `settlement-create` (MANAGEMENT_ROLES only). Reads are derived live
+from `WorkerLedgerEntry` (balance never stored); writes go through `allocation_service` /
+`advance_service` / `settlement_service` (single-writer per table).
+
 ### storefront (`/storefront/`)
 `public_home` (FBV, public); listing_team CRUD: products + categories list/add/edit/delete.
 
@@ -730,8 +770,8 @@ exports: `export-list`, `export-csv/xlsx/pdf` (POST), `export-download` (re-down
 2. `Stage.access_by_role` M2M — DB-driven
 3. `Stage.access_by_skill` M2M — skill-gated (floor workers); fail-closed if none match
 
-**Roles:** `super_admin` (universal bypass), `manager` (production CRUD), `karigar` (floor),
-`accountant` (financial fields), `listing_team` (storefront).
+**Roles:** `super_admin` (universal bypass), `manager` (production CRUD), `worker` (floor —
+renamed from `karigar` 2026-06-02), `accountant` (financial fields), `listing_team` (storefront).
 
 | Action | Who |
 |---|---|
@@ -812,11 +852,11 @@ QR payload = `{BASE_URL}/tracking/scan/{value}/` — phone camera scans natively
 env/bin/python config/manage.py <cmd>   # settings: config.settings.local
 ```
 
-**Dependencies (`requirements.txt`):** Django 5.2, psycopg2-binary, django-allauth 0.61.1,
+**Dependencies (`requirements.txt`):** Django 5.0.1 (pinned), psycopg2-binary, django-allauth 0.61.1,
 python-decouple, dj-database-url, Pillow 10.2, whitenoise, qrcode[pil] 7.4.2,
 openpyxl 3.1.2 (XLSX), reportlab 4.1.0 (PDF).
 
-**Migrations:** accounts 10 · inventory 17 · raw_materials 9 · production 23 · tracking 9 · storefront 2.
+**Migrations (non-`__init__`):** accounts 17 · inventory 21 · raw_materials 10 · production 33 · tracking 13 · expense 7 · storefront 2 · core 0.
 
 **Seed data:** 5 Products (3-PATTI, T-SHIRT, NIKKAR, PAJAMA, 1-6) each get `[layering, cutting]` by default;
 4 ClothTypes; 6 ClothColors; 2 StorageLocations (PACKING, ROHINI); 3 Stage rows
@@ -826,7 +866,7 @@ openpyxl 3.1.2 (XLSX), reportlab 4.1.0 (PDF).
 ```bash
 env/bin/python config/manage.py check
 env/bin/python config/manage.py makemigrations --dry-run   # → No changes detected
-env/bin/python config/manage.py test production tracking accounts   # 196/196
+env/bin/python config/manage.py test accounts inventory raw_materials production tracking expense storefront core   # 403 green
 ```
 
 ---

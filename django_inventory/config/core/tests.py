@@ -63,6 +63,76 @@ class FoundationPurityTests(SimpleTestCase):
         )
 
 
+REPO_ROOT = CONFIG_DIR.parent  # .../django_inventory
+
+
+class DocAccuracyTests(SimpleTestCase):
+    """P6.1 doc-accuracy guard — the source-of-truth docs can't silently re-drift.
+
+    Asserts only MACHINE-CHECKABLE facts (version, app list, relocated module,
+    debunked import claims). Prose accuracy still needs human review, but the
+    high-severity drift we just fixed (Django 5.2, karigar, inventory-owns-RBAC,
+    'never imports') now fails CI if it reappears.
+    """
+
+    SOURCE_DOCS = ('SYSTEM_DESIGN.md', 'ARCHITECTURE.md')
+
+    def _doc(self, name):
+        return (REPO_ROOT / name).read_text()
+
+    def test_django_version_claims_match_actual(self):
+        import re
+
+        import django
+        actual = django.get_version()  # e.g. '5.0.1'
+        for name in self.SOURCE_DOCS:
+            for claimed in re.findall(r'Django (\d+\.\d+(?:\.\d+)?)', self._doc(name)):
+                self.assertEqual(
+                    claimed, actual,
+                    f"{name} claims 'Django {claimed}' but the installed version is "
+                    f"{actual}. Update the doc (this guard auto-validates on upgrade).",
+                )
+
+    def test_no_debunked_dependency_or_relocation_claims(self):
+        # These exact phrasings were FALSE (cross-app lazy imports exist; RBAC
+        # moved to accounts). If they come back, the doc is lying again.
+        banned = ('imports nothing', 'never imports', 'inventory/services/permission_service')
+        for name in self.SOURCE_DOCS:
+            text = self._doc(name)
+            for phrase in banned:
+                self.assertNotIn(
+                    phrase, text,
+                    f"{name} contains the debunked claim '{phrase}'.",
+                )
+
+    def test_karigar_mentions_are_historical_only(self):
+        # The role was renamed worker<-karigar (2026-06-02). Any surviving
+        # 'karigar' must be a historical note ('renamed from'/'was'), never a
+        # live role description.
+        for name in self.SOURCE_DOCS:
+            for line in self._doc(name).splitlines():
+                if 'karigar' in line.lower():
+                    self.assertTrue(
+                        ('renamed' in line.lower()) or ('was' in line.lower()),
+                        f"{name}: live 'karigar' reference (renamed to 'worker'): {line!r}",
+                    )
+
+    def test_expense_and_core_apps_are_documented_and_installed(self):
+        from django.conf import settings
+        installed = ' '.join(settings.INSTALLED_APPS)
+        for app in ('expense', 'core'):
+            self.assertIn(app, installed, f"{app} missing from INSTALLED_APPS")
+            self.assertIn(
+                app, self._doc('SYSTEM_DESIGN.md'),
+                f"SYSTEM_DESIGN.md never mentions the '{app}' app.",
+            )
+
+    def test_permission_service_lives_in_accounts(self):
+        # The relocation (2026-06) is load-bearing for the whole RBAC story.
+        from accounts.services import permission_service
+        self.assertTrue(permission_service.__name__.startswith('accounts.'))
+
+
 class ObservabilityTests(TestCase):
     """P0.4: request-id correlation (core.observability)."""
 

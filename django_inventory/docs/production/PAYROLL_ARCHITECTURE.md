@@ -6,6 +6,12 @@
 > (production `expected_*` is visibility, not money). `StageWorkAssignment` is **transitional** (candidate
 > to become the settlement earning line — not removed). The immutable single-writer ledger + advance-pool
 > machinery here is **reused as-is**. Read ARCHITECTURE_V2 §11 + V2_1_REVIEW before touching earnings.
+>
+> ⚠️ **CORRECTION (2026-06):** the monthly **`WorkerPayment` model + `payment_service` were DROPPED**
+> (expense migrations 0004/0005). Payout is now settlement-based via **`PayrollSettlement` + `PayrollSettlementItem`**
+> (sole writer `settlement_service`). Advances do **NOT** post a ledger debit (separate loan pool; recovered at
+> settlement). Where the §3/§4/§10 text below still says `WorkerPayment`/`payment_service`/"advance debit", read
+> it as historical-design — the live models are `PayrollSettlement(+Item)` + `WorkerProfile` (expense migrations now run to 0007).
 
 > **Status:** IMPLEMENTED (as of 2026-06-02) — all models, services, views, and tests live
 > (expense app migrations 0001–0005, 270+ tests). Original design produced 2026-06-01 by a 7-specialist debate
@@ -67,8 +73,8 @@ accounts (User) ─┐   production (AddaStageRecord, CuttingBundle, ProductSize
 **Single-writer discipline (mirrors `history_service`):**
 - `expense/services/allocation_service.py` → sole writer of `StageWorkAssignment` (+ its `stage_earning` credit).
 - `expense/services/ledger_service.py` → **sole writer of `WorkerLedgerEntry`**.
-- `expense/services/advance_service.py` → sole writer of `WorkerAdvance` (+ its `advance` debit).
-- `expense/services/payment_service.py` → sole writer of `WorkerPayment` (+ its `payment` debit).
+- `expense/services/advance_service.py` → sole writer of `WorkerAdvance`. **No ledger debit** — advances are a separate loan pool, recovered only at settlement.
+- `expense/services/settlement_service.py` → sole writer of `PayrollSettlement`(+`Item`) and its `settlement_payment`/`advance_recovery` debits. *(Replaced the dropped monthly `WorkerPayment`/`payment_service`.)*
 - `expense/services/payroll_service.py` → read-only aggregations (worker payable, reports). No signals.
 
 ---

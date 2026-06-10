@@ -2,7 +2,7 @@
 
 > A factory-floor ERP for a kids-garment manufacturer.
 > Tracks raw cloth → batches (Adda) → layering → cutting-pattern → cutting → barcodes → public storefront.
-> Built with **Django 5.2 + PostgreSQL** with a strict service-layer architecture.
+> Built with **Django 5.0.1 + PostgreSQL** with a strict service-layer architecture.
 
 This document is the technical contract. If something here disagrees with the code, the **code wins** — open a PR to update this doc.
 
@@ -84,7 +84,12 @@ production     ──▶ raw_materials, accounts
 tracking       ──▶ production, raw_materials, accounts
 ```
 
-`raw_materials` never imports `production`/`tracking`. `production` never imports `tracking`.
+**No *module-level* cross-app import** exists between `raw_materials`, `production`, and
+`tracking` (a CI `import-linter` contract enforces this). But runtime coupling DOES exist in
+both directions — `raw_materials`/`production`/`tracking` import each other's services/models
+via **function-scope (lazy) imports** + string FKs (incl. an upstream `raw_materials.ClothRoll
+→ production.Adda` FK). The lazy discipline is what avoids the circular-import deadlock; the
+graph is not strictly acyclic.
 
 ---
 
@@ -540,7 +545,7 @@ Security log: `logs/security.log` — every auth event (success / failure / thro
 | New Product | `/production/products/add/` (Super Admin) |
 | New Pattern | `/production/patterns/` then assign at `/production/products/<pk>/patterns/` |
 | New permission for a role | `/inventory/roles/<pk>/edit/` (curated section editor) |
-| New typed stage record (e.g. Stitching) | new model in `production/models.py` (OneToOne AddaStageRecord) + new service `<stage>_service.py` + new templates `_stage_panel_<stage>.html` + add dispatch in `stage_panel_embedded.html` + add constant in `production/constants.py` + data migration to seed Stage row |
+| New typed stage record (e.g. Stitching) | new model in the `production/models/` package (OneToOne AddaStageRecord) + a `production/stages/<stage>/` handler + service (self-registers via the stage registry) + templates `_stage_panel_<stage>.html` + add dispatch in `stage_panel_embedded.html` + add constant in `production/constants.py` + data migration to seed Stage row |
 | New CRUD page | `<app>/urls.py` + `<app>/views/<area>_views.py` + `<app>/forms/...` + templates + `MenuItem` in `permission_service.SIDEBAR` |
 | New audit event | extend `tracking.AddaHistory.ChangeType` enum, then call `log_adda(...)` from inside the service that mutates |
 | New storefront section | new model in `storefront/` + Wagtail-style admin form OR extend `HomePageConfig` |

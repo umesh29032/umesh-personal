@@ -166,7 +166,7 @@ Owner-driven, any time. Per-worker (batch view lists all workers, drill into one
      • PayrollSettlement row (snapshots payable_before, advance_outstanding_before).
      • DEBIT settlement_payment = amount_paid       (ledger, settlement FK)
      • DEBIT advance_recovery   = x                 (ledger, settlement FK)  [if x>0]
-     • PayrollSettlementItem rows = FIFO split of x across open advances.
+     • PayrollSettlementItem rows = the owner's explicit per-advance recovery amounts (D3 — NOT auto-FIFO; each ≤ that advance's remaining).
 5. Result: Pending Payable → 0 (fresh overview). Advance Outstanding −= x.
    Worker dashboard instantly shows the new settlement in history.
 ```
