@@ -38,18 +38,6 @@ from tracking.models import BarcodeBatch, BatchBarcode
 logger = logging.getLogger(__name__)
 
 
-def _compact_code(s: str, max_len: int = 8) -> str:
-    """Color/size/pattern codes ko display labels mein fit karne ke liye.
-
-    Whitespace strip + uppercase + non-alnum drop + truncate. Used by
-    BarcodeBatch.__str__ aur templates — value format mein nahi.
-    """
-    if not s:
-        return ''
-    cleaned = ''.join(c for c in s.upper() if c.isalnum())
-    return cleaned[:max_len]
-
-
 def _allocation_key(size, color) -> tuple:
     """Sort key for deterministic range allocation.
 

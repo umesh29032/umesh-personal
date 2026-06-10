@@ -35,9 +35,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from production.models import Adda, BarcodeGenerationRecord
-from tracking.models import (
-    BarcodeBatch, BarcodeExportBatch, BatchBarcode,
-)
+from tracking.models import BarcodeBatch, BarcodeExportBatch
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -96,8 +94,8 @@ def _next_export_code() -> str:
 def _iter_export_rows(adda: Adda):
     """Yield per-piece dicts for an Adda's barcode export.
 
-    Expands each BarcodeBatch range into individual piece rows + merges
-    scanned-state from BatchBarcode (if scanned).
+    Expands each BarcodeBatch range into individual piece rows. The range
+    (BarcodeBatch) is the source of truth for piece existence/count.
 
     Output dict keys:
       barcode, qr_payload, adda, product, bundle, size, color, piece_seq
@@ -109,11 +107,6 @@ def _iter_export_rows(adda: Adda):
     )
     if not batches:
         return
-    scanned = {
-        bc.piece_seq: bc for bc in
-        BatchBarcode.objects.filter(adda=adda)
-        .only('piece_seq', 'value', 'status')
-    }
     for batch in batches:
         size_label = batch.size.label if batch.size_id else ''
         color_label = batch.color.name if batch.color_id else ''
@@ -200,7 +193,7 @@ def _render_pdf_summary_bytes(adda: Adda) -> bytes:
     styles = getSampleStyleSheet()
     story = []
 
-    story.append(Paragraph(f"<b>Barcode Export Summary</b>", styles['Title']))
+    story.append(Paragraph("<b>Barcode Export Summary</b>", styles['Title']))
     story.append(Spacer(1, 6*mm))
     story.append(Paragraph(f"Adda: <b>{adda.code}</b>", styles['Normal']))
     story.append(Paragraph(f"Product: {adda.product.name} ({adda.product.code})", styles['Normal']))

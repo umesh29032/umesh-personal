@@ -44,13 +44,6 @@ class LayeringRecord(TimeStampedModel):
         from decimal import Decimal
         return Decimal(self.lay_count) * self.layer_length_meters
 
-    @property
-    def stage_started_at(self):
-        """Wall-clock stage start (not LayeringRecord row creation time).
-        Reads from parent stage_record.started_at (set when Adda created).
-        """
-        return self.stage_record.started_at if self.stage_record_id else None
-
 
 class LayeringRollEntry(TimeStampedModel):
     """Per-roll verification log inside an active Layering stage.

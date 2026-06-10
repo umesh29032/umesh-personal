@@ -28,7 +28,6 @@ ROLE_ACCOUNTANT = 'accountant'      # can view + edit Supplier and Cost Per KG o
 # Convenience sets
 ADMIN_ROLES = {ROLE_SUPER_ADMIN}
 MANAGEMENT_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER}
-ALL_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_WORKER}
 STOREFRONT_ROLES = {ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM}
 
 # Production lifecycle: who can touch cloth + Adda + stages.
