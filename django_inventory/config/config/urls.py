@@ -24,7 +24,7 @@ urlpatterns = [
     path("storefront/", include("storefront.urls")),  # authenticated storefront management
     path("raw-materials/", include("raw_materials.urls")),  # cloth inventory + master data
     path("production/", include("production.urls")),        # Adda batches + workflow stages
-    path("tracking/", include("tracking.urls")),            # barcodes + audit history
+    path("tracking/", include("inventory.tracking_urls")),  # barcodes + audit history (P4.2: inventory-owned views, tracking namespace preserved)
     path("expense/", include("expense.urls")),              # worker payroll: earnings, advances, payments
 ]
 

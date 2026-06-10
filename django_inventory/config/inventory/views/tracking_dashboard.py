@@ -130,7 +130,7 @@ def barcode_export_csv(request, adda_code):
         return HttpResponse(status=403)
     adda = get_object_or_404(Adda, code=adda_code)
     # Reuse render-only helper from export service (no manifest row written).
-    from tracking.services.barcode_export_service import _render_csv_bytes
+    from production.stages.barcode_generation.export_service import _render_csv_bytes
     payload = _render_csv_bytes(adda)
     response = HttpResponse(payload, content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = (

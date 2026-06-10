@@ -43,7 +43,7 @@ from production.services import (
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
-from tracking.services import (
+from production.stages.barcode_generation.export_service import (
     generate_csv, generate_pdf_summary, generate_xlsx, regenerate_for_export,
 )
 

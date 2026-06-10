@@ -1,5 +1,10 @@
 """Barcode export service — CSV / XLSX / PDF generators + manifest tracking.
 
+P4.2 (2026-06-11): moved verbatim from tracking.services.barcode_export_service —
+the stage-completion gate reads BarcodeGenerationRecord/AddaStageRecord, so this
+is production-stage logic. It writes the tracking.BarcodeExportBatch manifest
+(downward edge); tracking stays the dumb range/scan/history primitive.
+
 YEH FILE KYU HAI?
 ─────────────────
 PR-D 2026-05-29 (BARCODE_STAGE_PLAN.md): Barcode Generation stage complete

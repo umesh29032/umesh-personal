@@ -29,7 +29,7 @@ from django.views.generic import ListView
 from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.models import Adda
 from tracking.models import BarcodeExportBatch
-from tracking.services import (
+from production.stages.barcode_generation.export_service import (
     content_type_for, filename_for, generate_csv, generate_pdf_summary,
     generate_xlsx, regenerate_for_export,
 )
