@@ -53,6 +53,17 @@
   books earnings at settlement, repoint/retire these + break the production↔expense
   cycle. See ARCHITECTURE_V2 §11 + V2_1_REVIEW.
 
+## § R1 — Manufacturing stage-domain review 🔒 LOCKED 2026-06-10
+**[R1_STAGE_DOMAIN_REVIEW.md](R1_STAGE_DOMAIN_REVIEW.md) — D-R1.1…D-R1.10 all owner-locked.** Resolves this agenda's items 2-8 at the ARCHITECTURE level (item 1 stage names/taxonomy + item 9 reporting grain confirmation remain open by design):
+- Archetype map (A-F) + invariants I1-I10; nine-field **Stage Contract** (§2A) = stable foundation beneath any taxonomy.
+- Output grain (adda, stage, color, size, qty) = expected-piece truth, **independent of barcodes** (§5A); Missing/Alter anchor on it, barcode refs = optional enrichment.
+- Contribution patterns per archetype; JSONB on first consumer. Cost-unit extensibility + cost≠earning separation.
+- Missing/Alter integration contracts (anchor duality, §11.10 variance seam, **rework = ordinary WorkerStageTasks** linked from AlterCase).
+- **P4.2 settled + UNPARKED**: barcode models stay in tracking (D3=NO move), tracking BELOW production (D2), assembly relocates to production; views = D1 at execution.
+- **Scan seam (§8A):** scanning = stage capability (not archetype); future additive `WorkflowStage.scan_policy {none,optional,required}` + handler `validate_scan` hook; scan events in tracking primitive; lifecycle/genealogy deferred to a future **Barcode/Traceability review**.
+- Machine sub-stages: parent-FK shape + trigger rule (different workers/rates OR independent progress; else one stage with operation measures).
+**Still open (deliberate):** final stage names/taxonomy (lands when real stages onboard, instantiating Stage Contracts) · concrete MissingPieceCase/AlterCase models (P6) · barcode lifecycle (future review).
+
 ## § R0 reconciliation — owner decisions locked 2026-06-10
 - **ADR 0007 ACCEPTED (Option A):** allocation-era ledger credits coexist untouched; AddaSettlement credits only uncredited (worker, stage_record) lines; symmetric cross-era double-credit guard; `LEDGER_CREDIT_AT_ALLOCATION` flag = rollback lever; no synthetic settlements. V2-2 build requirements + edge-case tests listed in the ADR.
 - **C2 — V2-1d preconditions** locked (see V2_1_REVIEW §10 header): parity assertion · kill-switch semantics · pt.2b soak ≥1 full Adda cycle · clone rehearsal.
