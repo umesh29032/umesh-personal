@@ -178,7 +178,7 @@ Standalone HTML (does NOT extend `accounts/base.html`). A4-anchored grid. ECC le
 | medium | 30mm | 5×7 | 35 |
 | large | 42mm | 4×6 | 24 |
 
-`?status=pending|packed|dispatched|missing` filters before printing (reprint flow).
+`?status=pending|packed|dispatched|missing` filters before printing (reprint flow). *(R0 note 2026-06-10: the `missing` filter is currently inert end-to-end — `mark_status` has no UI caller, so nothing can be marked missing yet; see SYSTEM_DESIGN scan-flow correction.)*
 
 Toolbar sticky-top + hidden in `@media print`. Mobile preview stacks toolbar + lets QR images scale to viewport (mm-anchored for actual paper print).
 

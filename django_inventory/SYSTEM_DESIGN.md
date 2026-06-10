@@ -257,8 +257,12 @@ EXPORT (post barcode-gen complete)
    ▼
 SCAN (lazy)
    /tracking/scan/{value}/ → resolve_value → get_or_create_piece (BatchBarcode row born here)
-                           → mark_status (pending/packed/dispatched/missing)
 ```
+> **R0 correction (2026-06-10):** scanning does NOT change status. The `mark_status` service exists but
+> has **no view/URL caller** — piece status (packed/dispatched/missing) cannot be set from the UI today;
+> dashboard "missing" counts are display-only. Owner decision (R0 C4): no interim status UI; status
+> marking ships with the MissingPieceCase module, and any missing-marking UI MUST capture
+> `detection_stage` + `detected_at` + `detected_by` at mark time (un-backfillable facts).
 
 **The golden rule:** `Adda.current_stage` only ever moves inside `adda_service.advance_to_next_stage`,
 which every `complete_*` calls. Nothing else mutates it. When `advance` finds no next stage,

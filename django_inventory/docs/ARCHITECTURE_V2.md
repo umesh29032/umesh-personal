@@ -1,6 +1,12 @@
 # Architecture V2 — Adda Production Tracking & Settlement
 
-> Status: PROPOSED 2026-06-09 (design only, not yet built). This is a production-execution
+> Status (updated 2026-06-10, R0 reconciliation): **worker-tracking layer BUILT + COMMITTED**
+> (V2-1a/1b/1c — `WorkerStageTask`, `WorkerStageContribution`, dual-write chokepoint, reader flip,
+> contribution_schema hook, isolation gate; migrations 0031-0033 applied; commits e4953ef9…cfdb2d26).
+> **§11 settlement remains LOCKED DESIGN, not yet built** (V2-2). Pending: pt.2b/2c worker-report UI,
+> V2-1d M2M drop, V2-2 AddaSettlement, V2-3 SWA repurpose, Missing/Alter modules.
+> Ledger cutover for V2-2 is decided: **ADR 0007 (Option A — coexist; cross-era double-credit guard;
+> `LEDGER_CREDIT_AT_ALLOCATION` rollback flag).** This is a production-execution
 > + Adda-centric settlement system with worker isolation — **NOT a traditional payroll app.**
 > Supersedes the M2.7 *crediting trigger* (see "M2.7 delta"); reuses its ledger/advance machinery.
 > **Option B:** Production Truth ≠ Financial Truth — money touches the ledger only at settlement.
@@ -81,7 +87,7 @@ created/updated (audit)
   (advance recovery / payment / adjustment). Earning credits link to the settlement
   (`settlement` FK) and trace back to the contribution(s) they settle — **not** to a
   `StageWorkAssignment`.
-- **`WorkerAdvance`** (existing) **+ add `adda` FK** — early payment; **separate from earnings**; recovered (configurably) at settlement.
+- **`WorkerAdvance`** (existing) — early payment; **separate from earnings**; recovered (configurably) at settlement. ~~+ add `adda` FK~~ **REJECTED by locked §11.3 ("Do not add it") — §11 wins; this line reconciled in R0.**
 - **`AddaSettlement`** (NEW) — adda · status · expected/packed/missing/rejected/variance (per color/size) · totals · created_by · settled_at. The reconciliation EVENT that *produces* ledger entries.
 - **`AddaSettlementItem`** (NEW) — per worker: expected_earned · final_payable · advance_deducted (manager-chosen) · amount_paid · remaining. The human-readable settlement breakdown beside each ledger credit it generates.
 
@@ -219,7 +225,7 @@ Worker sees ONLY: own tasks, own contributions, own earnings/advances, own settl
 - **Kept:** immutable `WorkerLedgerEntry` (now the *single* financial source of truth), advance pool, data-driven payability (`credits_workers`), the stage registry/handlers.
 - **Transitional (NOT removed):** `StageWorkAssignment`. M2.7 modelled it as the *allocate-time immutable earning* (credit booked when management allocated). Option B no longer credits at allocation, so its M2.7 *role* ends — but it still backs live readers and is the source FK for every `stage_earning` ledger credit. Decision: **deprecate-retain now; likely repurpose as the settlement earning line** (write at settlement so `WorkerLedgerEntry.assignment` stays intact). No removal migration until the financial design is locked and readers are repointed.
 - **Changed:** the money-write moves from *allocate-time credit* (M2.7) → *settlement-time credit* (Option B). Worker completion now freezes a visibility snapshot, books nothing. The PAY-2 guard reframes from "≥1 allocation" → "all active tasks completed" before advance.
-- **Added:** `WorkerStageTask`, `WorkerStageContribution` (with `expected_rate`/`expected_earning`), derived progress, `AddaSettlement`/`Item`, `WorkerAdvance.adda`.
+- **Added:** `WorkerStageTask`, `WorkerStageContribution` (with `expected_rate`/`expected_earning`), derived progress, `AddaSettlement`/`Item`. (~~`WorkerAdvance.adda`~~ rejected by §11.3 — R0 reconciliation.)
 
 ### Responsibility map (the question you asked — where each job lives under Option B)
 | Responsibility | Owner | Money? |

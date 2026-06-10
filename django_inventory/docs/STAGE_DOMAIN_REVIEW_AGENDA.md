@@ -53,6 +53,14 @@
   books earnings at settlement, repoint/retire these + break the production↔expense
   cycle. See ARCHITECTURE_V2 §11 + V2_1_REVIEW.
 
+## § R0 reconciliation — owner decisions locked 2026-06-10
+- **ADR 0007 ACCEPTED (Option A):** allocation-era ledger credits coexist untouched; AddaSettlement credits only uncredited (worker, stage_record) lines; symmetric cross-era double-credit guard; `LEDGER_CREDIT_AT_ALLOCATION` flag = rollback lever; no synthetic settlements. V2-2 build requirements + edge-case tests listed in the ADR.
+- **C2 — V2-1d preconditions** locked (see V2_1_REVIEW §10 header): parity assertion · kill-switch semantics · pt.2b soak ≥1 full Adda cycle · clone rehearsal.
+- **C3 — verification semantics:** task-level `verified` NEVER gates progression (optional correction workflow; completion drives readiness). Stage-level completion validations (e.g. CuttingPatternVerification) are stage-handler-owned and MAY gate that stage; their final shape belongs to THIS review.
+- **C4 — missing marking:** no interim `mark_status` UI; ships with MissingPieceCase; `detection_stage`/`detected_at`/`detected_by` mandatory at mark time from day one.
+- **C5 — reverse_settlement:** designed inside V2-2's reversal lifecycle (draft→finalized→reversed/superseded), covering AddaSettlement + narrowed payment; no isolated pre-V2 patch. Until then: manual-ops caution on settlements.
+- Full inventory + truth model: `docs/R0_RECONCILIATION.md`; review: `docs/ERP_MASTER_CONTEXT_REVIEW.md`.
+
 ## Checkpoint state at pause (2026-06-10)
 Branch `new_flask_app`, working tree clean, **389 tests green**. V2 commits this run:
 `e5ad1445 docs · e4953ef9 V2-1a · adddec97 V2-1b · bf9bfff3 V2-1c-i · 77d5d773 V2-1c-ii ·

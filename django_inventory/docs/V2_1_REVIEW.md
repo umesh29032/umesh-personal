@@ -240,7 +240,14 @@ Drop the M2M only in a final follow-up PR after every reader uses `WorkerStageTa
 
 # §10 — V2-1a implementation review (deep dive)
 
-> **Status: ✅ BUILT 2026-06-09 (uncommitted; migrations applied to dev DB).** Delivered:
+> **Status: ✅ BUILT + COMMITTED (R0 update 2026-06-10 — the "NOT committed" note below is historical;
+> commits e4953ef9 V2-1a · adddec97 V2-1b · bf9bfff3 V2-1c-i · 77d5d773 V2-1c-ii · 5e4b4516 V2-1c-iv ·
+> 2580a7d6/cfdb2d26 draft+contribution_schema; suite now 417 green, not 366).**
+> **V2-1d preconditions LOCKED by owner (R0 C2):** (i) M2M↔active-task parity assertion in suite/check.sh,
+> (ii) kill-switch semantics documented (`WORKER_TASK_DUAL_WRITE` OFF ⇒ M2M-only writes ⇒ tasks go stale ⇒
+> re-run 0032-style backfill before re-enabling), (iii) soak = pt.2b worker UI exercised on real data
+> through ≥1 full Adda cycle, (iv) clone rehearsal of the drop migration. Original 2026-06-09 record:
+> Delivered:
 > `WorkerStageTask` model + migrations `0031`/`0032` (rehearsed on a clone, round-trip verified,
 > APPLIED to dev — 0 backfilled, dev empty), the dual-write chokepoint
 > `production/services/worker_task_service.py` (`set_stage_workers`/`add_stage_worker`) behind
