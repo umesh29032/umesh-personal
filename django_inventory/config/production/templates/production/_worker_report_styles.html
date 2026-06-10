@@ -1,0 +1,110 @@
+{% comment %}Page-scoped CSS for the worker report (both wrappers include this).
+Scoped under .worker-report so nothing leaks (CLAUDE.md rule 10). Tokens + form
+shell mirror the approved mockup docs/mockups/worker_report.html, which itself
+mirrors production/_form_styles.html + stage_panel_embedded :root.{% endcomment %}
+<style>
+  .worker-report.form-shell{max-width:760px; margin:0 auto; padding-bottom:120px;}
+  .worker-report .hero{background:linear-gradient(135deg,#0a1628 0%,#1a2840 50%,#2a1f0e 85%,#b87333 130%);
+        color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
+        box-shadow:0 8px 32px rgba(14,11,9,.20); position:relative; overflow:hidden;}
+  .worker-report .hero::before{content:''; position:absolute; right:-100px; top:-100px; width:280px; height:280px;
+        background:radial-gradient(circle,rgba(184,115,51,.25),transparent 70%);}
+  .worker-report .hero h1{font-family:'Cormorant Garamond',Georgia,serif; font-size:30px; font-weight:600;
+        margin:0 0 6px; letter-spacing:-.01em; position:relative;}
+  .worker-report .hero p{margin:0; color:rgba(255,255,255,.72); font-size:14px; position:relative;}
+  .worker-report .hero-chip{display:inline-block; padding:3px 10px; margin-top:12px;
+        background:rgba(184,115,51,.22); border:1px solid rgba(184,115,51,.4); color:#d4924a;
+        border-radius:12px; font-size:10px; font-weight:700; letter-spacing:.12em; position:relative;}
+  .worker-report .submitted-chip{background:rgba(22,128,80,.22)!important; border-color:rgba(22,128,80,.45)!important; color:#bff0d4!important;}
+
+  .worker-report .flash{border-radius:10px; padding:11px 14px; margin-bottom:14px; font-size:13.5px;}
+  .worker-report .flash-success{background:rgba(22,128,80,.10); border:1px solid rgba(22,128,80,.35); color:#15663f;}
+  .worker-report .flash-error{background:var(--danger-bg, rgba(220,38,38,.10)); border:1px solid #e3b8b8; color:#b91c1c;}
+
+  .worker-report .panel{background:var(--card-bg,#fff); border:1px solid var(--border-card,#cfc0aa); border-radius:14px;
+        box-shadow:0 2px 12px rgba(14,11,9,.10); margin-bottom:18px;}
+  .worker-report .panel-head{display:flex; align-items:center; gap:12px; padding:18px 22px 0;}
+  .worker-report .panel-num{width:32px; height:32px; flex-shrink:0; background:var(--copper,#b87333); color:#fff;
+        font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;
+        border-radius:8px; box-shadow:0 2px 6px rgba(184,115,51,.35);}
+  .worker-report .panel-title{font-family:'Cormorant Garamond',Georgia,serif; font-size:20px; font-weight:600;
+        letter-spacing:-.01em;}
+  .worker-report .panel-body{padding:18px 22px 22px;}
+  .worker-report .panel-sub{font-size:13px; color:var(--stone,#6e6259); margin:0 0 14px;}
+
+  .worker-report .line-card{background:var(--surface-2,#f5f1ea); border:1px solid var(--border-card,#cfc0aa); border-radius:12px;
+        padding:14px 16px 16px; margin-bottom:12px; position:relative;}
+  .worker-report .line-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .worker-report .line-no{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--stone,#6e6259);}
+  .worker-report .line-remove{border:none; background:transparent; color:var(--stone,#6e6259); font-size:18px; line-height:1;
+        cursor:pointer; padding:2px 6px; border-radius:6px;}
+  .worker-report .line-remove:hover{color:#b91c1c; background:rgba(220,38,38,.10);}
+  .worker-report .line-field{margin-bottom:12px;}
+  .worker-report .line-field:last-child{margin-bottom:0;}
+  .worker-report .fld-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+        color:var(--stone,#6e6259); display:block; margin-bottom:7px;}
+
+  .worker-report .chip-row{display:flex; flex-wrap:wrap; gap:8px;}
+  .worker-report .chip{display:inline-flex; align-items:center; gap:7px; padding:8px 13px; cursor:pointer;
+        background:var(--cream,#faf7f2); border:1.5px solid var(--border-card,#cfc0aa); border-radius:999px;
+        font-size:13px; color:var(--ink,#1c1c1e); transition:background .15s,border-color .15s; font-family:inherit;}
+  .worker-report .chip:hover{border-color:var(--copper,#b87333);}
+  .worker-report .chip.selected{background:rgba(184,115,51,.12); border-color:var(--copper,#b87333); font-weight:600;}
+  .worker-report .swatch{width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.15); flex-shrink:0; display:inline-block;}
+
+  .worker-report .qty-row{display:flex; align-items:center; gap:10px;}
+  .worker-report .qty-input{width:120px; padding:11px 14px; background:var(--cream,#faf7f2); border:1.5px solid var(--border-card,#cfc0aa);
+        border-radius:10px; box-shadow:inset 0 1.5px 4px rgba(14,11,9,.07); font-size:15px; font-weight:700;
+        color:var(--ink,#1c1c1e); font-family:inherit;}
+  .worker-report .qty-input:focus{outline:none; border-color:var(--copper,#b87333); background:#fff;
+        box-shadow:inset 0 1.5px 4px rgba(14,11,9,.07),0 0 0 3px rgba(184,115,51,.15);}
+  .worker-report .qty-suffix{font-size:13px; color:var(--stone,#6e6259);}
+
+  .worker-report .add-line{width:100%; padding:12px; margin-top:2px; background:transparent;
+        border:1.5px dashed var(--border-card,#cfc0aa); border-radius:12px; color:var(--copper,#b87333);
+        font-weight:700; font-size:14px; cursor:pointer; transition:background .15s,border-color .15s; font-family:inherit;}
+  .worker-report .add-line:hover{background:rgba(184,115,51,.06); border-color:var(--copper,#b87333);}
+
+  .worker-report .stage-summary{background:var(--cream,#faf7f2); border:1px solid var(--border-card,#cfc0aa); border-radius:12px;
+        padding:16px 18px;}
+  .worker-report .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px;}
+  .worker-report .summary-grid .lbl{font-size:10px; color:var(--stone,#6e6259); text-transform:uppercase; letter-spacing:.05em; display:block;}
+  .worker-report .summary-grid .val{font-size:26px; font-weight:700; color:var(--ink,#1c1c1e);
+        font-family:'Cormorant Garamond',Georgia,serif; line-height:1.1;}
+  .worker-report .next-note{margin-top:14px; padding:11px 14px; background:var(--surface-2,#f5f1ea); border-radius:10px;
+        font-size:12.5px; color:var(--stone,#6e6259); display:flex; gap:9px; align-items:flex-start;}
+  .worker-report .next-note b{color:var(--ink,#1c1c1e);}
+
+  .worker-report .sticky-actions{position:sticky; bottom:14px; z-index:5; margin:22px 0 0; padding:14px 18px;
+        background:rgba(250,247,242,.80); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+        border:1px solid var(--border-card,#cfc0aa); border-radius:14px; box-shadow:0 8px 24px rgba(14,11,9,.10);
+        display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;}
+  .worker-report .btn{padding:12px 20px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer;
+        border:1.5px solid transparent; font-family:inherit;}
+  .worker-report .btn-primary{background:var(--copper,#b87333); color:#fff; box-shadow:0 2px 8px rgba(184,115,51,.35);}
+  .worker-report .btn-primary:hover{background:#a5641f;}
+  .worker-report .btn-ghost{background:#fff; color:var(--ink,#1c1c1e); border-color:var(--border-card,#cfc0aa);}
+  .worker-report .btn-ghost:hover{border-color:var(--copper,#b87333); color:var(--copper,#b87333);}
+
+  .worker-report .status-banner{background:rgba(22,128,80,.10); border:1px solid rgba(22,128,80,.35); color:#15663f;
+        border-radius:12px; padding:14px 18px; margin-bottom:18px; display:flex; gap:10px; align-items:flex-start; font-size:13.5px;}
+  .worker-report .status-banner b{color:#0f4d2f;}
+  .worker-report .banner-sub{opacity:.8;}
+  .worker-report .ro-line{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px;
+        background:var(--surface-2,#f5f1ea); border:1px solid var(--border-card,#cfc0aa); border-radius:12px; margin-bottom:10px;}
+  .worker-report .ro-dims{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .worker-report .ro-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 11px; background:var(--cream,#faf7f2);
+        border:1px solid var(--border-card,#cfc0aa); border-radius:999px; font-size:13px; color:var(--ink,#1c1c1e);}
+  .worker-report .ro-qty{font-family:'Cormorant Garamond',Georgia,serif; font-size:22px; font-weight:700; color:var(--ink,#1c1c1e); white-space:nowrap;}
+  .worker-report .ro-qty small{font-size:11px; color:var(--stone,#6e6259); font-weight:400;}
+  .worker-report .locked-foot{margin-top:16px; font-size:12.5px; color:var(--stone,#6e6259); text-align:center;}
+
+  @media (max-width:600px){
+    .worker-report .hero{padding:22px 20px; border-radius:12px;}
+    .worker-report .hero h1{font-size:24px;}
+    .worker-report .panel-head{padding:16px 18px 0;}
+    .worker-report .panel-body{padding:14px 18px 18px;}
+    .worker-report .sticky-actions{bottom:8px; flex-direction:column-reverse;}
+    .worker-report .sticky-actions .btn{width:100%;}
+  }
+</style>

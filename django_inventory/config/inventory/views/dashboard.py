@@ -102,10 +102,33 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
                     completed_at__isnull=True,
                     adda__status=Adda.Status.IN_PROGRESS)
-            .select_related('adda', 'workflow_stage', 'adda__product')
+            .select_related('adda', 'workflow_stage__stage', 'adda__product')
             .order_by('-created_at')
             .distinct()
         )
+        # pt.2c: report badge per assigned stage — ONE extra query for all my
+        # tasks (annotate counts lines), then attach in Python. Badge states:
+        # submitted (task completed/verified) > draft (has lines) > needed.
+        my_active_stages = list(my_active_stages)
+        my_report_tasks = (
+            WorkerStageTask.objects
+            .filter(worker=request.user,
+                    stage_record__in=[sr.pk for sr in my_active_stages])
+            .exclude(status=WorkerStageTask.Status.CANCELLED)
+            .annotate(n_lines=Count('contributions'))
+        )
+        task_by_sr = {t.stage_record_id: t for t in my_report_tasks}
+        for sr in my_active_stages:
+            t = task_by_sr.get(sr.pk)
+            if t is None:
+                sr.report_badge = None
+            elif t.status in (WorkerStageTask.Status.COMPLETED,
+                              WorkerStageTask.Status.VERIFIED):
+                sr.report_badge = 'submitted'
+            elif t.n_lines:
+                sr.report_badge = 'draft'
+            else:
+                sr.report_badge = 'needed'
         my_activity = user_activity_across_addas(request.user, limit=30)
 
         if user_has_skill(request.user, SKILL_CUTTING_MASTER_HELPER):

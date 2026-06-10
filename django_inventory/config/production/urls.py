@@ -54,6 +54,10 @@ urlpatterns = [
     # ?embedded=1 strips hero/nav so the panel fits inside iframe / accordion.
     path('addas/<str:code>/stage/<str:stage_type>/',    views.StagePanelView.as_view(),         name='stage-panel'),
 
+    # V2-1c-iii pt.2b — worker self-report (schema-driven; own-task only).
+    # Same ?embedded=1 convention as stage-panel for the dashboard iframe route.
+    path('addas/<str:code>/report/<str:stage_type>/',   views.WorkerReportView.as_view(),       name='worker-report'),
+
     # Layering workflow — workspace (GET) + actions (POST)
     path('addas/<str:code>/layering/',                  views.LayeringWorkspaceView.as_view(),  name='layering-workspace'),
     path('addas/<str:code>/layering/start/',            views.LayeringStartView.as_view(),      name='layering-start'),

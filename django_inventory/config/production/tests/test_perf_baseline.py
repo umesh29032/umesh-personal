@@ -147,5 +147,7 @@ BULK_SNAPSHOT_QUERIES = 5
 # CONSCIOUSLY if a real change moves them — a silent move = an N+1 regression.
 # NOTE 2026-06-10: these are HIGH (per-Adda snapshot/pipeline work) — M5/P5.1 should
 # bring them down; when it does, lower these numbers in the same commit.
-WORKER_DASHBOARD_QUERIES = 14   # P5.1: skip unrendered layering snapshot for non-skilled
-MANAGEMENT_DASHBOARD_QUERIES = 20   # was 25 — P5.1: bulk attach_layering_snapshots (N+1-free)
+WORKER_DASHBOARD_QUERIES = 16   # was 14 — pt.2c: +1 badge task query, +1 my_active_stages
+                                # now materialized in the builder (list() for badge attach;
+                                # previously lazy = uncounted here). Bounded, not per-row.
+MANAGEMENT_DASHBOARD_QUERIES = 21   # was 20 (25 pre-P5.1) — pt.2c: +1 badge task query

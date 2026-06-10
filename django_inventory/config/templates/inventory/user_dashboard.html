@@ -48,6 +48,15 @@
         border-radius: 999px; font-size: 12px; font-weight: 600;
         margin-left: 4px;
     }
+    /* pt.2c report badges — link pills, one colour per state (D3). */
+    .user-dash .stage-row .report-badge {
+        display: inline-block; padding: 4px 12px; margin-left: 6px;
+        border-radius: 999px; font-size: 12px; font-weight: 700;
+        text-decoration: none; border: 1.5px solid transparent;
+    }
+    .user-dash .stage-row .rb-needed   { background: rgba(220,38,38,.10); color: #b91c1c; border-color: #e3b8b8; }
+    .user-dash .stage-row .rb-draft    { background: rgba(184,115,51,.12); color: var(--copper); border-color: var(--copper); }
+    .user-dash .stage-row .rb-submitted{ background: rgba(22,128,80,.12); color: #15803d; border-color: rgba(22,128,80,.45); }
     .user-dash .stage-row .since {
         font-size: 11px; color: var(--stone);
         font-family: 'Courier New', monospace;
@@ -330,6 +339,13 @@
                         <a href="{% url 'production:adda-detail' sr.adda.code %}" class="adda-link">{{ sr.adda.code }}</a>
                         · {{ sr.adda.product.name }}
                         <span class="stage-pill">{{ sr.workflow_stage.get_stage_type_display }}</span>
+                        {% comment %}pt.2c report badge — links to the schema-driven worker report (D3).{% endcomment %}
+                        {% if sr.report_badge %}
+                        <a class="report-badge rb-{{ sr.report_badge }}"
+                           href="{% url 'production:worker-report' sr.adda.code sr.workflow_stage.stage.code %}">
+                            {% if sr.report_badge == 'submitted' %}✓ Submitted{% elif sr.report_badge == 'draft' %}✎ Draft saved{% else %}● Report needed{% endif %}
+                        </a>
+                        {% endif %}
                     </div>
                     <span class="since">since {{ sr.created_at|date:"d M H:i" }}</span>
                 </li>
