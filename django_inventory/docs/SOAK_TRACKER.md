@@ -63,3 +63,26 @@ Suggested P4.2 PR order (from P4_2_BARCODE_DESIGN_REVIEW): characterization lock
   - PR-2 `ce930ac1` export service → production stage pkg; 4 /tracking/ views → `inventory/views/tracking_*.py`; urls → `inventory/tracking_urls.py` (namespace + every path/name preserved)
   - PR-3 `4b19fe01` layers flipped (tracking BELOW production), tracking ignore block deleted — **production↔tracking cycle GONE**; remaining worklist = production→expense (V2-3 facade) + raw_materials edges + test noise.
   Rollback for any step = `git revert` (pure code moves).
+
+## 7) Real-workflow validation — 3-PATTI sufficiency analysis (2026-06-11)
+
+**Dev-DB reality check (as configured today):** 3-PATTI flow = `[layering, cutting]` ONLY (no cutting_pattern in flow); cutting `cost_rate=None` (expected_earning would freeze 0.00); **zero ProductSize rows** (cutting size chips render empty); zero patterns; **zero available rolls** (layering cannot start); **one worker user** (utest, cutting_master) + super_admin only; layering `credits_workers=False` / cutting `True` (good payability contrast).
+
+### Setup checklist BEFORE validation can start (all via existing real UIs — doing it manually also validates those admin surfaces):
+1. Users: create worker2 (worker role, cutting skill) + worker3 (worker role, NO cutting skill — isolation probe) + a `manager` role user (manager-bypass ≠ super_admin path). `/inventory/users` + Access Control hub.
+2. Cutting rate: set per-piece rate on 3-PATTI flow (`/production/products/<pk>/flow/`); optionally a role-rate override to validate the rate-source order (role_rate → stage rate).
+3. Sizes: add 2-3 ProductSizes for 3-PATTI (`/production/products/<pk>/sizes` editor) — without them the cutting schema renders degenerate.
+4. Rolls: bulk-add a few rolls (`/raw-materials/rolls/bulk-add/`) so layering can attach.
+5. OPTIONAL but recommended: insert `cutting_pattern` into the 3-PATTI flow via the flow editor (+ assign a pattern) — it is the ONLY stage exercising the stage-completion VERIFICATION GATE (R0 C3 semantics) and the reopen path; and insert `barcode_generation` to manually smoke the P4.2-relocated assembly/export/print/scan surfaces.
+
+### Q1 — validatable NOW with the real workflow (post-checklist):
+WorkerStageTask lifecycle (assign/report/complete/cancel-via-unassign) · assignment isolation (worker2 vs worker3 + URL probing) · draft→submit→locked · schema rendering across TWO real schemas through one renderer (layering=default qty-only vs cutting=color+size+qty) · expected_* freeze incl. rate-source + HALF_UP rounding · data-driven payability contrast (credits_workers False/True) · derived readiness + advance gates · multi-worker same-stage behavior (parity gate watches dual-write) · manager correction PATH (admin/shell — D6: no UI by design) · handler contracts for A/C archetypes (+B verification gate and E identification if step 5 done) · dashboard badge transitions · P4.2 smoke.
+
+### Q2 — NOT validatable until future stages/modules exist (by design, not gaps):
+`attributes` JSONB path (first machine/QC consumer) · `scan_policy`/`validate_scan` seam (future Barcode review) · free-standing D-archetype QC + F packing/dispatch · settlement consumption of contributions (V2-2) · advance-recovery + variance entry against real settlements · sub-stage parent FK · Missing/Alter lifecycles · real-device mobile ergonomics + true concurrency (deployment).
+
+### Q3 — risks that stay HIDDEN if validating only the current flow as-is:
+1. Empty-sizes degenerate form (fixed by checklist 3). 2. Single-worker blind spot — isolation + concurrent replace-draft races invisible (checklist 1). 3. Zero-rate blind spot — expected-earning math bugs invisible (checklist 2). 4. Verification-gate semantics unexercised without cutting_pattern in flow (checklist 5). 5. P4.2-relocated barcode surfaces untouched in-browser without barcode_generation (checklist 5). 6. Observation to confirm during validation: `complete_worker_task` freezes expected_* regardless of `credits_workers` (visibility on non-payable stages shows 0-rate lines) — expected per Option B, but verify it reads sanely on worker screens.
+
+### Q4 — seed tooling verdict: DEFERRED.
+Owner preference is right: real workflow first. The blocker isn't missing synthetic scenarios — it's incomplete real master data, and completing it MANUALLY through the existing admin UIs is itself validation coverage. `seed_validation_factory` only earns its keep if scenario RESETS become frequent (rule of thumb: automate after the 2nd-3rd manual reset). Revisit then.
