@@ -30,6 +30,8 @@ def ensure_worker_credit(stage_record) -> None:
     if not stage_is_payable(stage_record.workflow_stage):
         return
     # production -> expense: the declared one-way edge (lazy import).
+    # FUTURE-STAGE-REDESIGN: StageWorkAssignment is transitional — V2-2 settlement
+    # repoints earnings to settlement; revisit this SWA read then (ARCHITECTURE_V2 §11).
     from expense.models import StageWorkAssignment
     has_allocation = StageWorkAssignment.objects.filter(
         stage_record=stage_record, voided_at__isnull=True,

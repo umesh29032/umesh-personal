@@ -129,6 +129,8 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     # stage. The frozen manufacturing cost is cleared above; the worker ledger
     # credits must be voided too, else reopening leaves payable overstated.
     # Re-complete re-allocates. (production -> expense, the allowed one-way edge.)
+    # FUTURE-STAGE-REDESIGN: SWA is transitional — V2-2 settlement reshapes how reopen
+    # reverses earnings; revisit this SWA void then (see docs/ARCHITECTURE_V2.md §11).
     from expense.models import StageWorkAssignment
     from expense.services import void_allocation
     for assignment in list(

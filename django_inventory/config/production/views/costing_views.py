@@ -12,6 +12,9 @@ from django.views.generic import TemplateView
 
 from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.models import Adda, AddaStageRecord
+# FUTURE-STAGE-REDESIGN: StageWorkAssignment is transitional — V2-2 settlement
+# repoints worker earnings; this costing read moves to the settlement source then
+# (production->expense one-way edge; see docs/ARCHITECTURE_V2.md §11).
 from expense.models import StageWorkAssignment
 
 

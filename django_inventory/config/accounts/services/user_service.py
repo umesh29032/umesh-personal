@@ -100,6 +100,11 @@ def sync_user_skills(user) -> int:
     views + Django admin `save_related`). The cross-app write into production is
     now an explicit, greppable call here instead of a hidden signal.
     """
-    # Lazy import: production is a higher layer (Phase-5 formalizes the direction).
+    # P4.1: the ONE accounts->production edge, kept deliberately LAZY so the
+    # module-load graph stays acyclic (foundation-purity ast test passes). A full
+    # decouple is BLOCKED/low-value: the trigger is the User-management views AND
+    # `accounts.admin.save_related` (admin must live in accounts with the User model),
+    # so relocating to inventory would only move the violation or force a risky view/
+    # admin restructure. Kept as a single, explicit, greppable lazy call instead.
     from production.services import sync_layering_workers_for_skill
     return sync_layering_workers_for_skill(user)

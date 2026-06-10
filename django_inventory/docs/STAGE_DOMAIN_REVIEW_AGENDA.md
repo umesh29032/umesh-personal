@@ -46,7 +46,12 @@
 
 ## § Logged reminders (`# FUTURE-STAGE-REDESIGN:` markers added during remediation)
 > Appended as stage-coupled code is touched. `grep -rn "FUTURE-STAGE-REDESIGN" config` for the live set.
-- *(none yet — populated from Phase 6/8 onward)*
+- **SWA-transitional → V2-2 settlement (Phase 6, P2.7):** the `production → expense`
+  StageWorkAssignment reads are tagged at `stages/base/credit.py` (PAY-2 guard),
+  `services/_shared.py` (reopen void), `views/stage_views.py` (allocation UI),
+  `views/costing_views.py` (earnings column). When V2-2 (Adda settlement, Option B)
+  books earnings at settlement, repoint/retire these + break the production↔expense
+  cycle. See ARCHITECTURE_V2 §11 + V2_1_REVIEW.
 
 ## Checkpoint state at pause (2026-06-10)
 Branch `new_flask_app`, working tree clean, **389 tests green**. V2 commits this run:

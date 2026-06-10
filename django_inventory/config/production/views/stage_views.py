@@ -56,6 +56,9 @@ from production.services import (
     update_layering_roll_entry, upsert_breakup_row,
 )
 from raw_materials.models import ClothColor, ClothRoll
+# FUTURE-STAGE-REDESIGN: these expense imports are the SWA-transitional ALLOCATION
+# UI. V2-2 settlement (Option B) moves worker earnings to settlement — revisit/retire
+# this production->expense edge then (see docs/ARCHITECTURE_V2.md §11 + V2_1_REVIEW).
 from expense.models import StageWorkAssignment
 from expense.services import (
     allocate_stage_work, item_allocation_summary, void_allocation,
