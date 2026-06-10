@@ -36,9 +36,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.skills import (
-    SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
-)
+from accounts.skills import SKILL_CUTTING_MASTER_HELPER, user_has_skill
 from accounts.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
 from production.constants import STAGE_BARCODE_GENERATION, STAGE_CUTTING
 from production.models import (
@@ -55,13 +53,12 @@ logger = logging.getLogger(__name__)
 # ── Auth gates ─────────────────────────────────────────────────────────────
 
 def _ensure_barcode_skill(user):
-    """Generate barcodes — master or helper skill (mgmt bypass)."""
-    if user_has_role(user, MANAGEMENT_ROLES):
-        return
-    if not user_has_skill(user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]):
-        raise PermissionDenied(
-            "requires cutting_master or cutting_master_helper skill"
-        )
+    """Barcode-generation ACCESS gate — P3.1: data-driven via Stage.access_by_skill/
+    role (same policy as the view gate; management bypass built in). No hardcoded
+    skills here — a stage's access is config."""
+    from production.services.access_service import user_can_access_stage
+    if not user_can_access_stage(user, STAGE_BARCODE_GENERATION):
+        raise PermissionDenied("requires access to the barcode_generation stage")
 
 
 def _ensure_can_complete_barcode(user):

@@ -17,8 +17,9 @@ import logging
 
 from django.core.exceptions import PermissionDenied, ValidationError
 
-from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill
+from accounts.skills import SKILL_CUTTING_MASTER_HELPER, user_has_skill
 from accounts.services import MANAGEMENT_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role
+from production.constants import STAGE_LAYERING
 from production.models import Adda, AddaStageRecord
 
 logger = logging.getLogger(__name__)
@@ -46,11 +47,14 @@ def _ensure_assigned_worker(stage_record: AddaStageRecord, user):
 
 
 def _ensure_layering_skill(user):
-    """Cutting_master or cutting_master_helper required. Management bypass."""
-    if user_has_role(user, MANAGEMENT_ROLES):
-        return
-    if not user_has_skill(user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]):
-        raise PermissionDenied("requires cutting_master or cutting_master_helper skill")
+    """Layering stage ACCESS gate — P3.1: data-driven via Stage.access_by_skill/role
+    (the SAME policy the view gate uses, so view + mutation access stay consistent;
+    management bypass is built into user_can_access_stage). Adding/retuning a stage's
+    skills is now pure config — no edit here."""
+    # Lazy import: access_service is a sibling in production.services.
+    from production.services.access_service import user_can_access_stage
+    if not user_can_access_stage(user, STAGE_LAYERING):
+        raise PermissionDenied("requires access to the Layering stage")
 
 
 def _ensure_can_complete_layering(user):
