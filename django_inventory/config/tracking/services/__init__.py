@@ -1,6 +1,5 @@
 from .barcode_service import (
-    generate_for_cutting, generate_from_breakdown, get_or_create_piece,
-    mark_status, parse_value, qr_data_uri, resolve_value,
+    get_or_create_piece, mark_status, parse_value, qr_data_uri, resolve_value,
 )
 from .barcode_export_service import (
     content_type_for, filename_for, generate_csv, generate_pdf_summary,
@@ -8,8 +7,9 @@ from .barcode_export_service import (
 )
 from .history_service import log_roll, log_adda, log_product
 
+# P4.2: generate_for_cutting/generate_from_breakdown moved to
+# production.stages.barcode_generation.assembly (assembly = production concern).
 __all__ = [
-    'generate_for_cutting', 'generate_from_breakdown',
     'qr_data_uri', 'mark_status',
     'parse_value', 'resolve_value', 'get_or_create_piece',
     'log_roll', 'log_adda', 'log_product',

@@ -16,7 +16,7 @@ from .core import Product
 
 class CuttingRecord(TimeStampedModel):
     """Cutting stage ka typed record. `pieces_cut` save hote hi BatchBarcode rows
-    auto-generate hote hain (tracking.services.generate_for_cutting)."""
+    auto-generate hote hain (production.stages.barcode_generation.assembly.generate_for_cutting)."""
 
     stage_record = models.OneToOneField(
         AddaStageRecord, on_delete=models.CASCADE, related_name='cutting',

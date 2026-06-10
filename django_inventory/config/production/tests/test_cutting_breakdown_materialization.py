@@ -46,7 +46,7 @@ from production.services import (
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
 from tracking.models import BarcodeBatch, BarcodeExportBatch
-from tracking.services import generate_from_breakdown
+from production.stages.barcode_generation.assembly import generate_from_breakdown
 
 
 def _admin(email='ad@brk.test'):

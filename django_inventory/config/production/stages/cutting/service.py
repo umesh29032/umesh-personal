@@ -997,7 +997,7 @@ def complete_cutting_legacy(
     # barcode_generation stage in workflow get inline barcode generation.
     inline_barcodes = not _product_has_barcode_gen_stage(adda)
     if inline_barcodes:
-        from tracking.services import generate_for_cutting
+        from production.stages.barcode_generation.assembly import generate_for_cutting
         generate_for_cutting(cr)
 
     # Legacy compatibility path opts OUT of PAY-2 worker-credit enforcement
@@ -1115,7 +1115,7 @@ def complete_cutting_from_bundles(*, adda: Adda, user) -> CuttingRecord:
     # barcode_generation stage par generate karenge.
     inline_barcodes = not _product_has_barcode_gen_stage(adda)
     if inline_barcodes:
-        from tracking.services import generate_for_cutting
+        from production.stages.barcode_generation.assembly import generate_for_cutting
         generate_for_cutting(cr)
 
     advance_to_next_stage(adda, user)

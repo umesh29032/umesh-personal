@@ -234,7 +234,7 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
     Updates BarcodeGenerationRecord.total_barcodes + generated_at.
 
     Side effects:
-      • tracking.services.generate_from_breakdown → bulk_create BarcodeBatch rows (cross-app)
+      • barcode_generation.assembly.generate_from_breakdown → bulk_create tracking.BarcodeBatch rows (downward)
       • BarcodeGenerationRecord.total_barcodes + generated_at updated
       • tracking.services.log_adda → AddaHistory (BARCODES_GENERATED)
     """
@@ -257,7 +257,7 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
     if rec.generated_at is not None:
         raise ValidationError("Barcodes already generated for this Adda.")
 
-    from tracking.services import generate_from_breakdown
+    from production.stages.barcode_generation.assembly import generate_from_breakdown
     total = generate_from_breakdown(rec)
 
     rec.total_barcodes = total
