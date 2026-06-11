@@ -157,6 +157,14 @@ def void_allocation(assignment, *, user):
     assignment = StageWorkAssignment.objects.select_for_update().get(pk=assignment.pk)
     if assignment.voided_at is not None:
         raise ValidationError("Allocation is already voided.")
+    # V2-3 PR-A: settlement money is only ever mutated by adda_settlement_service.
+    # An era-B earning line (written at finalize) must be corrected through the
+    # settlement lifecycle, never voided piecemeal here.
+    if assignment.adda_settlement_id is not None:
+        raise ValidationError(
+            "This is a settlement earning line "
+            f"({assignment.adda_settlement.reference}) — reverse that settlement "
+            "instead (Adda Settlements screen).")
     credit = WorkerLedgerEntry.objects.filter(
         assignment=assignment,
         entry_type=WorkerLedgerEntry.EntryType.CREDIT,

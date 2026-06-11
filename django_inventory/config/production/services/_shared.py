@@ -111,6 +111,23 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     if sr.completed_at is None:
         raise ValidationError(f"{stage_label} is already open for edits.")
 
+    # V2-3 PR-A (D-V3.2): a settlement-credited stage cannot reopen. Production
+    # actions never perform hidden financial actions — settlement money moves
+    # ONLY through the settlement lifecycle (reverse / supersede), so the owner
+    # must reverse the settlement first, then reopen. (SR row is locked above;
+    # finalize locks the same rows, so this check cannot race a finalize.)
+    from expense.models import StageWorkAssignment as _SWA
+    settled_refs = sorted(set(
+        _SWA.objects.filter(stage_record=sr, voided_at__isnull=True,
+                            adda_settlement__isnull=False)
+        .values_list('adda_settlement__reference', flat=True)
+    ))
+    if settled_refs:
+        raise ValidationError(
+            f"{stage_label} earnings were settled by {', '.join(settled_refs)} — "
+            "reverse that settlement first (Adda Settlements screen), then reopen."
+        )
+
     if guard is not None:
         guard(adda, sr, wf)
 
@@ -125,16 +142,16 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     from production.services.cost_service import clear_stage_cost
     clear_stage_cost(sr)
 
-    # PAY-3: reopen also reverses the allocation-driven WORKER EARNINGS for this
-    # stage. The frozen manufacturing cost is cleared above; the worker ledger
-    # credits must be voided too, else reopening leaves payable overstated.
-    # Re-complete re-allocates. (production -> expense, the allowed one-way edge.)
-    # FUTURE-STAGE-REDESIGN: SWA is transitional — V2-2 settlement reshapes how reopen
-    # reverses earnings; revisit this SWA void then (see docs/ARCHITECTURE_V2.md §11).
-    from expense.models import StageWorkAssignment
+    # PAY-3 (narrowed V2-3 PR-A): reopen reverses the ALLOCATION-era worker
+    # earnings for this stage (era-A only — adda_settlement IS NULL). The frozen
+    # manufacturing cost is cleared above; era-A ledger credits must be voided
+    # too, else reopening leaves payable overstated. Re-complete re-allocates.
+    # Settlement-era (era-B) lines never reach here — the block above refuses
+    # reopen while any exist. (production -> expense, the allowed one-way edge.)
     from expense.services import void_allocation
     for assignment in list(
-        StageWorkAssignment.objects.filter(stage_record=sr, voided_at__isnull=True)
+        _SWA.objects.filter(stage_record=sr, voided_at__isnull=True,
+                            adda_settlement__isnull=True)
     ):
         void_allocation(assignment, user=user)
 

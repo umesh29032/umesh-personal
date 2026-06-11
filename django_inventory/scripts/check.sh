@@ -54,6 +54,19 @@ else
   echo "  ✗ stray settlement writes (route through adda_settlement_service):"; echo "$strays2"; fail=1
 fi
 
+# V2-3 PR-A (D-V3.4): SWA earning lines have exactly TWO writers — the legacy
+# allocation path (create + era-A void) and the settlement path (create at
+# finalize + void at reverse). Creation or voided_at writes anywhere else break
+# the "settlement money only moves through the settlement lifecycle" invariant.
+echo "[4c/4] StageWorkAssignment two-writer (V2-3: writes only in allocation_service + adda_settlement_service)"
+strays3=$(grep -rn "StageWorkAssignment.objects.create(\|\.voided_at = " config --include=*.py \
+  | grep -vE "allocation_service\.py|adda_settlement_service\.py" | grep -vE "/tests/|/migrations/")
+if [ -z "$strays3" ]; then
+  echo "  ✓ allocation_service + adda_settlement_service are the sole SWA writers"
+else
+  echo "  ✗ stray SWA writes (route through the two services):"; echo "$strays3"; fail=1
+fi
+
 echo ""
 echo "──────────── REPORT-ONLY (never fails the gate) ────────────"
 echo "[ruff] full-repo legacy (changed code is enforced blocking by pre-commit):"
