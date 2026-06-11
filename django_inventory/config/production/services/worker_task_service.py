@@ -201,8 +201,13 @@ def complete_worker_task(task, *, actor):
     if task.status == WorkerStageTask.Status.CANCELLED:
         raise ValidationError("Cannot complete a cancelled task.")
     ws = task.stage_record.workflow_stage
-    # Same rate source as allocation_service: per-role override, else the stage rate.
-    rate = cost_service.role_rate_for(ws, task.worker.role) or ws.cost_rate or Decimal('0')
+    # Same rate source as allocation_service: per-role override, else the stage
+    # rate. C-1 (ADR-0009): a grouped MEMBER stage freezes rate 0 outright —
+    # its labor is paid via the payer stage's grouped rate, never twice.
+    if ws.cost_billed_at_id is not None:
+        rate = Decimal('0')
+    else:
+        rate = cost_service.role_rate_for(ws, task.worker.role) or ws.cost_rate or Decimal('0')
     for c in task.contributions.all():
         c.expected_rate = rate
         c.expected_earning = (c.reported_quantity * rate).quantize(

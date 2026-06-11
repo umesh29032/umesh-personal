@@ -131,3 +131,20 @@ reference production.Product and never gain a direct Adda money-edge.**
 - [x] Owner locked 2026-06-11: indirect Order↔Adda via G5 inventory · revenue in
       commerce · profitability derived-never-stored · G5+G6+G7 in the gap
       registry · product-master rule effective now · MTO = MTS with zero dwell
+
+## Addendum — C-1 margin-formula amendment (2026-06-11, ADR-0009 companion)
+
+The locked margin formula is amended to close the non-payable-stage hole:
+
+> Adda production margin = output valuation − (ACTUAL settled labor
+> + material cost (G1) + variance valuation (G3)
+> **+ processing_cost of NON-payable priced stages** + future overhead).
+
+Without the bolded clause, flows containing priced `credits_workers=False`
+stages (outsourced/machine work — their cost exists ONLY as processing_cost)
+would overstate margin. Companion rule (ADR-0009): settled labor and
+processing_cost of PAYABLE stages are the same money — never both.
+
+Enforcement line (schema form of this ADR's boundary): production models never
+grow price/revenue fields; commerce references manufacturing identity only via
+the future G6 SKU entity (see ADR-0010 §5).

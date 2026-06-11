@@ -301,3 +301,53 @@ def assign_roll_to_adda(user, *, roll: ClothRoll, adda, weight_kg: Decimal, widt
         roll.roll_id, adda.code, weight_kg, width_inch, getattr(user, 'pk', None),
     )
     return roll
+
+
+@transaction.atomic
+def consume_leftover(user, *, leftover, adda, notes=''):
+    """C-1 (ADR-0009): the SOLE writer of leftover consumption — records that a
+    RemainingClothOfClothRoll piece was physically reused in another Adda.
+
+    Rules (locked):
+      • whole-piece only — partial use means weigh the new remainder as a CHILD
+        leftover row first, then consume this one;
+      • valued (for future G1 material costing) at the SOURCE roll's
+        cost_per_kg — never re-priced;
+      • append-only history: consumption is stamped, never deleted; a mistake
+        is corrected by a future un-consume event (not built; same lifecycle
+        family as settlement reversal).
+
+    No UI calls this yet — the write semantics exist BEFORE the data pattern
+    ossifies (off-book reuse is unrecoverable history).
+
+    Side effects: UPDATE production.RemainingClothOfClothRoll
+    (is_consumed/consumed_in_adda/consumed_at) under select_for_update.
+    """
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    from production.models import RemainingClothOfClothRoll
+
+    if not user_has_role(user, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can record leftover consumption.")
+    # Row lock so two concurrent consumes can't both pass the guard.
+    leftover = (RemainingClothOfClothRoll.objects.select_for_update()
+                .get(pk=leftover.pk))
+    if leftover.is_consumed:
+        raise ValidationError(
+            f"Leftover #{leftover.pk} was already consumed in "
+            f"{leftover.consumed_in_adda.code if leftover.consumed_in_adda_id else 'another Adda'}.")
+    if adda.pk == leftover.source_adda_id:
+        raise ValidationError(
+            "A leftover cannot be consumed by the Adda that produced it.")
+    leftover.is_consumed = True
+    leftover.consumed_in_adda = adda
+    leftover.consumed_at = timezone.now()
+    if notes:
+        leftover.notes = (leftover.notes + ' | ' + notes).strip(' |')[:255]
+    leftover.save(update_fields=['is_consumed', 'consumed_in_adda',
+                                 'consumed_at', 'notes', 'updated_at'])
+    logger.info(
+        "roll.consume_leftover leftover=%s roll=%s from=%s into=%s by=%s",
+        leftover.pk, leftover.roll_id, leftover.source_adda_id, adda.code,
+        user.pk,
+    )
+    return leftover

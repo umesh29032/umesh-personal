@@ -18,6 +18,16 @@ narrow update_fields lists naye columns ko silently drop na karein.
 
 Freeze site: `adda_service.advance_to_next_stage` (the one choke point every
 complete_* funnels through). Clear site: har `reopen_*`.
+
+C-1 / ADR-0009 — THE COST DUALITY (read before writing ANY cost report):
+processing_cost (standard cost: ws.cost_rate × handler quantity, role-
+independent) and settled worker earnings (actual pay: role-aware frozen rate ×
+reported/verified quantity, SWA + ledger) are TWO MEASUREMENTS OF THE SAME
+LABOR for credits_workers stages. NEVER add them. Full Adda cost = material
+(G1) + ACTUAL settled labor + processing_cost of NON-payable stages only
+(+ future overhead, era-stamped). Standard-vs-actual is a future VARIANCE
+report, never a sum. Per-Adda actual labor = Σ non-voided SWA snapshots (both
+eras) — never WSC.expected_*, never Σ AddaSettlement totals.
 """
 from __future__ import annotations
 
@@ -145,8 +155,16 @@ def clear_stage_cost(sr):
 
 def role_rate_for(workflow_stage, role):
     """Per-role rate override for a stage (Q7), or None to fall back to the
-    stage's binding cost_rate. Drives worker EARNING (allocation); the stage's
-    manufacturing processing_cost stays on ws.cost_rate (role-independent)."""
+    stage's binding cost_rate. Drives worker EARNING (allocation + the V2
+    expected-rate freeze); the stage's manufacturing processing_cost stays on
+    ws.cost_rate (role-independent).
+
+    C-1 (ADR-0009): a GROUPED MEMBER stage (cost_billed_at set) never yields a
+    role rate — the payer stage's grouped rate covers the whole group, so a
+    surviving WorkflowStageRoleRate row on a member must not become a second
+    payment at settlement. Member contributions freeze rate None → settle ₹0."""
+    if workflow_stage.cost_billed_at_id is not None:
+        return None
     if role is None:
         return None
     from production.models import WorkflowStageRoleRate

@@ -106,7 +106,8 @@ class ListViewQueryBaselineTest(TestCase):
 # Locked full-render baselines (3-Adda fixture; includes sidebar/menu overhead).
 # A silent move = a template/queryset N+1 regression — update CONSCIOUSLY.
 ADDA_LIST_QUERIES = 11
-COSTING_QUERIES = 9
+# 9→10 (C-1, conscious): +1 aggregate for the unpriced-rolls honest-NULL map.
+COSTING_QUERIES = 10
 
 
 class BulkSnapshotN1Test(TestCase):

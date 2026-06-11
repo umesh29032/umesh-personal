@@ -50,6 +50,14 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
                 completed_at__isnull=False, processing_cost__isnull=True,
             ).values('adda').annotate(n=Count('id'))
         }
+        # C-1 (ADR-0009 honest-NULL): consumed-but-UNPRICED rolls make an
+        # Adda's material costing incomplete — surfaced, never coerced to 0.
+        from raw_materials.models import ClothRoll
+        unpriced_rolls_map = {
+            r['adda']: r['n'] for r in
+            ClothRoll.objects.filter(adda__isnull=False, cost_per_kg__isnull=True)
+            .values('adda').annotate(n=Count('id'))
+        }
         earn_map = {
             r['stage_record__adda']: r['e'] for r in
             StageWorkAssignment.objects.filter(voided_at__isnull=True)
@@ -67,7 +75,9 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
                 'total_cost': cost,
                 'worker_earnings': earn_map.get(a.pk, 0),
                 'unpriced': unpriced_map.get(a.pk, 0),
+                'unpriced_rolls': unpriced_rolls_map.get(a.pk, 0),
             })
         ctx['rows'] = rows
         ctx['grand_cost'] = grand_cost
+        ctx['total_unpriced_rolls'] = sum(unpriced_rolls_map.values())
         return ctx

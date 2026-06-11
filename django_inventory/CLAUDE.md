@@ -17,7 +17,7 @@ Django 5.0 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 - [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) + [SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md) + [STAGE_COSTING_PLAN.md](docs/production/STAGE_COSTING_PLAN.md) — load when touching the `expense` app (earnings ledger, advances, settlement) or stage costing
 - [docs/production/RBAC.md](docs/production/RBAC.md) — roles/skills, Access Control hub, sidebar + URL enforcement
 - [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) — per-page contracts, flows
-- [docs/adr/](docs/adr/) — locked architecture decisions (ADRs) · [docs/archive/](docs/archive/) — superseded/dated docs (audits, build logs, shipped plans)
+- [docs/adr/](docs/adr/) — locked architecture decisions (ADRs; **0009 cost-truth + 0010 growth/identity = C-1 policy locks, read before any costing/commerce/multi-factory/barcode/rework design**) · [docs/archive/](docs/archive/) — superseded/dated docs (audits, build logs, shipped plans)
 
 ## Rules
 1. Terse. No greetings, no summaries unless asked.

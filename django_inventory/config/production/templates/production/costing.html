@@ -47,6 +47,14 @@
         </div>
     </div>
 
+    {% if total_unpriced_rolls %}
+    {% comment %}C-1 honest-NULL banner: unknown price ≠ zero — material costing
+    is INCOMPLETE until the accountant backfills these.{% endcomment %}
+    <div style="background:#fdeaea;border:1px solid #e8b4b4;border-radius:12px;padding:10px 16px;margin-bottom:14px;font-size:13px;color:#b03434;font-weight:600;">
+        ⚠ {{ total_unpriced_rolls }} consumed roll{{ total_unpriced_rolls|pluralize }} without a purchase price — material costing is incomplete for the affected Addas (unknown is never counted as ₹0).
+    </div>
+    {% endif %}
+
     <div class="card">
         <table>
             <thead>
@@ -72,7 +80,8 @@
                         <td class="num" data-label="Pieces">{{ r.pieces }}</td>
                         <td class="num" data-label="Mfg Cost">
                             <span class="cost">₹{{ r.total_cost|floatformat:2 }}</span>
-                            {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced</div>{% endif %}
+                            {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced stage{{ r.unpriced|pluralize }}</div>{% endif %}
+                            {% if r.unpriced_rolls %}<div class="unpriced">{{ r.unpriced_rolls }} unpriced roll{{ r.unpriced_rolls|pluralize }} — material cost incomplete</div>{% endif %}
                         </td>
                         <td class="num" data-label="Worker Earnings">₹{{ r.worker_earnings|floatformat:2 }}</td>
                     </tr>
