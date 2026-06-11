@@ -44,6 +44,16 @@ else
   echo "  ✗ stray task writes (route through worker_task_service):"; echo "$strays"; fail=1
 fi
 
+# V2-2: financial-event tables have exactly one writer (CLAUDE.md rule 5).
+echo "[4b/4] AddaSettlement single-writer (V2-2: no settlement writes outside adda_settlement_service)"
+strays2=$(grep -rn "AddaSettlement.objects.create(\|AddaSettlementItem.objects.create(" config --include=*.py \
+  | grep -v "adda_settlement_service.py" | grep -vE "/tests/|/migrations/")
+if [ -z "$strays2" ]; then
+  echo "  ✓ adda_settlement_service is the sole AddaSettlement/Item writer"
+else
+  echo "  ✗ stray settlement writes (route through adda_settlement_service):"; echo "$strays2"; fail=1
+fi
+
 echo ""
 echo "──────────── REPORT-ONLY (never fails the gate) ────────────"
 echo "[ruff] full-repo legacy (changed code is enforced blocking by pre-commit):"

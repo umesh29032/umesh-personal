@@ -253,6 +253,10 @@ class AddaHistory(AbstractHistoryEntry):
         BUNDLE_CREATED = 'bundle_created', 'Bundle Created'
         BARCODES_GENERATED = 'barcodes_generated', 'Barcodes Generated'
         EXPORTED = 'exported', 'Exported'
+        # V2-2: the financial closing events join the Adda timeline (Part 13).
+        SETTLEMENT_FINALIZED = 'settlement_finalized', 'Settlement Finalized'
+        SETTLEMENT_REVERSED = 'settlement_reversed', 'Settlement Reversed'
+        SETTLEMENT_SUPERSEDED = 'settlement_superseded', 'Settlement Superseded'
 
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='history',
