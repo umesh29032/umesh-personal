@@ -114,3 +114,48 @@ architectural defect. What remains between here and V2-1d is operational
 (deploy, onboard, soak, rehearse) plus a small UX-policy backlog (F4–F7), and the
 two watch-items above (silent-failure convention, dual-surface window length)
 are the things to keep eyes on during true soak.
+
+---
+
+## 9) BASELINE LOCKED + execution roadmap (owner sign-off 2026-06-11)
+
+Owner locked this checkpoint as the current architecture baseline. Sequencing
+only — nothing below redesigns, reopens, or proposes architecture.
+
+### Truly COMPLETE
+R0 reconciliation · R1 stage-domain locks (D-R1.1–10) · ADR-0007 · P2 worker
+report UI + badges · P4.2 cycle break (4 PRs) · parity gate [5/5] · validation
+scenarios 1–5 + full Adda cycle · F1 + F3/F8 fixes + migration 0034 · all
+fix-before-P3 items.
+
+### Operationally PENDING (the real path forward)
+| Step | What | Size | Exit criterion |
+|---|---|---|---|
+| 1. **PD** | Deploy-blocker PR: Redis `CACHES`, argon2-cffi + gunicorn in requirements, `SECURE_PROXY_SSL_HEADER`, prod media serving, stdout logging (+ Sentry DSN seam) | ~half day | clean deploy from requirements.txt works; rate limiter multi-process correct |
+| 2. **Deploy + ops basics** | Small host, .env provisioning, backup/restore REHEARSED once, smoke the golden path | ~a day | app live; restore drill done |
+| 3. **Onboard + TRUE soak** | Real workers run the §1 criteria on real Addas; findings → SOAK_TRACKER §2; parity after each cycle. (If managers need corrections mid-soak: shell path works; pulling F5's minimal admin forward is a soak-time owner call.) | calendar-driven | §1 boxes ticked with real-usage evidence |
+| 4. **Soak review signed** | Fill SOAK_TRACKER §4, owner signs | hours | the P3 gate document exists |
+| 5. **P3 / V2-1d** | Parity run → clone rehearsal (up→down→up) → drop M2M migration; A8 docstrings + F4 reopen-doc note ride this PR | ~a day + rehearsal | M2M gone; suite green; parity command retired or repurposed |
+| 6. **V2-2** | AddaSettlement build per locked §11 + ADR-0007 (cross-era double-credit guard, `LEDGER_CREDIT_AT_ALLOCATION` flag, reversal lifecycle — closes the reverse_settlement gap AND the dual-money-surface window) | the next big build | settlement-time crediting live |
+
+**Watch-item wiring:** the dual-surface window (checkpoint risk #1) is closed by
+step 6 — so V2-2 should follow V2-1d promptly once real usage starts; long gaps
+grow cohort A.
+
+### GATED (do not start before their gates)
+V2-1d ← signed soak review + clone rehearsal · V2-2 ← V2-1d · V2-3 ← V2-2 ·
+Missing/Alter modules ← V2-2 + R1 contracts · stage-taxonomy refactor (+ Phase 8
+stage_views split + elif removal) ← real new stages onboarding · Barcode/
+Traceability review ← first scan-capable stage.
+
+### Can safely WAIT (idle-fillers, owner-triaged fix-after-P3 or hygiene)
+F4 reopen-semantics doc note · F5 verified_quantity admin surface · F6 mgmt
+readiness panel · F7 assignable-pool unification (direction locked) · silent-
+failure UX convention (watch-item #2 — design it when F5/F6 land) · mypy ratchet ·
+raw_materials edge relocation · registry `clear()` hardening · coverage floor
+65→70 · ops runbook consolidation (natural companion to step 2).
+
+### Recommended order from today
+**PD → deploy → onboard/true-soak → sign review → V2-1d → V2-2.** Nothing else
+is on the critical path; everything in "can wait" slots into idle time without
+disturbing it.
