@@ -81,19 +81,19 @@
     }
 
     /* Worker checkbox grid */
-    .form-shell .workers-grid {
+    .form-shell .workers-grid, .workers-grid {
         display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 8px 10px;
     }
-    .form-shell .worker-chip {
+    .form-shell .worker-chip, .worker-chip {
         display:flex; align-items:center; gap:8px;
         padding: 9px 12px;
         background: var(--cream); border: 1.5px solid #cfc0aa; border-radius: 10px;
         cursor:pointer; font-size: 13px; transition: background 0.15s, border-color 0.15s;
     }
-    .form-shell .worker-chip:hover { border-color: var(--copper); }
-    .form-shell .worker-chip:has(input:checked) { background: rgba(184,115,51,0.10); border-color: var(--copper); }
-    .form-shell .worker-chip input { width: auto; padding: 0; margin: 0; box-shadow: none; border: none; }
+    .form-shell .worker-chip:hover, .worker-chip:hover { border-color: var(--copper); }
+    .form-shell .worker-chip:has(input:checked), .worker-chip:has(input:checked) { background: rgba(184,115,51,0.10); border-color: var(--copper); }
+    .form-shell .worker-chip input, .worker-chip input { width: auto; padding: 0; margin: 0; box-shadow: none; border: none; }
 
     .form-shell .sticky-actions {
         position: sticky; bottom: 14px; z-index: 5;

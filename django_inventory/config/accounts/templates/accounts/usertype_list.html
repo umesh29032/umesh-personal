@@ -2,7 +2,7 @@
 {% block title %}User Types{% endblock %}
 {% block page_title %}User Types{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+{% include 'shared/_datatables_vendor_css.html' %}
 {% endblock %}
 {% block content %}
 <div style="max-width:800px;margin:0 auto;">
@@ -52,7 +52,6 @@
 </div>
 {% endblock %}
 {% block extra_scripts %}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+{% include 'shared/_datatables_vendor_js.html' %}
 <script>$(function(){initFancyDataTable('#utypes-dt',{pageLength:25,itemName:'user types',searchPlaceholder:'Filter…'});});</script>
 {% endblock %}

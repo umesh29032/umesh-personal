@@ -283,7 +283,7 @@ Cutting master reviews + saves edits as the verified suggestion.
                                     <span class="bulk-add-hint">×{{ a.pieces_count }}/garment</span>
                                     {% endif %}
                                 </span>
-                                <input type="number" data-bulk-count="{{ a.pattern.id }}" value="" min="1" step="1" class="sf-input bulk-add-count" placeholder="pieces" disabled>
+                                <input type="number" inputmode="numeric" data-bulk-count="{{ a.pattern.id }}" value="" min="1" step="1" class="sf-input bulk-add-count" placeholder="pieces" disabled>
                             </label>
                         {% empty %}
                             <div style="color:var(--stone);font-style:italic;font-size:12px;">No patterns assigned to product.</div>
@@ -561,7 +561,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                             <td data-label="Color">{{ b.color.name }}</td>
                             <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
                             <td data-label="Take">
-                                <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                                <input type="number" inputmode="numeric" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
                             </td>
                         </tr>
                         {% endif %}
@@ -683,7 +683,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                                 <form method="post" action="{% url 'production:cutting-allocation-delete' adda.code r.pk %}" style="margin:0;" onsubmit="return confirm('Remove this allocation? Its earning is reversed.');">
                                     {% csrf_token %}
                                     {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                                    <button type="submit" class="btn btn-ghost" style="padding:2px 8px;font-size:12px;color:var(--danger);" title="Remove">×</button>
+                                    <button type="submit" class="btn btn-ghost" style="padding:2px 8px;font-size:12px;color:var(--danger);" title="Remove" aria-label="Remove allocation">×</button>
                                 </form>
                                 {% endif %}
                             </div>
@@ -698,7 +698,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                                         <option value="{{ w.pk }}">{{ w.get_full_name|default:w.email }}</option>
                                     {% endfor %}
                                 </select>
-                                <input type="number" name="allocated_quantity" min="1" max="{{ ai.remaining }}" value="{{ ai.remaining }}" required class="sf-input" style="max-width:80px;">
+                                <input type="number" inputmode="numeric" name="allocated_quantity" min="1" max="{{ ai.remaining }}" value="{{ ai.remaining }}" required class="sf-input" style="max-width:80px;">
                                 <input type="text" name="notes" placeholder="notes (optional)" class="sf-input" style="max-width:160px;">
                                 <button type="submit" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Allocate</button>
                             </form>
@@ -744,7 +744,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                                     <td data-label="Color">{{ b.color.name }}</td>
                                     <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
                                     <td data-label="Take">
-                                        <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                                        <input type="number" inputmode="numeric" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
                                     </td>
                                 </tr>
                                 {% endif %}

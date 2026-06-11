@@ -159,7 +159,7 @@ section header {
                         <div class="pricing-grid">
                             <div class="sf-field">
                                 <label class="sf-label">Price ₹ *</label>
-                                <input type="number" step="0.01" name="price" required
+                                <input type="number" inputmode="decimal" step="0.01" name="price" required
                                     value="{{ form.price.value|default:'' }}"
                                     class="sf-input" placeholder="149.00">
                                 {% if form.price.errors %}
@@ -168,7 +168,7 @@ section header {
                             </div>
                             <div class="sf-field">
                                 <label class="sf-label">Original Price ₹</label>
-                                <input type="number" step="0.01" name="original_price"
+                                <input type="number" inputmode="decimal" step="0.01" name="original_price"
                                     value="{{ form.original_price.value|default:'' }}"
                                     class="sf-input" placeholder="199.00 (strikethrough price)">
                                 <span class="sf-hint">Strikethrough MRP dikhega.</span>
@@ -220,7 +220,7 @@ section header {
                         <div class="pricing-grid">
                             <div class="sf-field">
                                 <label class="sf-label">Display Order</label>
-                                <input type="number" name="display_order"
+                                <input type="number" inputmode="numeric" name="display_order"
                                     value="{{ form.display_order.value|default:'0' }}"
                                     class="sf-input">
                                 <span class="sf-hint">Lower = shown first.</span>

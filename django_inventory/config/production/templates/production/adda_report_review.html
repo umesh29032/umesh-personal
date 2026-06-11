@@ -52,7 +52,7 @@
                     <span class="settled">settled by {{ c.settlement_line.adda_settlement.reference }} — reverse it to correct</span>
                 {% else %}
                     <label style="font-size:12px;color:var(--stone);">verified
-                        <input type="number" step="0.01" min="0" name="verified_{{ c.pk }}"
+                        <input type="number" inputmode="decimal" step="0.01" min="0" name="verified_{{ c.pk }}"
                                value="{{ c.verified_quantity|default_if_none:'' }}" placeholder="—">
                     </label>
                 {% endif %}

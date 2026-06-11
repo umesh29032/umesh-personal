@@ -434,10 +434,10 @@ allocation_sum = live sum of proportion_pct (red badge if != 100)
                             <td data-label="Proportion">
                                 <input type="hidden" name="size_id" value="{{ s.id }}">
                                 {% for a in allocations %}{% if a.size_id == s.id %}
-                                    <input type="number" name="proportion_pct" value="{{ a.proportion_pct }}" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
+                                    <input type="number" inputmode="numeric" name="proportion_pct" value="{{ a.proportion_pct }}" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
                                 {% endif %}{% endfor %}
                                 {% if s.id not in allocated_size_ids %}
-                                    <input type="number" name="proportion_pct" value="0" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
+                                    <input type="number" inputmode="numeric" name="proportion_pct" value="0" min="0" max="100" step="1" class="sf-input cp-pct-input" style="max-width:100px;">
                                 {% endif %}
                             </td>
                         </tr>

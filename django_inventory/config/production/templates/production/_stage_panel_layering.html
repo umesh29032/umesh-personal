@@ -146,7 +146,7 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
         <div><label class="sub" style="font-weight:700;">Type</label><select name="cloth_type" required><option value="">—</option>{% for t in cloth_types %}<option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
         <div><label class="sub" style="font-weight:700;">Colour</label><select name="cloth_color" required><option value="">—</option>{% for c in cloth_colors %}<option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
         <div><label class="sub" style="font-weight:700;">Width (in)</label><select name="width_inch" required><option value="">—</option>{% for w in width_choices %}<option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }}</option>{% endfor %}</select></div>
-        <div><label class="sub" style="font-weight:700;">Weight (kg)</label><input type="number" name="weight_kg" step="0.01" min="0.01" required placeholder="kg"></div>
+        <div><label class="sub" style="font-weight:700;">Weight (kg)</label><input type="number" inputmode="decimal" name="weight_kg" step="0.01" min="0.01" required placeholder="kg"></div>
         <div><label class="sub" style="font-weight:700;">Store</label><select name="storage_location" required><option value="">—</option>{% for loc in storage_locations %}<option value="{{ loc.pk }}">{{ loc.name }}</option>{% endfor %}</select></div>
       </div>
       <button type="submit" class="lybtn lybtn-primary" style="margin-top:10px;">Make + attach roll</button>

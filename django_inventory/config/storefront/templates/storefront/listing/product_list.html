@@ -4,7 +4,7 @@
 
 {% block extra_head %}
 <!-- DataTables CSS only — all overrides live in base.html now -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+{% include 'shared/_datatables_vendor_css.html' %}
 {% endblock %}
 
 {% block content %}
@@ -217,9 +217,7 @@
 
 {% block extra_scripts %}
 <!-- jQuery CDN — DataTables library ko jQuery chahiye kaam karne ke liye -->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
-<!-- DataTables JS CDN — table ko live search, column sort, aur pagination deta hai -->
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+{% include 'shared/_datatables_vendor_js.html' %}
 <script>
 $(document).ready(function () {
     // window.initFancyDataTable defined in base.html — DT init + DOM detach fix in one call

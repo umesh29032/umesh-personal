@@ -56,7 +56,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update_count">
                             <input type="hidden" name="assignment" value="{{ a.pk }}">
-                            <input type="number" name="pieces_count" value="{{ a.pieces_count }}" min="1" required>
+                            <input type="number" inputmode="numeric" name="pieces_count" value="{{ a.pieces_count }}" min="1" required>
                             <button type="submit" class="btn-mini">Save</button>
                         </form>
                     </td>
@@ -92,7 +92,7 @@
             </div>
             <div>
                 <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;">Pieces / Adda</label>
-                <input type="number" name="pieces_count" value="1" min="1" required>
+                <input type="number" inputmode="numeric" name="pieces_count" value="1" min="1" required>
             </div>
             <button type="submit" class="btn btn-primary">+ Add</button>
         </form>
