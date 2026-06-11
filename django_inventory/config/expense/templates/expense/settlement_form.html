@@ -5,15 +5,6 @@
 {% block extra_head %}
 <style>
     .settle { max-width: 720px; margin: 0 auto; }
-    .settle .hero-strip { background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%); color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px; }
-    .settle .hero-strip h1 { margin: 0; font-size: 20px; }
-    .settle .hero-strip p { margin: 4px 0 0; opacity: .9; font-size: 13px; }
-    .settle .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-    .settle .stat-card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px; }
-    .settle .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
-    .settle .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 6px; }
-    .settle .stat-card.payable .value { color: var(--copper); }
-    .settle .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px; }
     .settle .panel h2 { font-size: 14px; margin: 0 0 12px; }
     .settle table.adv { width: 100%; border-collapse: collapse; font-size: 13px; }
     .settle table.adv th, .settle table.adv td { padding: 9px 6px; border-bottom: 1px solid var(--border-subtle); text-align: left; }
@@ -30,7 +21,6 @@
     .settle .preview .row.total { border-top: 1px dashed var(--border-subtle); margin-top: 6px; padding-top: 8px; font-weight: 700; }
     .settle .preview .warn { color: #b91c1c; font-weight: 600; }
     .settle .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid var(--border-subtle); padding: 14px 0; display: flex; justify-content: flex-end; gap: 10px; }
-    .settle .btn-copper { background: var(--copper); color: #fff; border: none; padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; }
     .settle .btn-ghost { background: transparent; border: 1px solid var(--border-subtle); padding: 12px 18px; border-radius: 10px; text-decoration: none; color: var(--ink); }
     .settle .empty { color: var(--stone); font-style: italic; font-size: 13px; }
     @media (max-width: 640px) { .settle .stat-grid { grid-template-columns: 1fr; } }
@@ -39,7 +29,7 @@
 
 {% block content %}
 <div class="settle">
-    <div class="hero-strip">
+    <div class="hero-strip copper">
         <h1>Pay Worker</h1>
         <p>{{ viewed_worker.get_full_name|default:viewed_worker.email }} · cash payment against settled earnings. Advance recovery happens when the Adda is settled, not here.</p>
     </div>
