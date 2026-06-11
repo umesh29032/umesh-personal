@@ -267,3 +267,133 @@ class InvariantTests(_Base):
         self._contribute(self.w1, self.sr_pay, 10)
         with self.assertRaises(PermissionDenied):
             create_draft(adda=self.adda, user=self.w1)
+
+
+class ReversalLifecycleTests(_Base):
+    """PR-C: 'if an accountant makes a mistake today, what restores truth
+    tomorrow without editing history?'"""
+
+    def _settled_with_recovery(self):
+        self._contribute(self.w1, self.sr_pay, 50)        # 150 expected
+        adv = WorkerAdvance.objects.create(
+            worker=self.w1, amount=Decimal('2000'),
+            advance_date=timezone.now().date(), entered_by=self.mgmt)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt,
+                                 recoveries={adv.pk: Decimal('500')})
+        return s, adv
+
+    def test_reverse_restores_ledger_and_advance(self):
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        from expense.services import payroll_service
+        s, adv = self._settled_with_recovery()
+        self.assertEqual(ledger_service.worker_balance(self.w1), Decimal('-350.00'))
+        self.assertEqual(payroll_service.advance_outstanding(self.w1),
+                         Decimal('1500.00'))
+
+        reverse_adda_settlement(settlement=s, user=self.mgmt, notes='wrong qty')
+
+        s.refresh_from_db()
+        self.assertEqual(s.status, AddaSettlement.Status.REVERSED)
+        # Money truth restored — compensating rows, never edits:
+        self.assertEqual(ledger_service.worker_balance(self.w1), Decimal('0.00'))
+        self.assertEqual(payroll_service.advance_outstanding(self.w1),
+                         Decimal('2000.00'))
+        # Append-only proof: original rows still exist + reversal rows added.
+        self.assertEqual(WorkerLedgerEntry.objects.filter(
+            worker=self.w1).count(), 4)   # credit + recovery + 2 reversals
+        # Frozen snapshot untouched (audit of what was approved):
+        item = AddaSettlementItem.objects.get(adda_settlement=s)
+        self.assertEqual(item.expected_earning, Decimal('150.00'))
+        # SWA voided → guard re-armed → contribution settleable again:
+        c = WorkerStageContribution.objects.get(task__worker=self.w1)
+        self.assertIsNotNone(c.settlement_line.voided_at)
+        s2 = self._draft()
+        lines, skip_a, skip_b = preview_lines(s2)
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(skip_b, [])
+
+    def test_supersede_chain_and_resettle(self):
+        from expense.services.adda_settlement_service import (
+            finalize_adda_settlement as fin, reverse_adda_settlement)
+        task = self._contribute(self.w1, self.sr_pay, 50)
+        s1 = self._draft()
+        fin(settlement=s1, user=self.mgmt)
+        # correction: verified says 45 — reverse+supersede, fix, re-finalize
+        c = task.contributions.get()
+        old, successor = reverse_adda_settlement(
+            settlement=s1, user=self.mgmt, supersede=True, notes='verify 45')
+        self.assertEqual(old.status, AddaSettlement.Status.SUPERSEDED)
+        self.assertEqual(successor.supersedes_id, old.pk)
+        c.refresh_from_db()
+        c.verified_quantity = Decimal('45')
+        c.save(update_fields=['verified_quantity'])
+        fin(settlement=successor, user=self.mgmt)
+        successor.refresh_from_db()
+        self.assertEqual(successor.expected_total, Decimal('135.00'))
+        self.assertEqual(ledger_service.worker_balance(self.w1), Decimal('135.00'))
+        # provenance repointed to the NEW line; old line voided
+        c.refresh_from_db()
+        self.assertIsNone(c.settlement_line.voided_at)
+        self.assertEqual(c.settlement_line.adda_settlement_id, successor.pk)
+
+    def test_reverse_after_full_payment_goes_negative(self):
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        from expense.services.settlement_service import create_settlement
+        self._contribute(self.w1, self.sr_pay, 50)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        create_settlement(user=self.mgmt, worker=self.w1,
+                          amount_paid=Decimal('150'))      # cash out
+        self.assertEqual(ledger_service.worker_balance(self.w1), Decimal('0.00'))
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        # paid cash stands; earnings reversed → worker owes the factory:
+        self.assertEqual(ledger_service.worker_balance(self.w1),
+                         Decimal('-150.00'))
+        # payment guard: cannot pay against a negative balance
+        with self.assertRaises(ValidationError):
+            create_settlement(user=self.mgmt, worker=self.w1,
+                              amount_paid=Decimal('10'))
+
+    def test_mixed_era_reversal_never_touches_era_a(self):
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        # era-A credit for w2 (allocation path)
+        StageWorkAssignment.objects.create(
+            stage_record=self.sr_pay, worker=self.w2,
+            allocated_quantity=Decimal('45'),
+            earning_rate_snapshot=Decimal('3'),
+            earning_amount_snapshot=Decimal('135'),
+            entered_by=self.mgmt)
+        ledger_service.log_credit(
+            worker=self.w2, category='stage_earning', amount=Decimal('135'),
+            entry_date=timezone.now().date(), created_by=self.mgmt)
+        self._contribute(self.w1, self.sr_pay, 50)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        # w2's allocation-era money untouched by the era-B reversal:
+        self.assertEqual(ledger_service.worker_balance(self.w2), Decimal('135.00'))
+
+    def test_double_reverse_rejected_and_history_logged(self):
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        self._contribute(self.w1, self.sr_pay, 10)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        with self.assertRaises(ValidationError):
+            reverse_adda_settlement(settlement=s, user=self.mgmt)
+        self.assertTrue(AddaHistory.objects.filter(
+            adda=self.adda,
+            change_type=AddaHistory.ChangeType.SETTLEMENT_REVERSED).exists())
+
+    def test_payment_recovery_now_rejected(self):
+        from expense.services.settlement_service import create_settlement
+        self._contribute(self.w1, self.sr_pay, 50)
+        finalize_adda_settlement(settlement=self._draft(), user=self.mgmt)
+        adv = WorkerAdvance.objects.create(
+            worker=self.w1, amount=Decimal('100'),
+            advance_date=timezone.now().date(), entered_by=self.mgmt)
+        with self.assertRaises(ValidationError):
+            create_settlement(user=self.mgmt, worker=self.w1,
+                              amount_paid=Decimal('50'),
+                              recoveries=[{'advance': adv.id, 'amount': 10}])

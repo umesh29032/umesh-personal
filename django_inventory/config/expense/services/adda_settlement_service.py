@@ -99,7 +99,7 @@ def _settleable_lines(stage_records):
     era_a_pairs = set(
         StageWorkAssignment.objects
         .filter(stage_record_id__in=sr_ids, voided_at__isnull=True,
-                settled_contributions__isnull=True)
+                adda_settlement__isnull=True)      # STRUCTURAL era marker (PR-C)
         .values_list('worker_id', 'stage_record_id')
     )
     lines, skip_a, skip_b = [], [], []
@@ -247,6 +247,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
                 earning_rate_snapshot=rate,
                 earning_amount_snapshot=amount,
                 entered_by=user,
+                adda_settlement=settlement,        # structural era-B marker
                 notes=f"settled via {settlement.reference}",
             )
             # Part-13 provenance: exact per-row era-B guard from here on.
@@ -263,13 +264,14 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
 
         recovered = _ZERO
         for adv, amt in cleaned_recoveries.get(wid, []):
-            PayrollSettlementItem.objects.create(
-                adda_settlement=settlement, advance=adv, amount_recovered=amt)
-            ledger_service.log_debit(
+            debit = ledger_service.log_debit(
                 worker=worker, category='advance_recovery', amount=amt,
                 entry_date=when.date(), created_by=user, advance=adv,
                 notes=f"{settlement.reference} recovery adv#{adv.id}",
             )
+            PayrollSettlementItem.objects.create(
+                adda_settlement=settlement, advance=adv, amount_recovered=amt,
+                ledger_entry=debit)
             recovered += amt
 
         v = variance.get(wid) or variance.get(str(wid)) or {}
@@ -325,3 +327,101 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         settlement.reference, adda.code, len(workers), len(lines),
         len(skip_a), len(skip_b), expected_total)
     return settlement
+
+
+@transaction.atomic
+def reverse_adda_settlement(*, settlement, user, supersede=False, notes=''):
+    """Correction truth (§11.5, R0 C5): NEVER edit — reverse, then optionally
+    supersede. Restores tomorrow what a mistake booked today:
+
+      1. every STAGE_EARNING credit of this settlement (targets = its
+         earning_lines SWAs, structural) → compensating debit via
+         ledger_service.reverse_entry (entry_date copied — nets in-period);
+      2. every ADVANCE_RECOVERY debit (targets = its PayrollSettlementItems'
+         ledger_entry) → compensating credit; the PSI row is STAMPED
+         reversed_at (owner D-R: append-only, unsigned) so the advance
+         outstanding SUM restores instantly;
+      3. its SWA earning lines are soft-VOIDED (voided_at) — the era-B guard
+         re-arms, so a successor settlement may re-credit those contributions;
+      4. frozen AddaSettlementItems are NOT touched (the audit record of what
+         was approved); status → REVERSED (or SUPERSEDED) + stamps;
+      5. supersede=True additionally opens a fresh DRAFT with `supersedes`
+         pointing back — settle again correctly.
+      6. SETTLEMENT_REVERSED / SETTLEMENT_SUPERSEDED on the Adda timeline.
+
+    Returns (settlement, successor_draft_or_None).
+    """
+    from expense.models import WorkerLedgerEntry
+
+    _ensure_management(user)
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cur:
+            cur.execute('SELECT pg_advisory_xact_lock(%s)', [_REF_LOCK])
+
+    settlement = (AddaSettlement.objects.select_for_update()
+                  .get(pk=settlement.pk))
+    if settlement.status != AddaSettlement.Status.FINALIZED:
+        raise ValidationError(
+            f"Only a finalized settlement can be reversed (status: {settlement.status}).")
+
+    when = timezone.now()
+
+    # 1) earnings — exact structural target set.
+    swas = list(settlement.earning_lines.select_for_update())
+    credits = list(WorkerLedgerEntry.objects.filter(
+        assignment__in=swas, entry_type='credit', category='stage_earning'))
+    for entry in credits:
+        ledger_service.reverse_entry(
+            entry, actor=user,
+            notes=f"reverse {settlement.reference}: {notes}".strip(': '))
+
+    # 2) recoveries — restore advance outstanding (D-R stamp, never edit/sign).
+    psis = list(settlement.recovery_lines.select_for_update()
+                .filter(reversed_at__isnull=True))
+    for psi in psis:
+        if psi.ledger_entry_id:
+            ledger_service.reverse_entry(
+                psi.ledger_entry, actor=user,
+                notes=f"reverse {settlement.reference} recovery adv#{psi.advance_id}")
+        psi.reversed_at = when
+        psi.save(update_fields=['reversed_at', 'updated_at'])
+
+    # 3) void the earning lines — re-arms the double-credit guard.
+    for swa in swas:
+        swa.voided_at = when
+        swa.save(update_fields=['voided_at', 'updated_at'])
+
+    # 4) status + stamps (frozen items untouched).
+    successor = None
+    if supersede:
+        settlement.status = AddaSettlement.Status.SUPERSEDED
+    else:
+        settlement.status = AddaSettlement.Status.REVERSED
+    settlement.reversed_at = when
+    settlement.reversed_by = user
+    settlement.save(update_fields=['status', 'reversed_at', 'reversed_by',
+                                   'updated_at'])
+
+    # 5) successor draft.
+    if supersede:
+        successor = AddaSettlement.objects.create(
+            reference=_next_reference(), adda=settlement.adda,
+            supersedes=settlement,
+            notes=f"supersedes {settlement.reference}. {notes}".strip('. '))
+
+    # 6) timeline events.
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+    change = (AddaHistory.ChangeType.SETTLEMENT_SUPERSEDED if supersede
+              else AddaHistory.ChangeType.SETTLEMENT_REVERSED)
+    log_adda(settlement.adda, change, user, metadata={
+        'reference': settlement.reference,
+        'credits_reversed': len(credits),
+        'recoveries_reversed': len(psis),
+        'successor': successor.reference if successor else None,
+    })
+    logger.info(
+        "adda_settlement.reverse ref=%s supersede=%s credits=%s recoveries=%s "
+        "successor=%s", settlement.reference, supersede, len(credits),
+        len(psis), successor.reference if successor else None)
+    return settlement, successor

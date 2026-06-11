@@ -75,14 +75,20 @@ class ExpenseViewTests(TestCase):
 
         self.client.force_login(self.mgr)
         url = reverse('expense:settlement-create', args=[self.worker.pk])
+        # V2-2: posting a recovery at payment is refused (re-homed to the Adda
+        # settlement); the PR-D UI drops these inputs. Payment-only succeeds.
         resp = self.client.post(url, {
             'amount_paid': '15', 'method': 'cash', 'settlement_date': '', 'notes': '',
             f'recover_{adv.id}': '5',
         })
+        self.assertNotEqual(resp.status_code, 302)   # rejected, re-rendered with error
+        resp = self.client.post(url, {
+            'amount_paid': '15', 'method': 'cash', 'settlement_date': '', 'notes': '',
+        })
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(PayrollSettlement.objects.filter(worker=self.worker).exists())
-        self.assertEqual(worker_balance(self.worker), Decimal('0.00'))         # 20 − 15 − 5
-        self.assertEqual(advance_outstanding(self.worker), Decimal('3.00'))    # 8 − 5
+        self.assertEqual(worker_balance(self.worker), Decimal('5.00'))         # 20 − 15 (payment only)
+        self.assertEqual(advance_outstanding(self.worker), Decimal('8.00'))    # untouched at payment (V2-2)
 
     def test_manager_edits_worker_profile(self):
         self.client.force_login(self.mgr)

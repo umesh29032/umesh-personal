@@ -51,6 +51,14 @@ class StageWorkAssignment(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name='work_assignments',
     )
+    # V2-2 PR-C: settlement-era SWAs link to their AddaSettlement (era-A
+    # allocation rows stay NULL — the era distinction is STRUCTURAL, not
+    # inferred). Also the reversal path's exact target set. String would be
+    # circular here; lazy ref by name is fine inside one app.
+    adda_settlement = models.ForeignKey(
+        'expense.AddaSettlement', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='earning_lines',
+    )
     # Work dimensions — nullable so coarse stages (stitching/finishing) can
     # allocate at whatever grain they need. Cutting allocates at bundle level.
     bundle = models.ForeignKey(
@@ -335,6 +343,15 @@ class PayrollSettlementItem(TimeStampedModel):
         WorkerAdvance, on_delete=models.PROTECT, related_name='recoveries',
     )
     amount_recovered = models.DecimalField(max_digits=12, decimal_places=2)
+    # V2-2 PR-C (owner D-R): reversal never edits/signs rows — a reversed
+    # recovery line is STAMPED and excluded from the outstanding SUM.
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    # The ADVANCE_RECOVERY debit this line booked (reversal target). On the
+    # PSI side so the ledger schema stays untouched (§11.4 promise).
+    ledger_entry = models.ForeignKey(
+        'expense.WorkerLedgerEntry', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         indexes = [models.Index(fields=['advance'])]

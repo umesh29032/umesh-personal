@@ -79,6 +79,13 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
     """
     _ensure_management(user)
 
+    # V2-2 (Model A, §11.2): advance recovery RE-HOMED to the AddaSettlement
+    # finalize. This event is PAYMENT-ONLY now — cash debit, nothing else.
+    if recoveries:
+        raise ValidationError(
+            "Advance recovery now happens at Adda settlement (finalize), not at "
+            "payment. Settle the Adda first; pay cash here afterwards.")
+
     # Serialize settlement-reference allocation across ALL workers. _next_reference
     # reads the global max reference with an UNLOCKED select; the per-worker
     # WorkerProfile lock below does NOT serialize two settlements for *different*

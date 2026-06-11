@@ -27,7 +27,8 @@ _EARNING_CATS = (_CAT.STAGE_EARNING, _CAT.PRODUCTION_EARNING)
 def advance_remaining(advance: WorkerAdvance) -> Decimal:
     """How much of one advance is still outstanding = amount − Σ recovered."""
     recovered = (
-        PayrollSettlementItem.objects.filter(advance=advance)
+        PayrollSettlementItem.objects.filter(advance=advance,
+                                             reversed_at__isnull=True)
         .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO
     )
     return advance.amount - recovered
@@ -40,7 +41,8 @@ def advance_outstanding(worker) -> Decimal:
         .aggregate(s=Sum('amount'))['s'] or _ZERO
     )
     recovered = (
-        PayrollSettlementItem.objects.filter(advance__worker=worker)
+        PayrollSettlementItem.objects.filter(advance__worker=worker,
+                                             reversed_at__isnull=True)
         .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO
     )
     return given - recovered
