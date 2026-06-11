@@ -10,7 +10,7 @@ from decimal import Decimal
 from django.apps import apps as django_apps
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User
@@ -209,13 +209,8 @@ class DualWriteChokepointTest(TestCase):
         t = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w1)
         self.assertEqual(t.status, WorkerStageTask.Status.COMPLETED)
 
-    @override_settings(WORKER_TASK_DUAL_WRITE=False)
-    def test_flag_off_writes_no_tasks(self):
-        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
-        add_stage_worker(self.sr, self.w3)
-        self.assertEqual(WorkerStageTask.objects.filter(stage_record=self.sr).count(), 0)
-        # M2M still updated (authoritative) even with dual-write off.
-        self.assertEqual(_m2m_workers(self.sr), {self.w1.pk, self.w2.pk, self.w3.pk})
+    # (V2-1d Step 0) the WORKER_TASK_DUAL_WRITE kill-switch test retired with the
+    # mechanism it characterized: task writes are unconditional now.
 
 
 class ReadHelpersTest(TestCase):

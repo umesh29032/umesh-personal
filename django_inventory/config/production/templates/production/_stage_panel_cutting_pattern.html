@@ -52,7 +52,7 @@ neeche Section 04 me already render hota hai (full thumbnails).
         <div><span class="lbl">Photos Uploaded</span><span class="val">{{ photos|length }}</span></div>
         <div><span class="lbl">Video</span><span class="val">{% if record.video %}✓ Yes{% else %}—{% endif %}</span></div>
         <div><span class="lbl">Sizes Locked</span><span class="val">{{ allocations|length }}</span></div>
-        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.active_workers|length }}</span></div>
     </div>
     {% if record.notes %}<div class="cp-summary-notes">{{ record.notes }}</div>{% endif %}
 </div>

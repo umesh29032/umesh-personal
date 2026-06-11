@@ -2,7 +2,7 @@
 
 EVERY write to `AddaStageRecord.workers` routes through here. In V2-1a the M2M
 stays the AUTHORITATIVE source of truth; we ALSO maintain `WorkerStageTask` in
-lockstep (behind the `WORKER_TASK_DUAL_WRITE` flag) so V2-1b can flip readers to
+lockstep — V2-1d Step 0: task writes are UNCONDITIONAL (tasks = the always-written store); readers moved to
 Task with zero drift.
 
 Reconcile rule: add missing workers as an ACTIVE task; CANCEL tasks whose worker
@@ -21,16 +21,11 @@ lock-free (the skill-sync retro-tag path is not atomic).
 import logging
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
-
-
-def _dual_write_enabled() -> bool:
-    return getattr(settings, 'WORKER_TASK_DUAL_WRITE', True)
 
 
 def _seed_status(stage_record) -> str:
@@ -57,8 +52,6 @@ def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
     """
     target = {int(getattr(w, 'pk', w)) for w in (worker_ids or [])}
     stage_record.workers.set(list(target))          # M2M = source of truth in V2-1a
-    if not _dual_write_enabled():
-        return
     from production.models import WorkerStageTask
     # Lock active tasks for this stage_record (caller is atomic). The partial
     # unique (one active per sr+worker) is the final race backstop.
@@ -115,8 +108,6 @@ def add_stage_worker(stage_record, worker):
     cancel others. Used by the layering skill-sync retro-tag (non-atomic)."""
     wid = int(getattr(worker, 'pk', worker))
     stage_record.workers.add(wid)
-    if not _dual_write_enabled():
-        return
     from production.models import WorkerStageTask
     # Re-activate by creating a fresh active task if none exists (a prior cancelled
     # task does not block — partial unique excludes cancelled).
