@@ -23,6 +23,20 @@ Component vocabulary for templates. All CSS lives in `config/accounts/templates/
 | `.page-header-text h1` | Page title (26px serif) |
 | `.page-header-text p` | Page subtitle (smoke color) |
 
+## Money-family vocabulary (A-scope 2026-06-12) — REFERENCE for G4 / MissingPiece / Alter UIs
+
+The settlement/payroll screens are the reference implementations. Every future
+money or list+detail UI composes THESE classes from base.html — do not redefine.
+
+| Class | Purpose | Notes |
+|---|---|---|
+| `.hero-strip.copper` | Money-screen page hero (copper gradient, h1 20px) | Plain `.hero-strip` = the navy default. Page may add a flex modifier for hero actions/totals |
+| `.panel` | Content card: card-bg, radius 14, shadow, padding 16, mb 18 | Page modifiers only for real needs (e.g. `padding:16px 0 4px` table-bleed) |
+| `.stat-grid` / `.stat-card` | KPI cards (label uppercase 11px / value 22px; `.payable` → copper value) | auto-fit minmax(140px); 2-col on ≤560px |
+| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included |
+| `.btn-copper` / `.btn-ghost` / `.btn-danger` (standalone, WITHOUT `.btn`) | Money-screen buttons: radius 10, font 13/700, 40px min-height | `:not(.btn)` shapes — combining with `.btn` keeps the classic 6px-radius system instead |
+| stacked table (`.table-responsive` + `td[data-label]`) | THE responsive-table standard for all future lists | thead hidden ≤ breakpoint; label:value rows; F1 fix guarantees width |
+
 ## Cards & panels
 
 | Class | Purpose | When |
