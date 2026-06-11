@@ -60,6 +60,25 @@ def allocate_stage_work(*, user, stage_record, worker, allocated_quantity,
     """
     _ensure_management(user)
 
+    # V2-2 cutover lever (ADR-0007): with the flag OFF, earnings book ONLY at
+    # Adda settlement — the allocation-credit path refuses outright.
+    from django.conf import settings as dj_settings
+    if not getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', True):
+        raise ValidationError(
+            "Allocation-time crediting is disabled — earnings now book at Adda "
+            "settlement (finalize). Use the Adda Settlements screen.")
+
+    # Symmetric double-credit guard (ADR-0007, both directions from day one):
+    # if this worker-stage already has a non-voided SETTLEMENT earning line,
+    # allocating it again would double-credit — refuse regardless of the flag.
+    from expense.models import StageWorkAssignment as _SWA
+    if _SWA.objects.filter(stage_record=stage_record, worker=worker,
+                           voided_at__isnull=True,
+                           adda_settlement__isnull=False).exists():
+        raise ValidationError(
+            "This worker's work on this stage was already credited by an Adda "
+            "settlement — reverse that settlement before allocating.")
+
     ws = stage_record.workflow_stage
     if ws.cost_billed_at_id is not None:
         raise ValidationError(

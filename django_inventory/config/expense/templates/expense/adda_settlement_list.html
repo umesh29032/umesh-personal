@@ -1,0 +1,122 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Adda Settlements{% endblock %}
+
+{% block extra_head %}
+<style>
+    .adst-list .hero-strip {
+        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
+        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
+    }
+    .adst-list .hero-strip h1 { margin: 0; font-size: 20px; }
+    .adst-list .hero-strip p { margin: 6px 0 0; font-size: 13px; opacity: .9; }
+    .adst-list .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 16px 0 4px; margin-bottom: 18px; }
+    .adst-list .panel h2 { margin: 0 16px 10px; font-size: 15px; }
+    .adst-list table { width: 100%; border-collapse: collapse; }
+    .adst-list th, .adst-list td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
+    .adst-list th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
+    .adst-list td.num, .adst-list th.num { text-align: right; }
+    .adst-list tr:last-child td { border-bottom: none; }
+    .adst-list .empty { padding: 16px; color: var(--stone); font-style: italic; }
+    .adst-list a.ref { color: var(--copper); font-weight: 600; text-decoration: none; }
+    .adst-list .btn-copper { background: var(--copper); color: #fff; border: none; padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .adst-list .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .adst-list .pill.draft      { background: #fdf3e3; color: #9a6a1b; }
+    .adst-list .pill.finalized  { background: #e7f4ea; color: #1f7a3d; }
+    .adst-list .pill.reversed   { background: #fdeaea; color: #b03434; }
+    .adst-list .pill.superseded { background: #ececf4; color: #55557e; }
+    .adst-list .skipnote { color: var(--stone); font-size: 11px; }
+    @media (max-width: 640px) {
+        .adst-list thead { display: none; }
+        .adst-list tr { display: block; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+        .adst-list td { display: flex; justify-content: space-between; border: none; padding: 5px 16px; }
+        .adst-list td::before { content: attr(data-label); color: var(--stone); font-size: 11px; text-transform: uppercase; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="adst-list">
+    <div class="hero-strip">
+        <h1>Adda Settlements</h1>
+        <p>Settle an Adda to book worker earnings and recover advances. Cash payment is a separate step on each worker's page.</p>
+    </div>
+
+    <div class="panel">
+        <h2>Ready to settle</h2>
+        {% if queue.ready %}
+        <table>
+            <thead><tr><th>Adda</th><th>Product</th><th class="num">Workers</th><th class="num">Lines</th><th class="num">Expected ₹</th><th></th></tr></thead>
+            <tbody>
+            {% for r in queue.ready %}
+                <tr>
+                    <td data-label="Adda">{{ r.adda.code }}
+                        {% if r.skipped_era_a or r.skipped_era_b %}
+                            <div class="skipnote">{% if r.skipped_era_a %}{{ r.skipped_era_a }} line(s) already credited at allocation (legacy){% endif %}{% if r.skipped_era_a and r.skipped_era_b %} · {% endif %}{% if r.skipped_era_b %}{{ r.skipped_era_b }} line(s) settled earlier{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td data-label="Product">{{ r.adda.product.name }}</td>
+                    <td class="num" data-label="Workers">{{ r.workers }}</td>
+                    <td class="num" data-label="Lines">{{ r.lines }}</td>
+                    <td class="num" data-label="Expected">₹{{ r.expected|floatformat:2 }}</td>
+                    <td data-label="Action">
+                        {% if r.draft %}
+                            <a class="ref" href="{% url 'expense:adda-settlement-detail' r.draft.reference %}">Open draft {{ r.draft.reference }}</a>
+                        {% else %}
+                            <form method="post" action="{% url 'expense:adda-settlement-start' r.adda.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-copper">Start settlement</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="empty">Nothing pending — every completed payable Adda is settled.</div>
+        {% endif %}
+    </div>
+
+    {% if queue.waiting %}
+    <div class="panel">
+        <h2>Waiting on production <span class="skipnote">— payable stage(s) not completed yet</span></h2>
+        <table>
+            <thead><tr><th>Adda</th><th>Product</th><th>Blocked by</th></tr></thead>
+            <tbody>
+            {% for w in queue.waiting %}
+                <tr>
+                    <td data-label="Adda">{{ w.adda.code }}</td>
+                    <td data-label="Product">{{ w.adda.product.name }}</td>
+                    <td data-label="Blocked by">{{ w.incomplete|join:", " }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <h2>Settlement history</h2>
+        {% if settlements %}
+        <table>
+            <thead><tr><th>Reference</th><th>Adda</th><th>Status</th><th class="num">Expected ₹</th><th>Settled</th><th>Chain</th></tr></thead>
+            <tbody>
+            {% for s in settlements %}
+                <tr>
+                    <td data-label="Reference"><a class="ref" href="{% url 'expense:adda-settlement-detail' s.reference %}">{{ s.reference }}</a></td>
+                    <td data-label="Adda">{{ s.adda.code }}</td>
+                    <td data-label="Status"><span class="pill {{ s.status }}">{{ s.get_status_display }}</span></td>
+                    <td class="num" data-label="Expected">{% if s.status == 'draft' %}—{% else %}₹{{ s.expected_total|floatformat:2 }}{% endif %}</td>
+                    <td data-label="Settled">{{ s.settled_at|date:"d M Y H:i"|default:"—" }}</td>
+                    <td data-label="Chain">{% if s.supersedes %}replaces {{ s.supersedes.reference }}{% else %}—{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="empty">No settlements yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -314,6 +314,10 @@ SIDEBAR: tuple[MenuSection, ...] = (
         items=(
             MenuItem('Payroll', 'expense:payroll-overview', match=('expense/payroll',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
+            # V2-2: the earning+recovery event screens (settlement ≠ payment).
+            MenuItem('Adda Settlements', 'expense:adda-settlement-list',
+                     match=('expense/settlements',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Record Advance', 'expense:advance-add', match=('expense/advances',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
         ),

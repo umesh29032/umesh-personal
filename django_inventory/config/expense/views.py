@@ -209,25 +209,21 @@ class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form))
 
-        # Parse the dynamic per-advance recovery inputs: recover_<advanceId>.
-        recoveries = []
-        for adv in outstanding_advances(worker):
-            raw = request.POST.get(f"recover_{adv['advance'].id}", '').strip()
-            if not raw:
-                continue
-            try:
-                amt = Decimal(raw)
-            except (InvalidOperation, ValueError):
-                messages.error(request, f"Invalid recovery amount for advance #{adv['advance'].id}.")
-                return self.render_to_response(self.get_context_data(form=form))
-            if amt > 0:
-                recoveries.append({'advance': adv['advance'].id, 'amount': amt})
+        # V2-2: recovery RE-HOMED to AddaSettlement.finalize — this screen is
+        # PAYMENT-ONLY. Stray recover_* inputs (stale tab) are refused loudly.
+        if any(k.startswith('recover_') and str(v).strip()
+               for k, v in request.POST.items()):
+            messages.error(
+                request,
+                "Advance recovery now happens when you settle the Adda — this "
+                "screen only pays cash. Settle the Adda first.")
+            return self.render_to_response(self.get_context_data(form=form))
 
         cd = form.cleaned_data
         try:
             settlement = create_settlement(
                 user=request.user, worker=worker, amount_paid=cd['amount_paid'],
-                recoveries=recoveries, settlement_date=cd.get('settlement_date'),
+                settlement_date=cd.get('settlement_date'),
                 method=cd['method'], notes=cd.get('notes', ''),
             )
         except (ValidationError, PermissionDenied) as exc:
@@ -235,8 +231,7 @@ class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             return self.render_to_response(self.get_context_data(form=form))
         messages.success(
             request,
-            f"Settlement {settlement.reference}: paid ₹{settlement.amount_paid}, "
-            f"advance recovered ₹{settlement.advance_deducted}.")
+            f"Payment {settlement.reference}: paid ₹{settlement.amount_paid}.")
         return redirect(reverse('expense:worker-detail', args=[worker.pk]))
 
 
@@ -263,3 +258,177 @@ class WorkerProfileEditView(LoginRequiredMixin, _ManagementOnly, FormView):
         form.save()
         messages.success(self.request, "Worker profile saved.")
         return redirect(reverse('expense:worker-detail', args=[self._worker().pk]))
+
+
+# ─── V2-2 PR-D: Adda Settlement screens (management-only) ────────────────────
+# All writes go through adda_settlement_service (single-writer); these views
+# only parse POST inputs and render service output.
+
+class AddaSettlementListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Pending queue (ready / waiting Addas) + settlement history."""
+    template_name = 'expense/adda_settlement_list.html'
+
+    def get_context_data(self, **kwargs):
+        from expense.models import AddaSettlement
+        from expense.services import adda_settlement_service as adst
+        ctx = super().get_context_data(**kwargs)
+        ctx['queue'] = adst.settlement_queue()
+        ctx['settlements'] = (
+            AddaSettlement.objects
+            .select_related('adda', 'settled_by', 'supersedes')
+            .order_by('-id')[:50])
+        return ctx
+
+
+class AddaSettlementStartView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """POST-only: open (or resume) the draft for one Adda."""
+
+    def post(self, request, adda_pk):
+        from production.models import Adda
+        from expense.models import AddaSettlement
+        from expense.services import adda_settlement_service as adst
+        adda = get_object_or_404(Adda, pk=adda_pk)
+        existing = AddaSettlement.objects.filter(
+            adda=adda, status=AddaSettlement.Status.DRAFT).first()
+        if existing:
+            messages.info(request, f"Resuming open draft {existing.reference}.")
+            return redirect(reverse('expense:adda-settlement-detail',
+                                    args=[existing.reference]))
+        try:
+            settlement = adst.create_draft(adda=adda, user=request.user)
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+            return redirect(reverse('expense:adda-settlement-list'))
+        messages.success(request, f"Draft {settlement.reference} opened for {adda.code}.")
+        return redirect(reverse('expense:adda-settlement-detail',
+                                args=[settlement.reference]))
+
+
+class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Draft: labeled preview (settleable / era-A skipped / era-B skipped) +
+    variance + per-advance recovery inputs + Finalize/Discard. Finalized:
+    frozen snapshot + Reverse / Reverse&Supersede. Reversed/Superseded:
+    read-only snapshot + chain links."""
+    template_name = 'expense/adda_settlement_detail.html'
+
+    def _settlement(self):
+        from expense.models import AddaSettlement
+        return get_object_or_404(
+            AddaSettlement.objects.select_related(
+                'adda__product', 'settled_by', 'reversed_by', 'supersedes'),
+            reference=self.kwargs['reference'])
+
+    @staticmethod
+    def _line_dict(c):
+        qty = c.verified_quantity if c.verified_quantity is not None else c.reported_quantity
+        rate = c.expected_rate or _ZERO
+        return {
+            'contribution': c,
+            'stage': c.task.stage_record.workflow_stage.stage.name,
+            'color': c.color, 'size': c.size,
+            'qty': qty, 'verified': c.verified_quantity is not None,
+            'rate': rate, 'amount': (qty * rate).quantize(Decimal('0.01')),
+        }
+
+    def _chain(self, settlement):
+        """Ordered supersede chain (oldest → newest) around this settlement."""
+        first = settlement
+        while first.supersedes_id:
+            first = first.supersedes
+        chain, node = [], first
+        while node:
+            chain.append(node)
+            node = node.superseded_by.first()
+        return chain if len(chain) > 1 else []
+
+    def get_context_data(self, **kwargs):
+        from expense.models import AddaSettlement
+        from expense.services import adda_settlement_service as adst
+        ctx = super().get_context_data(**kwargs)
+        s = ctx['s'] = self._settlement()
+        ctx['chain'] = self._chain(s)
+        if s.status == AddaSettlement.Status.DRAFT:
+            lines, skip_a, skip_b = adst.preview_lines(s)
+            by_worker = {}
+            for c in lines:
+                w = by_worker.setdefault(c.task.worker_id, {
+                    'worker': c.task.worker, 'lines': [], 'expected': _ZERO})
+                d = self._line_dict(c)
+                w['lines'].append(d)
+                w['expected'] += d['amount']
+            for w in by_worker.values():
+                w['advances'] = outstanding_advances(w['worker'])
+            ctx['workers'] = sorted(by_worker.values(),
+                                    key=lambda w: w['worker'].pk)
+            ctx['grand_expected'] = sum(
+                (w['expected'] for w in by_worker.values()), _ZERO)
+            ctx['skip_a'] = [self._line_dict(c) for c in skip_a]
+            ctx['skip_b'] = [self._line_dict(c) for c in skip_b]
+        else:
+            ctx['items'] = s.items.select_related('worker').order_by('worker_id')
+            ctx['recoveries'] = (s.recovery_lines
+                                 .select_related('advance', 'advance__worker')
+                                 .order_by('id'))
+        return ctx
+
+    # ── POST actions: finalize / reverse / supersede / discard ──────────────
+    def post(self, request, *args, **kwargs):
+        from expense.services import adda_settlement_service as adst
+        s = self._settlement()
+        action = request.POST.get('action', '')
+        try:
+            if action == 'finalize':
+                variance, recoveries = self._parse_finalize_inputs(request)
+                adst.finalize_adda_settlement(
+                    settlement=s, user=request.user,
+                    variance=variance, recoveries=recoveries)
+                messages.success(request, f"{s.reference} finalized — earnings booked.")
+            elif action in ('reverse', 'supersede'):
+                notes = request.POST.get('notes', '').strip()
+                _, successor = adst.reverse_adda_settlement(
+                    settlement=s, user=request.user,
+                    supersede=(action == 'supersede'), notes=notes)
+                if successor:
+                    messages.success(
+                        request,
+                        f"{s.reference} superseded — continue in draft {successor.reference}.")
+                    return redirect(reverse('expense:adda-settlement-detail',
+                                            args=[successor.reference]))
+                messages.success(request, f"{s.reference} reversed — ledger restored.")
+            elif action == 'discard':
+                adst.discard_draft(settlement=s, user=request.user)
+                messages.success(request, f"Draft {s.reference} discarded.")
+                return redirect(reverse('expense:adda-settlement-list'))
+            else:
+                messages.error(request, "Unknown action.")
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+        return redirect(reverse('expense:adda-settlement-detail', args=[s.reference]))
+
+    @staticmethod
+    def _parse_finalize_inputs(request):
+        """variance: var_<workerId>_<field> (ints); recoveries: recover_<advId>
+        (decimals). Blank/zero inputs are simply omitted."""
+        variance, recoveries = {}, {}
+        for key, raw in request.POST.items():
+            raw = raw.strip()
+            if not raw:
+                continue
+            if key.startswith('var_'):
+                try:
+                    _, wid, field = key.split('_', 2)
+                    val = int(raw)
+                except ValueError:
+                    raise ValidationError(f"Invalid variance value for {key}.")
+                if field not in ('packed', 'missing', 'rejected', 'alter') or val < 0:
+                    raise ValidationError(f"Invalid variance input {key}.")
+                if val:
+                    variance.setdefault(int(wid), {})[field] = val
+            elif key.startswith('recover_'):
+                try:
+                    amt = Decimal(raw)
+                except InvalidOperation:
+                    raise ValidationError(f"Invalid recovery amount for {key}.")
+                if amt > 0:
+                    recoveries[int(key.split('_', 1)[1])] = amt
+        return variance, recoveries

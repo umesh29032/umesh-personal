@@ -143,6 +143,71 @@ def preview_lines(settlement):
     return _settleable_lines(stage_records)
 
 
+def settlement_queue():
+    """Read-only management queue (PR-D). Every Adda with payable stages is
+    classified:
+      ready   — all payable stages completed AND uncredited lines exist
+      waiting — payable stage(s) still open (names listed, so the owner knows
+                exactly what blocks the settlement)
+    Fully-credited Addas (no uncredited lines) drop out of the queue — their
+    history lives in the settlements list. Open drafts are attached so the UI
+    links to them instead of stacking duplicates."""
+    from production.models import Adda
+
+    addas = (
+        Adda.objects
+        .filter(stage_records__workflow_stage__credits_workers=True)
+        .distinct().select_related('product').order_by('code')
+    )
+    drafts = {
+        d.adda_id: d for d in
+        AddaSettlement.objects.filter(status=AddaSettlement.Status.DRAFT)
+    }
+    ready, waiting = [], []
+    for adda in addas:
+        payable = _payable_stage_records(adda)
+        incomplete = [sr.workflow_stage.stage.name for sr in payable
+                      if sr.completed_at is None]
+        if incomplete:
+            waiting.append({'adda': adda, 'incomplete': incomplete,
+                            'draft': drafts.get(adda.pk)})
+            continue
+        lines, skip_a, skip_b = _settleable_lines(payable)
+        if not lines:
+            continue                       # fully credited — nothing pending
+        expected = sum(
+            _q((c.verified_quantity if c.verified_quantity is not None
+                else c.reported_quantity) * (c.expected_rate or _ZERO))
+            for c in lines)
+        ready.append({
+            'adda': adda,
+            'lines': len(lines),
+            'workers': len({c.task.worker_id for c in lines}),
+            'expected': _q(expected),
+            'skipped_era_a': len(skip_a),
+            'skipped_era_b': len(skip_b),
+            'draft': drafts.get(adda.pk),
+        })
+    return {'ready': ready, 'waiting': waiting}
+
+
+@transaction.atomic
+def discard_draft(*, settlement, user):
+    """Delete a DRAFT scratchpad (PR-D). Safe by construction: drafts carry no
+    money, no frozen rows, no inbound FKs — only finalize writes those. NOT a
+    history deletion (work-that-happened immutability untouched)."""
+    _ensure_management(user)
+    settlement = (AddaSettlement.objects.select_for_update()
+                  .get(pk=settlement.pk))
+    if settlement.status != AddaSettlement.Status.DRAFT:
+        raise ValidationError(
+            f"Only a draft can be discarded (status: {settlement.status}).")
+    ref, adda_code = settlement.reference, settlement.adda.code
+    settlement.delete()
+    logger.info("adda_settlement.discard ref=%s adda=%s by=%s",
+                ref, adda_code, user.pk)
+
+
 @transaction.atomic
 def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None):
     """The settlement money-write (§11.5). NO CASH — payment is a separate event.
