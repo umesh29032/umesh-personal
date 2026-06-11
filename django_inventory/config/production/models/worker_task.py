@@ -144,6 +144,16 @@ class WorkerStageContribution(TimeStampedModel):
         max_digits=12, decimal_places=2, null=True, blank=True,
     )
     # Optional piece-precision source line (cutting today; any stage later).
+    # V2-2 Part-13 provenance (owner-locked): the settlement SWA earning line
+    # this contribution was credited under. NULL until settled; stamped by
+    # adda_settlement_service at finalize; voided lines re-arm settling. Makes
+    # the cross-era double-credit guard EXACT per-row (era-B) and gives
+    # credit↔report provenance for disputes/reporting. String FK — production
+    # never imports expense at module level (acyclic layers).
+    settlement_line = models.ForeignKey(
+        'expense.StageWorkAssignment', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='settled_contributions',
+    )
     bundle_item = models.ForeignKey(
         'production.CuttingBundleItem', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',

@@ -319,8 +319,17 @@ class PayrollSettlementItem(TimeStampedModel):
     `advance_deducted` equals the sum of these rows.
     """
 
+    # V2-2 re-homing (ARCHITECTURE_V2 §11.2): NEW recovery lines parent to the
+    # AddaSettlement (recovery decided at settlement, not payment); LEGACY lines
+    # keep `settlement`. Exactly one parent — XOR constraint below. The
+    # advance-outstanding SUM stays parent-agnostic.
     settlement = models.ForeignKey(
         PayrollSettlement, on_delete=models.PROTECT, related_name='items',
+        null=True, blank=True,
+    )
+    adda_settlement = models.ForeignKey(
+        'expense.AddaSettlement', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='recovery_lines',
     )
     advance = models.ForeignKey(
         WorkerAdvance, on_delete=models.PROTECT, related_name='recoveries',
@@ -334,6 +343,14 @@ class PayrollSettlementItem(TimeStampedModel):
             models.CheckConstraint(
                 check=models.Q(amount_recovered__gt=0),
                 name='expense_settlementitem_recovered_positive',
+            ),
+            # XOR: parented to exactly ONE of (legacy payment, adda settlement).
+            models.CheckConstraint(
+                check=(
+                    models.Q(settlement__isnull=False, adda_settlement__isnull=True)
+                    | models.Q(settlement__isnull=True, adda_settlement__isnull=False)
+                ),
+                name='expense_settlementitem_exactly_one_parent',
             ),
         ]
 
@@ -365,3 +382,147 @@ class WorkerProfile(TimeStampedModel):
 
     def __str__(self):
         return f"Profile · {self.user}"
+
+
+# ── V2-2: Adda-centric settlement (ARCHITECTURE_V2 §11, ADR-0007/0008) ────────
+
+
+class AddaSettlement(TimeStampedModel):
+    """The Adda-centric EARNING + RECOVERY-DECISION event (Model A: no cash).
+
+    draft → finalized → (reversed | superseded); corrections NEVER edit — they
+    reverse and (optionally) supersede. Drafts carry NO money and NO frozen
+    rows. At finalize, adda_settlement_service (the SOLE writer of these two
+    tables) books STAGE_EARNING credits + ADVANCE_RECOVERY debits via
+    ledger_service and freezes the per-worker items. Cash is a separate
+    PayrollSettlement (payment-only) event.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        FINALIZED = 'finalized', 'Finalized'
+        REVERSED = 'reversed', 'Reversed'
+        SUPERSEDED = 'superseded', 'Superseded'
+
+    class VariancePolicy(models.TextChoices):
+        # Launch policy (locked): variance tracked + reported, payable NOT
+        # auto-reduced. Future policies are new choices — no schema change.
+        FACTORY_ABSORBS = 'factory_absorbs', 'Factory absorbs'
+
+    reference = models.CharField(max_length=20, unique=True)   # ADST-0001
+    # PROTECT — a financial event must never vanish with its Adda.
+    adda = models.ForeignKey(
+        'production.Adda', on_delete=models.PROTECT, related_name='settlements',
+    )
+    status = models.CharField(
+        max_length=12, choices=Status.choices, default=Status.DRAFT,
+    )
+    variance_policy = models.CharField(
+        max_length=24, choices=VariancePolicy.choices,
+        default=VariancePolicy.FACTORY_ABSORBS,
+    )
+    # Frozen audit totals (write-once at finalize; NEVER read as live truth —
+    # §11.9.4. Balances always recompute from the ledger).
+    expected_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    packed_total = models.PositiveIntegerField(default=0)
+    missing_total = models.PositiveIntegerField(default=0)
+    rejected_total = models.PositiveIntegerField(default=0)
+    alter_total = models.PositiveIntegerField(default=0)      # reserved (§11.10)
+    variance_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    settled_at = models.DateTimeField(null=True, blank=True)
+    settled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # Correction chain (§11.3 — un-retrofittable, added from birth).
+    supersedes = models.ForeignKey(
+        'self', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='superseded_by',
+    )
+    reversed_at = models.DateTimeField(null=True, blank=True)
+    reversed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    notes = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        # NO unique(adda): partial settlements are legal (§11.8).
+        indexes = [models.Index(fields=['adda', '-settled_at'])]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(expected_total__gte=0) & models.Q(variance_total__gte=0),
+                name='expense_addasettlement_totals_nonneg',
+            ),
+            # finalized ⇒ settled_at stamped (status/timestamp coherence).
+            models.CheckConstraint(
+                check=(
+                    ~models.Q(status='finalized') | models.Q(settled_at__isnull=False)
+                ),
+                name='expense_addasettlement_finalized_has_settled_at',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} ({self.adda_id}, {self.status})"
+
+
+class AddaSettlementItem(TimeStampedModel):
+    """FROZEN per-worker business snapshot of one settlement — append-only,
+    NEVER recomputed after finalize (owner Q3 lock). The ledger stays the live
+    money truth; this row is what was reviewed and approved at the settlement
+    moment, independent of later rate/advance/policy changes.
+    """
+
+    adda_settlement = models.ForeignKey(
+        AddaSettlement, on_delete=models.PROTECT, related_name='items',
+    )
+    worker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+',
+    )
+    # Optional drill-down grain (per worker-stage when useful).
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    expected_earning = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    advance_outstanding_before = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    advance_recovered = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    final_payable = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    variance_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    packed_quantity = models.PositiveIntegerField(default=0)
+    missing_quantity = models.PositiveIntegerField(default=0)
+    rejected_quantity = models.PositiveIntegerField(default=0)
+    alter_quantity = models.PositiveIntegerField(default=0)   # reserved (§11.10)
+    settled_at = models.DateTimeField(null=True, blank=True)
+    settled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+    # Audit loop: item ↔ the settlement-written SWA earning line ↔ its ledger
+    # credit (§11.3). Nullable: a worker item may roll up several SWA lines —
+    # the per-line provenance lives on WorkerStageContribution.settlement_line.
+    earning_assignment = models.ForeignKey(
+        StageWorkAssignment, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        indexes = [models.Index(fields=['adda_settlement', 'worker'])]
+        constraints = [
+            models.CheckConstraint(
+                check=(models.Q(expected_earning__gte=0)
+                       & models.Q(advance_outstanding_before__gte=0)
+                       & models.Q(advance_recovered__gte=0)
+                       & models.Q(final_payable__gte=0)
+                       & models.Q(variance_amount__gte=0)),
+                name='expense_addasettlementitem_amounts_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(advance_recovered__lte=models.F('advance_outstanding_before')),
+                name='expense_addasettlementitem_recovery_within_outstanding',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.adda_settlement_id}/{self.worker_id}: payable {self.final_payable}"
