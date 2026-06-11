@@ -25,6 +25,7 @@ from expense.forms import AdvanceForm, SettlementForm, WorkerProfileForm
 from expense.models import StageWorkAssignment, WorkerLedgerEntry, WorkerProfile
 from expense.services import (
     can_view_worker, create_settlement, outstanding_advances, record_advance,
+    unsettled_expected,
     worker_adda_earnings, worker_advances, worker_assignments, worker_ledger,
     worker_production_stats, worker_settlements, worker_stage_earnings,
     worker_summary,
@@ -54,6 +55,7 @@ class MyEarningsView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         worker = self.request.user
         ctx['summary'] = worker_summary(worker, since=_month_start())
+        ctx['unsettled_expected'] = unsettled_expected(worker)
         ctx['prod_stats'] = worker_production_stats(worker)
         ctx['stage_earnings'] = worker_stage_earnings(worker)
         ctx['adda_earnings'] = worker_adda_earnings(worker, limit=15)
@@ -76,6 +78,7 @@ class WorkerPayrollDetailView(LoginRequiredMixin, TemplateView):
             raise PermissionDenied("You can only view your own payroll.")
         is_management = user_has_role(self.request.user, MANAGEMENT_ROLES)
         ctx['summary'] = worker_summary(worker, since=_month_start())
+        ctx['unsettled_expected'] = unsettled_expected(worker)
         ctx['prod_stats'] = worker_production_stats(worker)
         ctx['stage_earnings'] = worker_stage_earnings(worker)
         ctx['adda_earnings'] = worker_adda_earnings(worker)

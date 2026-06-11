@@ -57,9 +57,10 @@
 
     <div class="stat-grid">
         <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value">₹{{ summary.pending_payable|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Total Earned</div><div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Expected (unsettled)</div><div class="value">₹{{ unsettled_expected|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Earned (settled)</div><div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div></div>
         <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">₹{{ summary.advance_outstanding|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Total Settled</div><div class="value">₹{{ summary.total_settled|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Paid (cash)</div><div class="value">₹{{ summary.total_settled|floatformat:2 }}</div></div>
     </div>
 
     {% if is_management and profile %}

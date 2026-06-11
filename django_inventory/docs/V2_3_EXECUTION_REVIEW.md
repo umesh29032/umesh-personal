@@ -256,3 +256,60 @@ audit's real finding is that V2-2's settlement money is currently mutable
 through two legacy correction doors (reopen, void) — that armor is needed
 *today* independent of any cutover, and it defines the PR order. No blocker
 found. Awaiting owner approval on D-V3.1–D-V3.4 to begin PR-A.
+
+---
+
+## 13) EXECUTED — closing record (2026-06-11, PR-A/B/C committed)
+
+Owner locks D-V3.1–D-V3.4 all approved + implemented.
+- **PR-A** settlement-money armor: reopen of settlement-credited stage BLOCKED
+  (names ADST refs); void_allocation refuses era-B; PAY-3 sweep era-A-only;
+  gate [4c/4]. Live proof: both refusals on settled 3-PATTI-001 named ADST-0003.
+- **PR-B** cutover: default False; allocation UI hidden (era-A history readable,
+  void on open stages); 8 legacy classes pinned = lever regression suite;
+  CutoverLeverTests inverted (default proven without override). Live proof:
+  fresh-process default False, allocation refused, workspace note rendered,
+  era-A ₹135 visible, env lever restores True.
+- **PR-C** visibility: `unsettled_expected` (era-aware, non-overlapping) +
+  Expected (unsettled) → Earned (settled) → Paid (cash) labels on My Earnings +
+  worker detail; D-V3.3 production stats repointed to WSC (settlement-timing
+  independent). Lifecycle tests: expected 30 → settle 0 → reverse 30; era-A
+  credited lines never show as expected.
+
+### Responsive/mobile review (CLAUDE.md rule 11 — first review under the rule)
+No new page introduced; PR-C touched existing mobile-first surfaces. The new
+stat cards enter the existing `.stat-grid` (auto-fit minmax grid → stacks on
+phones); verified at 360×740 (Android), 768 (tablet), 1280 (desktop): cards
+wrap without horizontal scroll, labels readable, no fixed-width tables added.
+The cutting-workspace cutover note is plain text in an already-responsive
+panel. Workspace allocation forms (desktop-era flex) were REMOVED from the
+default render — a net mobile improvement.
+
+### Post-Cutover ERP State (owner-requested)
+- **Production truth** = `WorkerStageTask` (who was assigned / participated) +
+  `WorkerStageContribution` (what was reported; `verified_quantity` = accepted
+  correction, both preserved). Written ONLY via worker_task_service. Frozen
+  `expected_*` on contributions = visibility, never money.
+- **Financial truth** = `WorkerLedgerEntry` (append-only; single writer
+  ledger_service) created at **Adda settlement** (`finalize_adda_settlement`),
+  reversed/superseded only through the settlement lifecycle. AddaSettlement +
+  frozen items = the approval record; the ledger = the money.
+- **Worker earnings** come from: settlement of their completed contributions
+  (verified-else-reported × frozen rate) → STAGE_EARNING credits with line
+  provenance (`WSC.settlement_line` → SWA → ledger). Display ladder:
+  Expected (unsettled) → Earned (settled) → Paid (cash via payment-only
+  PayrollSettlement). Era-A history remains readable/reversible.
+- **Adda labor cost** comes from: AddaSettlement totals (settled truth) +
+  era-A allocation credits for legacy rows (UI labels the split); frozen
+  per-stage `processing_cost` remains the manufacturing-cost view (cost ≠ pay).
+- **Future phases plug in:** MissingPiece/Alter = lifecycle modules reading
+  production truth, feeding settlement variance through the §11.10
+  source-agnostic seam (settlement consumes counts, never owns their flow).
+  G1 material costing joins at the Adda on a now-uniform labor side. G4
+  Adda-360 composes production truth + settlement timeline + ledger — all
+  read-only, all existing. G5 finished goods will read completion/packing
+  truth (later scan-derived under TM-2) — never coupled to settlement. TM-1
+  tracking-mode config rides the locked WorkflowStage policy seam.
+
+**V2-3 status: COMPLETE pending owner sign-off. Remaining on ADR-0007: the
+soak-gated deletion PR (remove lever + era-A path) — after real-worker soak.**

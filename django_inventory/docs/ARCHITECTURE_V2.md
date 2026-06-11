@@ -332,6 +332,15 @@ Two new financial tables (owner chose the frozen snapshot over deriving it — a
   `PayrollSettlementItem → adda_settlement → adda`, and is a *feature* not a seam. **Do not add it.**
 
 ### 11.4 SWA's exact role (keeps the ledger FK invariant intact)
+
+> **STATUS (V2-3, 2026-06-11): repurpose COMPLETE + cutover EXECUTED.** SWA is
+> the settlement earning line (written at finalize, `adda_settlement` FK =
+> structural era marker). Allocation-time crediting is rollback-only behind
+> `LEDGER_CREDIT_AT_ALLOCATION` (default False). Settlement money mutates ONLY
+> via adda_settlement_service (reopen/void guards + gate 4c). Worker visibility:
+> `unsettled_expected` (frozen WSC) → Earned (ledger) → Paid (cash) — three
+> non-overlapping views. Legacy-path deletion soak-gated. See
+> docs/V2_3_EXECUTION_REVIEW.md.
 At `finalize`, for each settled `(worker, stage_record[, color/size])` line derived from a
 `WorkerStageContribution`, write ONE `StageWorkAssignment` row: `allocated_quantity` = policy-adjusted
 settled qty, `earning_rate_snapshot` = the contribution's frozen `expected_rate`,

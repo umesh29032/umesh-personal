@@ -75,3 +75,18 @@ Create historical `AddaSettlement` rows that wrap existing credits so all report
 - [x] Owner selected: **A** (2026-06-10)
 - [x] Symmetric guard requirement + flag-based rollback lever confirmed
 - [x] Status ACCEPTED; ARCHITECTURE_V2 §11 pointer added; agenda updated (see docs(R0) commit)
+
+## Addendum — cutover EXECUTED (V2-3, 2026-06-11)
+
+Owner D-V3.1/D-V3.2 locks. State as shipped:
+- `LEDGER_CREDIT_AT_ALLOCATION` **default = False** (settings/base.py) —
+  earnings book ONLY at Adda settlement. env `=True` is the ROLLBACK LEVER
+  (restart-only; symmetric guard keeps mixed data coherent both directions).
+- Settlement-money armor: reopen of a settlement-credited stage BLOCKED (names
+  the ADST refs); `void_allocation` refuses era-B lines; PAY-3 reopen sweep =
+  era-A only. Gate [4c/4] enforces the two-writer rule on SWA.
+- Allocation UI hidden under the default (era-A history stays readable; void
+  stays available on open stages). Lever path tested in CI: 8 legacy test
+  classes pinned `override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)`.
+- **Physical deletion of the legacy path remains SOAK-GATED** (amended C2):
+  separate PR after real workers run settlement-first in production.

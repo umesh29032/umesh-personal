@@ -223,11 +223,21 @@ def worker_assignments(worker, *, limit=None):
 
 
 def worker_production_stats(worker) -> dict:
-    """Adda counts + pieces produced for a worker (Q1/Q2). From non-voided
-    allocations: pieces = Σ allocated_quantity; Adda buckets by status."""
-    from production.models import Adda
-    base = StageWorkAssignment.objects.filter(worker=worker, voided_at__isnull=True)
-    pieces = base.aggregate(s=Sum('allocated_quantity'))['s'] or _ZERO
+    """Adda counts + pieces produced for a worker (Q1/Q2) — PRODUCTION truth
+    (V2-3 PR-C, owner D-V3.3): pieces = Σ reported_quantity on the worker's
+    completed/verified tasks, independent of settlement timing. Adda buckets
+    come from assignment truth (non-cancelled tasks). Pre-V2-1c allocations
+    that never had contributions are not counted — this is a productivity
+    view, not a money view (the ledger is)."""
+    from production.models import Adda, WorkerStageContribution, WorkerStageTask
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    pieces = (
+        WorkerStageContribution.objects
+        .filter(task__worker=worker, task__status__in=done)
+        .aggregate(s=Sum('reported_quantity'))['s'] or _ZERO
+    )
+    base = (WorkerStageTask.objects.filter(worker=worker)
+            .exclude(status=WorkerStageTask.Status.CANCELLED))
     by_status = (
         base.values('stage_record__adda__status')
         .annotate(n=Count('stage_record__adda', distinct=True))
@@ -239,6 +249,35 @@ def worker_production_stats(worker) -> dict:
         'active_addas': counts.get(Adda.Status.IN_PROGRESS, 0),
         'completed_addas': counts.get(Adda.Status.COMPLETED, 0),
     }
+
+
+def unsettled_expected(worker):
+    """Option B visibility (V2-3 PR-C): Σ frozen `expected_earning` of the
+    worker's completed-but-UNCREDITED contribution lines — what a future Adda
+    settlement would book. NEVER money (balances always come from the ledger).
+
+    Non-overlapping with "Earned" by construction — excludes lines already
+    credited era-B (active settlement_line; a VOIDED line counts as unsettled
+    again, mirroring the settlement guard) or era-A (non-voided allocation SWA
+    on the same worker+stage, the same coarse pair rule the settlement uses)."""
+    from production.models import WorkerStageContribution, WorkerStageTask
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    lines = (
+        WorkerStageContribution.objects
+        .filter(task__worker=worker, task__status__in=done,
+                expected_earning__isnull=False)
+        .filter(Q(settlement_line__isnull=True)
+                | Q(settlement_line__voided_at__isnull=False))
+        .select_related('task')
+    )
+    era_a_srs = set(
+        StageWorkAssignment.objects
+        .filter(worker=worker, voided_at__isnull=True,
+                adda_settlement__isnull=True)
+        .values_list('stage_record_id', flat=True)
+    )
+    return sum((c.expected_earning for c in lines
+                if c.task.stage_record_id not in era_a_srs), _ZERO)
 
 
 def worker_stage_earnings(worker):

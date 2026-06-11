@@ -21,6 +21,9 @@ from expense.services.adda_settlement_service import (
     create_draft, finalize_adda_settlement, reverse_adda_settlement,
 )
 from expense.services.allocation_service import allocate_stage_work, void_allocation
+from expense.services.payroll_service import (
+    unsettled_expected, worker_production_stats,
+)
 from production.models import (
     Adda, AddaStageRecord, Product, Stage, WorkflowStage, WorkerStageTask,
 )
@@ -149,3 +152,36 @@ class ReopenGuardTests(_Base):
         self.assertIsNotNone(line_b.voided_at)
         # w2 ledger: settlement credit + reversal only (no double reversal)
         self.assertEqual(WorkerLedgerEntry.objects.filter(worker=w2).count(), 2)
+
+
+class VisibilityTests(_Base):
+    """V2-3 PR-C: the three money views never overlap — expected (reported,
+    unsettled) → earned (ledger, at settlement) → paid (cash)."""
+
+    def test_unsettled_expected_full_lifecycle(self):
+        self._contribute_and_close()                       # 10 pcs @ ₹3
+        self.assertEqual(unsettled_expected(self.w1), Decimal('30.00'))
+        s = self._settle()
+        # moved expected → earned: no double-display
+        self.assertEqual(unsettled_expected(self.w1), Decimal('0.00'))
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        # reversal restores the line to settleable → expected again
+        self.assertEqual(unsettled_expected(self.w1), Decimal('30.00'))
+
+    def test_unsettled_expected_excludes_era_a_credited(self):
+        # era-A allocation already PAID this worker+stage — the same lines must
+        # not also show as "expected" (would read as double money).
+        allocate_stage_work(user=self.mgmt, stage_record=self.sr,
+                            worker=self.w1, allocated_quantity=Decimal('10'))
+        self._contribute_and_close()
+        self.assertEqual(unsettled_expected(self.w1), Decimal('0.00'))
+
+    def test_production_stats_from_contributions_not_settlement(self):
+        self._contribute_and_close()
+        stats = worker_production_stats(self.w1)
+        self.assertEqual(stats['pieces_produced'], Decimal('10'))
+        self.assertEqual(stats['assigned_addas'], 1)
+        # settling changes NOTHING in production stats (D-V3.3)
+        self._settle()
+        self.assertEqual(
+            worker_production_stats(self.w1)['pieces_produced'], Decimal('10'))

@@ -18,7 +18,7 @@ from .advance_service import record_advance
 from .settlement_service import create_settlement
 from .payroll_service import (
     advance_outstanding, advance_remaining, can_view_worker, outstanding_advances,
-    worker_adda_earnings, worker_advances, worker_assignments, worker_ledger,
+    unsettled_expected, worker_adda_earnings, worker_advances, worker_assignments, worker_ledger,
     worker_production_stats, worker_settlements, worker_stage_earnings,
     worker_summary,
 )
@@ -30,7 +30,7 @@ __all__ = [
     'allocate_stage_work', 'item_allocation_summary', 'void_allocation',
     'record_advance',
     'create_settlement',
-    'can_view_worker', 'worker_summary', 'worker_ledger', 'worker_assignments',
+    'can_view_worker', 'worker_summary', 'worker_ledger', 'worker_assignments', 'unsettled_expected',
     'worker_production_stats', 'worker_stage_earnings', 'worker_adda_earnings',
     'advance_outstanding', 'advance_remaining', 'outstanding_advances',
     'worker_advances', 'worker_settlements',

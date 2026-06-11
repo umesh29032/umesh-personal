@@ -63,8 +63,16 @@
             <div class="label">Pending Payable</div>
             <div class="value">₹{{ summary.pending_payable|floatformat:2 }}</div>
         </div>
+        {% comment %}V2-3 PR-C: three NON-OVERLAPPING money views —
+        expected (reported, not yet settled) → earned (booked at settlement)
+        → paid (cash). Expected is visibility only, never a balance.{% endcomment %}
         <div class="stat-card">
-            <div class="label">Total Earned</div>
+            <div class="label">Expected (unsettled)</div>
+            <div class="value">₹{{ unsettled_expected|floatformat:2 }}</div>
+            <div class="label" style="margin-top:4px;text-transform:none;letter-spacing:0;">becomes Earned when the Adda is settled</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Earned (settled)</div>
             <div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div>
         </div>
         <div class="stat-card">
@@ -76,11 +84,11 @@
             <div class="value">₹{{ summary.earnings_in_window|floatformat:2 }}</div>
         </div>
         <div class="stat-card">
-            <div class="label">Total Settled</div>
+            <div class="label">Paid (cash)</div>
             <div class="value">₹{{ summary.total_settled|floatformat:2 }}</div>
         </div>
         <div class="stat-card">
-            <div class="label">Last Settlement</div>
+            <div class="label">Last Payment</div>
             {% if summary.last_settlement %}
                 <div class="value">₹{{ summary.last_settlement.amount_paid|floatformat:2 }}</div>
                 <div class="label" style="margin-top:4px;">{{ summary.last_settlement.settlement_date }}</div>

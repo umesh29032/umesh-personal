@@ -110,6 +110,17 @@ class AllocationTests(TestCase):
     def test_worker_production_stats_and_stage_earnings(self):
         allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,
                             worker=self.worker, bundle_item=self.item, allocated_quantity=6)
+        # V2-3 PR-C (D-V3.3): stats come from PRODUCTION truth (contributions),
+        # not from allocations — the worker must have reported the work.
+        from production.services.worker_task_service import (
+            complete_worker_task, report_contributions, set_stage_workers,
+        )
+        from production.models import WorkerStageTask
+        set_stage_workers(self.cutting_sr, [self.worker.pk])
+        task = WorkerStageTask.objects.get(
+            stage_record=self.cutting_sr, worker=self.worker)
+        report_contributions(task, [{'reported_quantity': '6'}], actor=self.worker)
+        complete_worker_task(task, actor=self.worker)
         stats = worker_production_stats(self.worker)
         self.assertEqual(stats['pieces_produced'], Decimal('6'))
         self.assertEqual(stats['assigned_addas'], 1)
