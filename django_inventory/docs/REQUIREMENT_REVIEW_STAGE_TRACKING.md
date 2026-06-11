@@ -1,6 +1,6 @@
 # Requirement Review — Stage Reporting, Tracking Mode, and Settlement Truth
 
-Status: REVIEW ONLY — no implementation, no redesign. Date: 2026-06-11.
+Status: 🔒 LOCKED 2026-06-11 (owner-accepted; decisions in §9). No implementation yet.
 Owner requirement: per-stage configurable reporting (Manual / Barcode / Both /
 None) on the Product-Flow screen; worker-reports-own-work; reports = permanent
 production truth; settlement = separate financial decision; missing pieces
@@ -159,9 +159,44 @@ the Barcode/Traceability review, which R1 already scheduled.
   report-only stages (recommended, zero change now) / per-stage worker-console
   split (future, F7 family). Not a V2-3 item.
 
-## 8) Sequencing statement
+## 8) Sequencing statement (superseded by §9 locks where they overlap)
 
 Nothing in this requirement changes the locked next step: **V2-3 proceeds as
 reviewed** (settlement-primary cutover + the two integrity guards). Tracking
 Mode lands after, per D-T4 — TM-1 cheap and early, TM-2 behind the Barcode/
 Traceability review. This document is the requirements lock for both.
+
+---
+
+## 9) 🔒 OWNER LOCKS (2026-06-11 — verbatim decisions)
+
+- **D-T1 — DEFERRED to build time.** One enum vs two axes is an implementation
+  detail; UI identical either way. Decide at TM-1 implementation review.
+- **D-T2 — LOCKED.** None-mode tasks resolve as **participated-without-report**
+  on stage completion. NEVER auto-cancelled.
+- **D-T3 — LOCKED, both validations:**
+  1. `credits_workers ⇒ tracking_mode ≠ none`
+  2. tracking-mode changes BLOCKED while any Adda is actively using that stage.
+- **D-T4 — LOCKED, split delivery:**
+  - **TM-1** = Manual + None only (field + flow editor + D-T2/D-T3 rules).
+  - **TM-2** = Barcode + Both — ONLY after the dedicated Barcode/Traceability
+    review. TM-2 never rides into TM-1.
+- **D-T5 — LOCKED (accept now + future refinement recorded):** current
+  workspace behavior accepted. Future access-control refinement (F7 family,
+  NOT the Tracking Mode phase): planned quantities may be required for stage
+  MASTERS but must not automatically be visible to every assigned helper.
+- **Ownership clarification — LOCKED:** Tracking Mode is **product-flow
+  policy, not stage-library policy**. The same stage type operates differently
+  across products (Product A Cutting=Manual · B Cutting=None · C
+  Cutting=Barcode). `WorkflowStage` is the ownership location.
+- **C-TM convergence constraint — LOCKED:** production truth is independent of
+  reporting method. Manual entry, barcode scans, and any future automated
+  capture ALL converge into the same `WorkerStageContribution` production-truth
+  model, through the same single-writer chokepoint — so settlement, costing,
+  MissingPiece, Alter/Rework, reporting, inventory, and future commerce remain
+  entry-method agnostic. Any capture path that writes production truth
+  anywhere else is an architecture violation.
+
+**Roadmap placement (locked):** V2-3 unchanged and next. TM-1 = small phase,
+candidate alongside/before MissingPiece. TM-2 = inside the future
+Barcode/Traceability review. This §9 is the requirements lock for both.
