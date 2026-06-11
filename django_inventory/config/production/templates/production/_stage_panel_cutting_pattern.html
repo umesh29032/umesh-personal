@@ -508,7 +508,7 @@ allocation_sum = live sum of proportion_pct (red badge if != 100)
             </p>
             <form method="post" action="{% url 'production:pattern-complete' adda.code %}"
                   data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
-                  onsubmit="return confirm('Mark cutting-pattern complete and advance to ' + (this.dataset.nextStage || 'next stage') + '?\n\nUploaded photos and video will lock for editing.');">
+                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Mark cutting-pattern complete and advance to ' + (this.dataset.nextStage || 'next stage') + '?\n\nUploaded photos and video will lock for editing.');">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
                 <div class="stage-actions-row">

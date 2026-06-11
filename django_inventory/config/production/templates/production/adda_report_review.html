@@ -1,0 +1,71 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Review Reports · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .report-review .hero-strip {
+        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
+        color: #fff; border-radius: 16px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .report-review .hero-strip h1 { margin: 0; font-size: 19px; }
+    .report-review .hero-strip p { margin: 6px 0 0; font-size: 12px; opacity: .9; }
+    .report-review .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 12px 14px; margin-bottom: 12px; }
+    .report-review .line { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+    .report-review .line:last-child { border-bottom: none; }
+    .report-review .who { font-weight: 700; min-width: 140px; }
+    .report-review .dims { color: var(--stone); min-width: 130px; }
+    .report-review .rep { min-width: 90px; }
+    .report-review input[type=number] {
+        background: var(--cream, #fdf8ee); border: 1px solid var(--border-card); border-radius: 8px;
+        padding: 8px; font-size: 14px; width: 92px; box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+    }
+    .report-review .settled { color: var(--stone); font-size: 12px; font-style: italic; }
+    .report-review .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid var(--border-card); padding: 12px 14px; display: flex; gap: 10px; justify-content: flex-end; border-radius: 12px 12px 0 0; }
+    .report-review .btn-copper { background: var(--copper); color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .report-review .btn-ghost { background: transparent; border: 1px solid var(--border-card); color: var(--ink); padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .report-review .empty { padding: 16px; color: var(--stone); font-style: italic; }
+    @media (max-width: 640px) {
+        {% comment %}phone: each line stacks into a card-row; input stays thumb-sized{% endcomment %}
+        .report-review .line { flex-direction: column; align-items: flex-start; gap: 4px; }
+        .report-review .who, .report-review .dims, .report-review .rep { min-width: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="report-review">
+    <div class="hero-strip">
+        <h1>Review worker reports · {{ adda.code }}</h1>
+        <p>Worker's reported number is never changed. Enter a <strong>verified</strong> quantity only where the report is wrong — settlement pays verified-else-reported. Clear the box to go back to the reported number.</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="card">
+            {% for c in rows %}
+            <div class="line">
+                <span class="who">{{ c.task.worker.get_full_name|default:c.task.worker.email }}</span>
+                <span class="dims">{{ c.task.stage_record.workflow_stage.stage.name }}{% if c.color %} · {{ c.color }}{% endif %}{% if c.size %} · {{ c.size }}{% endif %}</span>
+                <span class="rep">reported <strong>{{ c.reported_quantity }}</strong></span>
+                {% if c.settlement_line_id and not c.settlement_line.voided_at %}
+                    <span class="settled">settled by {{ c.settlement_line.adda_settlement.reference }} — reverse it to correct</span>
+                {% else %}
+                    <label style="font-size:12px;color:var(--stone);">verified
+                        <input type="number" step="0.01" min="0" name="verified_{{ c.pk }}"
+                               value="{{ c.verified_quantity|default_if_none:'' }}" placeholder="—">
+                    </label>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="empty">No submitted reports on payable stages yet.</div>
+            {% endfor %}
+        </div>
+
+        <div class="sticky-bar">
+            <a class="btn-ghost" href="{% url 'production:adda-detail' adda.code %}">Back to Adda</a>
+            {% if rows %}<button type="submit" class="btn-copper">Save corrections</button>{% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

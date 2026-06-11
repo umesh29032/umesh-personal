@@ -152,3 +152,84 @@ class UnpricedRollSurfaceTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context['total_unpriced_rolls'], 1)
         self.assertContains(resp, 'material costing is incomplete')
+
+
+class PreDeploySafetyTests(TestCase):
+    """P1/P2 (final pre-deploy PR): verified-qty surface + completion warning."""
+
+    def setUp(self):
+        self.mgmt = _mgmt('p1-mgmt@test')
+        self.worker = User.objects.create_user(email='p1-w@test', password='x')
+        self.product = Product.objects.create(code='P1P', name='P1 P')
+        stage, _ = Stage.objects.get_or_create(
+            code='p1_cutting', defaults={'name': 'P1 Cutting'})
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=stage, order=1,
+            cost_rate=Decimal('3'), credits_workers=True)
+        self.adda = Adda.objects.create(code='P1P-001', product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+        from production.services.worker_task_service import (
+            report_contributions, set_stage_workers,
+        )
+        set_stage_workers(self.sr, [self.worker.pk])
+        self.task = WorkerStageTask.objects.get(
+            stage_record=self.sr, worker=self.worker)
+        report_contributions(self.task, [{'reported_quantity': '100'}],
+                             actor=self.worker)
+
+    def _complete(self):
+        from production.services.worker_task_service import complete_worker_task
+        complete_worker_task(self.task, actor=self.worker)
+
+    def test_verify_requires_submitted_report(self):
+        from production.services.worker_task_service import set_verified_quantity
+        c = self.task.contributions.get()
+        with self.assertRaisesMessage(ValidationError, 'not submitted'):
+            set_verified_quantity(c, 90, actor=self.mgmt)
+
+    def test_verify_sets_and_clears_without_touching_reported(self):
+        from production.services.worker_task_service import set_verified_quantity
+        self._complete()
+        c = self.task.contributions.get()
+        set_verified_quantity(c, 90, actor=self.mgmt)
+        c.refresh_from_db()
+        self.assertEqual(c.verified_quantity, Decimal('90'))
+        self.assertEqual(c.reported_quantity, Decimal('100'))   # untouched
+        set_verified_quantity(c, None, actor=self.mgmt)         # clear
+        c.refresh_from_db()
+        self.assertIsNone(c.verified_quantity)
+
+    def test_verify_refused_after_settlement(self):
+        from production.services.worker_task_service import set_verified_quantity
+        from expense.services.adda_settlement_service import (
+            create_draft, finalize_adda_settlement,
+        )
+        self._complete()
+        self.sr.completed_at = timezone.now()
+        self.sr.save(update_fields=['completed_at'])
+        s = create_draft(adda=self.adda, user=self.mgmt)
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        c = self.task.contributions.get()
+        with self.assertRaisesMessage(ValidationError, s.reference):
+            set_verified_quantity(c, 90, actor=self.mgmt)
+
+    def test_review_page_management_only_and_saves(self):
+        self._complete()
+        c = self.task.contributions.get()
+        url = f'/production/addas/{self.adda.code}/review-reports/'
+        self.client.force_login(self.worker)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.mgmt)
+        resp = self.client.get(url)
+        self.assertContains(resp, 'reported')
+        resp = self.client.post(url, {f'verified_{c.pk}': '95'})
+        self.assertEqual(resp.status_code, 302)
+        c.refresh_from_db()
+        self.assertEqual(c.verified_quantity, Decimal('95'))
+
+    def test_pending_report_workers_helper(self):
+        # task reported but NOT submitted → pending
+        self.assertEqual(self.sr.pending_report_workers, ['p1-w@test'])
+        self._complete()
+        self.assertEqual(self.sr.pending_report_workers, [])

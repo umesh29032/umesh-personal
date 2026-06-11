@@ -188,3 +188,13 @@ class AddaStageRecord(TimeStampedModel):
     def is_worker_assigned(self, user) -> bool:
         """True if `user` has an active (non-cancelled) task on this stage."""
         return self.worker_tasks.filter(worker=user).exclude(status='cancelled').exists()
+
+    @property
+    def pending_report_workers(self):
+        """P2 (F6-lite): display names of workers whose task is still UNREPORTED
+        (assigned/in_progress incl. drafts) — completing the stage would
+        auto-cancel them (F3: no pay eligibility). Drives the Mark-Complete
+        warning dialog; read-only."""
+        pending = self.worker_tasks.filter(status__in=('assigned', 'in_progress'))
+        return [t.worker.get_full_name() or t.worker.email
+                for t in pending.select_related('worker')]

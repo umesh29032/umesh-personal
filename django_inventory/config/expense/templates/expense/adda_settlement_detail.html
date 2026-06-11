@@ -67,6 +67,9 @@
 
     {% if s.status == 'draft' %}
     {# ── DRAFT: recomputable preview + variance + recovery + finalize ── #}
+    <div class="panel muted" style="font-size:12px;">
+        Numbers wrong? <a href="{% url 'production:adda-report-review' s.adda.code %}" style="color:var(--copper);font-weight:700;">Review &amp; correct quantities</a> first — settlement pays verified-else-reported.
+    </div>
     <form method="post">
         {% csrf_token %}
         {% for w in workers %}

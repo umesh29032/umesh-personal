@@ -26,7 +26,7 @@ from .barcode_gen_views import (
     _build_barcode_gen_context as _build_barcode_gen_context,
 )
 from .costing_views import ProductionCostingView
-from .worker_report_views import WorkerReportView
+from .worker_report_views import AddaReportReviewView, WorkerReportView
 from .stage_views import (
     CuttingAllocationDeleteView,
     CuttingBreakupDeleteView,
@@ -59,6 +59,7 @@ from .stage_views import (
 
 __all__ = [
     'AddaDashboardView',
+    'AddaReportReviewView',
     'WorkerReportView',
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',
     'ProductSizesEditView',

@@ -219,3 +219,49 @@ def complete_worker_task(task, *, actor):
     logger.info("worker_task.complete task=%s contributions=%s rate=%s",
                 task.pk, task.contributions.count(), rate)
     return task
+
+
+@transaction.atomic
+def set_verified_quantity(contribution, quantity, *, actor):
+    """P1 (F5-lite, ADR-0009-adjacent): management corrects PRODUCTION truth —
+    sets/clears `verified_quantity` on a completed contribution. The worker's
+    `reported_quantity` is NEVER touched (both preserved — owner §6/§7).
+    Settlement reads verified-else-reported, so this is the lever that fixes a
+    typo'd report BEFORE money books.
+
+    Guards:
+      • management only;
+      • task must be completed/verified (reports in flight are the worker's);
+      • a settlement-credited line (active settlement_line) REFUSES — money
+        already booked on the old number; reverse the settlement first (same
+        philosophy as the V2-3 reopen/void armor).
+    quantity=None clears the correction (back to reported).
+    """
+    from django.core.exceptions import PermissionDenied
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    from production.models import WorkerStageContribution, WorkerStageTask
+
+    if not user_has_role(actor, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can verify quantities.")
+    # of=('self',): settlement_line is a nullable FK → LEFT JOIN, and Postgres
+    # refuses FOR UPDATE on the nullable side — lock only the WSC row.
+    c = (WorkerStageContribution.objects.select_for_update(of=('self',))
+         .select_related('task', 'settlement_line')
+         .get(pk=contribution.pk))
+    if c.task.status not in (WorkerStageTask.Status.COMPLETED,
+                             WorkerStageTask.Status.VERIFIED):
+        raise ValidationError("Report not submitted yet — nothing to verify.")
+    if c.settlement_line_id and c.settlement_line.voided_at is None:
+        raise ValidationError(
+            "This line was already settled "
+            f"({c.settlement_line.adda_settlement.reference}) — reverse that "
+            "settlement first, then correct the quantity.")
+    if quantity is not None:
+        quantity = Decimal(str(quantity))
+        if quantity < 0:
+            raise ValidationError("Verified quantity cannot be negative.")
+    c.verified_quantity = quantity
+    c.save(update_fields=['verified_quantity', 'updated_at'])
+    logger.info("worker_task.verify_qty wsc=%s task=%s qty=%s by=%s",
+                c.pk, c.task_id, quantity, actor.pk)
+    return c

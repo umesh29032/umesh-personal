@@ -202,3 +202,60 @@ class WorkerReportView(LoginRequiredMixin, View):
         except PermissionDenied:
             raise
         return redirect(self._report_url(request, code, stage_type))
+
+
+class AddaReportReviewView(LoginRequiredMixin, View):
+    """P1 (F5-lite): management reviews + corrects quantities for one Adda's
+    payable stages BEFORE settlement. Reported stays untouched; verified is the
+    correction (settlement reads verified-else-reported). Mobile-first cards."""
+
+    def _gate(self, request):
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        if not user_has_role(request.user, MANAGEMENT_ROLES):
+            raise PermissionDenied("Management only.")
+
+    def _rows(self, adda):
+        from production.models import WorkerStageContribution, WorkerStageTask
+        return list(
+            WorkerStageContribution.objects
+            .filter(task__stage_record__adda=adda,
+                    task__stage_record__workflow_stage__credits_workers=True,
+                    task__status__in=(WorkerStageTask.Status.COMPLETED,
+                                      WorkerStageTask.Status.VERIFIED))
+            .select_related('task__worker', 'color', 'size', 'settlement_line',
+                            'task__stage_record__workflow_stage__stage')
+            .order_by('task__worker_id', 'pk')
+        )
+
+    def get(self, request, code):
+        self._gate(request)
+        adda = get_object_or_404(Adda, code=code)
+        return render(request, 'production/adda_report_review.html',
+                      {'adda': adda, 'rows': self._rows(adda)})
+
+    def post(self, request, code):
+        from production.services.worker_task_service import set_verified_quantity
+        self._gate(request)
+        adda = get_object_or_404(Adda, code=code)
+        changed = 0
+        try:
+            for c in self._rows(adda):
+                raw = request.POST.get(f'verified_{c.pk}')
+                if raw is None:
+                    continue
+                raw = raw.strip()
+                new_val = raw if raw != '' else None
+                old_val = c.verified_quantity
+                # only write actual changes — keeps logs/updated_at honest
+                if str(old_val if old_val is not None else '') == (raw or ''):
+                    continue
+                set_verified_quantity(c, new_val, actor=request.user)
+                changed += 1
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+            return redirect(request.path)
+        if changed:
+            messages.success(request, f"{changed} quantity correction(s) saved.")
+        else:
+            messages.info(request, "No changes.")
+        return redirect(request.path)

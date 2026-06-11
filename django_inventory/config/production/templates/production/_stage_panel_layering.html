@@ -203,7 +203,8 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
       <div class="actions">
         <span data-autosave-status class="autosave-pill"></span>
         <button type="submit" name="action" value="draft" class="lybtn lybtn-ghost">💾 Save draft</button>
-        {% if can_complete %}<button type="submit" name="action" value="complete" class="lybtn lybtn-primary">✓ Complete layering → {{ next_stage.get_stage_type_display|default:"Cutting" }}</button>
+        {% if can_complete %}<button type="submit" name="action" value="complete" class="lybtn lybtn-primary"
+            onclick="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete layering?');">✓ Complete layering → {{ next_stage.get_stage_type_display|default:"Cutting" }}</button>
         {% else %}<p class="sub" style="margin:0;text-align:center;">A cutting-master-helper completes this stage.</p>{% endif %}
       </div>
       {% endif %}

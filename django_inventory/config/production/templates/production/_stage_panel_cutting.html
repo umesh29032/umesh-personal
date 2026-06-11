@@ -956,7 +956,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
             {% endif %}
 
             <form method="post" action="{% url 'production:cutting-workspace-complete' adda.code %}"
-                  onsubmit="return confirm('Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
+                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
                   style="margin-top:14px;">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
@@ -980,7 +980,8 @@ panel exactly so backward-compat URLs keep working.
     workers) live inside one <form> so the submit button carries everything.
     Earlier the pieces_cut form and workers form were separate; the submit
     button targeted only the workers form so pieces_cut never submitted.{% endcomment %}
-    <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-legacy-form-{{ adda.code }}" novalidate>
+    <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-legacy-form-{{ adda.code }}" novalidate
+          onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete cutting?');">
         {% csrf_token %}
         {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
         {% if cutting_form.non_field_errors %}<div class="field-error">{{ cutting_form.non_field_errors }}</div>{% endif %}
