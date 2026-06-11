@@ -253,3 +253,82 @@ contribution line (recommended; matches §11.4) vs per worker-stage aggregate.
 - **PR-D** management UI (draft form: variance counts, per-advance recovery,
   mixed-era labels; finalize/reverse actions; settlement-pending queue) +
   `LEDGER_CREDIT_AT_ALLOCATION` wiring in allocation_service (default True).
+
+---
+
+## Part 13 — Future-state review (owner-requested, pre-PR-A; brutally critical)
+
+Reviewed against the mandatory Adda-360 vision + locked G1-G7/ADR-0008.
+
+### Q1 — Lock-in for G1-G7? NONE found.
+G1: settlement never touches material; Costing-2 composes as a derived read.
+G2/G5: zero commerce/order references anywhere in the design; stock valuation
+is derived later and is ordering-independent. G3: variance stored as COUNTS —
+valuation stays a future policy. G4: ADST+items are exactly the Adda-360 read
+rows. G6: no product duplication. G7: no planning coupling.
+
+### Q2 — What becomes harder later if PR-A..D ship EXACTLY as proposed? Three things:
+1. **(THE finding) Credit↔contribution provenance is implicit.** The §11.9.1
+   double-credit guard matches on the key tuple (worker, stage_record,
+   color/size) — but a worker can legally have TWO completed contribution rows
+   with the same key (reported 20 + 30 of Red/Free). Key-matching then (a)
+   makes the guard ambiguous at the margins, and (b) leaves future dispute/
+   reporting ("which worker reports back this ₹150 credit?") to heuristic
+   re-derivation. Retrofitting provenance after real settlements exist =
+   backfill-by-guess, the exact class of debt this project refuses.
+   **CHANGE NOW: add nullable `WorkerStageContribution.settlement_line` FK
+   (PROTECT → StageWorkAssignment), stamped at finalize.** Guard becomes EXACT
+   (skip WSC rows with a non-voided settlement_line — per-row, not per-key);
+   reversal voids the SWA and the linkage self-documents history; era-A
+   (allocation credits) stays key-based per ADR-0007 — coarse there is fine,
+   exact from era-B forward. One nullable FK in PR-A; near-free now.
+2. **D-S upgrades from micro-decision to LOCKED: SWA settlement lines MUST be
+   per (worker, stage_record, color/size).** A worker-stage aggregate would
+   destroy the dimension grain that G5 inventory costing needs (labor cost per
+   color/size feeds per-piece stock valuation; material already has dimension
+   via rolls→color). Aggregate = cheaper rows today, a costing migration later.
+3. **Settlement events belong on the Adda timeline.** Add AddaHistory change
+   types SETTLEMENT_FINALIZED / SETTLEMENT_REVERSED / SETTLEMENT_SUPERSEDED
+   (logged via history_service in PR-B/C). The Adda-360 view is a TIMELINE;
+   without these the financial closing event is invisible on it and gets
+   bolted on later.
+
+### Q3 — Grain correctness for future costing/inventory/order/profitability: YES, with #2 locked.
+Labor per Adda ✓ (totals) · per stage ✓ (items.stage_record) · per dimension ✓
+(SWA lines, given #2) · per worker ✓ (items). Variance per worker (counts) is
+the right FINANCIAL grain; per-dimension variance is an inventory concern that
+G5 reconciles from scan truth vs the frozen breakdown — settlement doesn't need
+it (the AddaSettlementItemLine child stays the additive escape hatch, §11.9.3).
+Order costing: per-piece cost = Adda cost / pieces, dimension-aware via #2 +
+rolls-per-color material — derivable end-to-end through the barcode bridge.
+
+### Q4 — Data discarded that future costing/reporting needs? One conscious loss + nothing else.
+The only discard: pre-Missing-module, per-DIMENSION variance facts ("50 RED
+missing") are flattened to per-worker counts on the snapshot — accepted by the
+owner's Q4/§11.10 manual-entry decision and remedied automatically when the
+Missing module becomes the source. Everything else checked and retained:
+material facts (rolls/weights/₹-kg/leftovers), output dimension truth (frozen
+breakdown), task timestamps, frozen rates, piece identities, cohort provenance
+(era-A vs era-B derivable: SWA referenced by an ADST item = settlement-era).
+Drafts are deletable scratchpads by design — not data.
+
+### Q5 — Would I build V2-2 this way from day one? Yes, with two day-one differences — both adopted above.
+The event+frozen-snapshot+live-ledger triad is the right pattern at this scale
+(double-entry-lite without account-tree machinery the factory doesn't need).
+From scratch I would have had (a) explicit credit↔contribution linkage and
+(b) settlement events on the unified timeline from the start — which is
+exactly #1 and #3. I would NOT add: multi-currency (single-₹ is a documented
+conscious assumption, painful-but-YAGNI), tax/GST (belongs to future commerce
+invoicing), payee/contractor indirection (thekedar-model payments — flagged as
+a domain QUESTION for the owner someday; additive payee FK if ever real).
+
+### Q6 — Changes adopted NOW (amending the PR plan):
+- **PR-A** += `WorkerStageContribution.settlement_line` nullable FK (PROTECT).
+- **PR-B** guard implementation = exact per-row (era-B) + key-based (era-A);
+  invariant 2 restated accordingly. += SETTLEMENT_FINALIZED history event.
+- **PR-C** += SETTLEMENT_REVERSED / SUPERSEDED history events.
+- **D-S locked**: per-dimension SWA lines (no aggregate option).
+- Documented assumptions (no build): single currency; direct-worker payees;
+  per-dimension variance arrives with the Missing module.
+
+Verdict unchanged: READY — now with provenance exact from birth.
