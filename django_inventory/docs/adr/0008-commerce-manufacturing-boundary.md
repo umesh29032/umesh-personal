@@ -80,6 +80,36 @@ the comparison honest.
   projections REFERENCING production.Product; no second product definition
   ever. (Cheap to honor now: any new commerce model points at the master.)
 
+## Make-to-Stock AND Make-to-Order under the same model (owner clarification)
+
+The unifying rule: **MTO is MTS with zero dwell time — pieces ALWAYS flow
+produce → stock → allocate, even when "stock" holds them for one second.** One
+model, both modes, no future reversal:
+
+1. **Order requiring fresh production:** the order's lines try to reserve from
+   G5 stock; the shortfall stands as visible UNFULFILLED DEMAND. Production
+   responds by creating Adda(s) (a human decision now, optionally
+   planning-assisted later), each carrying the `initiated_for` provenance hint.
+   On completion the pieces enter stock and G5 allocates them to the waiting
+   lines. The order never touches the Adda; it watches its reservations fill.
+2. **`Adda.initiated_for` scope:** sufficient for what it is — PROVENANCE
+   (traceability + MTO reporting: "this batch existed because of order X").
+   It is NOT a reservation. "These future pieces are promised to order X"
+   is a G5 reservation-against-incoming-production state, order-side —
+   exactly where promise/priority logic belongs. The two concepts must not
+   be merged onto the Adda.
+3. **Mixed fulfillment** (part stock, part fresh production) is the model's
+   home turf: an order line's allocations are G5 records spanning existing
+   pieces + reservations against initiated Addas. This is the case that
+   structurally breaks a direct Order→Adda FK — and works trivially here.
+4. **Planning/scheduling domain:** NOT required between Orders and Addas.
+   If MRP-lite ever becomes worth building (demand → production suggestions,
+   capacity views), it is an OPTIONAL OVERLAY that READS both sides
+   (unfulfilled demand from G5, capacity from manufacturing) and OWNS NO
+   TRUTH — derived-never-stored, same as profitability. Its absence costs
+   nothing; its later addition reverses nothing. Recorded as **G7 (optional
+   planning overlay)** for completeness.
+
 ## Gap registry (consolidated, all FUTURE-owned, none block V2-2)
 | Gap | What | Owning future phase |
 |---|---|---|
@@ -89,6 +119,7 @@ the comparison honest.
 | G4 | Adda-360 screen | Reporting's first deliverable |
 | G5 | Finished-goods inventory & allocation domain | Commerce prerequisite module |
 | G6 | Product-master unification direction | standing rule from lock-date |
+| G7 | Optional planning/MRP-lite overlay (derived, owns no truth) | only if demonstrated need |
 
 ## What this changes about current work: NOTHING.
 V2-2's AddaSettlement is exactly the Adda-side cost-closing event this model
