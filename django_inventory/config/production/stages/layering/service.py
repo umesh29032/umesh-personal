@@ -544,6 +544,10 @@ def save_layering_draft(
     draft_* fields. Cleared on complete.
 
     Use complete_layering for the final advance.
+
+    Returns (stage_record, skipped_rolls): skipped_rolls lists roll_ids whose
+    PARTIAL row was not persisted (needs both layers + leftover weight) — the
+    caller must surface these to the user (F1).
     """
     _ensure_can_manage(user)
 
@@ -581,10 +585,13 @@ def save_layering_draft(
         sr.save(update_fields=dirty_header)
 
     # Save per-row data via save_layering_breakup (which also denormalizes leftover).
-    # Skip entries with all-None values; tolerate partial fills as long as we have a layers count.
+    # Fully-blank rows are ignored; PARTIAL rows (some data but missing the
+    # layers+leftover-weight pair) are skipped AND REPORTED back (F1, owner-locked
+    # 2026-06-11: silent draft loss must become explicit worker feedback).
     entries_by_pk = {
         e.pk: e for e in sr.layering_roll_entries.select_related('roll').all()
     }
+    skipped_rolls: list[str] = []
     for pk, data in per_entry_data.items():
         if pk not in entries_by_pk:
             continue   # silently skip unknown entry pks
@@ -592,8 +599,11 @@ def save_layering_draft(
         layers = data.get('layers')
         leftover_len = data.get('leftover_length')   # optional now (weight-only capture)
         leftover_wt = data.get('leftover_weight')
+        if layers is None and leftover_wt is None and leftover_len is None:
+            continue   # fully blank row — user typed nothing, nothing to report
         # Persist a row once we have layers + leftover weight; length defaults 0.
         if layers is None or leftover_wt is None:
+            skipped_rolls.append(entry.roll.roll_id)
             continue
         try:
             save_layering_breakup(
@@ -605,9 +615,10 @@ def save_layering_draft(
                 user=user,
             )
         except ValidationError:
-            # Lax — single bad row doesn't fail the whole draft. Skip it.
+            # Lax — single bad row doesn't fail the whole draft, but DO report it.
+            skipped_rolls.append(entry.roll.roll_id)
             continue
-    return sr
+    return sr, skipped_rolls
 
 
 # ── Leftover bookkeeping (extra pieces beyond primary) ──────────────────────

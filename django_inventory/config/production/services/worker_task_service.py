@@ -47,11 +47,13 @@ def _new_task_kwargs(stage_record):
     }
 
 
-def set_stage_workers(stage_record, worker_ids):
+def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
     """Full-replace the stage's workers. M2M `.set()` (authoritative) + Task reconcile.
 
     Task reconcile: ensure ONE active task per id in `worker_ids`; CANCEL active
-    tasks whose worker is no longer present. Idempotent.
+    tasks whose worker is no longer present. Idempotent. `cancel_note` (optional)
+    is appended to each task cancelled by THIS call — audit trail for auto-cancels
+    (F3/F8 stage-completion lifecycle).
     """
     target = {int(getattr(w, 'pk', w)) for w in (worker_ids or [])}
     stage_record.workers.set(list(target))          # M2M = source of truth in V2-1a
@@ -74,8 +76,38 @@ def set_stage_workers(stage_record, worker_ids):
     for wid, task in active.items():
         if wid not in target:                        # removed → cancel (never delete)
             task.status = WorkerStageTask.Status.CANCELLED
-            task.save(update_fields=['status', 'updated_at'])
+            if cancel_note:
+                task.notes = (f"{task.notes} | {cancel_note}" if task.notes else cancel_note)[:200]
+            task.save(update_fields=['status', 'notes', 'updated_at'])
     logger.info("worker_task.set sr=%s members=%s", stage_record.pk, sorted(target))
+
+
+AUTO_CANCEL_NOTE = "auto-cancelled: stage completed without submitted report"
+
+
+def resolve_stage_tasks_on_complete(stage_record):
+    """F3/F8 (owner-locked 2026-06-11): a completed stage leaves NO unresolved
+    active tasks. assigned / in_progress (with or without draft lines) → CANCELLED;
+    completed / verified → untouched (immutable work). Draft contribution lines on
+    cancelled tasks are RETAINED (evidence of partial work; invisible to business
+    reads, which only consume completed tasks).
+
+    Routed through set_stage_workers so the legacy M2M roster syncs in the same
+    call — the completed-stage roster then shows only workers who actually
+    reported (owner decision: truthful roster > assignment-history display), and
+    M2M↔task PARITY holds by construction (check.sh gate [5/5]).
+    """
+    from production.models import WorkerStageTask
+    keep = list(
+        WorkerStageTask.objects
+        .filter(stage_record=stage_record,
+                status__in=(WorkerStageTask.Status.COMPLETED,
+                            WorkerStageTask.Status.VERIFIED))
+        .values_list('worker_id', flat=True)
+    )
+    set_stage_workers(stage_record, keep, cancel_note=AUTO_CANCEL_NOTE)
+    logger.info("worker_task.resolve_on_complete sr=%s kept=%s",
+                stage_record.pk, sorted(keep))
 
 
 def add_stage_worker(stage_record, worker):

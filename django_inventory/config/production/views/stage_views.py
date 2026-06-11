@@ -756,7 +756,7 @@ class LayeringCompleteView(_LayeringActionBase):
             pk: data for pk, data in per_entry.items()
         }
         try:
-            save_layering_draft(
+            _, skipped_rolls = save_layering_draft(
                 adda=adda,
                 layer_length_meters=layer_length,
                 duration_minutes=None,            # duration auto-computed at complete
@@ -773,7 +773,16 @@ class LayeringCompleteView(_LayeringActionBase):
         if action == 'draft':
             if _is_ajax(request):
                 return HttpResponse(status=204)   # debounced auto-save
-            messages.success(request, "Draft saved.")
+            # F1: partial rows are NOT silently dropped any more — tell the user
+            # exactly which rolls still need the layers + leftover-weight pair.
+            if skipped_rolls:
+                messages.warning(
+                    request,
+                    f"Draft saved, but {len(skipped_rolls)} row(s) were NOT stored — "
+                    f"{', '.join(skipped_rolls)} need both a layer count and a "
+                    "leftover weight.")
+            else:
+                messages.success(request, "Draft saved.")
             return redirect(self.workspace_url(code, request))
 
         # action == 'complete' path — strict validation + advance

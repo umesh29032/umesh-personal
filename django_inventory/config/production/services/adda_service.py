@@ -176,6 +176,13 @@ def advance_to_next_stage(adda: Adda, user, *, enforce_worker_credit: bool = Tru
         ensure_worker_credit(leaving_sr)
     if leaving_sr is not None:
         freeze_stage_cost(leaving_sr, user=user)
+        # F3/F8 lifecycle (owner-locked 2026-06-11): completed stage leaves no
+        # unresolved active tasks — unreported assigned/in_progress → cancelled
+        # (+ M2M roster sync via the chokepoint; parity by construction).
+        # completed/verified tasks untouched. This funnel covers every stage,
+        # current and future (open-closed).
+        from production.services.worker_task_service import resolve_stage_tasks_on_complete
+        resolve_stage_tasks_on_complete(leaving_sr)
 
     # Next stage = order > current ke saare stages mein se sabse pehla
     nxt = adda.product.workflow_stages.filter(order__gt=cur.order).order_by('order').first()
