@@ -190,7 +190,7 @@ class StartCuttingTests(CuttingWorkflowFixture):
         sr = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
-        self.assertIn(self.admin, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(self.admin))
 
     def test_requires_management(self):
         karigar = _user('k1@cw.test', role_code='worker', is_super=False,

@@ -206,7 +206,7 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
 
     Side effects:
       • AddaStageRecord — lazy get_or_create + started_at set
-      • AddaStageRecord.workers (M2M) — full replace via .set()
+      • WorkerStageTask set — full replace via worker_task_service.set_stage_workers
       • AddaHistory (tracking app) — WORKERS_ASSIGNED entry via log_adda
     """
     if not user_has_role(user, MANAGEMENT_ROLES):

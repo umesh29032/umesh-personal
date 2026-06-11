@@ -21,7 +21,7 @@ class BarcodeGenerationRecord(TimeStampedModel):
     Generation idempotent — re-run pe rows nahi badhte (one-shot in service).
 
     Lifecycle:
-        start_barcode_generation()       → sr.workers set + record exists
+        start_barcode_generation()       → worker tasks set + record exists
         generate_barcodes()              → BarcodeBatch rows + total_barcodes
                                             denorm + generated_at stamp
         complete_barcode_generation()    → count match validation + advance

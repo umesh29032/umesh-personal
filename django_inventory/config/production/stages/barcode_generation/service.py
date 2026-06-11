@@ -195,7 +195,7 @@ def start_barcode_generation(
 
     Side effects:
       • AddaStageRecord row get_or_create + started_at set
-      • AddaStageRecord.workers M2M set
+      • WorkerStageTask set (worker_task_service)
       • BarcodeGenerationRecord row lazy-create (OneToOne)
       • tracking.services.log_adda → AddaHistory (WORKERS_ASSIGNED)
     """

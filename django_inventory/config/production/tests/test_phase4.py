@@ -18,7 +18,7 @@ from django.test import TestCase
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.forms._shared import _layering_worker_queryset
-from production.models import AddaStageRecord, Product
+from production.models import WorkerStageTask, AddaStageRecord, Product
 from production.services import (
     adda_activity, attach_roll_to_layering, complete_layering,
     create_adda, record_remaining_cloth, sync_layering_workers_for_skill,
@@ -51,7 +51,7 @@ class CreateAddaAutoTagTests(TestCase):
         )
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
-        worker_pks = set(sr.workers.values_list('pk', flat=True))
+        worker_pks = {u.pk for u in sr.active_workers}
         self.assertEqual(worker_pks, {admin.pk, helper.pk})
 
     def test_rejects_create_adda_when_no_skilled_users(self):
@@ -80,12 +80,12 @@ class RetroTagTests(TestCase):
         )
         # New helper user added AFTER adda exists.
         late = _user('late@retro.test', role_code='worker', is_super=False)
-        self.assertNotIn(late, sr.workers.all())
+        self.assertFalse(sr.is_worker_assigned(late))
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
         # No signal anymore (CLAUDE.md rule #4) — retro-tag is an EXPLICIT call,
         # made by the user-management service after skills change.
         sync_layering_workers_for_skill(late)
-        self.assertIn(late, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(late))
 
     def test_retro_tag_skips_completed_stage_records(self):
         admin = _user('adm@retro2.test',
@@ -126,7 +126,7 @@ class RetroTagTests(TestCase):
         late = _user('late@retro2.test', role_code='worker', is_super=False)
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
         sync_layering_workers_for_skill(late)
-        self.assertNotIn(late, sr1.workers.all())
+        self.assertFalse(sr1.is_worker_assigned(late))
 
     def test_sync_helper_callable_directly(self):
         admin = _user('adm@dir.test', skills=['cutting_master'])
@@ -136,9 +136,11 @@ class RetroTagTests(TestCase):
         # First explicit sync tags them onto the active layering; a SECOND sync
         # must be idempotent (no double-add).
         sync_layering_workers_for_skill(u)
-        before = AddaStageRecord.objects.filter(workers=u).count()
+        before = WorkerStageTask.objects.filter(worker=u).exclude(
+            status=WorkerStageTask.Status.CANCELLED).count()
         sync_layering_workers_for_skill(u)
-        after = AddaStageRecord.objects.filter(workers=u).count()
+        after = WorkerStageTask.objects.filter(worker=u).exclude(
+            status=WorkerStageTask.Status.CANCELLED).count()
         self.assertEqual(before, after)
 
 

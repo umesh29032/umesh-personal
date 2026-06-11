@@ -105,7 +105,7 @@ content. Same look as form-shell tables.
     <div class="cp-summary-grid">
         <div><span class="lbl">Total Pieces</span><span class="val">{{ total_pieces }}</span></div>
         <div><span class="lbl">Breakup Rows</span><span class="val">{{ breakup|length }}</span></div>
-        <div><span class="lbl">Workers</span><span class="val">{{ cutting_stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ cutting_stage_record.active_workers|length }}</span></div>
         <div><span class="lbl">Barcodes</span><span class="val">{{ adda.total_pieces }}</span></div>
     </div>
     {% if cutting_record.notes %}<div class="cp-summary-notes">{{ cutting_record.notes }}</div>{% endif %}

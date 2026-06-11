@@ -66,7 +66,7 @@ class StartLayeringTests(TestCase):
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
         self.assertEqual(sr.workflow_stage.stage_type, 'layering')
-        self.assertIn(admin, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(admin))
 
     def test_requires_management_role(self):
         admin = _user('mgr@s.test', skills=['cutting_master'])

@@ -43,7 +43,7 @@ def _new_task_kwargs(stage_record):
 
 
 def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
-    """Full-replace the stage's workers. M2M `.set()` (authoritative) + Task reconcile.
+    """Full-replace the stage's workers (V2-1d: WorkerStageTask is the ONLY store).
 
     Task reconcile: ensure ONE active task per id in `worker_ids`; CANCEL active
     tasks whose worker is no longer present. Idempotent. `cancel_note` (optional)
@@ -51,7 +51,6 @@ def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
     (F3/F8 stage-completion lifecycle).
     """
     target = {int(getattr(w, 'pk', w)) for w in (worker_ids or [])}
-    stage_record.workers.set(list(target))          # M2M = source of truth in V2-1a
     from production.models import WorkerStageTask
     # Lock active tasks for this stage_record (caller is atomic). The partial
     # unique (one active per sr+worker) is the final race backstop.
@@ -85,10 +84,9 @@ def resolve_stage_tasks_on_complete(stage_record):
     cancelled tasks are RETAINED (evidence of partial work; invisible to business
     reads, which only consume completed tasks).
 
-    Routed through set_stage_workers so the legacy M2M roster syncs in the same
-    call — the completed-stage roster then shows only workers who actually
-    reported (owner decision: truthful roster > assignment-history display), and
-    M2M↔task PARITY holds by construction (check.sh gate [5/5]).
+    Routed through set_stage_workers — the completed-stage roster (active tasks)
+    then shows only workers who actually reported (owner decision: truthful
+    roster > assignment-history display).
     """
     from production.models import WorkerStageTask
     keep = list(
@@ -104,10 +102,9 @@ def resolve_stage_tasks_on_complete(stage_record):
 
 
 def add_stage_worker(stage_record, worker):
-    """Additive: add ONE worker (M2M `.add`) + ensure one active task. Does NOT
+    """Additive: ensure ONE active task for this worker. Does NOT
     cancel others. Used by the layering skill-sync retro-tag (non-atomic)."""
     wid = int(getattr(worker, 'pk', worker))
-    stage_record.workers.add(wid)
     from production.models import WorkerStageTask
     # Re-activate by creating a fresh active task if none exists (a prior cancelled
     # task does not block — partial unique excludes cancelled).

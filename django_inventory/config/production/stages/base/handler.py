@@ -94,7 +94,16 @@ class StageHandler(ABC):
 
     @abstractmethod
     def reopen(self, *, user_id: int, record) -> ReopenResult:
-        """Stage-specific teardown for reopening (delete/reset typed child rows)."""
+        """Stage-specific teardown for reopening (delete/reset typed child rows).
+
+        F4 (owner triage 2026-06-11): reopen SEMANTICS are a deliberate per-stage
+        choice — pick one explicitly, never inherit by accident:
+          • DESTRUCTIVE  (layering): typed record deleted, header copied to
+            drafts; work is re-entered.
+          • SOFT UNLOCK  (cutting_pattern): record/evidence/verifications kept;
+            re-complete sails through satisfied gates.
+        Either way, auto-cancelled worker tasks stay cancelled — manager
+        re-assignment is the recovery path (F3 lifecycle)."""
 
     @abstractmethod
     def cost_quantity(self, record) -> Decimal | None:

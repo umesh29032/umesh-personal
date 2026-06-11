@@ -86,10 +86,10 @@ class AddaStageRecord(TimeStampedModel):
     Har Adda + WorkflowStage combination ka EK row banta hai (unique_together).
     Typed records (LayeringRecord, CuttingRecord) OneToOne se hang karte hain.
 
-    `workers` M2M kyun parent pe?
-        Har stage type mein workers same shape mein store karne ki zarurat.
-        Future `expense.StageWorkAssignment` `through=` model isi M2M ko convert karega
-        (hours, rate, paid/unpaid track karne ke liye).
+    Workers kahan? (V2-1d) — `WorkerStageTask` rows (one per worker, lifecycle
+    + cancel-not-delete) are the SOLE assignment truth; the legacy `workers`
+    M2M was dropped in migration 0035. Read via `active_workers` /
+    `is_worker_assigned` / `active_worker_tasks`.
     """
 
     # PROTECT = frozen processing_cost snapshots are financial truth. Never let
@@ -97,10 +97,6 @@ class AddaStageRecord(TimeStampedModel):
     # hard-deleted. (No code path deletes an Adda; this only guards admin/manual.)
     adda = models.ForeignKey(Adda, on_delete=models.PROTECT, related_name='stage_records')
     workflow_stage = models.ForeignKey(WorkflowStage, on_delete=models.PROTECT, related_name='+')
-    # M2M to User — Django auto join table banata hai (production_addastagerecord_workers)
-    workers = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, related_name='stage_assignments', blank=True,
-    )
     # started_at = jab manager ne workers assign kar ke stage kick off ki.
     # null=True kyun? Legacy rows (pre-layering-workspace) sirf complete pe banti thi —
     # unhe NULL hi rakhna safe hai. Naye rows mein service hamesha set karti hai.

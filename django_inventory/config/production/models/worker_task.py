@@ -11,8 +11,10 @@ dual-write chokepoint while the M2M stays authoritative (readers repoint in
 V2-1b). NO money here — Option B books earnings only at settlement.
 See docs/ARCHITECTURE_V2.md §2 + docs/V2_1_REVIEW.md §10.
 
-`WorkerStageContribution` (quantity + frozen expected_*) is deferred to V2-1c,
-where its writer (worker self-report + complete-time freeze) lands.
+`WorkerStageContribution` (quantity + frozen expected_*) is BUILT (V2-1c) —
+writers: report_contributions / save_draft_contributions / complete_worker_task
+in worker_task_service. As of V2-1d these models are the SOLE production truth
+(legacy AddaStageRecord.workers M2M dropped in 0035).
 """
 from django.conf import settings
 from django.db import models

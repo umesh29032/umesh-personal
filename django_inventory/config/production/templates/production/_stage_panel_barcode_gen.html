@@ -36,7 +36,7 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         <div><span class="lbl">Total Barcodes</span><span class="val">{{ record.total_barcodes|default:0 }}</span></div>
         <div><span class="lbl">Batches</span><span class="val">{{ snapshot.batches|length }}</span></div>
         <div><span class="lbl">Generated At</span><span class="val">{% if record.generated_at %}{{ record.generated_at|date:"d M H:i" }}{% else %}—{% endif %}</span></div>
-        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.active_workers|length }}</span></div>
     </div>
 </div>
 {% if can_reopen %}

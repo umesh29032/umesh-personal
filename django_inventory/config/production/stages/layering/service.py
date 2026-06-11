@@ -294,7 +294,7 @@ def sync_layering_workers_for_skill(user) -> int:
     """Retro-tag: new skilled user → added to workers M2M on every active Layering.
 
     Side effects:
-      • AddaStageRecord.workers (M2M) — adds `user` to every active Layering stage_record
+      • WorkerStageTask — ensures an active task for `user` on every active Layering stage_record
       • Cross-app read: accounts.skills.user_has_skill (gate)
     """
     from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill

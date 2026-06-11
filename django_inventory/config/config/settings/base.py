@@ -170,11 +170,8 @@ else:
     }
 
 # ─── Feature flags ──────────────────────────────────────────────────────────
-# V2-1a dual-write: every AddaStageRecord.workers write ALSO maintains the new
-# WorkerStageTask rows (the M2M stays authoritative until V2-1b flips readers).
-# Flip to False (env: WORKER_TASK_DUAL_WRITE=0) to disable Task writes instantly
-# without a redeploy if dual-write ever breaks an assign. See docs/V2_1_REVIEW.md §10.3.
-WORKER_TASK_DUAL_WRITE = config('WORKER_TASK_DUAL_WRITE', default=True, cast=bool)
+# (V2-1d) WORKER_TASK_DUAL_WRITE retired with the M2M dual-write — WorkerStageTask
+# is the sole assignment truth (migration 0035). See docs/V2_1D_EXECUTION_REVIEW.md.
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain

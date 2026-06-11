@@ -1,6 +1,5 @@
 """F3/F8 (owner-locked 2026-06-11): stage completion resolves the task lifecycle —
-unreported active tasks auto-cancel (never delete) with the M2M roster synced via
-the chokepoint, so parity holds by construction. Plus F1: partial layering-draft
+unreported active tasks auto-cancel (never delete) via the chokepoint. Plus F1: partial layering-draft
 rows are reported back, never silently dropped.
 """
 from datetime import date
@@ -38,17 +37,6 @@ def _user(email, *, role_code='super_admin', is_super=True, skills=()):
     for s in skills:
         u.skills.add(Skill.objects.get(name=s))
     return u
-
-
-def _run_parity():
-    from io import StringIO
-    from django.core.management import call_command
-    out = StringIO()
-    try:
-        call_command('check_worker_task_parity', stdout=out)
-        return 0, out.getvalue()
-    except SystemExit as exc:
-        return exc.code, out.getvalue()
 
 
 class LayeringCompletionLifecycleTests(TestCase):
@@ -104,9 +92,8 @@ class LayeringCompletionLifecycleTests(TestCase):
         self.assertEqual(rep_task.status, WorkerStageTask.Status.COMPLETED)   # untouched
         self.assertEqual(idle_task.status, WorkerStageTask.Status.CANCELLED)  # auto-cancel
         self.assertIn(AUTO_CANCEL_NOTE, idle_task.notes)                      # audit note
-        # M2M roster synced: only the worker who actually reported remains.
-        self.assertEqual(set(self.sr.workers.values_list('pk', flat=True)),
-                         {self.reporter.pk})
+        # Active roster (tasks) = only the worker who actually reported.
+        self.assertEqual({u.pk for u in self.sr.active_workers}, {self.reporter.pk})
 
     def test_draft_lines_retained_on_autocancelled_task(self):
         rep_task = self._task(self.reporter)
@@ -127,21 +114,25 @@ class LayeringCompletionLifecycleTests(TestCase):
         self.assertEqual(lines[0].reported_quantity, Decimal('7'))
         self.assertIsNone(lines[0].expected_rate)
 
-    def test_parity_holds_after_autocancel(self):
+    def test_task_truth_consistent_after_autocancel(self):
         rep_task = self._task(self.reporter)
         report_contributions(rep_task, [{'reported_quantity': '3'}], actor=self.reporter)
         complete_worker_task(rep_task, actor=self.reporter)
         self._complete()
-        code, out = _run_parity()
-        self.assertEqual(code, 0, out)
-        self.assertIn('PARITY OK', out)
+        # Post-M2M world: the invariant is task-internal — every task terminal-or-
+        # completed on a completed stage, and active_workers mirrors that.
+        statuses = set(WorkerStageTask.objects.filter(
+            stage_record=self.sr).values_list('status', flat=True))
+        self.assertTrue(statuses <= {WorkerStageTask.Status.COMPLETED,
+                                     WorkerStageTask.Status.VERIFIED,
+                                     WorkerStageTask.Status.CANCELLED})
+        self.assertEqual({u.pk for u in self.sr.active_workers}, {self.reporter.pk})
 
     def test_no_reports_at_all_cancels_everyone_roster_empty(self):
         self._complete()
         for u in (self.reporter, self.idle):
             self.assertEqual(self._task(u).status, WorkerStageTask.Status.CANCELLED)
-        self.assertEqual(self.sr.workers.count(), 0)
-        self.assertEqual(_run_parity()[0], 0)
+        self.assertEqual(len(self.sr.active_workers), 0)
 
     def test_reopen_then_reassign_creates_fresh_active_task(self):
         self._complete()
@@ -153,7 +144,6 @@ class LayeringCompletionLifecycleTests(TestCase):
         self.assertEqual(tasks.count(), 2)            # cancelled + fresh
         self.assertEqual(tasks.first().status, WorkerStageTask.Status.CANCELLED)
         self.assertNotEqual(tasks.last().status, WorkerStageTask.Status.CANCELLED)
-        self.assertEqual(_run_parity()[0], 0)
 
 
 class ResolveFnUnitTests(TestCase):
@@ -180,7 +170,7 @@ class ResolveFnUnitTests(TestCase):
         t = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.worker)
         self.assertEqual(t.status, WorkerStageTask.Status.CANCELLED)
         self.assertIn(AUTO_CANCEL_NOTE, t.notes)
-        self.assertEqual(self.sr.workers.count(), 0)
+        self.assertEqual(len(self.sr.active_workers), 0)
 
     def test_idempotent(self):
         resolve_stage_tasks_on_complete(self.sr)

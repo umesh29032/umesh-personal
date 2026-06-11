@@ -193,7 +193,7 @@ class StartBarcodeGenerationTests(_BgWorkflowFixture):
             adda=self.adda, worker_ids=[self.admin.pk], user=self.admin,
         )
         self.assertIsNotNone(sr.started_at)
-        self.assertIn(self.admin, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(self.admin))
         # BarcodeGenerationRecord auto-created
         self.assertIsNotNone(getattr(sr, 'barcode_generation', None))
 
