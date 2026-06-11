@@ -151,3 +151,44 @@ class ObservabilityTests(TestCase):
     def test_inbound_request_id_is_honoured(self):
         resp = Client().get('/', HTTP_X_REQUEST_ID='abc123')
         self.assertEqual(resp['X-Request-ID'], 'abc123')
+
+
+class MediaServingTests(TestCase):
+    """PD bundle: two-tier /media/ serving — storefront assets public, all other
+    uploads login-gated (business evidence must never be world-readable).
+
+    NOTE: document_root is bound into the URLconf at import time, so these tests
+    write throwaway files under the REAL MEDIA_ROOT and clean them up.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from django.conf import settings
+        cls._pub = settings.MEDIA_ROOT / 'storefront' / '_test_media_pub.txt'
+        cls._priv = settings.MEDIA_ROOT / 'advances' / '_test_media_priv.txt'
+        for f, body in ((cls._pub, 'public asset'), (cls._priv, 'business evidence')):
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(body)
+
+    @classmethod
+    def tearDownClass(cls):
+        for f in (cls._pub, cls._priv):
+            f.unlink(missing_ok=True)
+        super().tearDownClass()
+
+    def test_storefront_media_is_public(self):
+        resp = self.client.get('/media/storefront/_test_media_pub.txt')
+        self.assertEqual(resp.status_code, 200)
+
+    def test_other_media_requires_login(self):
+        resp = self.client.get('/media/advances/_test_media_priv.txt')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('next=', resp['Location'])
+
+    def test_other_media_served_when_authenticated(self):
+        from accounts.models import User
+        user = User.objects.create_user(email='media@test', password='x')
+        self.client.force_login(user)
+        resp = self.client.get('/media/advances/_test_media_priv.txt')
+        self.assertEqual(resp.status_code, 200)

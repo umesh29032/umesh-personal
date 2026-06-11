@@ -10,7 +10,7 @@ Server pe environment variable set karo: DJANGO_SETTINGS_MODULE=config.settings.
 Tab Django automatic yahi file padhega, local.py nahi.
 """
 
-from .base import *    # base.py ki saari settings le lo
+from .base import *    # noqa: F403 — settings-module convention (scorecard: benign)
 from decouple import config  # .env se values padhne ke liye
 
 # DEBUG=False production mein MUST hai:
@@ -58,3 +58,35 @@ SECURE_HSTS_PRELOAD = True
 # In production, SECRET_KEY must be set via environment variable — no insecure default
 # config() bina default ke — agar .env mein nahi hai toh crash karo (intentional safety check)
 SECRET_KEY = config('SECRET_KEY')
+
+# ─── PD deploy-blocker bundle (2026-06-11) ────────────────────────────────────
+
+# Behind exactly ONE TLS-terminating reverse proxy, trust its forwarded-proto
+# header — without this, SECURE_SSL_REDIRECT loops forever behind the proxy.
+# NEVER expose gunicorn directly to the internet with this set (header spoofing
+# would fake HTTPS).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Shared cache — REQUIRED in production: the auth rate limiter stores its
+# counters in the default cache; per-process LocMem would silently weaken it
+# N× under multi-worker gunicorn. Fail-fast if REDIS_URL is unset (same
+# policy as SECRET_KEY).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': config('REDIS_URL'),
+    },
+}
+
+# Logs → stdout. RotatingFileHandler (base.py) is multi-process unsafe and
+# assumes a writable local logs/ dir; in production the platform collects
+# stdout. Same request-id format, same logger names, security included.
+LOGGING['handlers']['file'] = {  # noqa: F405 — LOGGING comes from base via star-import
+    'class': 'logging.StreamHandler',
+    'formatter': 'verbose',
+    'filters': ['request_id'],
+}
+LOGGING['handlers']['security_file'] = {  # noqa: F405 — same
+    'class': 'logging.StreamHandler',
+    'formatter': 'security',
+}
