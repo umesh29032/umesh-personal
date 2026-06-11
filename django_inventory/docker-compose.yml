@@ -1,0 +1,80 @@
+# Kapil Enterprises ERP — single-VPS production stack (direction C, 2026-06-11).
+# Exact-pinned images (owner rule #1). Only caddy publishes ports. App waits for
+# HEALTHY db+redis via depends_on condition AND its own entrypoint wait-loop
+# (owner rule #2). Volumes: pgdata + media are the business — backed up nightly.
+
+services:
+  caddy:
+    image: caddy:2.9.1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - media:/srv/app/config/media
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backup:
+    # postgres-alpine base gives us the matching pg_dump; restic added at boot
+    # (one apk install — accepted tradeoff, noted in deploy/README).
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/srv/backup.sh"]
+    env_file: .env
+    volumes:
+      - ./deploy/backup.sh:/srv/backup.sh:ro
+      - backups:/backups
+      - media:/media:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:
+  backups:

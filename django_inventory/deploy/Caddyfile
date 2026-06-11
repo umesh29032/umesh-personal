@@ -1,0 +1,6 @@
+# The ONE TLS-terminating proxy (PD's SECURE_PROXY_SSL_HEADER assumption).
+# Caddy auto-provisions Let's Encrypt for {$DOMAIN} and sets X-Forwarded-Proto.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8000
+}

@@ -90,3 +90,9 @@ LOGGING['handlers']['security_file'] = {  # noqa: F405 — same
     'class': 'logging.StreamHandler',
     'formatter': 'security',
 }
+
+# Django rejects HTTPS POSTs whose Origin isn't trusted — required behind the
+# TLS proxy (deploy direction C). Comma-separated, scheme-included.
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in config('CSRF_TRUSTED_ORIGINS').split(',') if o.strip()
+]
