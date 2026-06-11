@@ -949,7 +949,13 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     # Attach allocation data to each bundle for the template: existing
     # (non-voided) allocations + how much of each item is still unallocated.
     # Form is gated on can_allocate; the read-only display always renders.
-    can_allocate = is_management and sr is not None and sr.completed_at is None
+    # V2-3 PR-B: creation also requires the rollback lever ON — by default
+    # earnings book at Adda settlement, so the allocate forms hide. Existing
+    # era-A rows stay visible and voidable (historical corrections stay legal).
+    from django.conf import settings as dj_settings
+    ledger_at_allocation = getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', False)
+    can_void = is_management and sr is not None and sr.completed_at is None
+    can_allocate = can_void and ledger_at_allocation
     allocation_workers = sr.active_workers if sr else []
     for b in bundles:
         ann = []
@@ -1009,6 +1015,8 @@ def _build_cutting_context(request, adda: Adda) -> dict:
         'can_complete_workspace': can_complete_workspace,
         'can_reopen_cutting': can_reopen,
         'can_allocate': can_allocate,
+        'can_void': can_void,
+        'ledger_at_allocation': ledger_at_allocation,
         'allocation_workers': allocation_workers,
         'next_stage_after_cutting': next_stage,
         'cutting_start_form': CuttingStartForm(initial={

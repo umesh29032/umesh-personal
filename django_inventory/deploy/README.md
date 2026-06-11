@@ -57,12 +57,14 @@ build → `up -d` (entrypoint migrates) → prune. Then smoke.
   code back. (No destructive migrations on the roadmap until V2-1d, which gets
   its own clone rehearsal.)
 - Infra files (compose/Caddyfile/Dockerfile) are git-versioned — revert like code.
-- Settlement cutover (V2-2 / ADR-0007): `LEDGER_CREDIT_AT_ALLOCATION` in `.env`.
-  `True` (default) keeps the legacy allocation-credit path live; `False` makes
-  Adda settlement the ONLY way earnings book (allocation refuses with a clear
-  error). Flipping back to `True` is the rollback — no schema change either
-  way; the cross-era guard prevents double credit in both directions. Only
-  flip to `False` after the real-worker soak (amended C2).
+- Settlement cutover (V2-3 / ADR-0007 — EXECUTED): default is now `False` —
+  Adda settlement is the ONLY way earnings book; the allocation path refuses
+  with a clear error and its workspace UI hides. ROLLBACK = set
+  `LEDGER_CREDIT_AT_ALLOCATION=True` in `.env` + restart (no deploy, no schema
+  change; the cross-era guard prevents double credit in both directions, and
+  the lever path stays fully tested in CI). Physical deletion of the legacy
+  path is soak-gated — do not remove the lever until the real-worker soak
+  passes.
 
 ## Future exits (recorded; all config-level, no app rewrites)
 - Managed Postgres (Neon/RDS): change DATABASE_URL; drop db+backup pg_dump half.

@@ -2,7 +2,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -30,6 +30,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class AllocationTests(TestCase):
     def setUp(self):
         self.mgr = _manager()

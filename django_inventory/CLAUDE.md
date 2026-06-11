@@ -30,6 +30,7 @@ Django 5.0 + PostgreSQL. Personal project. Owner: Umesh (junior dev).
 8. gstack installed — route ship/review/qa/etc. to matching gstack skill. Don't auto-trigger.
 9. **Before writing CSS on a template**, check [UI_COMPONENTS.md](UI_COMPONENTS.md). If class exists → use it. If 80% match → extend with modifier. Only add new CSS to `base.html` when same pattern appears in 3+ templates.
 10. **Page-specific CSS** goes in page's `{% block extra_head %}`, scoped under a page class (`.user-create`, `.product-list`) so it can't leak to other pages.
+11. **Mobile-first is a FUNCTIONAL requirement (owner standing rule 2026-06-11), not polish.** Every new UI (worker, management, settlement, reporting, MissingPiece, Alter, Adda-360, inventory, commerce): worker flows optimized for phones FIRST; management flows must work desktop+tablet+mobile; no UI is "complete" unless usable on common Android sizes; every table needs an explicit responsive strategy (stack/cards/data-label/scroll/summary); touch targets + readability + low-friction entry are first-class. Every future UI execution review MUST include a responsive/mobile section.
 
 ## Run
 Venv at `env/`. `env/bin/python config/manage.py <cmd>`. Settings: `config.settings.local`.

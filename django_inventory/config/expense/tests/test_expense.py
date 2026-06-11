@@ -3,7 +3,7 @@ ledger + advances (separate loan pool) + on-demand settlements + scoping."""
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from accounts.models import Skill, User
 from inventory.models import Role
@@ -25,6 +25,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ExpenseCoreTests(TestCase):
     def setUp(self):
         self.mgr = _manager()

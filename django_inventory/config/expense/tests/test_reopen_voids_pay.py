@@ -11,7 +11,7 @@ simplest reopen: no teardown, just the downstream guard).
 from decimal import Decimal
 
 from django.db.models import Sum
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import Skill, User
@@ -28,6 +28,9 @@ def _balance(worker):
     return credit - debit
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ReopenVoidsWorkerPayTest(TestCase):
     def setUp(self):
         cp = Stage.objects.get_or_create(code='cutting_pattern', defaults={'name': 'Cutting Pattern'})[0]

@@ -95,6 +95,7 @@ class QueueAndDraftTests(_Base):
         self.assertContains(resp, 'Waiting on production')
         self.assertContains(resp, 'ADV Cutting')
 
+    @override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)   # era-A fixture needs the lever
     def test_draft_preview_labels_era_a_exclusion(self):
         self._contribute(self.w1, 10)
         # era-A: legacy allocation credit for the same worker+stage
@@ -180,21 +181,24 @@ class FinalizeAndCorrectionTests(_Base):
 
 
 class CutoverLeverTests(_Base):
-    """LEDGER_CREDIT_AT_ALLOCATION — ADR-0007 rollback lever, wired in PR-D."""
+    """LEDGER_CREDIT_AT_ALLOCATION — ADR-0007 lever. V2-3 PR-B: default is now
+    OFF (settlement-only); True is the tested rollback path."""
 
-    def test_flag_on_allocation_still_credits(self):
+    @override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
+    def test_lever_on_allocation_still_credits(self):
         allocate_stage_work(user=self.mgmt, stage_record=self.sr_pay,
                             worker=self.w1, allocated_quantity=Decimal('5'))
         self.assertEqual(WorkerLedgerEntry.objects.filter(
             worker=self.w1, category='stage_earning').count(), 1)
 
-    @override_settings(LEDGER_CREDIT_AT_ALLOCATION=False)
-    def test_flag_off_allocation_refuses(self):
+    def test_default_is_settlement_only_allocation_refuses(self):
+        # NO override — proves the shipped default refuses allocation credits.
         with self.assertRaisesMessage(ValidationError, 'Adda'):
             allocate_stage_work(user=self.mgmt, stage_record=self.sr_pay,
                                 worker=self.w1, allocated_quantity=Decimal('5'))
         self.assertEqual(WorkerLedgerEntry.objects.count(), 0)
 
+    @override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
     def test_symmetric_guard_blocks_allocation_after_settlement(self):
         self._contribute(self.w1, 10)
         self._close_stage()

@@ -8,7 +8,7 @@ from decimal import Decimal
 from io import StringIO
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import User
@@ -16,6 +16,9 @@ from expense.services import allocate_stage_work, reconcile_stage_pay, reconcile
 from production.models import Adda, AddaStageRecord, Product, Stage, WorkflowStage
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ReconciliationTest(TestCase):
     def setUp(self):
         cut = Stage.objects.get_or_create(code='cutting', defaults={'name': 'Cutting'})[0]

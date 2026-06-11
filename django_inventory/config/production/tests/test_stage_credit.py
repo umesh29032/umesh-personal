@@ -7,7 +7,7 @@ ensure_worker_credit(): blocks a payable stage with zero allocations; passes wit
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from accounts.models import Skill, User
@@ -17,6 +17,9 @@ from production.services import create_adda
 from production.stages.base import ensure_worker_credit, stage_is_payable
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class StageCreditTest(TestCase):
     def setUp(self):
         cut = Stage.objects.get_or_create(code='cutting', defaults={'name': 'Cutting'})[0]

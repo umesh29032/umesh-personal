@@ -1,7 +1,7 @@
 """View + access-scoping tests for the expense/payroll UI."""
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Skill, User
@@ -18,6 +18,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ExpenseViewTests(TestCase):
     def setUp(self):
         self.mgr = _manager()
@@ -108,6 +111,9 @@ class ExpenseViewTests(TestCase):
         self.assertNotEqual(resp.status_code, 200)
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class PayrollDataIsolationTests(TestCase):
     """Locks the IDOR invariant (OWASP A01): a worker can never READ or WRITE
     another worker's payroll — via view OR action. Only management can. Two

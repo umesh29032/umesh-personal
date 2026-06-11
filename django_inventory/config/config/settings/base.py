@@ -173,12 +173,13 @@ else:
 # (V2-1d) WORKER_TASK_DUAL_WRITE retired with the M2M dual-write — WorkerStageTask
 # is the sole assignment truth (migration 0035). See docs/V2_1D_EXECUTION_REVIEW.md.
 
-# V2-2 / ADR-0007 cutover lever: True = legacy allocation-time crediting stays
-# live (era-A); False = earnings book ONLY at Adda settlement (era-B). Flipping
-# OFF is the owner's explicit cutover act — gated on the true soak (amended C2).
-# Symmetric double-credit guard makes BOTH directions safe (see
-# allocation_service + adda_settlement_service).
-LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=True, cast=bool)
+# V2-3 PR-B / ADR-0007 cutover EXECUTED (owner D-V3.1, 2026-06-11): earnings
+# book ONLY at Adda settlement by default (era-B). env
+# LEDGER_CREDIT_AT_ALLOCATION=True is the ROLLBACK LEVER — restores legacy
+# allocation-time crediting (era-A). Symmetric double-credit guard makes BOTH
+# directions safe (allocation_service + adda_settlement_service). Physical
+# deletion of the legacy path stays soak-gated (separate future PR).
+LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain
