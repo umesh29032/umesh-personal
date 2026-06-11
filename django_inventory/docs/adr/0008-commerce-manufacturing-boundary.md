@@ -1,6 +1,6 @@
 # ADR 0008 — Commerce↔Manufacturing Boundary (future-safe ownership model)
 
-**Status: PROPOSED 2026-06-11 — awaiting owner lock.** Seams-not-features (ADR
+**Status: 🔒 ACCEPTED 2026-06-11 — owner locked all points incl. the MTS/MTO clause and gap registry G1-G7.** Seams-not-features (ADR
 0006 discipline): this ADR names boundaries and relationships so V2-2/V2-3,
 Missing/Alter, Costing, Reporting, and future commerce converge — it builds
 NOTHING now.
@@ -128,6 +128,6 @@ only behavioral rule effective immediately: **new commerce-adjacent models
 reference production.Product and never gain a direct Adda money-edge.**
 
 ## Sign-off
-- [ ] Owner locks: indirect Order↔Adda via G5 inventory · revenue in commerce ·
-      profitability derived-never-stored · G5+G6 added to the gap registry ·
-      product-master rule effective now
+- [x] Owner locked 2026-06-11: indirect Order↔Adda via G5 inventory · revenue in
+      commerce · profitability derived-never-stored · G5+G6+G7 in the gap
+      registry · product-master rule effective now · MTO = MTS with zero dwell
