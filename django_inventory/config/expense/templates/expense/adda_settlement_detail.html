@@ -4,16 +4,8 @@
 
 {% block extra_head %}
 <style>
-    .adst-detail .hero-strip {
-        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
-        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
-        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
-    }
-    .adst-detail .hero-strip h1 { margin: 0; font-size: 20px; }
-    .adst-detail .hero-strip p { margin: 6px 0 0; font-size: 13px; opacity: .9; }
+    .adst-detail .hero-strip { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
     .adst-detail .pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.18); }
-    .adst-detail .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 18px; }
-    .adst-detail .panel h2 { margin: 0 0 10px; font-size: 15px; }
     .adst-detail .panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--ink); }
     .adst-detail table { width: 100%; border-collapse: collapse; }
     .adst-detail th, .adst-detail td { text-align: left; padding: 9px 10px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
@@ -32,10 +24,6 @@
     .adst-detail .totals .t { background: #faf7f0; border-radius: 10px; padding: 10px 14px; }
     .adst-detail .totals .t .v { font-size: 17px; font-weight: 800; color: var(--copper); }
     .adst-detail .totals .t .l { font-size: 11px; text-transform: uppercase; color: var(--stone); }
-    .adst-detail .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-card); padding: 12px 16px; display: flex; gap: 10px; justify-content: flex-end; border-radius: 12px 12px 0 0; }
-    .adst-detail .btn-copper { background: var(--copper); color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .adst-detail .btn-danger { background: #b03434; color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .adst-detail .btn-ghost { background: transparent; border: 1px solid var(--border-card); color: var(--ink); padding: 10px 18px; border-radius: 10px; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
     .adst-detail .chain { font-size: 12px; }
     .adst-detail .chain a { color: var(--copper); font-weight: 700; text-decoration: none; }
     .adst-detail .chain .here { font-weight: 800; }
@@ -47,7 +35,7 @@
 
 {% block content %}
 <div class="adst-detail">
-    <div class="hero-strip">
+    <div class="hero-strip copper">
         <div>
             <h1>{{ s.reference }} · {{ s.adda.code }}</h1>
             <p>{{ s.adda.product.name }}{% if s.notes %} · {{ s.notes }}{% endif %}</p>
