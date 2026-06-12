@@ -171,7 +171,7 @@ else:
 
 # ─── Feature flags ──────────────────────────────────────────────────────────
 # (V2-1d) WORKER_TASK_DUAL_WRITE retired with the M2M dual-write — WorkerStageTask
-# is the sole assignment truth (migration 0035). See docs/V2_1D_EXECUTION_REVIEW.md.
+# is the sole assignment truth (migration 0035). See docs/archive/reviews/V2_1D_EXECUTION_REVIEW.md.
 
 # V2-3 PR-B / ADR-0007 cutover EXECUTED (owner D-V3.1, 2026-06-11): earnings
 # book ONLY at Adda settlement by default (era-B). env

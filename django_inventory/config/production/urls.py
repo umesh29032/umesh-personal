@@ -1,4 +1,17 @@
-"""Production app URL routes.
+"""Production app URL routes — the factory floor (mounted at /production/).
+
+Route groups / workflows:
+  (root)               Adda dashboard
+  products/… patterns/ product master, per-product FLOW EDITOR (rates,
+                       grouping, pay-eligibility; TM-1 lands here), sizes,
+                       pattern library
+  addas/start|list|<code>  one-click Adda creation → detail/workspaces
+  addas/<code>/<stage>/…   per-stage operator consoles + POST actions
+                       (layering / cutting-pattern / cutting / barcode-gen)
+  addas/<code>/report/<stage>  WORKER phone report (assignment-gated)
+  addas/<code>/review-reports/ P1 verified-qty correction (management)
+  costing/             manufacturing-cost dashboard (ADR-0009 surfaces)
+  stages/…             global Stage library CRUD (perm-gated)
 
 Yeh file Django ke URL dispatcher se tie karti hai. `app_name='production'`
 namespacing deta hai — templates `{% url 'production:adda-detail' code=... %}`

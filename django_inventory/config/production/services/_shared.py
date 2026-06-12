@@ -103,6 +103,8 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
         raise ValidationError(f"This product has no {stage_label} stage configured.")
 
     try:
+        # Hinglish: SR row lock — reopen aur settlement-finalize dono isi row
+        # ko lock karte hain, isliye yeh check finalize se race nahi kar sakta.
         sr = AddaStageRecord.objects.select_for_update().get(
             adda=adda, workflow_stage=wf,
         )
@@ -111,7 +113,9 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     if sr.completed_at is None:
         raise ValidationError(f"{stage_label} is already open for edits.")
 
-    # V2-3 PR-A (D-V3.2): a settlement-credited stage cannot reopen. Production
+    # V2-3 PR-A (D-V3.2, ADR-0007-family armor): a settlement-credited stage
+    # cannot reopen. Hinglish: jis stage ke paise ban chuke, usse production
+    # side se chhune ka rasta band — pehle settlement reverse karo. Production
     # actions never perform hidden financial actions — settlement money moves
     # ONLY through the settlement lifecycle (reverse / supersede), so the owner
     # must reverse the settlement first, then reopen. (SR row is locked above;

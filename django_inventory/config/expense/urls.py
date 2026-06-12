@@ -1,4 +1,14 @@
-"""Expense / payroll URLConf — mounted at /expense/."""
+"""Expense / payroll URLConf — mounted at /expense/. EVERY money URL.
+
+Route groups / workflows exposed:
+  my/                 worker self-view (Expected→Earned→Paid ladder)
+  payroll/ workers/   management money board + per-worker detail
+  workers/<id>/settle CASH PAYMENT only (V2-2: recovery happens at settlement)
+  advances/add        loan entry
+  settlements/…       the V2-2 Adda-settlement lifecycle: queue (ready/waiting)
+                      → start draft → preview/variance/recovery → finalize →
+                      reverse / reverse&supersede / discard
+All management URLs are also sidebar-rule gated (menu hidden ⇒ URL blocked)."""
 from django.urls import path
 
 from expense import views

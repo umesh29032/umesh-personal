@@ -1,3 +1,7 @@
+"""View mixins for inventory views — RBAC gates only (no business logic).
+
+Delegates every check to accounts.permission_service; keep new gates THERE,
+not as ad-hoc mixin logic (rule 6)."""
 from django.contrib.auth.mixins import UserPassesTestMixin
 
 from ..services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role

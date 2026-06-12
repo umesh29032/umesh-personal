@@ -12,6 +12,22 @@ Section map:
 
 Every POST endpoint that is an auth action calls check_throttle() near the top
 and reset_throttle() on success. See throttle.py for the rate-limit policies.
+
+FILE MAP:
+  L53   Authentication  — OTP login (LoginView/Resend/Verify), Logout
+  L201  Home redirect
+  L211  User management — Super-Admin CRUD (list/create/update/delete)
+  L338  Password login  — rate-limited DjangoLoginView subclass
+  L377  Signup          — pre-provisioned-only OTP signup + verify
+  L506  Password reset  — OTP-based reset flow
+
+RESPONSIBILITY: auth flows + user admin ONLY. Every endpoint is rate-limited
+(cache, per IP+email — see services). DELEGATES TO: accounts services (user
+writes moved out of views in the 2026-06 remediation; no signals).
+INVARIANTS: pre-provisioned users only (no open signup); self-lockout
+protection on the rate limiter; permission checks via permission_service.
+MUST NOT BE ADDED HERE: domain views (dashboards live in inventory),
+role/sidebar editors (inventory/views), any direct domain-model writes.
 """
 import logging
 

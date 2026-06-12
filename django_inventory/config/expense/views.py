@@ -1,9 +1,24 @@
-"""Expense / payroll views.
+"""Expense / payroll views — EVERY money screen.
 
-Worker-facing: a mobile "My Earnings" dashboard (own data only, never gated).
-Management-facing: payroll overview (all workers), per-worker detail, advance
-entry, on-demand Settlement, and worker-profile edit. All reads are scoped
-through payroll_service so a worker can never see another worker's payroll.
+FILE MAP:
+  MyEarningsView            — worker self-view (always self-scoped, never role-gated)
+  PayrollOverviewView       — management all-workers board
+  WorkerPayrollDetailView   — per-worker money story (mgmt or self)
+  AdvanceCreateView         — loan entry
+  SettlementCreateView      — CASH PAYMENT ONLY (V2-2: recovery refused here)
+  WorkerProfileEditView     — bank/UPI metadata
+  AddaSettlement{List,Start,Detail}View — the V2-2 settlement queue/draft/
+        finalize/reverse/supersede/discard screens (PR-D)
+
+RESPONSIBILITY: parse POST inputs (variance/recovery/verified links), gate via
+_ManagementOnly, delegate to ONE service, redirect+message — views never touch
+money tables. DELEGATES TO: payroll_service (ALL reads — it knows the era
+rules so templates don't), adda_settlement_service, settlement_service,
+ledger via those services only. INVARIANTS RELIED ON: single-writer gates
+[4b/4c], era guards, recovery≤remaining — all enforced in services; the view
+trusts refusals and surfaces their messages. MUST NOT ADD: any direct
+WorkerLedgerEntry/SWA/Settlement write, any expected_*-as-money read
+(ADR-0005), any processing_cost+earnings sum (ADR-0009).
 """
 from __future__ import annotations
 

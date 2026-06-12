@@ -1,7 +1,11 @@
 """AddaSettlement — the V2-2 Adda-centric EARNING + RECOVERY-DECISION event.
 
-THE SOLE WRITER of AddaSettlement + AddaSettlementItem (single-writer rule;
-check.sh gate enforces). Model A (ARCHITECTURE_V2 §11, locked): finalize books
+THE SOLE WRITER of AddaSettlement + AddaSettlementItem (ADR-0002; CI gate
+[4b/4] enforces) and of era-B StageWorkAssignment lines (gate [4c/4]).
+ADRs in force here: 0005 (truth split) · 0007 (eras + lever) · 0009 (labor
+sourcing). WHAT BREAKS WITHOUT the single door: double-pay (same line settled
+twice), deadlocks (lock order lives HERE), and unauditable money (the
+item↔SWA↔ledger↔WSC provenance loop is written in one transaction). Model A (ARCHITECTURE_V2 §11, locked): finalize books
 financial truth — STAGE_EARNING credits + ADVANCE_RECOVERY debits via
 ledger_service — and moves NO cash. Payment stays the separate worker-centric
 PayrollSettlement event. Drafts carry no money and no frozen rows.
@@ -238,6 +242,8 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
 
     if connection.vendor == 'postgresql':
         with connection.cursor() as cur:
+            # Hinglish: poore settlement-system ka EK hi gate-lock — ref numbering
+            # aur lock-ORDER dono race-safe; order todna = deadlock (§11.5).
             cur.execute('SELECT pg_advisory_xact_lock(%s)', [_REF_LOCK])
 
     settlement = (AddaSettlement.objects.select_for_update()
@@ -265,6 +271,8 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         by_worker.setdefault(c.task.worker_id, []).append(c)
 
     # Per-worker locks in a stable order (worker_id) — deadlock-safe.
+    # Hinglish: sab transactions worker-locks ISI order me lein to circular
+    # wait kabhi nahi banta — deadlock ka ilaaj order hai, luck nahi.
     workers = sorted(by_worker)
     for wid in workers:
         profile, _ = WorkerProfile.objects.get_or_create(user_id=wid)
@@ -275,6 +283,8 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
     }
 
     # Recovery validation up-front (before any money moves).
+    # Hinglish: pehle SAARI recoveries check (≤ remaining, sahi worker), TAB
+    # paisa likhna shuru — aadha-likha settlement kabhi exist nahi karta.
     cleaned_recoveries: dict[int, list[tuple[WorkerAdvance, Decimal]]] = {}
     for adv_id, amount in recoveries.items():
         amt = _q(amount)

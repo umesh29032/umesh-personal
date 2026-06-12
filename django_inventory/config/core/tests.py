@@ -75,7 +75,9 @@ class DocAccuracyTests(SimpleTestCase):
     'never imports') now fails CI if it reappears.
     """
 
-    SOURCE_DOCS = ('SYSTEM_DESIGN.md', 'ARCHITECTURE.md')
+    # ARCHITECTURE.md archived 2026-06-12 (merged into SYSTEM_DESIGN.md);
+    # the guard now also covers the first-read knowledge map.
+    SOURCE_DOCS = ('SYSTEM_DESIGN.md', 'docs/PROJECT_KNOWLEDGE_MAP.md')
 
     def _doc(self, name):
         return (REPO_ROOT / name).read_text()

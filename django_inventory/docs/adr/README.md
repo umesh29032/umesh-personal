@@ -1,7 +1,7 @@
 # Architecture Decision Records (ADRs)
 
 Each ADR captures **one durable architectural decision** — the context, the choice, and the
-consequences — as an immutable record. Unlike `docs/production/DECISION_LOG.md` (a running
+consequences — as an immutable record. Unlike `docs/archive/production/DECISION_LOG.md` (a running
 brainstorm log) these are the *load-bearing* decisions that constrain how the system is
 allowed to grow. Supersede an ADR with a new one; don't rewrite history.
 

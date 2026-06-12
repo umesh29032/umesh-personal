@@ -149,6 +149,10 @@ class WorkflowStage(TimeStampedModel):
     # + the succeed-and-flag freeze net (unpriced -> processing_cost stays NULL).
     cost_method = models.CharField(
         max_length=16, choices=CostMethod.choices, default=CostMethod.PER_PIECE,
+        # ADR-0009: cost_rate DOUBLE DUTY karta hai — stage ka standard
+        # manufacturing rate AUR worker pay ka default (role-rate override ke
+        # saath). cost_billed_at set = grouped MEMBER: cost payer pe billed,
+        # member kabhi earning rate nahi deta (C-1 guard — double-pay block).
     )
     cost_rate = models.DecimalField(
         max_digits=10, decimal_places=4, null=True, blank=True,

@@ -1,9 +1,14 @@
-"""Ledger service — the SOLE writer of WorkerLedgerEntry.
+"""Ledger service — the SOLE writer of WorkerLedgerEntry (ADR-0002, rule 5).
 
 Append-only + immutable: rows are never UPDATE/DELETE'd. Corrections happen via
 `reverse_entry` (an opposite-direction entry linked by `reverses`). Running
 balance is NEVER stored — `worker_balance` recomputes it from SUM(credits) −
 SUM(debits) every time. No signals; callers wrap in their own atomic block.
+
+WHAT BREAKS IF BYPASSED: ek stray INSERT kisi worker ka balance chupke se
+badal deta hai — koi settlement reference nahi, koi reversal path nahi, aur
+append-only matlab galti PERMANENT history ban jaati hai. Views NEVER call
+this; only sibling expense services do (settlement/allocation flows).
 """
 from __future__ import annotations
 
@@ -88,6 +93,8 @@ def reverse_entry(entry: WorkerLedgerEntry, *, actor=None, notes=''):
     """Undo an entry by writing an opposite-direction REVERSAL row (never edit).
 
     A credit is reversed by a debit of equal amount (and vice-versa).
+    Hinglish: reversal me ORIGINAL ki entry_date copy hoti hai — taaki mahine
+    ka total usi period me net ho (galti June ki, sudhaar bhi June me ginega).
 
     Side effects:
       - INSERT WorkerLedgerEntry (1 opposite-direction REVERSAL row) via _create_entry.

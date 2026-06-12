@@ -1,7 +1,7 @@
 # ADR-0009 — Cost truth: the duality, the full-cost formula, and material price semantics
 
 Status: **ACCEPTED** (owner, 2026-06-11 — C-1 pre-deploy hardening).
-Source: docs/ARCH_AUDIT_FOUNDATION_2026_06_11.md (cost-duality CRITICAL finding).
+Source: docs/archive/audits/ARCH_AUDIT_FOUNDATION_2026_06_11.md (cost-duality CRITICAL finding).
 
 ## Decision 1 — THE COST DUALITY (never add the two labor numbers)
 

@@ -131,7 +131,7 @@ class StageHandler(ABC):
         Stage-specific measures beyond today's columns (machine hours, defect count,
         roll weight…) are a LOCKED future extension: a nullable `attributes` JSONB
         on WorkerStageContribution + schema fields that map into it — added additively
-        when a real stage needs it. See docs/V2_FOUNDATION_REVIEW.md (F1, locked).
+        when a real stage needs it. See docs/archive/reviews/V2_FOUNDATION_REVIEW.md (F1, locked).
         """
         return {
             'line_label': 'line',

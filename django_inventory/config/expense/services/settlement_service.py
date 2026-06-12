@@ -1,10 +1,15 @@
-"""Settlement service — sole writer of PayrollSettlement (+ its ledger debits).
+"""Payment service — sole writer of PayrollSettlement (+ its ledger debits).
 
-The owner settles a worker whenever they decide (no fixed cycle). A settlement:
-  • pays cash (settlement_payment debit) and/or
-  • recovers advances (advance_recovery debit), owner-controlled per advance (D3)
-Both reduce the payable. After a FULL settlement the worker's pending payable
-returns to 0 (a "fresh overview"); partial settlements leave the remainder owed.
+V2-2 NARROWED THIS TO PAYMENT-ONLY (Model A: settlement ≠ payment).
+A PayrollSettlement now means exactly one thing: CASH was paid
+(settlement_payment debit). Advance RECOVERY moved to the Adda settlement
+(adda_settlement_service) — owner-chosen per advance at finalize; any
+`recoveries` passed here is loudly REFUSED, by design (old-habit guard).
+
+WHY: earnings + recovery are an APPROVAL decision (Adda-scoped, reviewable,
+reversible via the settlement lifecycle); cash is fungible and worker-scoped.
+Mixing them again would re-couple money creation with money handover — the
+exact ambiguity V2-2 removed. See docs/ARCHITECTURE_V2.md §11 + ADR-0005.
 
 Immutable: a settlement is never edited. A mistake = reverse its ledger debits +
 a fresh settlement (same append-only discipline as the rest of the ledger).

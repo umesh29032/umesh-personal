@@ -131,6 +131,9 @@ class ClothRoll(TimeStampedModel):
     weight_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     # Role-gated fields — form pop kar deta hai non-finance users ke liye (defence in depth)
     supplier = models.CharField(max_length=200, blank=True)
+    # ADR-0009 §5: PURCHASE price — ek FACT (corrections only), market/replacement
+    # rate kabhi nahi. NULL allowed (honest-NULL: 'pata nahi' ≠ ₹0) — unpriced
+    # consumed rolls costing dashboard pe LOUD banner ke saath dikhte hain.
     cost_per_kg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     storage_location = models.ForeignKey(
         StorageLocation, on_delete=models.PROTECT, related_name='rolls',

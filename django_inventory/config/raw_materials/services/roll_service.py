@@ -329,6 +329,8 @@ def consume_leftover(user, *, leftover, adda, notes=''):
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied("Only management can record leftover consumption.")
     # Row lock so two concurrent consumes can't both pass the guard.
+    # Hinglish: leftover EK hi baar consume ho sakta hai — lock + re-check ka
+    # wahi pattern jo void_allocation me hai.
     leftover = (RemainingClothOfClothRoll.objects.select_for_update()
                 .get(pk=leftover.pk))
     if leftover.is_consumed:

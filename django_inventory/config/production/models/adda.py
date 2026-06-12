@@ -84,6 +84,9 @@ class AddaStageRecord(TimeStampedModel):
     """Stage records ka polymorphic parent.
 
     Har Adda + WorkflowStage combination ka EK row banta hai (unique_together).
+    Money side (ADR-0009): `processing_cost` = STANDARD manufacturing cost,
+    frozen at stage advance (price-at-time-of-order) — worker EARNINGS se alag
+    measurement hai, kabhi ADD mat karna. NULL = unpriced (honest-NULL), 0 nahi.
     Typed records (LayeringRecord, CuttingRecord) OneToOne se hang karte hain.
 
     Workers kahan? (V2-1d) — `WorkerStageTask` rows (one per worker, lifecycle
@@ -173,7 +176,7 @@ class AddaStageRecord(TimeStampedModel):
 
     # ── V2-1b: live worker set reads come from WorkerStageTask, not the M2M ──────
     # The `workers` M2M is still dual-written (until V2-1d drops it), but READS now
-    # trust the Task lifecycle (cancelled = un-assigned). See docs/V2_1_REVIEW.md §10.
+    # trust the Task lifecycle (cancelled = un-assigned). See docs/archive/reviews/V2_1_REVIEW.md §10.
     def active_worker_tasks(self):
         """Non-cancelled WorkerStageTask rows — the live assignment set."""
         return self.worker_tasks.exclude(status='cancelled')

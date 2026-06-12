@@ -1,7 +1,7 @@
 # Target Architecture — Kapil Enterprises ERP
 
 > Companion to [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Describes the **end-state** the
-> remediation drives toward. Status: APPROVED 2026-06-09. Not yet built.
+> remediation drives toward. Status: APPROVED 2026-06-09. PARTIALLY REALIZED — V2-1→V2-3 + C-1 delivered the money/truth half (2026-06-12); the structural half (god-file splits, RBAC relocation, cycle-break M4) remains the PARKED backlog tracked in REMEDIATION_PLAN.md.
 
 ## Governing principle
 

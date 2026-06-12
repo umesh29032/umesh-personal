@@ -14,13 +14,14 @@ them into this directory as they're revised; add new flows here directly.
 - **Cutting → bundles → barcodes** — `docs/production/BARCODE_GENERATION.md`
   (+ archived `docs/archive/production/CUTTING_DESIGN.md`) (breakup → bundle items → barcode batches; consumed/
   available counters; uniqueness + contiguity).
-- **Payroll / earnings ledger** — `docs/production/PAYROLL_ARCHITECTURE.md`
+- **Payroll / earnings ledger** — `docs/archive/production/PAYROLL_ARCHITECTURE.md`
   (allocation → immutable ledger credit; advances as a separate loan pool).
-- **Settlement** — `docs/production/SETTLEMENT_ARCHITECTURE.md` (owner starts a
+- **Settlement** — `docs/archive/production/SETTLEMENT_ARCHITECTURE.md` (owner starts a
   settlement anytime; cash + per-advance recovery; invariant
   `paid + recovered ≤ payable_before`; reversal = append-only, no edit).
 - **Tracking / export** — `docs/tracking/EXPORTS.md`.
 
 ## Open flow gaps (backlog)
-- `reverse_settlement` (compensating-item reversal) — not yet built; see
+- settlement reversal — BUILT in V2-2 (`reverse_adda_settlement`: compensating
+  ledger rows + supersede chain); for payment-only PayrollSettlement see
   `docs/archive/QA/bugs_found.md` #2.

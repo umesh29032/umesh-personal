@@ -188,9 +188,9 @@ See [CUTTING_PATTERN.md](CUTTING_PATTERN.md) for full details. TL;DR:
 - [LAYERING_STAGE.md](LAYERING_STAGE.md) — Stage 1 deep dive
 - [RBAC.md](RBAC.md) — `ROLE_ACCOUNTANT` + financial gating
 - [MIGRATIONS.md](MIGRATIONS.md) — migration order + seed data
-- [TESTS_AND_RISKS.md](TESTS_AND_RISKS.md) — coverage + edge cases
-- [DECISION_LOG.md](DECISION_LOG.md) — chronological brainstorm decisions
-- [UI_PATTERNS.md](UI_PATTERNS.md) — form shell, mobile rules, filter chips, accordions, QR print
+- [TESTS_AND_RISKS.md](../archive/production/TESTS_AND_RISKS.md) (archived) — coverage + edge cases
+- [DECISION_LOG.md](../archive/production/DECISION_LOG.md) (archived) — chronological brainstorm decisions
+- [UI_COMPONENTS.md](../../UI_COMPONENTS.md) (UI_PATTERNS merged there) — form shell, mobile rules, filter chips, accordions, QR print
 - [CHAT_LOG.md](../archive/production/CHAT_LOG.md) — design evolution log *(archived)*
 
 ## How to load this in a fresh session

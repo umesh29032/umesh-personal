@@ -1,6 +1,6 @@
 # ADR 0004 — `tracking` is an append-only history + barcode primitive
 
-**Status:** Accepted (DECISION_LOG #8; refined by docs/P4_2_BARCODE_DESIGN_REVIEW.md)
+**Status:** Accepted (DECISION_LOG #8; refined by docs/archive/reviews/P4_2_BARCODE_DESIGN_REVIEW.md)
 
 ## Context
 History/audit and per-piece barcode state must be durable and never silently mutated. We
@@ -20,4 +20,4 @@ also want `tracking` to be cleanly extractable later (a scan/range microservice)
 - The range is the source of truth for piece existence/count; unscanned pieces cost no rows.
 - Future Missing-Piece / Alter-Rework domains *read* this scan state by id; they don't move it.
 - Direction of the production↔tracking edge (assembly ownership) is **deferred** to the
-  manufacturing-domain review — see `docs/P4_2_BARCODE_DESIGN_REVIEW.md` (D3).
+  manufacturing-domain review — see `docs/archive/reviews/P4_2_BARCODE_DESIGN_REVIEW.md` (D3).

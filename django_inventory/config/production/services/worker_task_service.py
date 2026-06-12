@@ -1,9 +1,14 @@
-"""Dual-write chokepoint for worker assignment (V2-1a).
+"""THE production-truth chokepoint (V2-1 → V2-3; M2M dropped in 0035).
 
-EVERY write to `AddaStageRecord.workers` routes through here. In V2-1a the M2M
-stays the AUTHORITATIVE source of truth; we ALSO maintain `WorkerStageTask` in
-lockstep — V2-1d Step 0: task writes are UNCONDITIONAL (tasks = the always-written store); readers moved to
-Task with zero drift.
+SOLE writer of WorkerStageTask + WorkerStageContribution (CI gate [4/4]).
+WST = participation truth (roster; cancel-not-delete). WSC = production truth:
+`reported_quantity` is IMMUTABLE (owner §6); `verified_quantity` is the
+management correction (P1) — both preserved forever; `expected_*` freezes at
+complete and is VISIBILITY ONLY, never money (ADR-0005 Option B).
+
+C-TM (locked): EVERY capture path — manual report today, barcode scans under
+TM-2 tomorrow — must converge through these functions. A second WSC writer =
+settlement paying numbers nobody can trust; that is what this gate prevents.
 
 Reconcile rule: add missing workers as an ACTIVE task; CANCEL tasks whose worker
 was removed (never delete — production history is immutable, owner rule). New
@@ -15,7 +20,8 @@ so stage services can import it without a circular import.
 
 CALL CONTRACT: `set_stage_workers` must run inside the caller's @transaction.atomic
 (all 6 callers are) so the M2M write + Task reconcile commit together; it locks
-the active tasks with select_for_update. `add_stage_worker` is additive and
+the active tasks with select_for_update (Hinglish: roster full-replace hai —
+lock ke bina do managers ki save ek doosre ke cancel/create ko khaa jaati). `add_stage_worker` is additive and
 lock-free (the skill-sync retro-tag path is not atomic).
 """
 import logging

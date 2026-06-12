@@ -1,3 +1,9 @@
+"""Public storefront pages (no auth) — homepage composition from config rows.
+
+RESPONSIBILITY: read-only rendering of HomePageConfig/Featured/Hero/WhyUs/
+Nav/Footer rows. DELEGATES TO: storefront services for any processing.
+INVARIANT (ADR-0008): nothing here may read production money/quantities or
+write anything — commerce boundary's public face."""
 from django.shortcuts import render
 
 from ..models import (

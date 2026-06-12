@@ -3,8 +3,9 @@
 > **Single source of truth for the CURRENTLY-BUILT system.** Generated 2026-06-01 by deep code dig.
 > Stack: **Django 5.0.1 + PostgreSQL** (use `CheckConstraint(check=...)`). Branch `new_flask_app`.
 >
-> ⚠️ **V2 worker-tracking — read [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) (§11 🔒LOCKED)
-> + [docs/V2_1_REVIEW.md](docs/V2_1_REVIEW.md).** Status (2026-06):
+> ⚠️ **V2 SUPERSEDES where they conflict — read [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md)
+> (V2-1→V2-3 + C-1 all BUILT as of 2026-06-12) and start at
+> [docs/PROJECT_KNOWLEDGE_MAP.md](docs/PROJECT_KNOWLEDGE_MAP.md).** Historical status (2026-06):
 > - **BUILT (V2-1a/1b/1c):** per-worker `WorkerStageTask` + `WorkerStageContribution` (migrations 0031–0033)
 >   replace the read-path of `AddaStageRecord.workers` (M2M still **dual-written** behind the
 >   `WORKER_TASK_DUAL_WRITE` flag until V2-1d drops it). `expected_*` frozen at complete = **Option B**
@@ -595,8 +596,8 @@ File content is **regenerated on download** (not stored) — storage stays lean;
 ### 6.7 `expense` (6 models — worker payroll, downstream of production)
 
 > Added 2026-06-02. Full field-level design lives in
-> [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) +
-> [docs/production/SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md).
+> [docs/archive/production/PAYROLL_ARCHITECTURE.md](docs/archive/production/PAYROLL_ARCHITECTURE.md) +
+> [docs/archive/production/SETTLEMENT_ARCHITECTURE.md](docs/archive/production/SETTLEMENT_ARCHITECTURE.md).
 > Settlement-based (NOT monthly). Balance is ALWAYS derived, never stored.
 
 | Model | Purpose |
@@ -895,8 +896,8 @@ env/bin/python config/manage.py test accounts inventory raw_materials production
 - Storefront has zero test coverage; legacy `barcode_export_csv` view untested.
 - ffmpeg video recompression for cutting_pattern uploads deferred.
 - Future-arch scaffolds (feature flags, machine tracking) not started. (The `expense`
-  payroll app SHIPPED 2026-06-02 — see docs/production/PAYROLL_ARCHITECTURE.md +
-  SETTLEMENT_ARCHITECTURE.md; it is not yet detailed in §6 below.)
+  payroll app SHIPPED 2026-06-02 — see docs/archive/production/PAYROLL_ARCHITECTURE.md +
+  docs/archive/production/SETTLEMENT_ARCHITECTURE.md (archived; V2 supersedes); current truth: docs/ARCHITECTURE_V2.md §11.)
 
 ---
 

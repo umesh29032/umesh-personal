@@ -18,7 +18,7 @@ Models:
   • PayrollSettlement   — on-demand payout event (owner settles anytime).
   • PayrollSettlementItem — per-advance recovery line (owner-controlled).
   • WorkerProfile       — per-worker metadata (bank/UPI/opening advance).
-  See docs/production/SETTLEMENT_ARCHITECTURE.md for the full design.
+  See docs/archive/production/SETTLEMENT_ARCHITECTURE.md for the full design.
 
 Discipline (mirrors history_service):
   • expense/services/ledger_service is the SOLE writer of WorkerLedgerEntry.
@@ -127,6 +127,11 @@ class StageWorkAssignment(TimeStampedModel):
 
 class WorkerLedgerEntry(TimeStampedModel):
     """Append-only, immutable money ledger. The financial source of truth.
+
+    ADR-0002 (single writer: ledger_service) + ADR-0005 (written ONLY at
+    settlement since V2-3). Hinglish: yeh table factory ki paise ki KITAB hai —
+    row kabhi badalti/मिटti nahi; galti = ulti-direction REVERSAL row. Isko
+    bypass kiya to worker ka balance chupke se galat ho jata hai, hamesha ke liye.
 
     Balance (payable) = SUM(credit.amount) − SUM(debit.amount), computed live —
     NEVER stored. Every credit traces to a source row (assignment); every debit
@@ -367,6 +372,9 @@ class PayrollSettlementItem(TimeStampedModel):
                     models.Q(settlement__isnull=False, adda_settlement__isnull=True)
                     | models.Q(settlement__isnull=True, adda_settlement__isnull=False)
                 ),
+                # Hinglish: har recovery line ka THEEK EK maalik — purana
+                # payment-parent YA naya Adda-settlement-parent. Dono/zero = DB
+                # hi mana kar dega (app bug ho tab bhi jhooth store nahi hota).
                 name='expense_settlementitem_exactly_one_parent',
             ),
         ]
@@ -476,6 +484,8 @@ class AddaSettlement(TimeStampedModel):
                 check=(
                     ~models.Q(status='finalized') | models.Q(settled_at__isnull=False)
                 ),
+                # Hinglish: 'finalized' likha hai to settled_at TIME hona hi
+                # hoga — status aur timestamp kabhi alag kahani nahi bolenge.
                 name='expense_addasettlement_finalized_has_settled_at',
             ),
         ]

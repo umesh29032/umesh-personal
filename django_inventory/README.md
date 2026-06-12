@@ -52,8 +52,8 @@ Lazy-load only what you need:
 |------|-------------|
 | [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | **Current full system design** — most up-to-date big picture. |
 | [CLAUDE.md](CLAUDE.md) | Working rules for AI agents + shortcuts. Always-on. |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Models, services, ER, security, perf. Read before non-trivial changes. |
-| [docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md) · [SETTLEMENT_ARCHITECTURE.md](docs/production/SETTLEMENT_ARCHITECTURE.md) · [STAGE_COSTING_PLAN.md](docs/production/STAGE_COSTING_PLAN.md) | `expense` app: earnings ledger, advances, settlement + stage costing. |
+| [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | Canonical current-state design (models/services/ER/security/perf). First read: [docs/PROJECT_KNOWLEDGE_MAP.md](docs/PROJECT_KNOWLEDGE_MAP.md). |
+| [docs/archive/production/PAYROLL_ARCHITECTURE.md](docs/archive/production/PAYROLL_ARCHITECTURE.md) · [SETTLEMENT_ARCHITECTURE.md](docs/archive/production/SETTLEMENT_ARCHITECTURE.md) · [STAGE_COSTING_PLAN.md](docs/archive/production/STAGE_COSTING_PLAN.md) | `expense` app: earnings ledger, advances, settlement + stage costing. |
 | [docs/production/RBAC.md](docs/production/RBAC.md) | Roles/skills, Access Control hub, sidebar + URL enforcement. |
 | [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) | Changelog, per-page contracts, flows. |
 | [docs/adr/](docs/adr/) · [docs/archive/](docs/archive/) | Locked architecture decisions (ADRs); superseded/dated docs (audits, build logs). |

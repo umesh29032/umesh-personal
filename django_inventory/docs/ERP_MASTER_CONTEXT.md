@@ -2,7 +2,7 @@
 
 ## Garment Manufacturing ERP — Master Project Context
 
-**Regenerated 2026-06-10 (R0 reconciliation)** — supersedes the previous version; status and precision corrections only, no principle changes. Verified against repo `new_flask_app` (417 tests green, migrations through production 0033) and locked docs. Corrections log: `docs/R0_RECONCILIATION.md` · full review: `docs/ERP_MASTER_CONTEXT_REVIEW.md`.
+**Regenerated 2026-06-10 (R0 reconciliation)** — supersedes the previous version; status and precision corrections only, no principle changes. Verified against repo `new_flask_app` (417 tests green, migrations through production 0033) and locked docs. Corrections log: `docs/archive/reviews/R0_RECONCILIATION.md` · full review: `docs/archive/reviews/ERP_MASTER_CONTEXT_REVIEW.md`.
 
 This document is the durable reference context for future chats, architecture reviews, and implementation planning. It captures long-term requirements, locked decisions, preferred design principles, and the open areas intentionally not final yet.
 
@@ -205,7 +205,7 @@ Long-lived manufacturing platform: Adda-based production, future stage redesign,
 
 ## 16) How to Use This File in Future Chats
 
-Attach this file (or a subset). When asking for review, clarify whether the question is about: foundation · current stage implementation · settlement · future domain expansion · migration safety. **Process docs in-repo:** `docs/ERP_MASTER_CONTEXT_REVIEW.md` (12-section review) · `docs/R0_RECONCILIATION.md` (truth model + contradiction inventory) · `docs/STAGE_DOMAIN_REVIEW_AGENDA.md` (next review's backlog + resume order).
+Attach this file (or a subset). When asking for review, clarify whether the question is about: foundation · current stage implementation · settlement · future domain expansion · migration safety. **Process docs in-repo:** `docs/archive/reviews/ERP_MASTER_CONTEXT_REVIEW.md` (12-section review) · `docs/archive/reviews/R0_RECONCILIATION.md` (truth model + contradiction inventory) · `docs/archive/reviews/STAGE_DOMAIN_REVIEW_AGENDA.md` (next review's backlog + resume order).
 
 ## 17) Deployment & Runtime Architecture Seeds
 

@@ -3,7 +3,7 @@
 > Companion to [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md).
 > **Update 2026-06-09:** migrations `0029/0030` (`credits_workers`) **APPLIED** to dev DB (rehearsed on a
 > clone, round-trip verified, suite green). The worker-tracking + settlement redesign is now §11-LOCKED in
-> [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) + [V2_1_REVIEW.md](V2_1_REVIEW.md) — that V2 track runs alongside
+> [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) + [V2_1_REVIEW.md](archive/reviews/V2_1_REVIEW.md) — that V2 track runs alongside
 > these M-phases (P1.2/P1.4 + M4.1 intersect it; see V2_1_REVIEW §7).
 > Status: APPROVED 2026-06-09, **Rev 2 (pre-mortem fixes applied)**. Baseline: **305 tests green**
 > (~103s, settings=config.settings.local). Branch: new_flask_app.
@@ -20,7 +20,7 @@ the heavy dimension lift — is banked; most dimensions already ~8.5–9.5 per t
 **New facts that re-shape the remaining plan:**
 - **A stage-domain review is now a gating phase (NEW · owner-requested).** Stage taxonomy/responsibilities,
   machine sub-stages, Missing-Piece + Alter/Rework lifecycles, costing/settlement/reporting implications
-  (see [STAGE_DOMAIN_REVIEW_AGENDA.md](STAGE_DOMAIN_REVIEW_AGENDA.md)). **This gates two M2 cleanups** —
+  (see [STAGE_DOMAIN_REVIEW_AGENDA.md](archive/reviews/STAGE_DOMAIN_REVIEW_AGENDA.md)). **This gates two M2 cleanups** —
   P2.8 (dissolve `stage_views.py`) and P2.9 (draft `draft_*` polymorphic move) — because stage taxonomy may
   reshape stage views + the draft model. Do P2.8/P2.9 **after** the stage review, not before.
 - **M4.1 is now UNBLOCKED.** It was deferred to post-V2-1; V2-1a/b/c (assignment foundation) are built, so the
@@ -62,7 +62,7 @@ but is tracked separately in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md); the stage
 Stage-coupled work is done **against the CURRENT flow** (Layering · Cutting-Pattern · Cutting ·
 Barcode-Gen), kept **simple (no speculative multi-stage machinery)**, and every stage-coupled touch point
 gets a durable reminder: an inline **`# FUTURE-STAGE-REDESIGN:`** comment pointing to
-[STAGE_DOMAIN_REVIEW_AGENDA.md](STAGE_DOMAIN_REVIEW_AGENDA.md) (the living backlog). So the future
+[STAGE_DOMAIN_REVIEW_AGENDA.md](archive/reviews/STAGE_DOMAIN_REVIEW_AGENDA.md) (the living backlog). So the future
 "add stages + refactor" work has a checklist; nothing is over-built today.
 
 **Run one phase per `continue`. Each phase = shippable, gate-green, characterization-before-refactor,

@@ -1,10 +1,12 @@
 # Architecture V2 — Adda Production Tracking & Settlement
 
-> Status (updated 2026-06-10, R0 reconciliation): **worker-tracking layer BUILT + COMMITTED**
-> (V2-1a/1b/1c — `WorkerStageTask`, `WorkerStageContribution`, dual-write chokepoint, reader flip,
-> contribution_schema hook, isolation gate; migrations 0031-0033 applied; commits e4953ef9…cfdb2d26).
-> **§11 settlement remains LOCKED DESIGN, not yet built** (V2-2). Pending: pt.2b/2c worker-report UI,
-> V2-1d M2M drop, V2-2 AddaSettlement, V2-3 SWA repurpose, Missing/Alter modules.
+> Status (updated 2026-06-12): **EVERYTHING THROUGH V2-3 IS BUILT, COMMITTED, AND LIVE-PROVEN.**
+> V2-1a→1d (worker truth; legacy M2M dropped, migration 0035) · V2-2 (§11 AddaSettlement —
+> finalize/reverse/supersede + management UI) · V2-3 (settlement-FIRST cutover executed:
+> `LEDGER_CREDIT_AT_ALLOCATION` default False, env True = rollback lever; settlement-money armor;
+> Expected→Earned→Paid worker visibility) · C-1 money-truth hardening (ADR-0009/0010).
+> Remaining on this doc's roadmap: soak-gated era-A deletion PR, then Missing/Alter modules.
+> First-read for new developers: [docs/PROJECT_KNOWLEDGE_MAP.md](PROJECT_KNOWLEDGE_MAP.md).
 > Ledger cutover for V2-2 is decided: **ADR 0007 (Option A — coexist; cross-era double-credit guard;
 > `LEDGER_CREDIT_AT_ALLOCATION` rollback flag).** This is a production-execution
 > + Adda-centric settlement system with worker isolation — **NOT a traditional payroll app.**
@@ -340,7 +342,7 @@ Two new financial tables (owner chose the frozen snapshot over deriving it — a
 > via adda_settlement_service (reopen/void guards + gate 4c). Worker visibility:
 > `unsettled_expected` (frozen WSC) → Earned (ledger) → Paid (cash) — three
 > non-overlapping views. Legacy-path deletion soak-gated. See
-> docs/V2_3_EXECUTION_REVIEW.md.
+> docs/archive/reviews/V2_3_EXECUTION_REVIEW.md.
 At `finalize`, for each settled `(worker, stage_record[, color/size])` line derived from a
 `WorkerStageContribution`, write ONE `StageWorkAssignment` row: `allocated_quantity` = policy-adjusted
 settled qty, `earning_rate_snapshot` = the contribution's frozen `expected_rate`,

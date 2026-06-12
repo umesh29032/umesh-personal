@@ -1,7 +1,7 @@
 # ADR 0005 — Production truth ≠ financial truth; ledger only at settlement (Option B)
 
 **Status:** Accepted for the model; **settlement build (V2 §11) pending** — see
-[docs/ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md) §11 (🔒LOCKED) + [docs/V2_1_REVIEW.md](../V2_1_REVIEW.md).
+[docs/ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md) §11 (🔒LOCKED) + [docs/archive/reviews/V2_1_REVIEW.md](../archive/reviews/V2_1_REVIEW.md).
 
 ## Context
 A worker reporting their stage work (production truth) is **not** the same event as the

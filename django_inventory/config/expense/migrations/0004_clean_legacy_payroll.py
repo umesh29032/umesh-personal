@@ -4,7 +4,7 @@ Runs as its own migration (separate transaction) BEFORE the schema change in
 0005 — Postgres refuses to ALTER a table in the same transaction as a DELETE
 with pending deferred-FK triggers.
 
-Under the settlement design (docs/production/SETTLEMENT_ARCHITECTURE.md):
+Under the settlement design (docs/archive/production/SETTLEMENT_ARCHITECTURE.md):
   • ADVANCE debits go away — advances are a SEPARATE loan pool, recovered at
     settlement, never a payable debit. WorkerAdvance rows are KEPT (they ARE the
     outstanding pool now).

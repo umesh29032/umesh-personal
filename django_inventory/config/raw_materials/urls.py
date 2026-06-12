@@ -1,4 +1,12 @@
-"""URL routes for raw_materials app."""
+"""raw_materials URLConf — cloth stock surfaces (mounted at /raw-materials/).
+
+Route groups / workflows:
+  (root) + cloth/      dashboards (stock by type/color, recent movement)
+  rolls/…              roll list (stacked cards on phone), bulk intake
+                       (price fields = financial roles only), detail
+  masters: types/colors/locations CRUD (soft-deactivate, never delete)
+  assign flow          roll→Adda binding happens from the LAYERING workspace
+                       (production app) — not from here."""
 from django.urls import path
 
 from raw_materials import views

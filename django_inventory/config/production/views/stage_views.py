@@ -1,4 +1,27 @@
-"""Stage views — Layering workspace + Cutting completion.
+"""Stage views — the LAYERING + CUTTING operator consoles (the app's biggest view file).
+
+FILE MAP (architecture comment — keep sections in this order):
+  L75   Helpers                 — _get_adda, rolls queryset, param parsing
+  L128  Layering workspace      — _build_layering_context + GET views
+        (StagePanelView serves EVERY stage's embedded panel — shared seam)
+  L305  Layering actions (POST) — start/attach/entry-edit/leftovers/complete/reopen
+  L857  Cutting legacy complete — single-form NIKKAR-style flow
+  L891  Cutting workspace       — _build_cutting_context (breakup, verification,
+        bundles, allocation display, barcode preview) + 15 action views
+  L1407 Allocation views        — era-A creation (LEVER-gated since V2-3) + void
+
+RESPONSIBILITY: parse request → permission/skill/assignment gate
+(ProductionRoleMixin + StageViewAccessMixin) → delegate to ONE service →
+redirect+message. DELEGATES TO: production stage services (layering/cutting via
+services facade), expense.allocate_stage_work/void_allocation (the allowed
+one-way production→expense edge). INVARIANTS RELIED ON: single-writer
+chokepoints do the actual writes; era guards live in services, NOT here.
+
+WHAT MUST NOT BE ADDED HERE: business logic, multi-row writes, money math,
+direct WST/WSC/SWA mutations — services own all of that (ADR-0001/0002).
+New STAGE TYPES don't extend this file: they get their own handler+views
+module (open-closed; see barcode_gen_views.py as the template).
+PARKED: splitting into per-stage modules = remediation Phase 8 (touch-time).
 
 YEH FILE KYU HAI?
 ─────────────────

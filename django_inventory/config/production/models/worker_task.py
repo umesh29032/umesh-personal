@@ -9,7 +9,7 @@ never recorded.
 V2-1a scope: the model + a reversible backfill from the M2M, written behind a
 dual-write chokepoint while the M2M stays authoritative (readers repoint in
 V2-1b). NO money here — Option B books earnings only at settlement.
-See docs/ARCHITECTURE_V2.md §2 + docs/V2_1_REVIEW.md §10.
+See docs/ARCHITECTURE_V2.md §2 + docs/archive/reviews/V2_1_REVIEW.md §10.
 
 `WorkerStageContribution` (quantity + frozen expected_*) is BUILT (V2-1c) —
 writers: report_contributions / save_draft_contributions / complete_worker_task
@@ -71,6 +71,9 @@ class WorkerStageTask(TimeStampedModel):
         constraints = [
             # ≤1 ACTIVE task per (stage_record, worker). Partial: cancelled rows are
             # excluded, so a cancelled worker can be re-assigned (a fresh active task).
+            # Hinglish: ek worker ka ek stage pe EK hi active task — cancelled
+            # history jama hoti rehti hai. Rework rounds isi liye CASE-scoped
+            # honge (ADR-0010 §4), WSC ko kabhi dilute nahi karenge.
             # Django 5.0.1: condition= on partial UniqueConstraint (NOT check=).
             models.UniqueConstraint(
                 fields=['stage_record', 'worker'],
@@ -105,6 +108,14 @@ class WorkerStageTask(TimeStampedModel):
 
 class WorkerStageContribution(TimeStampedModel):
     """Dimensional production line under a WorkerStageTask (≥1 per task).
+
+    THE production truth (ADR-0005): `reported_quantity` is the worker's claim,
+    IMMUTABLE forever; `verified_quantity` is management's correction (both
+    preserved — dispute me teeno sawaalon ka jawab alag column me hai).
+    Frozen `expected_*` = VISIBILITY only, never money. C-TM (locked): every
+    capture path — manual ya future barcode — writes here ONLY via
+    worker_task_service. A second writer breaks settlement's trust in these
+    numbers; that is what CI gate [4/4] exists to prevent.
 
     Owns the worker-reported QUANTITY + the FROZEN expected-earning snapshot.
     NEVER money (Option B): `expected_*` is operational visibility only — frozen

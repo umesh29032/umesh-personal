@@ -154,6 +154,8 @@ def void_allocation(assignment, *, user):
     _ensure_management(user)
     # Lock the row + re-check under the lock so two concurrent voids can't both
     # pass the guard and double-reverse the credit (worker under-paid).
+    # Hinglish: pehle LOCK, PHIR check — lock ke bina do click ek saath aaye
+    # to dono guard paas kar lete aur credit DO baar ulta ho jata.
     assignment = StageWorkAssignment.objects.select_for_update().get(pk=assignment.pk)
     if assignment.voided_at is not None:
         raise ValidationError("Allocation is already voided.")

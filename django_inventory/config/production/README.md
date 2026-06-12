@@ -397,3 +397,49 @@ env/bin/python config/manage.py runserver
 - `../docs/production/LAYERING_STAGE.md` — layering stage deep dive
 - `../docs/archive/production/CHAT_LOG.md` — chronological design decisions *(archived)*
 - `../CLAUDE.md` — repo-wide rules (service layer, RBAC, no signals)
+
+
+---
+
+## 2026-06-12 status + data-flow card (V2 era — read this first)
+
+**Truth model (LIVE since V2-1→V2-3):** `WorkerStageTask` = participation
+truth (partial-unique active per (stage_record, worker); cancel-not-delete) ·
+`WorkerStageContribution` = PRODUCTION truth (`reported_quantity` immutable;
+`verified_quantity` = management correction via the review page; frozen
+`expected_*` = visibility, never money). Canonical:
+[docs/ARCHITECTURE_V2.md](../../docs/ARCHITECTURE_V2.md).
+
+```
+Adda start → stage records (one per WorkflowStage) → workers assigned
+ (set_stage_workers — SOLE WST writer, CI gate [4/4])
+ → worker reports on phone (report_contributions → WSC lines)
+ → complete_worker_task FREEZES expected_rate/_earning
+ → stage completes (unreported tasks auto-cancel — F3; P2 dialog warns first)
+ → settlement reads verified-else-reported (expense app's job)
+```
+
+**Single-writer rules here:** WST/WSC → `worker_task_service` only (C-TM:
+EVERY capture path — manual today, barcode later — converges through it) ·
+stage records/typed records → each stage's service via the shared skeletons ·
+costing freeze → `cost_service`.
+
+**What breaks if bypassed:** a WSC written elsewhere skips the expected-*
+freeze and the settlement guards — a payable line that money code can't
+trust; a second WST writer breaks the roster=participation promise.
+
+**Mobile-first (rule 11):** worker report flow is phone-first (verified
+360px); every management table needs an explicit responsive strategy.
+
+## Django Learning Notes (V2 additions)
+
+- **Partial unique constraint** (`UniqueConstraint(condition=~Q(status='cancelled'))`):
+  one ACTIVE task per worker-stage while letting cancelled history pile up.
+- **Frozen snapshots**: write-once columns set inside the completing
+  transaction (price-at-time-of-order pattern) — later rate edits change
+  nothing retroactively.
+- **Open-closed stage engine**: `StageHandler.contribution_schema(adda)` —
+  the worker form renders from a schema; new stage = new handler, zero UI edits.
+- **Template-method reopen** (`_shared.reopen_stage_record`): shared skeleton
+  + per-stage guard/teardown; V2-3 armor blocks reopen when settlement money
+  exists (names the ADST).

@@ -1,7 +1,7 @@
 # ADR-0010 — Growth & identity policy locks (multi-factory, references, barcode, rework)
 
 Status: **ACCEPTED** (owner, 2026-06-11 — C-1 pre-deploy hardening).
-Source: docs/ARCH_AUDIT_FOUNDATION_2026_06_11.md. Pure policy — zero schema
+Source: docs/archive/audits/ARCH_AUDIT_FOUNDATION_2026_06_11.md. Pure policy — zero schema
 today; each lock converts a potential rewrite into a bounded future migration.
 
 ## Decision 1 — References are globally unique, forever

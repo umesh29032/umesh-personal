@@ -1,5 +1,13 @@
 """Cutting-pattern stage views — workspace + 6 action handlers.
 
+RESPONSIBILITY: the cutting-pattern operator console (evidence photos/video,
+verification, complete/reopen). DELEGATES TO: pattern-stage services (typed
+record writes, completion validations, reopen via the _shared skeleton).
+INVARIANTS: assignment-gated (skill alone insufficient); evidence locks at
+complete; reopen rules live in the service skeleton (incl. the V2-3
+settled-stage block). MUST NOT ADD: cross-stage logic (each stage = own
+module), money paths, direct model writes.
+
 YEH FILE KYU HAI?
 ─────────────────
 Cutting-pattern stage ka user-facing layer. Service layer ko HTTP se connect

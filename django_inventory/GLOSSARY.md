@@ -94,4 +94,4 @@ erDiagram
 
 *Read first for the big picture: [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md). Deeper:
 [docs/production/OVERVIEW.md](docs/production/OVERVIEW.md),
-[docs/production/PAYROLL_ARCHITECTURE.md](docs/production/PAYROLL_ARCHITECTURE.md).*
+[docs/archive/production/PAYROLL_ARCHITECTURE.md](docs/archive/production/PAYROLL_ARCHITECTURE.md).*
