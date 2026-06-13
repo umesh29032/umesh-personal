@@ -8,6 +8,9 @@ storefront listings.
 
 > Personal project. Owner: Umesh. Solo maintainer.
 
+> **New here? → [docs/START_HERE.md](docs/START_HERE.md).** One front door that
+> routes a new developer, the owner, or an AI agent to exactly what to read.
+
 ---
 
 ## Quick Start
@@ -50,12 +53,13 @@ Lazy-load only what you need:
 
 | File | When to read |
 |------|-------------|
+| [docs/START_HERE.md](docs/START_HERE.md) | **First, always.** Routes you (new dev / owner / AI agent) to exactly what to read. |
 | [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | **Current full system design** — most up-to-date big picture. |
 | [CLAUDE.md](CLAUDE.md) | Working rules for AI agents + shortcuts. Always-on. |
 | [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) | Canonical current-state design (models/services/ER/security/perf). First read: [docs/PROJECT_KNOWLEDGE_MAP.md](docs/PROJECT_KNOWLEDGE_MAP.md). |
-| [docs/archive/production/PAYROLL_ARCHITECTURE.md](docs/archive/production/PAYROLL_ARCHITECTURE.md) · [SETTLEMENT_ARCHITECTURE.md](docs/archive/production/SETTLEMENT_ARCHITECTURE.md) · [STAGE_COSTING_PLAN.md](docs/archive/production/STAGE_COSTING_PLAN.md) | `expense` app: earnings ledger, advances, settlement + stage costing. |
+| [config/expense/README.md](config/expense/README.md) · [docs/ARCHITECTURE_V2.md](docs/ARCHITECTURE_V2.md) §11 · [docs/LEARNING_2_0/CHOKEPOINTS/adda_settlement_service.md](docs/LEARNING_2_0/CHOKEPOINTS/adda_settlement_service.md) | **`expense` app (live canonicals):** earnings ledger, advances, settlement + stage costing ([ADR-0009](docs/adr/0009-cost-truth.md)). *(Pre-V2 design archived under [docs/archive/production/](docs/archive/production/) — history only.)* |
 | [docs/production/RBAC.md](docs/production/RBAC.md) | Roles/skills, Access Control hub, sidebar + URL enforcement. |
-| [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/FLOWS/](docs/FLOWS/) | Changelog, per-page contracts, flows. |
+| [CHANGELOG.md](CHANGELOG.md) · [docs/PAGES/](docs/PAGES/) · [docs/LEARNING_2_0/DATA_FLOWS/](docs/LEARNING_2_0/DATA_FLOWS/) | Changelog, per-page contracts, flows (write-path + REQUEST_JOURNEYS call-chains). |
 | [docs/adr/](docs/adr/) · [docs/archive/](docs/archive/) | Locked architecture decisions (ADRs); superseded/dated docs (audits, build logs). |
 | [ABOUT_THIS_PROJECT.md](ABOUT_THIS_PROJECT.md) | Why + how + learning map for a junior Django dev. |
 | [UI_COMPONENTS.md](UI_COMPONENTS.md) | Component vocabulary + design tokens. Read before writing CSS. |
