@@ -3,7 +3,7 @@ ledger + advances (separate loan pool) + on-demand settlements + scoping."""
 from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from accounts.models import Skill, User
 from inventory.models import Role
@@ -25,6 +25,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ExpenseCoreTests(TestCase):
     def setUp(self):
         self.mgr = _manager()
@@ -34,8 +37,11 @@ class ExpenseCoreTests(TestCase):
         self.sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         # Price the stage so allocation has a rate.
         ws = self.sr.workflow_stage
+        # Layering ships grouped-at-cutting (migration 0026). These earning tests
+        # use it as a priced vehicle, so ungroup + price it.
+        ws.cost_billed_at = None
         ws.cost_rate = Decimal('2')
-        ws.save(update_fields=['cost_rate'])
+        ws.save(update_fields=['cost_billed_at', 'cost_rate'])
 
     def test_allocation_is_quantity_driven_and_credits_ledger(self):
         a = allocate_stage_work(user=self.mgr, stage_record=self.sr,
@@ -74,15 +80,19 @@ class ExpenseCoreTests(TestCase):
         self.assertEqual(s.amount_paid, Decimal('20.00'))
         self.assertEqual(worker_summary(self.worker)['total_settled'], Decimal('20.00'))
 
-    def test_settlement_recovers_advance_owner_choice(self):
-        allocate_stage_work(user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=10)  # payable 20
-        adv = record_advance(user=self.mgr, worker=self.worker, amount=15)       # outstanding 15
-        # owner recovers 10 of the 15 + pays 10 cash → 20 total = full payable
-        s = create_settlement(user=self.mgr, worker=self.worker, amount_paid=10,
+    def test_payment_recovery_rejected_post_v2_2(self):
+        # V2-2 Model A: recovery RE-HOMED to AddaSettlement.finalize — the
+        # payment event refuses it (mechanics covered in
+        # test_adda_settlement_service).
+        allocate_stage_work(user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=10)
+        adv = record_advance(user=self.mgr, worker=self.worker, amount=15)
+        with self.assertRaises(ValidationError):
+            create_settlement(user=self.mgr, worker=self.worker, amount_paid=10,
                               recoveries=[{'advance': adv.id, 'amount': 10}])
-        self.assertEqual(worker_balance(self.worker), Decimal('0.00'))
-        self.assertEqual(advance_outstanding(self.worker), Decimal('5.00'))      # 15 − 10
-        self.assertEqual(s.advance_deducted, Decimal('10.00'))
+        # payment-only still works:
+        create_settlement(user=self.mgr, worker=self.worker, amount_paid=10)
+        self.assertEqual(worker_balance(self.worker), Decimal('10.00'))
+        self.assertEqual(advance_outstanding(self.worker), Decimal('15.00'))
 
     def test_partial_settlement_leaves_remainder(self):
         allocate_stage_work(user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=10)  # payable 20
@@ -94,12 +104,8 @@ class ExpenseCoreTests(TestCase):
         with self.assertRaises(ValidationError):
             create_settlement(user=self.mgr, worker=self.worker, amount_paid=25)
 
-    def test_recovery_cannot_exceed_advance_remaining(self):
-        allocate_stage_work(user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=10)
-        adv = record_advance(user=self.mgr, worker=self.worker, amount=5)
-        with self.assertRaises(ValidationError):
-            create_settlement(user=self.mgr, worker=self.worker, amount_paid=0,
-                              recoveries=[{'advance': adv.id, 'amount': 10}])
+    # (V2-2) recovery-bound checks live at AddaSettlement.finalize now —
+    # see test_adda_settlement_service.test_over_recovery_rejected.
 
     def test_settlement_requires_management(self):
         allocate_stage_work(user=self.mgr, stage_record=self.sr, worker=self.worker, allocated_quantity=10)

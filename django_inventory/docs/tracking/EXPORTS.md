@@ -217,5 +217,5 @@ Full suite: 196/196 as of 2026-05-29.
 ## See Also
 
 - [../production/BARCODE_GENERATION.md](../production/BARCODE_GENERATION.md) — upstream stage
-- [../production/BARCODE_STAGE_PLAN.md](../production/BARCODE_STAGE_PLAN.md) — design decisions
+- [../archive/production/BARCODE_STAGE_PLAN.md](../archive/production/BARCODE_STAGE_PLAN.md) — design decisions *(archived)*
 - [../production/OVERVIEW.md](../production/OVERVIEW.md) — production subsystem overview

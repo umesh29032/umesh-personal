@@ -97,6 +97,11 @@ class _BgWorkflowFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises barcode-gen mechanics, not payroll.
+        # Cutting is seeded credits_workers=True (mig 0030) -> would otherwise need a
+        # worker allocation to complete. Not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         # Attach barcode_generation Stage to T-SHIRT workflow as last stage
         bg_stage = Stage.objects.get(code=STAGE_BARCODE_GENERATION)
@@ -188,7 +193,7 @@ class StartBarcodeGenerationTests(_BgWorkflowFixture):
             adda=self.adda, worker_ids=[self.admin.pk], user=self.admin,
         )
         self.assertIsNotNone(sr.started_at)
-        self.assertIn(self.admin, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(self.admin))
         # BarcodeGenerationRecord auto-created
         self.assertIsNotNone(getattr(sr, 'barcode_generation', None))
 
@@ -238,10 +243,14 @@ class CompleteBarcodeGenerationTests(_BgWorkflowFixture):
 
     def test_complete_refuses_on_count_mismatch(self):
         generate_barcodes(adda=self.adda, user=self.admin)
-        # Corrupt one batch: shrink total_pieces directly
-        batch = BarcodeBatch.objects.filter(adda=self.adda).first()
-        batch.total_pieces = 99
-        batch.save(update_fields=['total_pieces'])
+        # Simulate counter drift on the generation-record denorm so it disagrees
+        # with the actual barcode batches. (A batch's total_pieces is now
+        # DB-constrained to its seq-range width — tracking_batch_pieces_consistent
+        # — so we drift the record side instead, which is a reachable state.)
+        sr = AddaStageRecord.objects.get(adda=self.adda, workflow_stage=self.bg_wf)
+        rec = sr.barcode_generation
+        rec.total_barcodes = rec.total_barcodes + 1
+        rec.save(update_fields=['total_barcodes'])
         with self.assertRaises(ValidationError):
             complete_barcode_generation(adda=self.adda, user=self.admin)
 

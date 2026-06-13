@@ -1,7 +1,7 @@
 # accounts app — Developer Guide
 
 Internal auth + user-management app for Kapil Enterprises Inventory ERP.
-Written for Django 5.2 + PostgreSQL. All auth endpoints are rate-limited.
+Written for Django 5.0.1 + PostgreSQL. All auth endpoints are rate-limited.
 
 ---
 
@@ -383,3 +383,37 @@ Test coverage:
 All test classes inherit `BaseSecurityTest` which pins the cache backend to
 `LocMemCache` and calls `cache.clear()` in setUp/tearDown to keep counters
 isolated between test methods.
+
+
+---
+
+## How data flows through this app (added 2026-06-12)
+
+```
+login (password/OTP/Google) → rate-limit check (cache, per IP+email)
+  → session → every request: permission_service.user_has_perm/_has_role
+  → SidebarItemRule (menu + URL gated together, via inventory middleware)
+```
+
+**Tables:** `accounts_user` (custom User, email login) · `accounts_role` +
+`accounts_user_extra_roles` (RBAC; relocated here 2026-06 so identity+access
+is ONE foundation) · `accounts_sidebaritemrule` · allauth tables (Google).
+
+**Who writes:** user CRUD → accounts services (service layer owns writes,
+2026-06 remediation removed the signals); role/sidebar edits → Access hub
+views via the same services. **Single-writer note:** `user_has_perm` carries
+the `ROLE_SUPER_ADMIN` bypass — change it nowhere else.
+
+**Why this design / what breaks if bypassed:** auth is the foundation gate —
+a raw `is_superuser` check in a view bypasses the role editor's curation and
+breaks the delegation model (rule 6). Skipping the rate-limiter helpers on a
+new auth endpoint reopens brute-force.
+
+## Django Learning Notes
+
+- **Custom User (`AUTH_USER_MODEL`)**: email as username; set BEFORE first
+  migrate, effectively permanent.
+- **Argon2 hasher** + cache-backed rate limit (per IP+email) on every auth
+  endpoint; allauth restricted to pre-provisioned users (no open signup).
+- **M2M `extra_roles`**: one primary FK role + additive extras — simple
+  precedence, no role explosion.

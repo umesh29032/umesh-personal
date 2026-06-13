@@ -841,6 +841,25 @@
             -webkit-overflow-scrolling: touch;
             /* Must NOT be inside an overflow:hidden ancestor for scrolling to work */
         }
+        /* Worker roster chips (S1-4, frontend audit): the assignment widget
+           renders in stage panels on several hosts (workspace, adda detail,
+           dashboard-embedded) — base owns the chip look so raw checkboxes can
+           never appear. Mirrors _form_styles.html's .form-shell variant. */
+        .workers-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 8px 10px;
+        }
+        .worker-chip {
+            display: flex; align-items: center; gap: 8px;
+            padding: 9px 12px; min-height: 44px;          /* touch target */
+            background: var(--cream, #faf3e7); border: 1.5px solid #cfc0aa;
+            border-radius: 10px; cursor: pointer; font-size: 13px;
+            transition: background .15s, border-color .15s;
+        }
+        .worker-chip:hover { border-color: var(--copper); }
+        .worker-chip:has(input:checked) { background: rgba(184,115,51,.10); border-color: var(--copper); }
+        .worker-chip input { width: auto; padding: 0; margin: 0; box-shadow: none; border: none; }
+
         /* .table-responsive is the same concept — used in most page templates */
         .table-responsive {
             overflow-x: auto;
@@ -904,6 +923,15 @@
             }
             /* Hide desktop column headers */
             .table-responsive thead { display: none; }
+            /* F1 (frontend audit 2026-06-12): in stacked-card mode the table
+               must never keep a desktop width. Two offenders beat width:100%:
+               .tbl's own min-width:560px (the desktop h-scroll pattern) and
+               DataTables' inline style width. Both pushed every VALUE
+               off-screen right while labels stayed visible. */
+            .table-responsive table {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
 
             /* Each row is a card */
             .table-responsive tbody tr {
@@ -1468,6 +1496,61 @@
             .hero-strip h1 { font-size: 20px; }
             .hero-strip p { font-size: 13px; }
         }
+
+        /* ── Money-family canonicals (A-scope consolidation 2026-06-12) ──
+           The reference vocabulary for settlement/payroll/costing screens and
+           every FUTURE money/list UI (G4, MissingPiece, Alter). Pages keep
+           only page-SPECIFIC extras; these shared shapes live here once. */
+        .hero-strip.copper {
+            background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
+            color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
+            box-shadow: var(--shadow-card);
+        }
+        .hero-strip.copper h1 { font-size: 20px; margin: 0; color: #fff; }
+        .hero-strip.copper p { font-size: 13px; margin: 6px 0 0; color: rgba(255,255,255,.9); }
+
+        .panel {
+            background: var(--card-bg); border: 1px solid var(--border-card);
+            border-radius: 14px; box-shadow: var(--shadow-card);
+            padding: 16px; margin-bottom: 18px;
+        }
+        .panel h2 { margin: 0 0 10px; font-size: 15px; }
+
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin-bottom: 16px;
+        }
+        .stat-card {
+            background: var(--card-bg); border: 1px solid var(--border-card);
+            border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px 16px;
+        }
+        .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
+        .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+        .stat-card.payable .value { color: var(--copper); }
+        @media (max-width: 560px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+
+        .sticky-bar {
+            position: sticky; bottom: 0; z-index: 5;
+            background: rgba(255,255,255,.88); backdrop-filter: blur(8px);
+            border-top: 1px solid var(--border-card); border-radius: 12px 12px 0 0;
+            padding: 12px 16px; display: flex; gap: 10px; justify-content: flex-end;
+        }
+        html[data-theme="dark"] .sticky-bar { background: rgba(20,16,12,.88); }
+
+        /* Standalone button shapes for the money family — markup uses bare
+           .btn-copper/.btn-ghost/.btn-danger WITHOUT the .btn base (different
+           geometry: radius 10, font 13). :not(.btn) keeps the classic
+           .btn + modifier combos elsewhere pixel-identical. */
+        .btn-copper:not(.btn), .btn-danger:not(.btn), .btn-ghost:not(.btn) {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 18px; border-radius: 10px;
+            font-size: 13px; font-weight: 700; font-family: inherit;
+            border: none; cursor: pointer; text-decoration: none;
+            min-height: 40px;          /* touch target */
+        }
+        .btn-danger:not(.btn) { background: #b03434; color: #fff; }
+        .btn-danger:not(.btn):hover { background: #992b2b; }
+        .btn-ghost:not(.btn) { background: transparent; border: 1px solid var(--border-card); color: var(--ink); font-weight: 600; }
 
         /* ── Tabs ───────────────────────────────────────────────────── */
         .tabs {

@@ -10,8 +10,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.views.generic import TemplateView
 
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.models import Adda, AddaStageRecord
+# FUTURE-STAGE-REDESIGN: StageWorkAssignment is transitional — V2-2 settlement
+# repoints worker earnings; this costing read moves to the settlement source then
+# (production->expense one-way edge; see docs/ARCHITECTURE_V2.md §11).
 from expense.models import StageWorkAssignment
 
 
@@ -28,6 +31,9 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         ctx = super().get_context_data(**kwargs)
         addas = list(
             Adda.objects.select_related('product', 'current_stage__stage')
+            # Annotate pieces in ONE query — shadows the Adda.total_pieces
+            # property so we don't fire a per-Adda aggregate in the loop (N+1).
+            .annotate(pieces=Sum('barcode_batches__total_pieces'))
             .order_by('-started_at')[:200]
         )
         # Total manufacturing cost per Adda (only frozen+priced stage rows).
@@ -44,6 +50,14 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
                 completed_at__isnull=False, processing_cost__isnull=True,
             ).values('adda').annotate(n=Count('id'))
         }
+        # C-1 (ADR-0009 honest-NULL): consumed-but-UNPRICED rolls make an
+        # Adda's material costing incomplete — surfaced, never coerced to 0.
+        from raw_materials.models import ClothRoll
+        unpriced_rolls_map = {
+            r['adda']: r['n'] for r in
+            ClothRoll.objects.filter(adda__isnull=False, cost_per_kg__isnull=True)
+            .values('adda').annotate(n=Count('id'))
+        }
         earn_map = {
             r['stage_record__adda']: r['e'] for r in
             StageWorkAssignment.objects.filter(voided_at__isnull=True)
@@ -57,11 +71,13 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             rows.append({
                 'adda': a,
                 'current_stage': a.current_stage.stage.name if a.current_stage else '—',
-                'pieces': a.total_pieces,
+                'pieces': a.pieces or 0,   # annotation (see queryset), not the N+1 property
                 'total_cost': cost,
                 'worker_earnings': earn_map.get(a.pk, 0),
                 'unpriced': unpriced_map.get(a.pk, 0),
+                'unpriced_rolls': unpriced_rolls_map.get(a.pk, 0),
             })
         ctx['rows'] = rows
         ctx['grand_cost'] = grand_cost
+        ctx['total_unpriced_rolls'] = sum(unpriced_rolls_map.values())
         return ctx

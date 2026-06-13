@@ -18,7 +18,7 @@ from django.test import TestCase
 from accounts.models import Skill, User
 from inventory.models import Role
 from production.forms._shared import _layering_worker_queryset
-from production.models import AddaStageRecord, Product
+from production.models import WorkerStageTask, AddaStageRecord, Product
 from production.services import (
     adda_activity, attach_roll_to_layering, complete_layering,
     create_adda, record_remaining_cloth, sync_layering_workers_for_skill,
@@ -51,7 +51,7 @@ class CreateAddaAutoTagTests(TestCase):
         )
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
-        worker_pks = set(sr.workers.values_list('pk', flat=True))
+        worker_pks = {u.pk for u in sr.active_workers}
         self.assertEqual(worker_pks, {admin.pk, helper.pk})
 
     def test_rejects_create_adda_when_no_skilled_users(self):
@@ -70,7 +70,7 @@ class CreateAddaAutoTagTests(TestCase):
             create_adda(admin, product=product)
 
 
-class RetroTagSignalTests(TestCase):
+class RetroTagTests(TestCase):
     def test_new_skill_user_retro_tagged_to_active_layering(self):
         admin = _user('adm@retro.test', skills=['cutting_master'])
         adda = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
@@ -78,12 +78,14 @@ class RetroTagSignalTests(TestCase):
             adda=adda,
             workflow_stage__stage__code='layering',
         )
-        # New helper user added AFTER adda exists — signal should retro-tag them.
+        # New helper user added AFTER adda exists.
         late = _user('late@retro.test', role_code='worker', is_super=False)
-        self.assertNotIn(late, sr.workers.all())
+        self.assertFalse(sr.is_worker_assigned(late))
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
-        # Signal fires on m2m_changed post_add → late should now be in workers M2M
-        self.assertIn(late, sr.workers.all())
+        # No signal anymore (CLAUDE.md rule #4) — retro-tag is an EXPLICIT call,
+        # made by the user-management service after skills change.
+        sync_layering_workers_for_skill(late)
+        self.assertTrue(sr.is_worker_assigned(late))
 
     def test_retro_tag_skips_completed_stage_records(self):
         admin = _user('adm@retro2.test',
@@ -119,22 +121,26 @@ class RetroTagSignalTests(TestCase):
         sr1.refresh_from_db()
         self.assertIsNotNone(sr1.completed_at)
 
-        # New helper user — must NOT be added to the completed adda1's stage_record
+        # Even when the retro-tag sync runs, it must NOT add them to the
+        # COMPLETED adda1's stage_record (only active layerings get tagged).
         late = _user('late@retro2.test', role_code='worker', is_super=False)
         late.skills.add(Skill.objects.get(name='cutting_master_helper'))
-        self.assertNotIn(late, sr1.workers.all())
+        sync_layering_workers_for_skill(late)
+        self.assertFalse(sr1.is_worker_assigned(late))
 
     def test_sync_helper_callable_directly(self):
         admin = _user('adm@dir.test', skills=['cutting_master'])
         create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
-        # Make a user, attach skill via plain ORM (bypasses signal? no, M2M always fires)
-        # then call sync directly to assert idempotence
         u = _user('dir@dir.test', role_code='worker', is_super=False,
                   skills=['cutting_master_helper'])
-        # Already tagged via signal; calling sync again should not raise
-        before = AddaStageRecord.objects.filter(workers=u).count()
+        # First explicit sync tags them onto the active layering; a SECOND sync
+        # must be idempotent (no double-add).
         sync_layering_workers_for_skill(u)
-        after = AddaStageRecord.objects.filter(workers=u).count()
+        before = WorkerStageTask.objects.filter(worker=u).exclude(
+            status=WorkerStageTask.Status.CANCELLED).count()
+        sync_layering_workers_for_skill(u)
+        after = WorkerStageTask.objects.filter(worker=u).exclude(
+            status=WorkerStageTask.Status.CANCELLED).count()
         self.assertEqual(before, after)
 
 

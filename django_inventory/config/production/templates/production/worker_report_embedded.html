@@ -1,0 +1,33 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ adda.code }} · Report my work</title>
+{% comment %}V2-1c-iii pt.2b — CHROMELESS worker report for iframe embed (D1 route 2;
+mirrors stage_panel_embedded.html's pattern: tokens inline, no sidebar/nav).
+All logic in _worker_report_body.html (schema-driven).{% endcomment %}
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --ink:#1c1c1e; --stone:#6e6259; --cream:#faf7f2; --cream-2:#f1ece2;
+    --copper:#b87333; --surface-2:#f5f1ea; --card-bg:#fff; --border-card:#cfc0aa;
+    --border-subtle:#e6dcc9; --danger:#b91c1c; --danger-bg:rgba(220,38,38,.10); --white:#fff; }
+  *{box-sizing:border-box}
+  body{margin:0; background:transparent; color:var(--ink); padding:8px 6px;
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
+</style>
+{% include "production/_worker_report_styles.html" %}
+</head>
+<body>
+{% include "production/_worker_report_body.html" %}
+<script>
+  // Iframe auto-resize — same postMessage contract as stage_panel_embedded.html.
+  (function(){
+    function send(){ parent.postMessage({type:'stage-panel-resize',
+      height: document.documentElement.scrollHeight}, window.location.origin); }
+    window.addEventListener('load', send);
+    new MutationObserver(send).observe(document.body, {subtree:true, childList:true, attributes:true});
+  })();
+</script>
+</body>
+</html>

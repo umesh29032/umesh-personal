@@ -1,0 +1,247 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}{{ s.reference }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .adst-detail .hero-strip { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .adst-detail .pill { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.18); }
+    .adst-detail .panel h3 { margin: 14px 0 6px; font-size: 13px; color: var(--ink); }
+    .adst-detail table { width: 100%; border-collapse: collapse; }
+    .adst-detail th, .adst-detail td { text-align: left; padding: 9px 10px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
+    .adst-detail th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
+    .adst-detail td.num, .adst-detail th.num { text-align: right; }
+    .adst-detail tr:last-child td { border-bottom: none; }
+    .adst-detail .muted { color: var(--stone); font-size: 12px; }
+    .adst-detail .skip { background: #faf7f0; border: 1px dashed var(--border-card); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+    .adst-detail .skip .why { font-size: 12px; color: #9a6a1b; font-weight: 600; }
+    .adst-detail input[type=number], .adst-detail textarea {
+        background: var(--cream, #fdf8ee); border: 1px solid var(--border-card); border-radius: 8px;
+        padding: 6px 8px; font-size: 13px; box-shadow: inset 0 1px 2px rgba(0,0,0,.06); width: 90px;
+    }
+    .adst-detail textarea { width: 100%; min-height: 56px; }
+    .adst-detail .totals { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; }
+    .adst-detail .totals .t { background: #faf7f0; border-radius: 10px; padding: 10px 14px; }
+    .adst-detail .totals .t .v { font-size: 17px; font-weight: 800; color: var(--copper); }
+    .adst-detail .totals .t .l { font-size: 11px; text-transform: uppercase; color: var(--stone); }
+    .adst-detail .chain { font-size: 12px; }
+    .adst-detail .chain a { color: var(--copper); font-weight: 700; text-decoration: none; }
+    .adst-detail .chain .here { font-weight: 800; }
+    @media (max-width: 640px) {
+        .adst-detail input[type=number] { width: 70px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="adst-detail">
+    <div class="hero-strip copper">
+        <div>
+            <h1>{{ s.reference }} · {{ s.adda.code }}</h1>
+            <p>{{ s.adda.product.name }}{% if s.notes %} · {{ s.notes }}{% endif %}</p>
+        </div>
+        <span class="pill">{{ s.get_status_display }}</span>
+    </div>
+
+    {% if chain %}
+    <div class="panel chain">
+        <strong>Correction chain:</strong>
+        {% for c in chain %}
+            {% if c.pk == s.pk %}<span class="here">{{ c.reference }} ({{ c.get_status_display }})</span>{% else %}<a href="{% url 'expense:adda-settlement-detail' c.reference %}">{{ c.reference }} ({{ c.get_status_display }})</a>{% endif %}
+            {% if not forloop.last %} → {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if s.status == 'draft' %}
+    {# ── DRAFT: recomputable preview + variance + recovery + finalize ── #}
+    <div class="panel muted" style="font-size:12px;">
+        Numbers wrong? <a href="{% url 'production:adda-report-review' s.adda.code %}" style="color:var(--copper);font-weight:700;">Review &amp; correct quantities</a> first — settlement pays verified-else-reported.
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        {% for w in workers %}
+        <div class="panel">
+            <h2>{{ w.worker.get_full_name|default:w.worker.email }}
+                <span class="muted">— expected ₹{{ w.expected|floatformat:2 }}</span></h2>
+            <table>
+                <thead><tr><th>Stage</th><th>Color</th><th>Size</th><th class="num">Qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th></tr></thead>
+                <tbody>
+                {% for l in w.lines %}
+                    <tr>
+                        <td>{{ l.stage }}</td>
+                        <td>{{ l.color|default:"—" }}</td>
+                        <td>{{ l.size|default:"—" }}</td>
+                        <td class="num">{{ l.qty }}{% if l.verified %} <span class="muted" title="verified quantity used">✓</span>{% endif %}</td>
+                        <td class="num">{{ l.rate|floatformat:2 }}</td>
+                        <td class="num">{{ l.amount|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            <h3>Variance (counts only — factory absorbs; pay is not reduced)</h3>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+                <label class="muted">Packed <input type="number" inputmode="numeric" min="0" name="var_{{ w.worker.pk }}_packed"></label>
+                <label class="muted">Missing <input type="number" inputmode="numeric" min="0" name="var_{{ w.worker.pk }}_missing"></label>
+                <label class="muted">Rejected <input type="number" inputmode="numeric" min="0" name="var_{{ w.worker.pk }}_rejected"></label>
+            </div>
+
+            {% if w.advances %}
+            <h3>Recover advances <span class="muted">— optional, ≤ remaining; you decide per advance</span></h3>
+            <table>
+                <thead><tr><th>Date</th><th class="num">Remaining ₹</th><th class="num">Recover now ₹</th></tr></thead>
+                <tbody>
+                {% for a in w.advances %}
+                    <tr>
+                        <td>{{ a.advance.advance_date }}{% if a.advance.notes %} · <span class="muted">{{ a.advance.notes }}</span>{% endif %}</td>
+                        <td class="num">{{ a.remaining|floatformat:2 }}</td>
+                        <td class="num"><input type="number" inputmode="decimal" step="0.01" min="0" max="{{ a.remaining|floatformat:2 }}" name="recover_{{ a.advance.id }}" placeholder="0.00"></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {% if not workers %}
+        <div class="panel"><div class="muted">No settleable lines — every completed contribution on payable stages is already credited (see below).</div></div>
+        {% endif %}
+
+        {% if skip_a %}
+        <div class="panel">
+            <h2>Excluded — already credited at allocation (legacy)</h2>
+            <div class="skip">
+                <div class="why">Why excluded: these earnings were booked the old way, at work allocation, before Adda settlements existed. Settling them again would pay the worker twice. They stay on the old ledger entries.</div>
+                <table>
+                    <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th class="num">Would-be ₹</th></tr></thead>
+                    <tbody>
+                    {% for l in skip_a %}
+                        <tr>
+                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td>{{ l.stage }}</td>
+                            <td class="num">{{ l.qty }}</td>
+                            <td class="num">{{ l.amount|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if skip_b %}
+        <div class="panel">
+            <h2>Excluded — settled by an earlier Adda settlement</h2>
+            <div class="skip">
+                <div class="why">Why excluded: an earlier settlement already booked these lines. To re-settle them, reverse that settlement first.</div>
+                <table>
+                    <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th>Settled by</th></tr></thead>
+                    <tbody>
+                    {% for l in skip_b %}
+                        <tr>
+                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td>{{ l.stage }}</td>
+                            <td class="num">{{ l.qty }}</td>
+                            <td>{{ l.contribution.settlement_line.adda_settlement.reference|default:"—" }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="panel totals">
+            <div class="t"><div class="v">₹{{ grand_expected|floatformat:2 }}</div><div class="l">Total expected earning</div></div>
+            <div class="t"><div class="v">{{ workers|length }}</div><div class="l">Workers</div></div>
+        </div>
+
+        <div class="sticky-bar">
+            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="discard" class="btn-ghost"
+                    onclick="return confirm('Discard draft {{ s.reference }}? Nothing was booked; this just removes the scratchpad.');">Discard draft</button>
+            {% if workers %}
+            <button type="submit" name="action" value="finalize" class="btn-copper"
+                    onclick="return confirm('Finalize {{ s.reference }}? This books earnings and recoveries to the ledger.');">Finalize settlement</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% else %}
+    {# ── FINALIZED / REVERSED / SUPERSEDED: frozen snapshot ── #}
+    <div class="panel totals">
+        <div class="t"><div class="v">₹{{ s.expected_total|floatformat:2 }}</div><div class="l">Expected total</div></div>
+        <div class="t"><div class="v">{{ s.packed_total }}</div><div class="l">Packed</div></div>
+        <div class="t"><div class="v">{{ s.missing_total }}</div><div class="l">Missing</div></div>
+        <div class="t"><div class="v">{{ s.rejected_total }}</div><div class="l">Rejected</div></div>
+        <div class="t"><div class="v">₹{{ s.variance_total|floatformat:2 }}</div><div class="l">Variance ₹ (absorbed)</div></div>
+    </div>
+
+    <div class="panel">
+        <h2>Per-worker snapshot <span class="muted">— frozen at finalize; the ledger stays the live truth</span></h2>
+        <table>
+            <thead><tr><th>Worker</th><th class="num">Expected ₹</th><th class="num">Advance before ₹</th><th class="num">Recovered ₹</th><th class="num">Final payable ₹</th></tr></thead>
+            <tbody>
+            {% for i in items %}
+                <tr>
+                    <td>{{ i.worker.get_full_name|default:i.worker.email }}</td>
+                    <td class="num">{{ i.expected_earning|floatformat:2 }}</td>
+                    <td class="num">{{ i.advance_outstanding_before|floatformat:2 }}</td>
+                    <td class="num">{{ i.advance_recovered|floatformat:2 }}</td>
+                    <td class="num">{{ i.final_payable|floatformat:2 }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if recoveries %}
+    <div class="panel">
+        <h2>Advance recoveries</h2>
+        <table>
+            <thead><tr><th>Worker</th><th>Advance</th><th class="num">Recovered ₹</th><th>State</th></tr></thead>
+            <tbody>
+            {% for r in recoveries %}
+                <tr>
+                    <td>{{ r.advance.worker.get_full_name|default:r.advance.worker.email }}</td>
+                    <td>#{{ r.advance_id }} · {{ r.advance.advance_date }}</td>
+                    <td class="num">{{ r.amount_recovered|floatformat:2 }}</td>
+                    <td>{% if r.reversed_at %}<span class="muted">reversed {{ r.reversed_at|date:"d M Y H:i" }}</span>{% else %}active{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="panel muted">
+        Settled {{ s.settled_at|date:"d M Y H:i" }} by {{ s.settled_by.get_full_name|default:s.settled_by.email }}.
+        {% if s.reversed_at %}<br>Reversed {{ s.reversed_at|date:"d M Y H:i" }} by {{ s.reversed_by.get_full_name|default:s.reversed_by.email }}.{% endif %}
+        {% if s.supersedes %}<br>Replaces <a href="{% url 'expense:adda-settlement-detail' s.supersedes.reference %}">{{ s.supersedes.reference }}</a>.{% endif %}
+    </div>
+
+    {% if s.status == 'finalized' %}
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            <h2>Correct a mistake <span class="muted">— history is never edited; reversal writes compensating entries</span></h2>
+            <textarea name="notes" placeholder="Reason for reversal (kept on the ledger entries)"></textarea>
+        </div>
+        <div class="sticky-bar">
+            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="reverse" class="btn-danger"
+                    onclick="return confirm('Reverse {{ s.reference }}? Earnings and recoveries are undone with compensating ledger entries.');">Reverse</button>
+            <button type="submit" name="action" value="supersede" class="btn-copper"
+                    onclick="return confirm('Reverse {{ s.reference }} and open a fresh draft to settle again?');">Reverse &amp; settle again</button>
+        </div>
+    </form>
+    {% else %}
+    <div class="sticky-bar">
+        <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

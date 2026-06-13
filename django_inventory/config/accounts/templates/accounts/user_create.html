@@ -100,7 +100,7 @@
                             </div>
                             <div class="field">
                                 <label for="id_salary">Salary <span class="label-unit">(₹)</span></label>
-                                <input type="number" step="0.01" name="salary" id="id_salary" value="{{ form.salary.value|default:'' }}" placeholder="0.00">
+                                <input type="number" inputmode="decimal" step="0.01" name="salary" id="id_salary" value="{{ form.salary.value|default:'' }}" placeholder="0.00">
                             </div>
                         </div>
 
@@ -150,13 +150,10 @@
                         </div>
 
                         <div class="field">
-                            <label for="id_user_type">Legacy User Type</label>
-                            <select name="user_type" id="id_user_type">
-                                {% for value, label in form.user_type.field.choices %}
-                                <option value="{{ value }}" {% if form.user_type.value == value %}selected{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                            <small>Backward-compat. Keep matching the Role above.</small>
+                            <label for="{{ form.user_type.id_for_label }}">User Type</label>
+                            {{ form.user_type }}
+                            {% if form.user_type.errors %}<small class="field-error">{{ form.user_type.errors|join:" " }}</small>{% endif %}
+                            <small>Classification label — "who this user is". Add new types at <a href="{% url 'accounts:usertype_list' %}">User Types</a>.</small>
                         </div>
 
                         <div class="field">

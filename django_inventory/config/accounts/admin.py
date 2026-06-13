@@ -24,3 +24,11 @@ class UserAdmin(admin.ModelAdmin):
     )
     search_fields = ("email",)
     ordering = ("email",)
+
+    def save_related(self, request, form, formsets, change):
+        # M2M (incl. skills) is saved here. Retro-tag onto active layerings
+        # explicitly — replaces the removed m2m_changed signal so the admin
+        # path keeps the same behavior (CLAUDE.md rule #4: no signals).
+        super().save_related(request, form, formsets, change)
+        from accounts.services import user_service
+        user_service.sync_user_skills(form.instance)

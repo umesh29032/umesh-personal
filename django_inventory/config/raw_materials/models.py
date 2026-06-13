@@ -12,41 +12,12 @@ Discipline rules:
   • Multi-row writes services/ mein hote hain — views/ se DIRECT save nahi (CLAUDE.md rule #4).
 """
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 
-
-class ActiveManager(models.Manager):
-    """Non-default manager — returns only `is_active=True` rows.
-
-    YEH MANAGER KYU HAI?
-    Master data models (ClothType, ClothColor, StorageLocation) mein
-    `is_active=False` soft-archive flag hai. Form dropdowns + service
-    lookups archived rows ko skip karna chahte hain — but admin + audit
-    queries sab kuch dikhana chahte hain. Solution:
-        Model.objects.all()    → sab rows (archived bhi)
-        Model.active.all()     → sirf is_active=True
-
-    Default `objects` ko swap NAHI karte (regression risk) — opt-in via
-    `.active` accessor. Future me jab har queryset audit ho jaaye, default
-    swap consider karna.
-    """
-
-    def get_queryset(self):
-        return super().get_queryset().filter(is_active=True)
-
-
-class TimeStampedModel(models.Model):
-    """Abstract base — har row mein auto created_at + updated_at columns aate hain.
-
-    `auto_now_add=True` → INSERT pe set hota hai, baad mein change nahi
-    `auto_now=True`     → har SAVE pe refresh — "last modified" track karta hai
-    """
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True   # abstract = is model ka apna table nahi banta; sirf inherit hota hai
+# Shared bases — single source in core (TimeStampedModel + ActiveManager were
+# duplicated in this file; now imported).
+from core.models import ActiveManager, TimeStampedModel
 
 
 class ClothType(TimeStampedModel):
@@ -74,8 +45,16 @@ class ClothColor(TimeStampedModel):
     """Cloth colors master. hex_code optional — UI mein swatch dikhane ke liye."""
 
     name = models.CharField(max_length=80, unique=True)
-    # hex_code blank=True — har color ka hex code zaruri nahi (e.g. mixed patterns)
-    hex_code = models.CharField(max_length=7, blank=True)
+    # hex_code blank=True — har color ka hex code zaruri nahi (e.g. mixed patterns).
+    # RegexValidator = form-level error; the Meta CheckConstraint is the DB guard.
+    # Blank '' skips validators (it's an empty value), so "no hex" stays allowed.
+    hex_code = models.CharField(
+        max_length=7, blank=True,
+        validators=[RegexValidator(
+            regex=r'^#[0-9A-Fa-f]{6}$',
+            message='Enter a hex colour like #AABBCC.',
+        )],
+    )
     is_active = models.BooleanField(default=True)
 
     objects = models.Manager()
@@ -83,6 +62,13 @@ class ClothColor(TimeStampedModel):
 
     class Meta:
         ordering = ['name']
+        # Stored hex is either blank or a valid #RRGGBB — no "banana" values.
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(hex_code='') | models.Q(hex_code__regex=r'^#[0-9A-Fa-f]{6}$'),
+                name='rawmat_clothcolor_hex_format',
+            ),
+        ]
 
     def __str__(self):
         return self.name
@@ -145,6 +131,9 @@ class ClothRoll(TimeStampedModel):
     weight_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     # Role-gated fields — form pop kar deta hai non-finance users ke liye (defence in depth)
     supplier = models.CharField(max_length=200, blank=True)
+    # ADR-0009 §5: PURCHASE price — ek FACT (corrections only), market/replacement
+    # rate kabhi nahi. NULL allowed (honest-NULL: 'pata nahi' ≠ ₹0) — unpriced
+    # consumed rolls costing dashboard pe LOUD banner ke saath dikhte hain.
     cost_per_kg = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     storage_location = models.ForeignKey(
         StorageLocation, on_delete=models.PROTECT, related_name='rolls',
@@ -194,6 +183,26 @@ class ClothRoll(TimeStampedModel):
             models.Index(fields=['adda', 'status']),
         ]
         ordering = ['-created_at']   # latest pehle dikhe
+        # Money + physical measures are never negative (NULL = not-yet-measured,
+        # passes CHECK; these are set at Adda-assignment time, not intake).
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(cost_per_kg__gte=0),
+                name='rawmat_clothroll_costperkg_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(weight_kg__gte=0),
+                name='rawmat_clothroll_weight_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(remaining_length_meters__gte=0),
+                name='rawmat_clothroll_remlen_nonneg',
+            ),
+            models.CheckConstraint(
+                check=models.Q(remaining_weight_kg__gte=0),
+                name='rawmat_clothroll_remwt_nonneg',
+            ),
+        ]
 
     def __str__(self):
         return self.roll_id

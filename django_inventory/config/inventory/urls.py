@@ -1,3 +1,11 @@
+"""Inventory URLConf — dashboards + Access Control surfaces (mounted at /inventory/).
+
+Route groups / workflows:
+  dashboard/           role-aware home (worker: active stages + report badges;
+                       management: ops summary)
+  access-control/…     the Super-Admin hub: roles, skills, per-user access
+  sidebar-access/…     menu+URL gating rules (SidebarItemRule editor)
+The /tracking/ section lives in inventory/tracking_urls.py (P4.2 ownership)."""
 from django.urls import path
 from . import views
 

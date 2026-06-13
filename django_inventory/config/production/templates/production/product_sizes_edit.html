@@ -64,7 +64,7 @@
                             <input type="hidden" name="action" value="update">
                             <input type="hidden" name="size_id" value="{{ s.pk }}">
                             <input type="text" name="label" value="{{ s.label }}" maxlength="40" required>
-                            <input type="number" name="display_order" value="{{ s.display_order }}" min="0">
+                            <input type="number" inputmode="numeric" name="display_order" value="{{ s.display_order }}" min="0">
                             <button type="submit" class="btn-mini">Save</button>
                         </form>
                     </td>
@@ -101,7 +101,7 @@
             </div>
             <div>
                 <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;display:block;">Order</label>
-                <input type="number" name="display_order" value="0" min="0">
+                <input type="number" inputmode="numeric" name="display_order" value="0" min="0">
             </div>
             <button type="submit" class="btn btn-primary">+ Add Size</button>
         </form>

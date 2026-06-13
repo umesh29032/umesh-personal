@@ -112,7 +112,7 @@ Pre-population on render:
 
 **URL:** `POST /production/addas/<code>/layering/complete/`
 **View:** `LayeringCompleteView.post` ([production/views/stage_views.py](../../config/production/views/stage_views.py))
-**Service:** `layering_service.complete_layering` ([production/services/layering_service.py](../../config/production/services/layering_service.py))
+**Service:** `layering_service.complete_layering` ([production/services/layering_service.py](../../config/production/stages/layering/service.py))
 
 ### View phase
 

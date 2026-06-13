@@ -1,7 +1,7 @@
 """View + access-scoping tests for the expense/payroll UI."""
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Skill, User
@@ -18,6 +18,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class ExpenseViewTests(TestCase):
     def setUp(self):
         self.mgr = _manager()
@@ -68,20 +71,27 @@ class ExpenseViewTests(TestCase):
         adda = create_adda(self.mgr, product=Product.objects.get(code='NIKKAR'))
         sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         ws = sr.workflow_stage
-        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_rate'])
+        ws.cost_billed_at = None  # ungroup layering (migration 0026) to price it for earning tests
+        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_billed_at', 'cost_rate'])
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.worker, allocated_quantity=10)  # payable 20
         adv = record_advance(user=self.mgr, worker=self.worker, amount=8)                                # outstanding 8
 
         self.client.force_login(self.mgr)
         url = reverse('expense:settlement-create', args=[self.worker.pk])
+        # V2-2: posting a recovery at payment is refused (re-homed to the Adda
+        # settlement); the PR-D UI drops these inputs. Payment-only succeeds.
         resp = self.client.post(url, {
             'amount_paid': '15', 'method': 'cash', 'settlement_date': '', 'notes': '',
             f'recover_{adv.id}': '5',
         })
+        self.assertNotEqual(resp.status_code, 302)   # rejected, re-rendered with error
+        resp = self.client.post(url, {
+            'amount_paid': '15', 'method': 'cash', 'settlement_date': '', 'notes': '',
+        })
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(PayrollSettlement.objects.filter(worker=self.worker).exists())
-        self.assertEqual(worker_balance(self.worker), Decimal('0.00'))         # 20 − 15 − 5
-        self.assertEqual(advance_outstanding(self.worker), Decimal('3.00'))    # 8 − 5
+        self.assertEqual(worker_balance(self.worker), Decimal('5.00'))         # 20 − 15 (payment only)
+        self.assertEqual(advance_outstanding(self.worker), Decimal('8.00'))    # untouched at payment (V2-2)
 
     def test_manager_edits_worker_profile(self):
         self.client.force_login(self.mgr)
@@ -101,6 +111,9 @@ class ExpenseViewTests(TestCase):
         self.assertNotEqual(resp.status_code, 200)
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class PayrollDataIsolationTests(TestCase):
     """Locks the IDOR invariant (OWASP A01): a worker can never READ or WRITE
     another worker's payroll — via view OR action. Only management can. Two
@@ -116,7 +129,8 @@ class PayrollDataIsolationTests(TestCase):
         adda = create_adda(self.mgr, product=Product.objects.get(code='NIKKAR'))
         sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=adda.current_stage)
         ws = sr.workflow_stage
-        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_rate'])
+        ws.cost_billed_at = None  # ungroup layering (migration 0026) to price it for earning tests
+        ws.cost_rate = Decimal('2'); ws.save(update_fields=['cost_billed_at', 'cost_rate'])
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.a, allocated_quantity=10)  # A earns 20
         allocate_stage_work(user=self.mgr, stage_record=sr, worker=self.b, allocated_quantity=7)   # B earns 14
 

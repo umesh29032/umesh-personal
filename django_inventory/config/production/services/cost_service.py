@@ -18,14 +18,27 @@ narrow update_fields lists naye columns ko silently drop na karein.
 
 Freeze site: `adda_service.advance_to_next_stage` (the one choke point every
 complete_* funnels through). Clear site: har `reopen_*`.
+
+C-1 / ADR-0009 — THE COST DUALITY (read before writing ANY cost report):
+processing_cost (standard cost: ws.cost_rate × handler quantity, role-
+independent) and settled worker earnings (actual pay: role-aware frozen rate ×
+reported/verified quantity, SWA + ledger) are TWO MEASUREMENTS OF THE SAME
+LABOR for credits_workers stages. NEVER add them. Full Adda cost = material
+(G1) + ACTUAL settled labor + processing_cost of NON-payable stages only
+(+ future overhead, era-stamped). Standard-vs-actual is a future VARIANCE
+report, never a sum. Per-Adda actual labor = Σ non-voided SWA snapshots (both
+eras) — never WSC.expected_*, never Σ AddaSettlement totals.
 """
 from __future__ import annotations
 
+import logging  # module logger — debug-trace money writes (cost freeze/clear)
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 
 from production.models import CostMethod
+
+logger = logging.getLogger(__name__)
 
 # Columns this module owns — written together as one atomic UPDATE.
 _COST_FIELDS = [
@@ -36,33 +49,26 @@ _CENT = Decimal('0.01')
 
 
 def _quantity_for(sr, method: str) -> Decimal | None:
-    """Resolve the cost quantity from the typed stage record by method.
+    """Resolve the cost quantity from the stage's HANDLER (registry-driven, M2.10#2).
 
-    per_layer  → LayeringRecord.lay_count
-    per_bundle → CuttingBundle row count for the cutting record
-    per_piece  → CuttingRecord.pieces_cut OR BarcodeGenerationRecord.total_barcodes
-    fixed_cost → None (cost = rate, quantity-independent)
+    Delegates to the stage handler's cost_quantity (which reads the typed record):
+      per_layer  → LayeringRecord.lay_count
+      per_bundle → CuttingBundle row count
+      per_piece  → CuttingRecord.pieces_cut OR BarcodeGenerationRecord.total_barcodes
+      fixed_cost → None (quantity-independent)
 
-    Returns None when the stage has no matching typed record (treated as
-    unpriced → processing_cost stays NULL, never 0).
+    Returns None when no quantity is available (unpriced → processing_cost stays
+    NULL, never 0) OR when the stage has no registered handler (preserves the
+    pre-M2.10 fallback). NULL != 0.00 — see compute_processing_cost.
     """
     if method == CostMethod.FIXED:
         return None
-    if method == CostMethod.PER_LAYER:
-        lr = getattr(sr, 'layering', None)
-        return Decimal(lr.lay_count) if lr is not None and lr.lay_count is not None else None
-    if method == CostMethod.PER_BUNDLE:
-        cr = getattr(sr, 'cutting', None)
-        return Decimal(cr.bundles.count()) if cr is not None else None
-    if method == CostMethod.PER_PIECE:
-        cr = getattr(sr, 'cutting', None)
-        if cr is not None and cr.pieces_cut is not None:
-            return Decimal(cr.pieces_cut)
-        bg = getattr(sr, 'barcode_generation', None)
-        if bg is not None and bg.total_barcodes is not None:
-            return Decimal(bg.total_barcodes)
+    # Import-safe here: production.stages.base does not back-import cost_service.
+    from production.stages import base as stage_registry
+    code = sr.workflow_stage.stage.code
+    if not stage_registry.has(code):
         return None
-    return None
+    return stage_registry.get(code).cost_quantity(sr)
 
 
 def compute_processing_cost(sr) -> tuple[str, Decimal | None, Decimal | None, Decimal | None]:
@@ -99,6 +105,14 @@ def freeze_stage_cost(sr, *, user=None):
     Idempotent — safe to re-run on re-complete after a reopen; overwrites the
     snapshot and advances cost_frozen_at. Does its OWN save(update_fields=[...])
     so it never depends on the caller's narrow update_fields list.
+
+    Side effects:
+      • Writes AddaStageRecord cost columns (cost_method_snapshot,
+        cost_rate_snapshot, cost_quantity_snapshot, processing_cost,
+        cost_frozen_at, updated_at) — the frozen money snapshot.
+      • Reads WorkflowStage (method/rate/cost_billed_at) + typed stage records
+        (LayeringRecord/CuttingRecord/CuttingBundle/BarcodeGenerationRecord) via
+        compute_processing_cost for the quantity. No cross-app service calls.
     """
     method, rate, qty, cost = compute_processing_cost(sr)
     sr.cost_method_snapshot = method
@@ -107,12 +121,24 @@ def freeze_stage_cost(sr, *, user=None):
     sr.processing_cost = cost
     sr.cost_frozen_at = timezone.now()
     sr.save(update_fields=_COST_FIELDS)
+    logger.info(
+        "cost.freeze adda=%s stage_record=%s workflow_stage=%s method=%s "
+        "rate=%s qty=%s processing_cost=%s user=%s",
+        getattr(sr, 'adda_id', None), sr.pk, sr.workflow_stage_id,
+        method or None, rate, qty, cost, getattr(user, 'pk', None),
+    )
     return sr
 
 
 def clear_stage_cost(sr):
     """Wipe the cost snapshot (for reopen). A reopened-but-not-recompleted
     stage must carry NO money; re-complete re-freezes via advance_to_next_stage.
+
+    Side effects:
+      • Writes AddaStageRecord cost columns (cost_method_snapshot,
+        cost_rate_snapshot, cost_quantity_snapshot, processing_cost,
+        cost_frozen_at, updated_at) back to empty/NULL — clears the money
+        snapshot. No reads of other models, no cross-app service calls.
     """
     sr.cost_method_snapshot = ''
     sr.cost_rate_snapshot = None
@@ -120,13 +146,25 @@ def clear_stage_cost(sr):
     sr.processing_cost = None
     sr.cost_frozen_at = None
     sr.save(update_fields=_COST_FIELDS)
+    logger.info(
+        "cost.clear adda=%s stage_record=%s workflow_stage=%s",
+        getattr(sr, 'adda_id', None), sr.pk, sr.workflow_stage_id,
+    )
     return sr
 
 
 def role_rate_for(workflow_stage, role):
     """Per-role rate override for a stage (Q7), or None to fall back to the
-    stage's binding cost_rate. Drives worker EARNING (allocation); the stage's
-    manufacturing processing_cost stays on ws.cost_rate (role-independent)."""
+    stage's binding cost_rate. Drives worker EARNING (allocation + the V2
+    expected-rate freeze); the stage's manufacturing processing_cost stays on
+    ws.cost_rate (role-independent).
+
+    C-1 (ADR-0009): a GROUPED MEMBER stage (cost_billed_at set) never yields a
+    role rate — the payer stage's grouped rate covers the whole group, so a
+    surviving WorkflowStageRoleRate row on a member must not become a second
+    payment at settlement. Member contributions freeze rate None → settle ₹0."""
+    if workflow_stage.cost_billed_at_id is not None:
+        return None
     if role is None:
         return None
     from production.models import WorkflowStageRoleRate

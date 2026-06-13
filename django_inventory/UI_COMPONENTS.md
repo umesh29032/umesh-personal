@@ -23,6 +23,51 @@ Component vocabulary for templates. All CSS lives in `config/accounts/templates/
 | `.page-header-text h1` | Page title (26px serif) |
 | `.page-header-text p` | Page subtitle (smoke color) |
 
+## Production template patterns (merged from docs/archive/production/UI_PATTERNS.md, 2026-06-12)
+
+| Pattern | How |
+|---|---|
+| Time-log accordion | `{% include 'inventory/_time_log_styles.html' %}` in extra_head + `_roll_events_accordion.html` / `_adda_events_accordion.html` with `roll_events`/`adda_events` context (select_related, latest 30). Native `<details>/<summary>`, no JS |
+| QR print sheet | `barcode_print_sheet.html` — standalone (no base), A4 grid, ECC-Q; `?size=` small 54/A4 · medium 35 · large modes |
+| Worker roster chips | `_workers_widget.html` via `_WorkerCheckboxes`; chip CSS canonical in base.html (S1-4) |
+| Hinglish comments | templates may use Hinglish in comments; `{# #}` is SINGLE-line only — multi-line MUST use `{% comment %}` (regression history) |
+| Shared partials | `production/_form_styles.html` (form-shell) · `_autosave.html` · `_stage_panel_collapse.html` · `inventory/_time_log_styles.html` |
+| Empty states | every list/table renders an explicit `.empty` row — never a blank card |
+
+## Template checklist (new pages + updating old pages) — owner rule 2026-06-12
+
+**NEW page:** extends base · page-class wrapper · page CSS only in extra_head
+under that class · COMPOSE FROM CANONICALS first (`hero-strip copper` for
+money screens — never swap a page's hero variant, that's a re-theme · `.panel`
+· `.stat-grid/.stat-card` · `.sticky-bar` · bare `.btn-copper/-ghost/-danger`,
+never mixed with `.btn`) · page keeps only TRUE extras as modifiers · tables =
+`.table-responsive` + `td[data-label]` (no min-width on stacking tables — F1)
+· DataTables → `shared/_datatables_vendor_*` partials, filters OUTSIDE the
+responsive wrapper · rule-11 verify 360/768/1280 (cache-busted) before "done"
+· `inputmode` on numbers, `aria-label` on icon buttons, `.empty` states ·
+no logic in templates (context flags gate forms; display always renders) ·
+`confirm()` on money/destructive (completion = P2 pending-workers list) ·
+`{# #}` single-line only, multi-line = `{% comment %}`.
+
+**UPDATING old pages:** migrate its duplicated CSS to canonicals while you're
+there (one page = one commit) · unexpected drift → revert, never redesign ·
+re-verify 3 viewports after ANY edit · docs-sync (CLAUDE rule 12): pattern or
+page-list changed ⇒ update this file + the app GUIDE same session.
+
+## Money-family vocabulary (A-scope 2026-06-12) — REFERENCE for G4 / MissingPiece / Alter UIs
+
+The settlement/payroll screens are the reference implementations. Every future
+money or list+detail UI composes THESE classes from base.html — do not redefine.
+
+| Class | Purpose | Notes |
+|---|---|---|
+| `.hero-strip.copper` | Money-screen page hero (copper gradient, h1 20px) | Plain `.hero-strip` = the navy default. Page may add a flex modifier for hero actions/totals |
+| `.panel` | Content card: card-bg, radius 14, shadow, padding 16, mb 18 | Page modifiers only for real needs (e.g. `padding:16px 0 4px` table-bleed) |
+| `.stat-grid` / `.stat-card` | KPI cards (label uppercase 11px / value 22px; `.payable` → copper value) | auto-fit minmax(140px); 2-col on ≤560px |
+| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included |
+| `.btn-copper` / `.btn-ghost` / `.btn-danger` (standalone, WITHOUT `.btn`) | Money-screen buttons: radius 10, font 13/700, 40px min-height | `:not(.btn)` shapes — combining with `.btn` keeps the classic 6px-radius system instead |
+| stacked table (`.table-responsive` + `td[data-label]`) | THE responsive-table standard for all future lists | thead hidden ≤ breakpoint; label:value rows; F1 fix guarantees width |
+
 ## Cards & panels
 
 | Class | Purpose | When |

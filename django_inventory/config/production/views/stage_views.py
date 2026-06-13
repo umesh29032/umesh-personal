@@ -1,9 +1,32 @@
-"""Stage views — Layering workspace + Cutting completion.
+"""Stage views — the LAYERING + CUTTING operator consoles (the app's biggest view file).
+
+FILE MAP (architecture comment — keep sections in this order):
+  L75   Helpers                 — _get_adda, rolls queryset, param parsing
+  L128  Layering workspace      — _build_layering_context + GET views
+        (StagePanelView serves EVERY stage's embedded panel — shared seam)
+  L305  Layering actions (POST) — start/attach/entry-edit/leftovers/complete/reopen
+  L857  Cutting legacy complete — single-form NIKKAR-style flow
+  L891  Cutting workspace       — _build_cutting_context (breakup, verification,
+        bundles, allocation display, barcode preview) + 15 action views
+  L1407 Allocation views        — era-A creation (LEVER-gated since V2-3) + void
+
+RESPONSIBILITY: parse request → permission/skill/assignment gate
+(ProductionRoleMixin + StageViewAccessMixin) → delegate to ONE service →
+redirect+message. DELEGATES TO: production stage services (layering/cutting via
+services facade), expense.allocate_stage_work/void_allocation (the allowed
+one-way production→expense edge). INVARIANTS RELIED ON: single-writer
+chokepoints do the actual writes; era guards live in services, NOT here.
+
+WHAT MUST NOT BE ADDED HERE: business logic, multi-row writes, money math,
+direct WST/WSC/SWA mutations — services own all of that (ADR-0001/0002).
+New STAGE TYPES don't extend this file: they get their own handler+views
+module (open-closed; see barcode_gen_views.py as the template).
+PARKED: splitting into per-stage modules = remediation Phase 8 (touch-time).
 
 YEH FILE KYU HAI?
 ─────────────────
 Layering workflow ke saare HTTP entry points yahan hain. Saara business logic
-production.services.stage_service mein hai — views sirf:
+production.services (layering_service / cutting_service) mein hai — views sirf:
   1. Form render karna
   2. POST validate karna
   3. Service call karna
@@ -25,6 +48,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -33,7 +57,7 @@ from django.views.generic import FormView, TemplateView
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.forms import (
     AttachRollForm, CompleteLayeringForm, CuttingDraftForm,
     CuttingForm, CuttingStartForm, EditRollEntryForm, StartLayeringForm,
@@ -45,7 +69,8 @@ from production.models import (
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle,
-    attach_roll_to_layering, complete_cutting, complete_layering,
+    attach_roll_to_layering, complete_cutting_from_bundles,
+    complete_cutting_legacy, complete_layering,
     create_bundle_with_pieces, delete_breakup_row, delete_bundle,
     delete_bundle_item, detach_roll_from_layering, get_cutting_snapshot,
     get_layering_snapshot, get_suggested_breakup, preview_barcode_batches,
@@ -54,6 +79,9 @@ from production.services import (
     update_layering_roll_entry, upsert_breakup_row,
 )
 from raw_materials.models import ClothColor, ClothRoll
+# FUTURE-STAGE-REDESIGN: these expense imports are the SWA-transitional ALLOCATION
+# UI. V2-2 settlement (Option B) moves worker earnings to settlement — revisit/retire
+# this production->expense edge then (see docs/ARCHITECTURE_V2.md §11 + V2_1_REVIEW).
 from expense.models import StageWorkAssignment
 from expense.services import (
     allocate_stage_work, item_allocation_summary, void_allocation,
@@ -140,7 +168,7 @@ def _build_layering_context(request, adda: Adda) -> dict:
     filter_width = _parse_int_param(request, 'fw')
 
     is_management = user_has_role(user, MANAGEMENT_ROLES)
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
     has_master_skill = user_has_skill(
         user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]
     )
@@ -192,7 +220,7 @@ def _build_layering_context(request, adda: Adda) -> dict:
 
     # Master data for filter dropdowns + quick-create form pre-fill
     from raw_materials.models import ClothColor, ClothType, StorageLocation
-    from inventory.services import user_can_edit_financials
+    from accounts.services import user_can_edit_financials
     cloth_colors = ClothColor.active.order_by('name')
     cloth_types = ClothType.active.order_by('name')
     storage_locations = StorageLocation.active.order_by('name')
@@ -208,14 +236,13 @@ def _build_layering_context(request, adda: Adda) -> dict:
         'roll_ids': [e.roll.roll_id for e in entries],
         'available_rolls_qs': filtered_rolls,
         'start_form': StartLayeringForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_assign else None,
         'attach_form': AttachRollForm(available_rolls_qs=filtered_rolls) if can_attach else None,
         # Section 04 form rendered for anyone who can draft (= anyone who can attach).
         # Pre-populated from stage_record.draft_* fields persisted by save_layering_draft.
         'complete_form': CompleteLayeringForm(initial={
             'layer_length_meters': sr.draft_layer_length_meters if sr else None,
-            'duration_minutes': sr.draft_duration_minutes if sr else None,
             'notes': sr.draft_notes if sr else '',
         }) if can_draft else None,
         'can_assign': can_assign,
@@ -288,27 +315,13 @@ class StagePanelView(LoginRequiredMixin, ProductionRoleMixin,
         ctx['adda'] = adda
         ctx['stage_type'] = stage_type
         ctx['embedded'] = self.request.GET.get('embedded') == '1'
-        if stage_type == STAGE_LAYERING:
-            ctx.update(_build_layering_context(self.request, adda))
-        elif stage_type == 'cutting_pattern':
-            # Lazy import — pattern_stage_views depends on services that
-            # touch Pillow / FileField storage; only loaded when this branch hits.
-            from production.views.pattern_stage_views import _build_pattern_context
-            ctx.update(_build_pattern_context(self.request, adda))
-        elif stage_type == STAGE_CUTTING:
-            # New cutting workspace context (PR3). Legacy CuttingForm
-            # still in context for products without cutting_pattern stage.
-            ctx['cutting_form'] = CuttingForm()
-            ctx['can_complete_cutting'] = (
-                user_has_role(self.request.user, MANAGEMENT_ROLES)
-                and adda.current_stage is not None
-                and adda.current_stage.stage_type == STAGE_CUTTING
-            )
-            ctx.update(_build_cutting_context(self.request, adda))
-        elif stage_type == 'barcode_generation':
-            # Lazy import to avoid touching tracking models at startup.
-            from production.views.barcode_gen_views import _build_barcode_gen_context
-            ctx.update(_build_barcode_gen_context(self.request, adda))
+        # Per-stage panel context via the stage handler registry (M2.6c — the
+        # legacy if/elif was removed once the registry path was proven at parity).
+        # Each handler's panel_context owns its stage's render context; an unknown
+        # stage (no registered handler) just gets the base context.
+        from production.stages import base as stage_registry
+        if stage_registry.has(stage_type):
+            ctx.update(stage_registry.get(stage_type).panel_context(self.request, adda, None))
         return ctx
 
 
@@ -756,7 +769,6 @@ class LayeringCompleteView(_LayeringActionBase):
         # only apply on action=complete and are enforced server-side below.
         form.is_valid()
         layer_length = form.cleaned_data.get('layer_length_meters')
-        duration = form.cleaned_data.get('duration_minutes')
         notes = form.cleaned_data.get('notes', '')
 
         per_entry = self._parse_per_entry_data(request)
@@ -767,10 +779,10 @@ class LayeringCompleteView(_LayeringActionBase):
             pk: data for pk, data in per_entry.items()
         }
         try:
-            save_layering_draft(
+            _, skipped_rolls = save_layering_draft(
                 adda=adda,
                 layer_length_meters=layer_length,
-                duration_minutes=duration,
+                duration_minutes=None,            # duration auto-computed at complete
                 notes=notes,
                 per_entry_data=per_entry_normalized,
                 user=request.user,
@@ -784,7 +796,16 @@ class LayeringCompleteView(_LayeringActionBase):
         if action == 'draft':
             if _is_ajax(request):
                 return HttpResponse(status=204)   # debounced auto-save
-            messages.success(request, "Draft saved.")
+            # F1: partial rows are NOT silently dropped any more — tell the user
+            # exactly which rolls still need the layers + leftover-weight pair.
+            if skipped_rolls:
+                messages.warning(
+                    request,
+                    f"Draft saved, but {len(skipped_rolls)} row(s) were NOT stored — "
+                    f"{', '.join(skipped_rolls)} need both a layer count and a "
+                    "leftover weight.")
+            else:
+                messages.success(request, "Draft saved.")
             return redirect(self.workspace_url(code, request))
 
         # action == 'complete' path — strict validation + advance
@@ -816,10 +837,14 @@ class LayeringCompleteView(_LayeringActionBase):
             return redirect(self.workspace_url(code, request))
 
         per_entry_layers = {e.pk: e.layers_on_roll for e in entries}
+        # Duration auto-calculated from timestamps (stage-duration-rule): layering
+        # duration = now − adda.started_at, in whole minutes (min 1). No manual input.
+        elapsed_min = (timezone.now() - adda.started_at).total_seconds() / 60
+        auto_duration = max(1, round(elapsed_min))
         try:
             complete_layering(
                 adda=adda,
-                duration_minutes=duration,
+                duration_minutes=auto_duration,
                 layer_length_meters=layer_length,
                 per_entry_layers=per_entry_layers,
                 notes=notes,
@@ -872,7 +897,7 @@ class CuttingCompleteView(LoginRequiredMixin, ProductionRoleMixin, FormView):
     def form_valid(self, form):
         adda = self.get_adda()
         try:
-            cr = complete_cutting(
+            cr = complete_cutting_legacy(
                 adda=adda,
                 pieces_cut=form.cleaned_data['pieces_cut'],
                 worker_ids=[u.pk for u in form.cleaned_data.get('workers') or []],
@@ -933,7 +958,7 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     has_helper_skill = user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)
 
     can_start = is_management
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
     can_edit_breakup = sr is not None and sr.completed_at is None and (
         is_management or (is_assigned and has_master_skill)
     )
@@ -947,8 +972,14 @@ def _build_cutting_context(request, adda: Adda) -> dict:
     # Attach allocation data to each bundle for the template: existing
     # (non-voided) allocations + how much of each item is still unallocated.
     # Form is gated on can_allocate; the read-only display always renders.
-    can_allocate = is_management and sr is not None and sr.completed_at is None
-    allocation_workers = list(sr.workers.all()) if sr else []
+    # V2-3 PR-B: creation also requires the rollback lever ON — by default
+    # earnings book at Adda settlement, so the allocate forms hide. Existing
+    # era-A rows stay visible and voidable (historical corrections stay legal).
+    from django.conf import settings as dj_settings
+    ledger_at_allocation = getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', False)
+    can_void = is_management and sr is not None and sr.completed_at is None
+    can_allocate = can_void and ledger_at_allocation
+    allocation_workers = sr.active_workers if sr else []
     for b in bundles:
         ann = []
         for it in b.items.select_related('pattern', 'color').all():
@@ -1007,10 +1038,12 @@ def _build_cutting_context(request, adda: Adda) -> dict:
         'can_complete_workspace': can_complete_workspace,
         'can_reopen_cutting': can_reopen,
         'can_allocate': can_allocate,
+        'can_void': can_void,
+        'ledger_at_allocation': ledger_at_allocation,
         'allocation_workers': allocation_workers,
         'next_stage_after_cutting': next_stage,
         'cutting_start_form': CuttingStartForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_start else None,
         'cutting_draft_form': CuttingDraftForm(initial={
             'notes': cutting_record.notes if cutting_record else '',
@@ -1156,7 +1189,7 @@ class CuttingWorkspaceCompleteView(_CuttingActionBase):
     def post(self, request, code):
         adda = _get_adda(code)
         try:
-            cr = complete_cutting(adda=adda, user=request.user)
+            cr = complete_cutting_from_bundles(adda=adda, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))

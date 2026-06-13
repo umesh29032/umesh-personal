@@ -4,12 +4,7 @@
 
 {% block extra_head %}
 <style>
-    .payroll-overview .hero-strip {
-        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
-        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
-        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
-    }
-    .payroll-overview .hero-strip h1 { margin: 0; font-size: 20px; }
+    .payroll-overview .hero-strip { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
     .payroll-overview .hero-strip .total { text-align: right; }
     .payroll-overview .hero-strip .total .v { font-size: 24px; font-weight: 800; }
     .payroll-overview .hero-strip .total .l { font-size: 11px; opacity: .9; text-transform: uppercase; }
@@ -36,7 +31,7 @@
 
 {% block content %}
 <div class="payroll-overview">
-    <div class="hero-strip">
+    <div class="hero-strip copper">
         <h1>Payroll Overview</h1>
         <div class="total">
             <div class="v">₹{{ total_payable|floatformat:2 }}</div>

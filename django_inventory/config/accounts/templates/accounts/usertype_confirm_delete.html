@@ -1,0 +1,15 @@
+{% extends 'accounts/base.html' %}
+{% block page_title %}Delete User Type{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:40px auto;">
+    <div class="card"><div class="card-body">
+        <h2 style="margin-bottom:8px;">Delete "{{ object.label }}"?</h2>
+        <p style="color:var(--text-secondary);margin-bottom:20px;">This user type will be permanently removed. Users assigned to it will have their type set to none.</p>
+        <form method="post" style="display:flex;gap:12px;">
+            {% csrf_token %}
+            <a href="{% url 'accounts:usertype_list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary" style="background:var(--danger);">Delete</button>
+        </form>
+    </div></div>
+</div>
+{% endblock %}

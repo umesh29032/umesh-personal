@@ -1,4 +1,17 @@
-"""Production app URL routes.
+"""Production app URL routes — the factory floor (mounted at /production/).
+
+Route groups / workflows:
+  (root)               Adda dashboard
+  products/… patterns/ product master, per-product FLOW EDITOR (rates,
+                       grouping, pay-eligibility; TM-1 lands here), sizes,
+                       pattern library
+  addas/start|list|<code>  one-click Adda creation → detail/workspaces
+  addas/<code>/<stage>/…   per-stage operator consoles + POST actions
+                       (layering / cutting-pattern / cutting / barcode-gen)
+  addas/<code>/report/<stage>  WORKER phone report (assignment-gated)
+  addas/<code>/review-reports/ P1 verified-qty correction (management)
+  costing/             manufacturing-cost dashboard (ADR-0009 surfaces)
+  stages/…             global Stage library CRUD (perm-gated)
 
 Yeh file Django ke URL dispatcher se tie karti hai. `app_name='production'`
 namespacing deta hai — templates `{% url 'production:adda-detail' code=... %}`
@@ -53,6 +66,12 @@ urlpatterns = [
     # Per-stage panel — canonical URL for both standalone view and iframe embed.
     # ?embedded=1 strips hero/nav so the panel fits inside iframe / accordion.
     path('addas/<str:code>/stage/<str:stage_type>/',    views.StagePanelView.as_view(),         name='stage-panel'),
+
+    # V2-1c-iii pt.2b — worker self-report (schema-driven; own-task only).
+    # Same ?embedded=1 convention as stage-panel for the dashboard iframe route.
+    path('addas/<str:code>/report/<str:stage_type>/',   views.WorkerReportView.as_view(),       name='worker-report'),
+    # P1 (F5-lite): management quantity review/correction before settlement.
+    path('addas/<str:code>/review-reports/',             views.AddaReportReviewView.as_view(),    name='adda-report-review'),
 
     # Layering workflow — workspace (GET) + actions (POST)
     path('addas/<str:code>/layering/',                  views.LayeringWorkspaceView.as_view(),  name='layering-workspace'),

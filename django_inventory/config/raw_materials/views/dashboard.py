@@ -17,7 +17,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from inventory.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_has_role
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 
 from .mixins import ProductionRoleMixin

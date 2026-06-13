@@ -1,6 +1,6 @@
 # About this project — Kapil Enterprises Inventory
 
-A narrative companion to [ARCHITECTURE.md](ARCHITECTURE.md).
+A narrative companion to [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) and [docs/PROJECT_KNOWLEDGE_MAP.md](docs/PROJECT_KNOWLEDGE_MAP.md).
 ARCHITECTURE explains **what** the system is. This file explains **why** it
 exists, **how** it grew, and **what I'm learning** as I build it.
 
@@ -199,12 +199,15 @@ If you're new to Django (or you're future-me coming back in 3 months):
 
 1. Read [config/config/settings/base.py](config/config/settings/base.py) end-to-end.
 2. Then [config/accounts/models.py](config/accounts/models.py) — the custom user.
-3. Then [config/inventory/models.py](config/inventory/models.py) — the domain.
-4. Then **one service** — start with [batch_service.py](config/inventory/services/batch_service.py).
+3. Then [config/production/models/](config/production/models/) — the domain
+   (start: `adda.py` + `worker_task.py`).
+4. Then **one service** — start with
+   [worker_task_service.py](config/production/services/worker_task_service.py)
+   (THE chokepoint; its header explains why).
    It shows transactions, validation, ledger writes, race protection.
-5. Then **one view** — [batch_views.py](config/inventory/views/batch_views.py).
+5. Then **one view** — [adda_views.py](config/production/views/adda_views.py).
    See how thin views are once services exist.
-6. Then [permission_service.py](config/inventory/services/permission_service.py)
+6. Then [permission_service.py](config/accounts/services/permission_service.py)
    — the sidebar registry is the only place that knows about all the pages.
 
 By that point you've seen 80% of the codebase's patterns.
@@ -219,7 +222,7 @@ By that point you've seen 80% of the codebase's patterns.
   `on_delete=PROTECT` means.
 - I prefer **junior-friendly explanations** with the "why" included.
 - I want this repo to be **trainable** — i.e. when Claude reads it later,
-  it should "get" the architecture from CLAUDE.md + ARCHITECTURE.md + this
+  it should "get" the architecture from CLAUDE.md + SYSTEM_DESIGN.md + this
   file without having to re-read every model.
 - I want to do my **personal projects separately** from company work. This
   repo's `.claude/` is project-local: skills here don't leak into other

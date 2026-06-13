@@ -1,0 +1,29 @@
+> **ARCHIVED 2026-06-13** -- superseded scaffold (it only ever indexed docs living elsewhere). Flow documentation now lives in: docs/production/ (subsystem deep-dives) + docs/LEARNING_2_0/DATA_FLOWS/ (write-path view) + docs/LEARNING_2_0/REQUEST_JOURNEYS/ (call-chain view).
+
+# docs/FLOWS/ — end-to-end flow documentation
+
+One file per cross-cutting flow (spans models + services + views). Each should
+cover: trigger, service choke-point(s), state transitions, history/audit rows
+written, reopen/undo semantics, and failure modes.
+
+Today the canonical flow docs live in `docs/production/` — index below. Migrate
+them into this directory as they're revised; add new flows here directly.
+
+## Existing flows
+- **Production stage flow** — `docs/production/STAGE_FLOW.md` (Adda →
+  WorkflowStage → AddaStageRecord; advance/reopen; `advance_to_next_stage` choke
+  point; cost freeze/clear).
+- **Cutting → bundles → barcodes** — `docs/production/BARCODE_GENERATION.md`
+  (+ archived `docs/archive/production/CUTTING_DESIGN.md`) (breakup → bundle items → barcode batches; consumed/
+  available counters; uniqueness + contiguity).
+- **Payroll / earnings ledger** — `docs/archive/production/PAYROLL_ARCHITECTURE.md`
+  (allocation → immutable ledger credit; advances as a separate loan pool).
+- **Settlement** — `docs/archive/production/SETTLEMENT_ARCHITECTURE.md` (owner starts a
+  settlement anytime; cash + per-advance recovery; invariant
+  `paid + recovered ≤ payable_before`; reversal = append-only, no edit).
+- **Tracking / export** — `docs/tracking/EXPORTS.md`.
+
+## Open flow gaps (backlog)
+- settlement reversal — BUILT in V2-2 (`reverse_adda_settlement`: compensating
+  ledger rows + supersede chain); for payment-only PayrollSettlement see
+  `docs/archive/QA/bugs_found.md` #2.

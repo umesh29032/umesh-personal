@@ -1,0 +1,12 @@
+# Keep the build context tiny + secret-free.
+env/
+.git/
+.env
+*.pyc
+__pycache__/
+config/media/
+config/logs/
+config/staticfiles/
+docs/
+*.md
+.claude/

@@ -4,22 +4,10 @@
 
 {% block extra_head %}
 <style>
-    .worker-payroll .hero-strip {
-        background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%);
-        color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px;
-        display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center;
-    }
-    .worker-payroll .hero-strip h1 { margin: 0; font-size: 19px; }
-    .worker-payroll .hero-strip p { margin: 4px 0 0; opacity: .9; font-size: 12px; }
+    .worker-payroll .hero-strip { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: center; }
     .worker-payroll .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .worker-payroll .hero-actions a { background: rgba(255,255,255,.18); color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; }
     .worker-payroll .hero-actions a.primary { background: #fff; color: var(--copper); }
-    .worker-payroll .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
-    .worker-payroll .stat-card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px; }
-    .worker-payroll .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
-    .worker-payroll .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 6px; }
-    .worker-payroll .stat-card.payable .value { color: var(--copper); }
-    .worker-payroll .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 16px 18px; margin-bottom: 16px; }
     .worker-payroll .panel h2 { font-size: 14px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; }
     .worker-payroll .panel h2 a { font-size: 12px; font-weight: 600; color: var(--copper); text-decoration: none; }
     .worker-payroll .line { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
@@ -35,13 +23,13 @@
     .worker-payroll table.adv td.num { text-align: right; }
     .worker-payroll .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; font-size: 13px; }
     .worker-payroll .profile-grid .k { color: var(--stone); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
-    @media (max-width: 700px) { .worker-payroll .stat-grid { grid-template-columns: repeat(2, 1fr); } .worker-payroll .profile-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 700px) { .worker-payroll .profile-grid { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="worker-payroll">
-    <div class="hero-strip">
+    <div class="hero-strip copper">
         <div>
             <h1>{{ viewed_worker.get_full_name|default:viewed_worker.email }}</h1>
             <p>{{ viewed_worker.email }}{% if is_self %} · your payroll{% endif %}</p>
@@ -57,9 +45,10 @@
 
     <div class="stat-grid">
         <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value">₹{{ summary.pending_payable|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Total Earned</div><div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Expected (unsettled)</div><div class="value">₹{{ unsettled_expected|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Earned (settled)</div><div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div></div>
         <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">₹{{ summary.advance_outstanding|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Total Settled</div><div class="value">₹{{ summary.total_settled|floatformat:2 }}</div></div>
+        <div class="stat-card"><div class="label">Paid (cash)</div><div class="value">₹{{ summary.total_settled|floatformat:2 }}</div></div>
     </div>
 
     {% if is_management and profile %}

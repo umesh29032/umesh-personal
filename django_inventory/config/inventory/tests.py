@@ -144,3 +144,21 @@ class AccessControlHubTests(TestCase):
         # Managed panel item → SidebarAccessMiddleware redirects (302) with a
         # message, rather than a bare 403. Denied either way.
         self.assertEqual(self.client.get(reverse('inventory:access-control')).status_code, 302)
+
+
+class SidebarSingleSourceTest(TestCase):
+    """P3.4: the DB SidebarItemRule rows must not drift from the code SIDEBAR
+    registry (the single source of truth for menu items). Every rule must point at
+    a real menu item — an orphan means a rename/removal left stale access data."""
+
+    def test_no_orphan_sidebar_rules(self):
+        from accounts.models import SidebarItemRule
+        from accounts.services.permission_service import SIDEBAR
+        code_url_names = {item.url_name for section in SIDEBAR for item in section.items}
+        rule_url_names = set(SidebarItemRule.objects.values_list('url_name', flat=True))
+        orphans = rule_url_names - code_url_names
+        self.assertEqual(
+            orphans, set(),
+            f"SidebarItemRule rows reference menu items absent from the code SIDEBAR "
+            f"registry (drift from a rename/removal): {orphans}",
+        )

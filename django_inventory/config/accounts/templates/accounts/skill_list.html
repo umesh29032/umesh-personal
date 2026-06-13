@@ -5,7 +5,7 @@
 
 {% block extra_head %}
 <!-- DataTables CSS only — all overrides live in base.html now -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+{% include 'shared/_datatables_vendor_css.html' %}
 <style>
 /* ── Skill preview chip (page-specific) ── */
 .skill-preview-chip {
@@ -105,8 +105,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+{% include 'shared/_datatables_vendor_js.html' %}
 <script>
 $(document).ready(function () {
     initFancyDataTable('#skills-dt', {

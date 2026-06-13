@@ -79,11 +79,9 @@ def process_image(uploaded_file, crop_data_json: str, target_width: int, target_
     buffer = io.BytesIO()
 
     if ext in ('.png',) and has_alpha:
-        output_format = 'PNG'
         content_type = 'image/png'
         img.save(buffer, format='PNG', optimize=True)
     elif ext in ('.webp',):
-        output_format = 'WEBP'
         content_type = 'image/webp'
         if img.mode == 'RGBA':
             img.save(buffer, format='WEBP', quality=JPEG_QUALITY, lossless=False)
@@ -91,7 +89,6 @@ def process_image(uploaded_file, crop_data_json: str, target_width: int, target_
             img = img.convert('RGB')
             img.save(buffer, format='WEBP', quality=JPEG_QUALITY)
     else:
-        output_format = 'JPEG'
         content_type = 'image/jpeg'
         if img.mode != 'RGB':
             img = img.convert('RGB')

@@ -1,776 +1,240 @@
 {% comment %}
-Layering stage panel — REUSABLE partial.
+Layering stage panel — worker-first, accordion sections (2026-06-03).
 
-Used by three surfaces:
-  • layering_workspace.html              (standalone full-page workspace)
-  • stage_panel_standalone.html          (standalone /stage/layering/ page)
-  • stage_panel_embedded.html            (iframe embed mode)
-  • adda detail Layering tab (via iframe)
-  • user dashboard accordion (via iframe)
+Sections use the documented `.panel` / `.panel-head` / `.panel-num` /
+`.panel-title` / `.panel-body` vocabulary so `_stage_panel_collapse.html`
+auto-attaches the whole-header collapse/expand accordion (chevron + localStorage).
 
-Required context (from _build_layering_context):
-  adda, stage_record, entries, total_weight, distinct_colors_count, roll_ids,
-  start_form, attach_form, complete_form, can_assign, can_attach, can_complete,
-  embedded (bool — true on iframe surfaces; adds hidden `embedded=1` to forms so
-            action views redirect back to embedded URL)
+  ① Workers   ② Add cloth roll (filter + pick/create)   ③ Rolls (per-roll cards)
+  ④ Summary   (layer length + totals + Save Draft / Complete)
+
+Selects are plain <select> → base.html auto-upgrades to .fancy-select. They live
+in ALWAYS-VISIBLE panels (NOT a collapsed <details>) so the fancy-select panel
+positions correctly on mobile. Duration auto (now − adda start). Leftover = weight.
+
+The complete <form> wraps the Rolls + Summary panels (valid nesting) so per-roll
+Layers/Leftover inputs stay inside the form DOM → autosave-on-type fires. "Remove"
+is a formaction button (no nested form).
+
+Context: _build_layering_context (adda, stage_record, entries, layering_snap,
+start_form, attach_form, complete_form, can_*, next_stage, available_rolls_qs,
+cloth_colors, cloth_types, width_choices, storage_locations, filter_*,
+has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, embedded).
 {% endcomment %}
 
-{% if messages %}
-<div class="messages-strip">
-    {% for m in messages %}
-        <div class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</div>
-    {% endfor %}
-</div>
-{% endif %}
-
-{% comment %}
-COMPLETED-STATE TOP SUMMARY CARD
-Inline-styled card — DO NOT use _layering_summary.html here. That partial
-depends on .ls-card-* CSS in accounts/base.html which is absent inside
-the embedded iframe (stage_panel_embedded.html has its own minimal CSS).
-Inline style block below mirrors cp-summary-card pattern from
-_stage_panel_cutting_pattern.html.
-{% endcomment %}
-{% if stage_record.completed_at %}
-<div class="ly-summary-card">
-    <div class="ly-summary-title">Layering — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
-    <div class="ly-summary-grid">
-        <div><span class="lbl">Lay Count</span><span class="val">{{ layering_snap.lay_count|default:"—" }}</span></div>
-        <div><span class="lbl">Layer Length</span><span class="val">{% if layering_snap.layer_length %}{{ layering_snap.layer_length }} m{% else %}—{% endif %}</span></div>
-        <div><span class="lbl">Duration</span><span class="val">{% if layering_snap.duration_min %}{{ layering_snap.duration_min }} min{% else %}—{% endif %}</span></div>
-        <div><span class="lbl">Total Colors</span><span class="val">{{ layering_snap.total_colors|default:"—" }}</span></div>
-        <div><span class="lbl">Rolls Used</span><span class="val">{{ layering_snap.rolls_count|default:"—" }}</span></div>
-        <div><span class="lbl">Total Fabric Used</span><span class="val">{% if layering_snap.total_fabric_used %}{{ layering_snap.total_fabric_used|floatformat:2 }} m{% else %}—{% endif %}</span></div>
-        <div><span class="lbl">Leftover Length</span><span class="val">{{ layering_snap.leftover_length_sum|floatformat:2 }} m</span></div>
-        <div><span class="lbl">Leftover Weight</span><span class="val">{{ layering_snap.leftover_weight_sum|floatformat:2 }} KG</span></div>
-    </div>
-    {% if layering_snap.record.notes %}<div class="ly-summary-notes">{{ layering_snap.record.notes }}</div>{% endif %}
-</div>
 <style>
-    .ly-summary-card {
-        background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
-        border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
-    }
-    .ly-summary-title {
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 12px;
-    }
-    .ly-summary-grid {
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 10px 14px;
-    }
-    .ly-summary-grid > div { display: flex; flex-direction: column; }
-    .ly-summary-grid .lbl {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--stone);
-    }
-    .ly-summary-grid .val {
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 20px; font-weight: 600; color: var(--ink); margin-top: 2px;
-    }
-    .ly-summary-notes {
-        margin-top: 12px; padding: 8px 10px; background: var(--cream);
-        border-radius: 8px; font-size: 13px; color: var(--stone); font-style: italic;
-    }
+  .ly .panel{background:var(--card-bg,#fff);border:1px solid var(--border-card,#cfc0aa);border-radius:14px;margin-bottom:14px;box-shadow:var(--shadow-card,0 2px 12px rgba(14,11,9,.10));overflow:hidden;}
+  .ly .panel-head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--cream,#f5ede0);border-bottom:1px solid var(--border-subtle,#e7ddcf);}
+  .ly .panel-num{width:26px;height:26px;border-radius:8px;background:var(--copper,#b87333);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none;}
+  .ly .panel-title{font-family:'Cormorant Garamond',Georgia,serif;font-size:20px;font-weight:600;color:var(--ink,#1a1410);}
+  .ly .panel-body{padding:14px 16px;}
+  .ly .sub{font-size:13px;color:var(--stone,#78716c);margin:0 0 12px;}
+  .ly .chip{display:inline-flex;align-items:center;gap:6px;background:var(--cream-2,#ede3d4);border:1px solid var(--border-subtle,#e7ddcf);border-radius:999px;padding:6px 12px;font-size:14px;margin:0 6px 6px 0;}
+  .ly .lybtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;padding:14px 18px;width:100%;}
+  .ly .lybtn-primary{background:var(--copper,#b87333);color:#fff;} .ly .lybtn-primary:hover{background:#8a5520;}
+  .ly .lybtn-ghost{background:var(--cream-2,#ede3d4);color:var(--ink,#1a1410);border:1.5px solid var(--border-subtle,#e7ddcf);}
+  .ly .roll{border:1px solid var(--border-card,#cfc0aa);border-radius:14px;padding:14px;margin-bottom:12px;background:#fff;}
+  .ly .roll-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .ly .swatch{width:30px;height:30px;border-radius:8px;background:var(--cream-2,#ede3d4);border:1px solid var(--border-subtle,#e7ddcf);display:grid;place-items:center;font-weight:700;color:var(--stone,#78716c);font-size:13px;flex:none;}
+  .ly .roll-id{font-weight:700;font-size:17px;color:var(--ink,#1a1410);}
+  .ly .roll-meta{font-size:13px;color:var(--stone,#78716c);}
+  .ly .roll-x{margin-left:auto;background:none;border:none;color:var(--danger,#dc2626);font-size:13px;cursor:pointer;}
+  .ly .inrow{display:flex;gap:12px;}
+  .ly .fld{flex:1;}
+  .ly .fld label{display:block;font-size:13px;font-weight:700;color:var(--stone,#78716c);margin-bottom:6px;}
+  .ly .fld .u{font-weight:400;}
+  .ly .big-in{width:100%;font-size:22px;font-weight:700;text-align:center;padding:13px 8px;border:2px solid var(--border-subtle,#e7ddcf);border-radius:12px;background:var(--cream,#f5ede0);color:var(--ink,#1a1410);}
+  .ly .big-in:focus{outline:none;border-color:var(--copper,#b87333);background:#fff;}
+  .ly .layer-field{margin-bottom:14px;}
+  .ly .layer-field label{font-size:14px;font-weight:700;color:var(--ink,#1a1410);margin-bottom:6px;display:block;}
+  .ly .sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .ly .stat{background:var(--cream,#f5ede0);border-radius:12px;padding:12px;text-align:center;}
+  .ly .stat .l{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--stone,#78716c);}
+  .ly .stat .v{font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:600;color:var(--ink,#1a1410);margin-top:2px;}
+  .ly .leftover-line{font-size:14px;color:var(--stone,#78716c);margin-top:10px;}
+  .ly .actions{margin-top:14px;display:flex;flex-direction:column;gap:10px;}
+  .ly .add-form{margin-top:12px;}
+  .ly .add-form .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .ly .add-form select,.ly .add-form input{width:100%;padding:12px;border:1.5px solid var(--border-subtle,#e7ddcf);border-radius:10px;background:var(--cream,#f5ede0);font-size:15px;}
+  .ly .msg{padding:10px 14px;border-radius:10px;margin-bottom:10px;font-size:14px;}
+  .ly .msg-error{background:rgba(220,38,38,.08);color:var(--danger,#dc2626);}
+  .ly .msg-success{background:rgba(5,150,105,.08);color:var(--success,#059669);}
+  @media(min-width:600px){ .ly .add-form .grid{grid-template-columns:1fr 1fr 1fr;} }
+  @media(max-width:480px){ .ly .panel-body{padding:12px 11px;} .ly .panel-head{padding:11px 12px;} .ly .roll{padding:12px 11px;} }
 </style>
-{% if can_reopen %}
-<div style="margin: 10px 0 14px; display: flex; justify-content: flex-end;">
-    <form method="post" action="{% url 'production:layering-reopen' adda.code %}"
-          onsubmit="return confirm('Reopen Layering for corrections?\n\nThe completed summary will be cleared and the Adda will roll back to the Layering stage. Downstream stages must not have been started.');">
-        {% csrf_token %}
-        {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-        <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
-            ✎ Edit / Reopen Layering
-        </button>
+
+<div class="ly">
+
+{% if messages %}{% for m in messages %}<div class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</div>{% endfor %}{% endif %}
+
+{% comment %} ── COMPLETED: read-only summary + reopen ── {% endcomment %}
+{% if stage_record.completed_at %}
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num" style="background:var(--success,#059669);">✓</div><div class="panel-title">Layering complete</div></div>
+    <div class="panel-body">
+      <div class="sgrid">
+        <div class="stat"><div class="l">Rolls</div><div class="v">{{ layering_snap.rolls_count|default:"—" }}</div></div>
+        <div class="stat"><div class="l">Total layers</div><div class="v">{{ layering_snap.lay_count|default:"—" }}</div></div>
+        <div class="stat"><div class="l">Weight</div><div class="v">{{ total_weight|floatformat:"0" }} <span style="font-size:14px">kg</span></div></div>
+        <div class="stat"><div class="l">Colours</div><div class="v">{{ layering_snap.total_colors|default:distinct_colors_count }}</div></div>
+      </div>
+      <div class="leftover-line">Layer length: {% if layering_snap.layer_length %}{{ layering_snap.layer_length }} m{% else %}—{% endif %} · Cloth left over: {{ layering_snap.leftover_weight_sum|floatformat:2 }} kg</div>
+      {% if layering_snap.completed_at %}<div class="leftover-line">Done {{ layering_snap.completed_at|date:"d M H:i" }}{% if layering_snap.completed_by %} by {{ layering_snap.completed_by.email }}{% endif %}</div>{% endif %}
+      {% if can_reopen %}
+      <form method="post" action="{% url 'production:layering-reopen' adda.code %}" style="margin-top:12px;"
+            onsubmit="return confirm('Reopen Layering for corrections? Rolls back to Layering; only works if Cutting has not started.');">
+        {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <button type="submit" class="lybtn lybtn-ghost" style="color:var(--copper);border-color:var(--copper);">✎ Reopen Layering</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+
+{% comment %} ── ① WORKERS ── {% endcomment %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-num">1</div><div class="panel-title">Workers</div></div>
+  <div class="panel-body">
+    {% if stage_record %}{% for w in stage_record.active_workers %}<span class="chip">👤 {{ w.email }}</span>{% empty %}<span class="sub">No workers assigned yet.</span>{% endfor %}{% endif %}
+    {% if can_assign %}
+      <form method="post" action="{% url 'production:layering-start' adda.code %}" style="margin-top:10px;">
+        {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        {{ start_form.workers }}
+        <button type="submit" class="lybtn lybtn-ghost" style="margin-top:10px;">{% if stage_record %}Update workers{% else %}Start layering{% endif %}</button>
+      </form>
+    {% elif not stage_record %}<p class="sub" style="margin:0;">A manager assigns workers to start.</p>{% endif %}
+  </div>
+</div>
+
+{% comment %} ── ② ADD CLOTH ROLL (always visible → selects fancify in correct position) ── {% endcomment %}
+{% if can_attach %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-num">＋</div><div class="panel-title">Add cloth roll</div></div>
+  <div class="panel-body">
+
+    {% comment %}Filter stock by colour/type/width — GET, auto-submit. View narrows the picker + pre-fills quick-add.{% endcomment %}
+    <form method="get" class="add-form" style="margin-top:0;">
+      {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+      <div class="grid">
+        <div><label class="sub" style="font-weight:700;">Colour</label>
+          <select name="fc" onchange="this.form.submit()"><option value="">All colours</option>{% for c in cloth_colors %}<option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Type</label>
+          <select name="ft" onchange="this.form.submit()"><option value="">All types</option>{% for t in cloth_types %}<option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Width</label>
+          <select name="fw" onchange="this.form.submit()"><option value="">Any width</option>{% for w in width_choices %}<option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }} in</option>{% endfor %}</select></div>
+      </div>
+      {% if has_filter_active %}<div class="sub" style="margin-top:6px;">{{ filtered_rolls_count }} roll{{ filtered_rolls_count|pluralize }} match · <a href="?{% if embedded %}embedded=1{% endif %}" style="color:var(--copper);font-weight:700;">clear</a></div>{% endif %}
     </form>
-</div>
-{% endif %}
-{% endif %}
 
-{% comment %}
-stage-stats tiles only when NOT completed — completed state already
-covered by ly-summary-card above (same metrics + more, richer formatting).
-{% endcomment %}
-{% if not stage_record.completed_at %}
-<div class="stage-stats">
-    <div class="stat-tile">
-        <div class="stat-label">Rolls Attached</div>
-        <div class="stat-value">{{ entries|length }}</div>
-    </div>
-    <div class="stat-tile">
-        <div class="stat-label">Total Weight</div>
-        <div class="stat-value">{{ total_weight|floatformat:2 }} <span style="font-size:14px; color:var(--stone);">KG</span></div>
-    </div>
-    <div class="stat-tile">
-        <div class="stat-label">Distinct Colors</div>
-        <div class="stat-value">{{ distinct_colors_count }}</div>
-    </div>
-    <div class="stat-tile">
-        <div class="stat-label">Status</div>
-        <div class="stat-value" style="font-size: 18px;">
-            {% if stage_record %}
-                {% if stage_record.completed_at %}Completed
-                {% else %}In Progress
-                {% endif %}
-            {% else %}Not Started{% endif %}
-        </div>
-    </div>
+    {% if available_rolls_qs %}
+    <form method="post" action="{% url 'production:layering-attach-roll' adda.code %}" class="add-form">
+      {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+      <div class="grid">
+        <div style="grid-column:1/-1;"><label class="sub" style="font-weight:700;">Pick a roll from stock</label>
+          <select name="roll" required data-roll-pick><option value="">— select roll —</option>{% for r in available_rolls_qs %}<option value="{{ r.pk }}" data-w="{{ r.width_inch|default_if_none:'' }}" data-wt="{{ r.weight_kg|default_if_none:'' }}">{{ r.display_summary }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Width (in)</label>{{ attach_form.width_verified_inch }}</div>
+        <div><label class="sub" style="font-weight:700;">Weight (kg)</label>{{ attach_form.weight_verified_kg }}</div>
+      </div>
+      <button type="submit" class="lybtn lybtn-primary" style="margin-top:10px;">Attach roll</button>
+    </form>
+    <div class="sub" style="text-align:center;margin:12px 0 0;">— or make a new one —</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'production:layering-quick-create-roll' adda.code %}" class="add-form">
+      {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+      <div class="grid">
+        <div><label class="sub" style="font-weight:700;">Type</label><select name="cloth_type" required><option value="">—</option>{% for t in cloth_types %}<option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Colour</label><select name="cloth_color" required><option value="">—</option>{% for c in cloth_colors %}<option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Width (in)</label><select name="width_inch" required><option value="">—</option>{% for w in width_choices %}<option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }}</option>{% endfor %}</select></div>
+        <div><label class="sub" style="font-weight:700;">Weight (kg)</label><input type="number" inputmode="decimal" name="weight_kg" step="0.01" min="0.01" required placeholder="kg"></div>
+        <div><label class="sub" style="font-weight:700;">Store</label><select name="storage_location" required><option value="">—</option>{% for loc in storage_locations %}<option value="{{ loc.pk }}">{{ loc.name }}</option>{% endfor %}</select></div>
+      </div>
+      <button type="submit" class="lybtn lybtn-primary" style="margin-top:10px;">Make + attach roll</button>
+    </form>
+  </div>
 </div>
 {% endif %}
 
+{% comment %} ── ③ Rolls + ④ Summary inside ONE complete form (valid nesting → autosave works) ── {% endcomment %}
 {% if entries %}
-<div class="panel">
-    <div class="panel-head">
-        <div class="panel-num">★</div>
-        <div class="panel-title">Rolls in this Layering ({{ entries|length }})</div>
-    </div>
+<form method="post" action="{% url 'production:layering-complete' adda.code %}"
+      id="ly-complete-{{ adda.code }}"
+      data-autosave-url="{% url 'production:layering-complete' adda.code %}"
+      data-next-stage="{{ next_stage.get_stage_type_display|default:'Cutting' }}"
+      onsubmit="return window.__lyConfirm ? window.__lyConfirm(event) : true;">
+  {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">3</div><div class="panel-title">Rolls ({{ entries|length }})</div></div>
     <div class="panel-body">
-        <div class="chips-row">
-        {% for e in entries %}
-            <span class="roll-id-chip" title="{{ e.roll.roll_id }}">
-                <strong>{{ e.roll.roll_id }}</strong>
-                · {{ e.roll.cloth_type.name }}
-                · {{ e.roll.cloth_color.name }}
-                {% if e.width_verified_inch %} - {{ e.width_verified_inch }} inch{% elif e.roll.width_inch %} - {{ e.roll.width_inch }} inch{% endif %}
-            </span>
-        {% endfor %}
+      {% for e in entries %}
+      {% with lo=e.remaining_pieces.first %}
+      <div class="roll">
+        <div class="roll-top">
+          <span class="swatch" title="{{ e.roll.cloth_color.name }}">{{ e.roll.cloth_color.name|first|upper }}</span>
+          <div>
+            <div class="roll-id">{{ e.roll.roll_id }}</div>
+            <div class="roll-meta">{{ e.roll.cloth_color.name }} · {{ e.roll.cloth_type.name }} · {% if e.width_verified_inch %}{{ e.width_verified_inch }}{% else %}{{ e.roll.width_inch|default:"—" }}{% endif %} in · {{ e.weight_verified_kg|default:"—" }} kg</div>
+          </div>
+          {% if can_attach %}<button type="submit" class="roll-x" formaction="{% url 'production:layering-entry-remove' adda.code e.pk %}" formnovalidate onclick="return confirm('Remove roll {{ e.roll.roll_id }} and return it to stock?');">✕ remove</button>{% endif %}
         </div>
+        <div class="inrow">
+          <div class="fld"><label>Layers</label><input class="big-in" type="number" name="entry_{{ e.pk }}_layers" value="{{ e.layers_on_roll|default_if_none:'' }}" min="1" inputmode="numeric" placeholder="0" data-ly-layers {% if not can_draft %}disabled{% endif %}></div>
+          <div class="fld"><label>Cloth left over <span class="u">(kg)</span></label><input class="big-in" type="number" name="entry_{{ e.pk }}_leftover_wt" value="{{ lo.remaining_weight_kg|default_if_none:'' }}" step="0.01" min="0" inputmode="decimal" placeholder="0" {% if not can_draft %}disabled{% endif %}></div>
+        </div>
+      </div>
+      {% endwith %}
+      {% endfor %}
     </div>
-</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">4</div><div class="panel-title">Summary</div></div>
+    <div class="panel-body">
+      {% if can_draft %}<div class="layer-field"><label>Layer length (metres)</label>{{ complete_form.layer_length_meters }}</div>{% endif %}
+      <div class="sgrid">
+        <div class="stat"><div class="l">Rolls</div><div class="v">{{ entries|length }}</div></div>
+        <div class="stat"><div class="l">Total layers</div><div class="v" data-ly-sum>0</div></div>
+        <div class="stat"><div class="l">Weight</div><div class="v">{{ total_weight|floatformat:"0" }} <span style="font-size:14px">kg</span></div></div>
+        <div class="stat"><div class="l">Colours</div><div class="v">{{ distinct_colors_count }}</div></div>
+      </div>
+      <div class="leftover-line">⏱ Time is recorded automatically when you complete.</div>
+      {% if can_draft %}
+      <div class="actions">
+        <span data-autosave-status class="autosave-pill"></span>
+        <button type="submit" name="action" value="draft" class="lybtn lybtn-ghost">💾 Save draft</button>
+        {% if can_complete %}<button type="submit" name="action" value="complete" class="lybtn lybtn-primary"
+            onclick="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete layering?');">✓ Complete layering → {{ next_stage.get_stage_type_display|default:"Cutting" }}</button>
+        {% else %}<p class="sub" style="margin:0;text-align:center;">A cutting-master-helper completes this stage.</p>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</form>
+{% else %}
+<div class="panel"><div class="panel-head"><div class="panel-num">3</div><div class="panel-title">Rolls</div></div>
+  <div class="panel-body"><p class="sub" style="margin:0;">No rolls yet. {% if can_attach %}Use <strong>Add cloth roll</strong> above.{% else %}Workers add cloth rolls here.{% endif %}</p></div></div>
 {% endif %}
 
-{% comment %}Section 01: Worker assignment — management only{% endcomment %}
-<div class="panel">
-    <div class="panel-head">
-        <div class="panel-num">01</div>
-        <div class="panel-title">Assigned Workers</div>
-        <span class="panel-state {% if stage_record %}in-progress{% else %}not-started{% endif %}">
-            {% if stage_record %}Started {{ stage_record.started_at|date:"d M H:i" }}{% else %}Not Started{% endif %}
-        </span>
-    </div>
-    <div class="panel-body">
-        {% if can_assign %}
-            <p class="panel-sub">Pick workers for this layering. <strong>At least one Cutting Master required</strong>.</p>
-            <form method="post" action="{% url 'production:layering-start' adda.code %}">
-                {% csrf_token %}
-                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                {{ start_form.workers }}
-                <div style="display:flex; gap:10px; margin-top: 14px; flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary">{% if stage_record %}Update Assignment{% else %}Start Layering Stage{% endif %}</button>
-                </div>
-            </form>
-        {% else %}
-            {% if stage_record %}
-                <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                    {% for w in stage_record.workers.all %}
-                        <span class="roll-id-chip">{{ w.email }}</span>
-                    {% empty %}
-                        <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <p class="panel-sub" style="margin:0;">Only a manager can assign workers and start this stage.</p>
-            {% endif %}
-        {% endif %}
-    </div>
+{% endif %}{# end not-completed #}
 </div>
 
-{% comment %}
-Section 02: Attach roll — assigned worker + skill gate.
-
-Three sub-sections:
-  (a) Filter dropdowns (color / type / width) — GET form, auto-submit onchange
-  (b) Roll picker (filtered queryset) + verified width/weight + Attach button
-  (c) Quick-create-roll panel — shown only if filtered list is empty AND user
-      has filters active. Creates exactly 1 roll and attaches in one POST.
-{% endcomment %}
-<div class="panel">
-    <div class="panel-head">
-        <div class="panel-num">02</div>
-        <div class="panel-title">Add Cloth Roll</div>
-    </div>
-    <div class="panel-body">
-        {% if can_attach %}
-            <p class="panel-sub">Filter inventory by color / type / width, then pick a roll. If none match, create a fresh one with the same details.</p>
-
-            {% comment %}(a) Filter dropdowns — GET form, no CSRF needed (idempotent){% endcomment %}
-            <form method="get" class="roll-filters" id="roll-filters-{{ adda.code }}">
-                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                <div class="form-grid">
-                    <div class="field">
-                        <label>Color</label>
-                        <select name="fc" class="sf-input" onchange="this.form.submit()">
-                            <option value="">All colors</option>
-                            {% for c in cloth_colors %}
-                                <option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Cloth Type</label>
-                        <select name="ft" class="sf-input" onchange="this.form.submit()">
-                            <option value="">All types</option>
-                            {% for t in cloth_types %}
-                                <option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Width</label>
-                        <select name="fw" class="sf-input" onchange="this.form.submit()">
-                            <option value="">Any width</option>
-                            {% for w in width_choices %}
-                                <option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }} inch</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                {% if has_filter_active %}
-                    <div style="margin-top:6px; font-size: 11px; color: var(--stone);">
-                        {{ filtered_rolls_count }} roll{{ filtered_rolls_count|pluralize }} match ·
-                        <a href="?{% if embedded %}embedded=1{% endif %}" style="color:var(--copper);">clear filters</a>
-                    </div>
-                {% endif %}
-            </form>
-
-            {% comment %}
-            (b) Roll picker + attach form.
-            Roll select is RENDERED MANUALLY (not via {{ attach_form.roll }}) so each
-            <option> can carry data-width / data-weight attributes. JS reads those
-            on `change` to pre-fill the verified width + weight inputs.
-            Form name stays `roll` (matches AttachRollForm field name).
-            {% endcomment %}
-            {% if filtered_rolls_count > 0 %}
-            <form method="post" action="{% url 'production:layering-attach-roll' adda.code %}" style="margin-top: 14px;" id="attach-form-{{ adda.code }}">
-                {% csrf_token %}
-                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                <div class="form-grid">
-                    <div class="field full">
-                        <label>Cloth Roll *</label>
-                        <select name="roll" class="sf-input" required
-                                data-attach-roll-picker
-                                data-form-id="attach-form-{{ adda.code }}">
-                            <option value="">— select a roll —</option>
-                            {% for r in available_rolls_qs %}
-                                <option value="{{ r.pk }}"
-                                        data-width="{{ r.width_inch|default_if_none:'' }}"
-                                        data-weight="{{ r.weight_kg|default_if_none:'' }}">
-                                    {{ r.display_summary }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label>Verified Width *</label>
-                        {{ attach_form.width_verified_inch }}
-                    </div>
-                    <div class="field">
-                        <label>Verified Weight (KG) *</label>
-                        {{ attach_form.weight_verified_kg }}
-                    </div>
-                    <div class="field full">
-                        <label>Notes</label>
-                        {{ attach_form.notes }}
-                    </div>
-                </div>
-                <div style="margin-top: 12px;">
-                    <button type="submit" class="btn btn-primary">+ Attach Roll</button>
-                </div>
-            </form>
-
-            <script>
-                // Roll-pick auto-fill: when user picks a roll, copy its stored width + weight
-                // into the verified inputs as a starting point. Worker still confirms / overrides
-                // before submit. Listens on data-attach-roll-picker selects only.
-                (function() {
-                    document.querySelectorAll('select[data-attach-roll-picker]').forEach(function(sel) {
-                        sel.addEventListener('change', function() {
-                            var opt = sel.options[sel.selectedIndex];
-                            if (!opt || !opt.value) return;
-                            var form = document.getElementById(sel.dataset.formId);
-                            if (!form) return;
-                            var w = opt.dataset.width || '';
-                            var wt = opt.dataset.weight || '';
-                            var widthEl = form.querySelector('[name="width_verified_inch"]');
-                            var weightEl = form.querySelector('[name="weight_verified_kg"]');
-                            if (widthEl && w) widthEl.value = w;
-                            if (weightEl && wt) weightEl.value = wt;
-                        });
-                    });
-                })();
-            </script>
-            {% else %}
-                <p class="panel-sub" style="margin: 14px 0 6px;">
-                    {% if has_filter_active %}No matching roll in inventory.{% else %}No unused rolls available.{% endif %}
-                    Use the form below to create a new one.
-                </p>
-            {% endif %}
-
-            {% comment %}
-            (c) Quick-create-roll panel (essentials only). Pre-filled with active
-            filters when present; quantity hard-coded to 1. Auto-opens when zero rolls match.
-            {% endcomment %}
-            {% if filtered_rolls_count == 0 or has_filter_active %}
-            <details class="quick-create" {% if filtered_rolls_count == 0 %}open{% endif %} style="margin-top: 14px;">
-                <summary>+ Quick Add Roll (essentials only)</summary>
-                <form method="post" action="{% url 'production:layering-quick-create-roll' adda.code %}" style="margin-top: 10px;">
-                    {% csrf_token %}
-                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Cloth Type *</label>
-                            <select name="cloth_type" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for t in cloth_types %}
-                                    <option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Color *</label>
-                            <select name="cloth_color" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for c in cloth_colors %}
-                                    <option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Width *</label>
-                            <select name="width_inch" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for w in width_choices %}
-                                    <option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }} inch</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Weight (KG) *</label>
-                            <input type="number" name="weight_kg" step="0.01" min="0.01" required class="sf-input" placeholder="actual weight">
-                        </div>
-                        <div class="field">
-                            <label>Storage Location *</label>
-                            <select name="storage_location" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for loc in storage_locations %}
-                                    <option value="{{ loc.pk }}">{{ loc.name }} ({{ loc.code }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Purchased Date</label>
-                            <input type="date" name="purchased_date" class="sf-input">
-                        </div>
-                        <div class="field full">
-                            <label>Notes</label>
-                            <input type="text" name="notes" class="sf-input" placeholder="Optional">
-                        </div>
-                    </div>
-                    <div style="margin-top: 12px;">
-                        <button type="submit" class="btn btn-primary">Create + Attach Roll</button>
-                    </div>
-                </form>
-            </details>
-            {% endif %}
-
-            {% comment %}
-            (d) Full-detail create + attach panel. Always available regardless of
-            filter state. Includes intake metadata (purchased date, supplier, cost)
-            plus on-floor verified width + weight. Single roll (qty=1) — not bulk.
-            Service: bulk_create_rolls(qty=1) + attach_roll_to_layering, same as quick.
-            Financial fields shown only to users who can edit them.
-            {% endcomment %}
-            <details class="quick-create" style="margin-top: 14px; border-style: solid;">
-                <summary>+ Add Roll (Full Details — intake + financial)</summary>
-                <form method="post" action="{% url 'production:layering-full-create-roll' adda.code %}" style="margin-top: 10px;">
-                    {% csrf_token %}
-                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                    <div class="form-grid">
-                        <div class="field">
-                            <label>Cloth Type *</label>
-                            <select name="cloth_type" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for t in cloth_types %}
-                                    <option value="{{ t.pk }}"{% if filter_type == t.pk %} selected{% endif %}>{{ t.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Color *</label>
-                            <select name="cloth_color" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for c in cloth_colors %}
-                                    <option value="{{ c.pk }}"{% if filter_color == c.pk %} selected{% endif %}>{{ c.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Storage Location *</label>
-                            <select name="storage_location" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for loc in storage_locations %}
-                                    <option value="{{ loc.pk }}">{{ loc.name }} ({{ loc.code }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Purchased Date *</label>
-                            <input type="date" name="purchased_date" required class="sf-input">
-                        </div>
-                        {% if can_edit_financials %}
-                        <div class="field">
-                            <label>Supplier</label>
-                            <input type="text" name="supplier" class="sf-input" placeholder="Supplier name (optional)">
-                        </div>
-                        <div class="field">
-                            <label>Cost per KG</label>
-                            <input type="number" name="cost_per_kg" step="0.01" min="0" class="sf-input" placeholder="₹ per KG (optional)">
-                        </div>
-                        {% endif %}
-                        <div class="field">
-                            <label>Verified Width *</label>
-                            <select name="width_inch" class="sf-input" required>
-                                <option value="">— select —</option>
-                                {% for w in width_choices %}
-                                    <option value="{{ w }}"{% if filter_width == w %} selected{% endif %}>{{ w }} inch</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label>Verified Weight (KG) *</label>
-                            <input type="number" name="weight_kg" step="0.01" min="0.01" required class="sf-input" placeholder="actual weight">
-                        </div>
-                        <div class="field full">
-                            <label>Notes</label>
-                            <input type="text" name="notes" class="sf-input" placeholder="Optional">
-                        </div>
-                    </div>
-                    <div style="margin-top: 12px;">
-                        <button type="submit" class="btn btn-primary">Create Roll (Full) + Attach</button>
-                    </div>
-                </form>
-            </details>
-
-        {% elif not stage_record %}
-            <p class="panel-sub" style="margin:0;">Manager must assign workers first.</p>
-        {% elif stage_record.completed_at %}
-            <p class="panel-sub" style="margin:0;">Layering complete — rolls locked.</p>
-        {% else %}
-            <p class="panel-sub" style="margin:0;">You need <code>cutting_master</code> or <code>cutting_master_helper</code> skill plus an assignment.</p>
-        {% endif %}
-    </div>
-</div>
-
-{% comment %}Section 03: Listing of rolls — entries list with inline edit/remove.
-
-Two modes:
-  • In-progress (or pre-start): ul/li rows with collapsible "Correct/remove" form.
-  • Completed: read-only table — clearer scan of layers/leftover/notes for revisit.
-{% endcomment %}
-<div class="panel">
-    <div class="panel-head">
-        <div class="panel-num">03</div>
-        <div class="panel-title">Rolls in this Layering ({{ entries|length }})</div>
-    </div>
-    <div class="panel-body">
-        {% if entries and stage_record.completed_at %}
-            {# Read-only table — completed stage revisit. Mobile stacks via data-label. #}
-            <div class="breakup-table-wrap">
-            <table class="breakup-table rolls-readonly">
-                <thead>
-                    <tr>
-                        <th>Roll</th>
-                        <th>Color · Type</th>
-                        <th>Width</th>
-                        <th>Weight</th>
-                        <th>Layers</th>
-                        <th>Leftover (L / Wt)</th>
-                        <th>Attached</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for e in entries %}
-                    {% with primary_leftover=e.remaining_pieces.first %}
-                    <tr>
-                        <td data-label="Roll" class="cell-mono">{{ e.roll.roll_id }}</td>
-                        <td data-label="Cloth">{{ e.roll.cloth_color.name }} · {{ e.roll.cloth_type.name }}</td>
-                        <td data-label="Width">{% if e.width_verified_inch %}{{ e.width_verified_inch }} inch{% else %}—{% endif %}</td>
-                        <td data-label="Weight">{{ e.weight_verified_kg|default:"—" }} KG</td>
-                        <td data-label="Layers">{{ e.layers_on_roll|default:"—" }}</td>
-                        <td data-label="Leftover">
-                            {% for lo in e.remaining_pieces.all %}
-                                {{ lo.remaining_length_meters }} m / {{ lo.remaining_weight_kg }} KG{% if not forloop.last %}<br>{% endif %}
-                            {% empty %}—{% endfor %}
-                        </td>
-                        <td data-label="Attached">
-                            {{ e.attached_by.email|default:"—" }}<br>
-                            <span style="color:var(--stone); font-size:11px;">{{ e.attached_at|date:"d M H:i" }}</span>
-                        </td>
-                    </tr>
-                    {% if e.notes %}
-                    <tr>
-                        <td colspan="7" data-label="Notes" style="background:var(--cream-2); color:var(--stone); font-style:italic;">
-                            Notes — {{ e.notes }}
-                        </td>
-                    </tr>
-                    {% endif %}
-                    {% endwith %}
-                {% endfor %}
-                </tbody>
-            </table>
-            </div>
-        {% elif entries %}
-            <ul class="roll-list">
-            {% for e in entries %}
-                <li class="roll-row">
-                    <div class="roll-row-head">
-                        <div>
-                            <strong>{{ e.roll.roll_id }}</strong>
-                            — {{ e.roll.cloth_color.name }} · {{ e.roll.cloth_type.name }}
-                        </div>
-                        <div class="roll-row-meta">
-                            W: {% if e.width_verified_inch %}{{ e.width_verified_inch }} inch{% else %}—{% endif %} ·
-                            Wt: {{ e.weight_verified_kg|default:"—" }} KG ·
-                            {% if e.layers_on_roll %}Layers: {{ e.layers_on_roll }} · {% endif %}
-                            by {{ e.attached_by.email|default:"—" }} ·
-                            {{ e.attached_at|date:"d M H:i" }}
-                        </div>
-                    </div>
-                    {% if e.notes %}<div class="roll-row-meta" style="margin-top:4px;">{{ e.notes }}</div>{% endif %}
-
-                    {% comment %}Leftover summary for this roll-entry. Shown to everyone (read-only data).{% endcomment %}
-                    {% with leftovers=e.remaining_pieces.all %}
-                    {% if leftovers %}
-                    <div class="roll-row-meta" style="margin-top:6px; padding:6px 10px; background: var(--cream-2); border-radius: 8px;">
-                        <strong>Leftover:</strong>
-                        {% for lo in leftovers %}
-                            {{ lo.remaining_length_meters }} m / {{ lo.remaining_weight_kg }} KG{% if lo.notes %} ({{ lo.notes }}){% endif %}
-                            {% if can_attach and not lo.is_consumed %}
-                                <form method="post" action="{% url 'production:layering-remove-remaining' adda.code lo.pk %}" style="display:inline;" onsubmit="return confirm('Delete this leftover entry?');">
-                                    {% csrf_token %}
-                                    {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                                    <button type="submit" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:11px; padding:0 4px;">×</button>
-                                </form>
-                            {% endif %}
-                            {% if not forloop.last %} · {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% endwith %}
-                    {% if can_attach %}
-                    <details>
-                        <summary>Correct / remove</summary>
-                        <form method="post" action="{% url 'production:layering-entry-update' adda.code e.pk %}" class="inline-form">
-                            {% csrf_token %}
-                            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                            <div class="field">
-                                <label>Width</label>
-                                <select name="width_verified_inch" class="sf-input">
-                                    <option value="">— no change —</option>
-                                    {% for w in "36,37,38,39,40,41,42,43,44"|cut:" " %}{% endfor %}
-                                    <option value="36"{% if e.width_verified_inch == 36 %} selected{% endif %}>36 inch</option>
-                                    <option value="37"{% if e.width_verified_inch == 37 %} selected{% endif %}>37 inch</option>
-                                    <option value="38"{% if e.width_verified_inch == 38 %} selected{% endif %}>38 inch</option>
-                                    <option value="39"{% if e.width_verified_inch == 39 %} selected{% endif %}>39 inch</option>
-                                    <option value="40"{% if e.width_verified_inch == 40 %} selected{% endif %}>40 inch</option>
-                                    <option value="41"{% if e.width_verified_inch == 41 %} selected{% endif %}>41 inch</option>
-                                    <option value="42"{% if e.width_verified_inch == 42 %} selected{% endif %}>42 inch</option>
-                                    <option value="43"{% if e.width_verified_inch == 43 %} selected{% endif %}>43 inch</option>
-                                    <option value="44"{% if e.width_verified_inch == 44 %} selected{% endif %}>44 inch</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label>Weight (KG)</label>
-                                <input type="number" step="0.01" min="0.01" name="weight_verified_kg" value="{{ e.weight_verified_kg|default_if_none:'' }}" class="sf-input">
-                            </div>
-                            <div class="field">
-                                <label>Notes</label>
-                                <input type="text" name="notes" value="{{ e.notes|default_if_none:'' }}" class="sf-input">
-                            </div>
-                            <button type="submit" class="btn btn-primary">Save</button>
-                        </form>
-                        <form method="post" action="{% url 'production:layering-entry-remove' adda.code e.pk %}" class="row-actions" onsubmit="return confirm('Detach roll {{ e.roll.roll_id }} and return it to stock?');">
-                            {% csrf_token %}
-                            {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                            <button type="submit" class="btn btn-ghost" style="color: var(--danger);">Detach</button>
-                        </form>
-                    </details>
-
-                    {% comment %}Leftover input lives in Section 04 breakup row instead. Standalone form removed.{% endcomment %}
-                    {% endif %}
-                </li>
-            {% endfor %}
-            </ul>
-        {% else %}
-            <p class="panel-sub" style="margin:0;">No rolls attached yet.</p>
-        {% endif %}
-    </div>
-</div>
-
-{% comment %}
-Section 04: Mark complete — overall layer length + per-roll breakup.
-
-Breakup table renders one input per LayeringRollEntry. Input name pattern
-`entry_<pk>_layers` — view parses these into per_entry_layers dict.
-JS sums them live into the readonly "Total Lay Count" cell.
-{% endcomment %}
-<div class="panel">
-    <div class="panel-head">
-        <div class="panel-num">04</div>
-        <div class="panel-title">Mark Layering Complete</div>
-        {% if stage_record.completed_at %}
-            <span class="panel-state completed">Completed {{ stage_record.completed_at|date:"d M H:i" }}</span>
-        {% endif %}
-    </div>
-    <div class="panel-body">
-        {% if can_draft %}
-            <p class="panel-sub">
-                Fill <strong>overall layer length</strong> + <strong>duration</strong>
-                and the <strong>per-roll breakup</strong>. Save Draft anytime;
-                {% if can_complete %}Complete to advance{% if next_stage %} to {{ next_stage.get_stage_type_display }}{% endif %}.{% else %}Completion requires a <code>cutting_master_helper</code> user.{% endif %}
-                <em>Layers + leftover required for every roll before completing.</em>
-            </p>
-
-            {% comment %}
-            SINGLE FORM for the whole Section 04 — header + breakup table + actions.
-            Two submit buttons (action=draft / action=complete) post to the same endpoint.
-            View dispatches:
-              draft   → save_layering_draft (lax, persists what's filled)
-              complete → complete_layering (strict, advances to Cutting)
-            Pre-populated values come from:
-              • entries (layers_on_roll, primary RemainingClothOfClothRoll)
-              • stage_record draft_* fields (header)
-            {% endcomment %}
-            <form method="post" action="{% url 'production:layering-complete' adda.code %}"
-                  id="layering-complete-form-{{ adda.code }}" class="layering-section04"
-                  data-autosave-url="{% url 'production:layering-complete' adda.code %}"
-                  data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
-                  onsubmit="return window.__confirmLayeringSubmit ? window.__confirmLayeringSubmit(event) : true;">
-                {% csrf_token %}
-                {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-
-                {% comment %}Header — layer length, duration, notes (one applies to whole stage){% endcomment %}
-                <div class="form-grid" style="margin-bottom: 14px;">
-                    <div class="field">
-                        <label>Layer Length (m) *</label>
-                        {{ complete_form.layer_length_meters }}
-                    </div>
-                    <div class="field">
-                        <label>Duration (minutes) *</label>
-                        {{ complete_form.duration_minutes }}
-                    </div>
-                    <div class="field full">
-                        <label>Notes</label>
-                        {{ complete_form.notes }}
-                    </div>
-                </div>
-
-                {% if entries %}
-                <div class="chips-label" style="margin: 10px 0 6px;">Per-Roll Breakup</div>
-                <div class="breakup-table-wrap">
-                <table class="breakup-table">
-                    <thead>
-                        <tr>
-                            <th>Roll</th>
-                            <th>Color · Type</th>
-                            <th>Width / Weight</th>
-                            <th>Layers *</th>
-                            <th>Leftover Length (m) *</th>
-                            <th>Leftover Weight (KG) *</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for e in entries %}
-                        {% with primary_leftover=e.remaining_pieces.first %}
-                        <tr>
-                            <td data-label="Roll" class="cell-mono">{{ e.roll.roll_id }}</td>
-                            <td data-label="Cloth">{{ e.roll.cloth_color.name }} · {{ e.roll.cloth_type.name }}</td>
-                            <td data-label="W/Wt">{% if e.width_verified_inch %}{{ e.width_verified_inch }}"{% else %}—{% endif %} · {{ e.weight_verified_kg|default:"—" }} KG</td>
-                            <td data-label="Layers">
-                                <input type="number" name="entry_{{ e.pk }}_layers" value="{{ e.layers_on_roll|default_if_none:'' }}" min="1" class="sf-input" data-layer-input placeholder="N">
-                            </td>
-                            <td data-label="Leftover L">
-                                <input type="number" name="entry_{{ e.pk }}_leftover_len" value="{{ primary_leftover.remaining_length_meters|default_if_none:'' }}" step="0.01" min="0" class="sf-input" data-leftover-len placeholder="m">
-                            </td>
-                            <td data-label="Leftover Wt">
-                                <input type="number" name="entry_{{ e.pk }}_leftover_wt" value="{{ primary_leftover.remaining_weight_kg|default_if_none:'' }}" step="0.01" min="0" class="sf-input" data-leftover-wt placeholder="KG">
-                            </td>
-                        </tr>
-                        {% endwith %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-                </div>
-                {% endif %}
-
-                {% comment %}Summary card — totals from current inputs. Pattern reusable for any stage.{% endcomment %}
-                <div class="stage-summary">
-                    <div class="stage-summary-title">Stage Summary</div>
-                    <div class="stage-summary-grid">
-                        <div><span class="lbl">Rolls Used</span><span class="val">{{ entries|length }}</span></div>
-                        <div><span class="lbl">Total Layers</span><span class="val" id="sum-layers-{{ adda.code }}">0</span></div>
-                        <div><span class="lbl">Total Weight (KG)</span><span class="val">{{ total_weight|floatformat:2 }}</span></div>
-                        <div><span class="lbl">Distinct Colors</span><span class="val">{{ distinct_colors_count }}</span></div>
-                        <div><span class="lbl">Leftover Length (m)</span><span class="val" id="sum-leftover-len-{{ adda.code }}">0</span></div>
-                        <div><span class="lbl">Leftover Weight (KG)</span><span class="val" id="sum-leftover-wt-{{ adda.code }}">0</span></div>
-                    </div>
-                </div>
-
-                {% comment %}
-                Two submit buttons — Save Draft always available to drafters;
-                Complete only to cutting_master_helper / super_admin.
-                {% endcomment %}
-                <div class="stage-actions-row">
-                    <button type="submit" name="action" value="draft" class="btn btn-ghost">💾 Save Draft</button>
-                    <span data-autosave-status class="autosave-pill"></span>
-                    {% if can_complete %}
-                    <button type="submit" name="action" value="complete" class="btn btn-primary">Complete Layering{% if next_stage %} → Advance to {{ next_stage.get_stage_type_display }}{% endif %}</button>
-                    {% endif %}
-                </div>
-            </form>
-
-            <script>
-                // Native confirm before advancing — guards against accidental click.
-                // submitter resolves to the actual button clicked; only Complete asks.
-                window.__confirmLayeringSubmit = function(ev) {
-                    var btn = ev.submitter || document.activeElement;
-                    if (!btn || btn.value !== 'complete') return true;
-                    var next = ev.target.dataset.nextStage || 'next stage';
-                    return window.confirm(
-                        'Mark Layering complete and advance to ' + next + '?\n\n' +
-                        'This locks all rolls and per-roll layer counts. You will not be able to edit this stage afterwards.'
-                    );
-                };
-                (function() {
-                    var addaCode = '{{ adda.code }}';
-                    var sumLayers = document.getElementById('sum-layers-' + addaCode);
-                    var sumLeftLen = document.getElementById('sum-leftover-len-' + addaCode);
-                    var sumLeftWt = document.getElementById('sum-leftover-wt-' + addaCode);
-                    if (!sumLayers) return;
-                    function num(n) { var v = parseFloat(n); return isNaN(v) ? 0 : v; }
-                    function recompute() {
-                        var L = 0, LL = 0, LW = 0;
-                        document.querySelectorAll('input[data-layer-input]').forEach(function(i) { L += num(i.value); });
-                        document.querySelectorAll('input[data-leftover-len]').forEach(function(i) { LL += num(i.value); });
-                        document.querySelectorAll('input[data-leftover-wt]').forEach(function(i) { LW += num(i.value); });
-                        sumLayers.textContent = L;
-                        sumLeftLen.textContent = LL.toFixed(2);
-                        sumLeftWt.textContent = LW.toFixed(2);
-                    }
-                    document.querySelectorAll('input[data-layer-input], input[data-leftover-len], input[data-leftover-wt]').forEach(function(i) {
-                        i.addEventListener('input', recompute);
-                    });
-                    recompute();
-                })();
-            </script>
-        {% elif stage_record.completed_at %}
-            {# Top of panel already shows full summary + Edit/Reopen button. #}
-            <p class="panel-sub" style="margin:0;">Stage finalized. See top of panel for full summary.</p>
-        {% else %}
-            <p class="panel-sub" style="margin:0;">You need <code>cutting_master_helper</code> skill to complete this stage.</p>
-        {% endif %}
-    </div>
-</div>
+<script>
+(function(){
+  document.querySelectorAll('select[data-roll-pick]').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var o=sel.options[sel.selectedIndex]; if(!o||!o.value) return;
+      var f=sel.closest('form'); var w=f.querySelector('[name=width_verified_inch]'), wt=f.querySelector('[name=weight_verified_kg]');
+      if(w&&o.dataset.w) w.value=o.dataset.w; if(wt&&o.dataset.wt) wt.value=o.dataset.wt;
+    });
+  });
+  var sum=document.querySelector('[data-ly-sum]');
+  function recompute(){var t=0;document.querySelectorAll('[data-ly-layers]').forEach(function(i){var v=parseInt(i.value,10);if(!isNaN(v))t+=v;});if(sum)sum.textContent=t;}
+  document.querySelectorAll('[data-ly-layers]').forEach(function(i){i.addEventListener('input',recompute);});
+  recompute();
+  window.__lyConfirm=function(ev){var b=ev.submitter||document.activeElement;if(!b||b.value!=='complete')return true;var n=ev.target.dataset.nextStage||'Cutting';return confirm('Complete layering and advance to '+n+'? This locks the rolls + layer counts.');};
+})();
+</script>
 
 {% include "production/_stage_panel_collapse.html" %}
 {% include "production/_autosave.html" %}

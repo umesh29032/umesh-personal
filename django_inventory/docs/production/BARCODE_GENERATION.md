@@ -172,6 +172,6 @@ Full suite: 196/196 as of 2026-05-29.
 
 ## See Also
 
-- [BARCODE_STAGE_PLAN.md](BARCODE_STAGE_PLAN.md) — design decisions D1-D5
+- [BARCODE_STAGE_PLAN.md](../archive/production/BARCODE_STAGE_PLAN.md) — design decisions D1-D5 *(archived)*
 - [../tracking/EXPORTS.md](../tracking/EXPORTS.md) — export flow + LabelPrintQueue stub
 - [OVERVIEW.md](OVERVIEW.md) — stage list snapshot

@@ -8,6 +8,7 @@ from django.contrib import admin
 from .models import (
     PayrollSettlement, PayrollSettlementItem, StageWorkAssignment,
     WorkerAdvance, WorkerLedgerEntry, WorkerProfile,
+    AddaSettlement, AddaSettlementItem,
 )
 
 
@@ -86,3 +87,21 @@ class WorkerProfileAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('user__email', 'phone', 'bank_account_name')
     raw_id_fields = ('user',)
+
+
+@admin.register(AddaSettlement)
+class AddaSettlementAdmin(_MoneyReadOnlyAdmin):
+    """V2-2: financial event — read-only in admin; all writes via
+    adda_settlement_service (single-writer rule)."""
+    list_display = ('reference', 'adda', 'status', 'expected_total',
+                    'variance_total', 'settled_at')
+    list_filter = ('status',)
+    search_fields = ('reference', 'adda__code')
+
+
+@admin.register(AddaSettlementItem)
+class AddaSettlementItemAdmin(_MoneyReadOnlyAdmin):
+    """Frozen per-worker snapshot — append-only, never edited (owner Q3)."""
+    list_display = ('adda_settlement', 'worker', 'expected_earning',
+                    'advance_recovered', 'final_payable', 'settled_at')
+    search_fields = ('adda_settlement__reference', 'worker__email')

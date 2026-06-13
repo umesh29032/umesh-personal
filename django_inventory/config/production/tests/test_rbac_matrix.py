@@ -7,20 +7,21 @@ Asserts the master-spec access expectations the review called out:
 from django.test import TestCase
 from django.urls import reverse
 
-from accounts.models import Skill, User
+from accounts.models import Skill, User, UserType
 from inventory.models import Role
 from production.models import Product, Stage
 from production.services import create_adda
 
 
-def _user(email, *, role_code=None, user_type='worker', is_super=False, skills=()):
+def _user(email, *, role_code=None, user_type_code='worker', is_super=False, skills=()):
+    ut = UserType.objects.filter(code=user_type_code).first()
     u = User.objects.create_user(
         email=email, password='pw', is_superuser=is_super, is_staff=is_super,
-        user_type=user_type,
     )
+    u.user_type = ut
     if role_code:
         u.role = Role.objects.get(code=role_code)
-        u.save()
+    u.save()
     for s in skills:
         u.skills.add(Skill.objects.get(name=s))
     return u
@@ -32,7 +33,7 @@ class ProductsAccessMatrixTests(TestCase):
         self.manager = _user('m-mgr@test.test', role_code='manager')          # "Admin" tier
         self.worker = _user('m-worker@test.test', role_code='worker')        # Worker
         # 'normal' type + no role → no privileged role at all (Supplier analog).
-        self.norole = _user('m-none@test.test', role_code=None, user_type='normal')
+        self.norole = _user('m-none@test.test', role_code=None, user_type_code='normal')
         self.url = reverse('production:product-list')
 
     def test_super_admin_allowed(self):
@@ -56,7 +57,7 @@ class ProductsAccessMatrixTests(TestCase):
 class ScanPieceAccessTests(TestCase):
     def setUp(self):
         self.worker = _user('s-worker@test.test', role_code='worker')
-        self.norole = _user('s-none@test.test', role_code=None, user_type='normal')
+        self.norole = _user('s-none@test.test', role_code=None, user_type_code='normal')
         self.url = reverse('tracking:scan', kwargs={'value': 'NOPE-0001'})
 
     def test_non_production_denied(self):

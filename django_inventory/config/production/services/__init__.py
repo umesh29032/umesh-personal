@@ -7,7 +7,9 @@ Pattern (Phase 6+):
   services/adda_service.py        — Adda lifecycle (create + advance)
   services/product_service.py     — Product CRUD
   services/activity_service.py    — Activity timeline derivation
-  services/stage_service.py       — back-compat shim re-exporting everything
+
+This package __init__ is the public facade — it re-exports each stage's
+entry points so callers do `from production.services import complete_layering`.
 
 Future stages = drop in services/<stage>_service.py + re-export here.
 """
@@ -17,7 +19,8 @@ from .product_size_service import (
     add_product_size, archive_product_size, reactivate_product_size,
     update_product_size,
 )
-from .layering_service import (
+from production.stages.layering.service import (
+    attach_layering_snapshots,
     attach_roll_to_layering,
     complete_layering,
     detach_roll_from_layering,
@@ -31,11 +34,13 @@ from .layering_service import (
     sync_layering_workers_for_skill,
     update_layering_roll_entry,
 )
-from .cutting_service import (
+from production.stages.cutting.service import (
     add_bundle_item,
     add_item_to_bundle,
     add_pieces_to_bundle,
     complete_cutting,
+    complete_cutting_from_bundles,
+    complete_cutting_legacy,
     create_bundle,
     create_bundle_with_pieces,
     delete_breakup_row,
@@ -49,7 +54,7 @@ from .cutting_service import (
     start_cutting,
     upsert_breakup_row,
 )
-from .cutting_pattern_service import (
+from production.stages.cutting_pattern.service import (
     attach_photo as attach_pattern_photo,
     complete_pattern_stage,
     ensure_pattern_record,
@@ -62,7 +67,7 @@ from .cutting_pattern_service import (
     unverify_pattern,
     verify_pattern,
 )
-from .barcode_generation_service import (
+from production.stages.barcode_generation.service import (
     complete_barcode_generation,
     generate_barcodes,
     get_barcode_snapshot,
@@ -71,6 +76,7 @@ from .barcode_generation_service import (
     reopen_barcode_generation,
     start_barcode_generation,
 )
+from .cost_service import clear_stage_cost
 from .activity_service import adda_activity, user_activity_across_addas
 from .access_service import user_can_access_stage, stage_access_map
 from .flow_service import (
@@ -103,6 +109,7 @@ __all__ = [
     'complete_layering',
     'reopen_layering',
     'get_layering_snapshot',
+    'attach_layering_snapshots',
     # Cutting stage
     'start_cutting',
     'upsert_breakup_row',
@@ -111,10 +118,13 @@ __all__ = [
     'create_bundle_with_pieces',
     'add_bundle_item',
     'add_item_to_bundle',
+    'add_pieces_to_bundle',
     'delete_bundle_item',
     'delete_bundle',
     'save_cutting_draft',
     'complete_cutting',
+    'complete_cutting_from_bundles',
+    'complete_cutting_legacy',
     'reopen_cutting',
     'get_cutting_snapshot',
     'get_suggested_breakup',
@@ -139,6 +149,8 @@ __all__ = [
     'get_or_create_barcode_stage_record',
     'preview_barcode_counts',
     'get_barcode_snapshot',
+    # Stage costing
+    'clear_stage_cost',
     # Activity
     'adda_activity',
     'user_activity_across_addas',

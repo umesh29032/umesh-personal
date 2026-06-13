@@ -1,0 +1,15 @@
+{% extends "accounts/base.html" %}
+{% comment %}V2-1c-iii pt.2b — STANDALONE worker report page (mobile-first).
+All logic in _worker_report_body.html (schema-driven). D1: this is one of the two
+routes; the chromeless twin is worker_report_embedded.html.{% endcomment %}
+
+{% block title %}Report my work · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+{% include "production/_worker_report_styles.html" %}
+{% endblock %}
+
+{% block content %}
+{% include "production/_worker_report_body.html" %}
+{% endblock %}

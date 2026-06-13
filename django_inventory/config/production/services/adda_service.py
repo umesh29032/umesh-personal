@@ -20,14 +20,18 @@ bachna chahiye (spec D1 + D5 + D6).
 """
 from __future__ import annotations
 
+import logging
+
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
 from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
-from inventory.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import PRODUCTION_ROLES, user_has_role
 from production.constants import STAGE_LAYERING
 from production.models import Adda, AddaStageRecord, Product
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_can_manage(user):
@@ -68,6 +72,12 @@ def create_adda(user, *, product: Product) -> Adda:
         • Helpers ko ye Adda dashboard pe turant dikhega (spec D1).
 
     Resulting code: {Product.code}-{counter:03d}  e.g. 'T-SHIRT-001'.
+
+    Side effects:
+        • UPDATE Product.adda_counter (locked row, atomic increment).
+        • INSERT Adda (new batch row).
+        • INSERT AddaStageRecord + set workers M2M — only when first stage is Layering.
+        • tracking.services.log_adda → INSERT AddaHistory (CREATED, + WORKERS_ASSIGNED if Layering).
     """
     _ensure_can_manage(user)
     if not product.is_active:
@@ -106,7 +116,9 @@ def create_adda(user, *, product: Product) -> Adda:
             adda=adda, workflow_stage=first_stage,
             started_at=timezone.now(),
         )
-        sr.workers.set(skilled_pks)   # M2M snapshot — manager refine kar sakta
+        # Dual-write chokepoint: M2M (authoritative) + WorkerStageTask (V2-1a).
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, skilled_pks)   # M2M snapshot — manager refine kar sakta
 
     # tracking app ka lazy import — production pe ulta depend karta hai
     from tracking.services import log_adda
@@ -115,12 +127,21 @@ def create_adda(user, *, product: Product) -> Adda:
     if first_stage.stage_type == STAGE_LAYERING:
         log_adda(adda, AddaHistory.ChangeType.WORKERS_ASSIGNED, user,
                  stage_record=sr, metadata={'worker_ids': list(skilled_pks)})
+    logger.info(
+        "adda.create code=%s adda_id=%s product=%s first_stage=%s worker_count=%d",
+        adda.code, adda.pk, prod.code, first_stage.stage_type, len(skilled_pks),
+    )
     return adda
 
 
 @transaction.atomic
-def advance_to_next_stage(adda: Adda, user) -> Adda:
+def advance_to_next_stage(adda: Adda, user, *, enforce_worker_credit: bool = True) -> Adda:
     """Adda ko next WorkflowStage pe move karta hai. Last stage ke baad COMPLETED.
+
+    enforce_worker_credit: PAY-2 (M2.7c). When True (default), a PAYABLE stage being
+    left (WorkflowStage.credits_workers + self-paid) must have >=1 non-voided worker
+    allocation or completion is blocked. Legacy paths pass False to opt out
+    (compatibility-only flow, per the payroll architecture decision).
 
     Stage services (complete_layering / complete_cutting, in layering_service /
     cutting_service) iss helper ko call karte hain typed record save hone ke baad.
@@ -128,6 +149,13 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     Last-stage handling:
         nxt=None    → Adda completed, current_stage=None set, completed_at stamp
         nxt set hai → current_stage update
+
+    Side effects:
+        • production.services.cost_service.freeze_stage_cost → writes frozen
+          processing_cost + cost_*_snapshot on the leaving AddaStageRecord (MONEY).
+        • UPDATE Adda (current_stage; + status/completed_at when last stage).
+        • tracking.services.log_adda → INSERT AddaHistory (COST_FROZEN if leaving record,
+          STAGE_ADVANCED, + COMPLETED on final stage).
     """
     cur = adda.current_stage
     if cur is None:
@@ -140,8 +168,21 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     # the same atomic block, so the quantity is authoritative here.
     from production.services.cost_service import freeze_stage_cost
     leaving_sr = AddaStageRecord.objects.filter(adda=adda, workflow_stage=cur).first()
+    # PAY-2 (M2.7c): block completing a payable stage with zero worker allocations.
+    # Runs BEFORE the freeze so nothing is mutated on rejection. No-op for
+    # non-payable stages; legacy callers opt out via enforce_worker_credit=False.
+    if enforce_worker_credit and leaving_sr is not None:
+        from production.stages.base import ensure_worker_credit
+        ensure_worker_credit(leaving_sr)
     if leaving_sr is not None:
         freeze_stage_cost(leaving_sr, user=user)
+        # F3/F8 lifecycle (owner-locked 2026-06-11): completed stage leaves no
+        # unresolved active tasks — unreported assigned/in_progress → cancelled
+        # (+ M2M roster sync via the chokepoint; parity by construction).
+        # completed/verified tasks untouched. This funnel covers every stage,
+        # current and future (open-closed).
+        from production.services.worker_task_service import resolve_stage_tasks_on_complete
+        resolve_stage_tasks_on_complete(leaving_sr)
 
     # Next stage = order > current ke saare stages mein se sabse pehla
     nxt = adda.product.workflow_stages.filter(order__gt=cur.order).order_by('order').first()
@@ -173,4 +214,10 @@ def advance_to_next_stage(adda: Adda, user) -> Adda:
     log_adda(adda, AddaHistory.ChangeType.STAGE_ADVANCED, user, stage_from=cur, stage_to=nxt)
     if nxt is None:
         log_adda(adda, AddaHistory.ChangeType.COMPLETED, user)
+    logger.info(
+        "adda.advance code=%s adda_id=%s stage_from=%s stage_to=%s frozen_cost=%s status=%s",
+        adda.code, adda.pk, cur.stage_type, (nxt.stage_type if nxt is not None else None),
+        (str(leaving_sr.processing_cost) if leaving_sr is not None else None),
+        adda.status,
+    )
     return adda

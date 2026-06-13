@@ -215,7 +215,7 @@
                             <option value="">— pick color —</option>
                             {% for c in active_colors %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
                         </select>
-                        <input type="number" name="breakup_qty" min="1" placeholder="qty" required>
+                        <input type="number" inputmode="numeric" name="breakup_qty" min="1" placeholder="qty" required>
                         <button type="button" class="remove-row" title="Remove row">✕</button>
                     </div>
                 </template>
@@ -230,7 +230,7 @@
                                         <option value="{{ c.pk }}" {% if row.color_pk == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>
                                     {% endfor %}
                                 </select>
-                                <input type="number" name="breakup_qty" min="1" placeholder="qty" value="{{ row.qty }}" required>
+                                <input type="number" inputmode="numeric" name="breakup_qty" min="1" placeholder="qty" value="{{ row.qty }}" required>
                                 <button type="button" class="remove-row" title="Remove row">✕</button>
                             </div>
                         {% endfor %}

@@ -89,6 +89,11 @@ class CuttingWorkflowFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises cutting mechanics, not payroll.
+        # Cutting is seeded credits_workers=True (mig 0030); the worker-allocation
+        # guard is covered separately by test_stage_credit. Not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         # Patterns + Assignments
         ProductPatternAssignment.objects.filter(product=cls.product).delete()
@@ -185,7 +190,7 @@ class StartCuttingTests(CuttingWorkflowFixture):
         sr = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
-        self.assertIn(self.admin, sr.workers.all())
+        self.assertTrue(sr.is_worker_assigned(self.admin))
 
     def test_requires_management(self):
         karigar = _user('k1@cw.test', role_code='worker', is_super=False,

@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Report my work (V2-1c-iii)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Real Kapil tokens (from production stage_panel_embedded + base) ───────── */
+  :root{
+    --ink:#1c1c1e; --stone:#6e6259; --cream:#faf7f2; --cream-2:#f1ece2;
+    --copper:#b87333; --copper-l:#d4924a; --surface-2:#f5f1ea; --card-bg:#fff;
+    --border-card:#cfc0aa; --border-subtle:#e6dcc9; --danger:#b91c1c;
+    --danger-bg:rgba(220,38,38,.10); --white:#fff; --bg:#efe7d8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--bg); color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+       padding:24px 16px;}
+
+  /* ── Form shell (mirrors production/_form_styles.html) ─────────────────────── */
+  .form-shell{max-width:760px; margin:0 auto; padding-bottom:120px;}
+  .hero{background:linear-gradient(135deg,#0a1628 0%,#1a2840 50%,#2a1f0e 85%,#b87333 130%);
+        color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
+        box-shadow:0 8px 32px rgba(14,11,9,.20); position:relative; overflow:hidden;}
+  .hero::before{content:''; position:absolute; right:-100px; top:-100px; width:280px; height:280px;
+        background:radial-gradient(circle,rgba(184,115,51,.25),transparent 70%);}
+  .hero h1{font-family:'Cormorant Garamond',Georgia,serif; font-size:30px; font-weight:600;
+        margin:0 0 6px; letter-spacing:-.01em; position:relative;}
+  .hero p{margin:0; color:rgba(255,255,255,.72); font-size:14px; position:relative;}
+  .hero-chip{display:inline-block; padding:3px 10px; margin-top:12px;
+        background:rgba(184,115,51,.22); border:1px solid rgba(184,115,51,.4); color:#d4924a;
+        border-radius:12px; font-size:10px; font-weight:700; letter-spacing:.12em; position:relative;}
+
+  .panel{background:var(--card-bg); border:1px solid var(--border-card); border-radius:14px;
+        box-shadow:0 2px 12px rgba(14,11,9,.10); margin-bottom:18px;}
+  .panel-head{display:flex; align-items:center; gap:12px; padding:18px 22px 0;}
+  .panel-num{width:32px; height:32px; flex-shrink:0; background:var(--copper); color:#fff;
+        font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;
+        border-radius:8px; box-shadow:0 2px 6px rgba(184,115,51,.35);}
+  .panel-title{font-family:'Cormorant Garamond',Georgia,serif; font-size:20px; font-weight:600;
+        color:var(--ink); letter-spacing:-.01em;}
+  .panel-body{padding:18px 22px 22px;}
+  .panel-sub{font-size:13px; color:var(--stone); margin:0 0 14px;}
+
+  /* ── Contribution line cards (stacked = touch-friendly for workers) ────────── */
+  .line-card{background:var(--surface-2); border:1px solid var(--border-card); border-radius:12px;
+        padding:14px 16px 16px; margin-bottom:12px; position:relative;}
+  .line-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .line-no{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--stone);}
+  .line-remove{border:none; background:transparent; color:var(--stone); font-size:18px; line-height:1;
+        cursor:pointer; padding:2px 6px; border-radius:6px;}
+  .line-remove:hover{color:var(--danger); background:var(--danger-bg);}
+  .line-field{margin-bottom:12px;}
+  .line-field:last-child{margin-bottom:0;}
+  .fld-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+        color:var(--stone); display:block; margin-bottom:7px;}
+
+  /* chip pickers (mirror .worker-chip behaviour) */
+  .chip-row{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{display:inline-flex; align-items:center; gap:7px; padding:8px 13px; cursor:pointer;
+        background:var(--cream); border:1.5px solid var(--border-card); border-radius:999px;
+        font-size:13px; color:var(--ink); transition:background .15s,border-color .15s;}
+  .chip:hover{border-color:var(--copper);}
+  .chip.selected{background:rgba(184,115,51,.12); border-color:var(--copper); font-weight:600;}
+  .swatch{width:14px; height:14px; border-radius:50%; border:1px solid rgba(0,0,0,.15); flex-shrink:0;}
+
+  /* quantity input (cream + inset, the house input) */
+  .qty-row{display:flex; align-items:center; gap:10px;}
+  .qty-input{width:120px; padding:11px 14px; background:var(--cream); border:1.5px solid var(--border-card);
+        border-radius:10px; box-shadow:inset 0 1.5px 4px rgba(14,11,9,.07); font-size:15px; font-weight:700;
+        color:var(--ink); font-family:inherit;}
+  .qty-input:focus{outline:none; border-color:var(--copper); background:var(--white);
+        box-shadow:inset 0 1.5px 4px rgba(14,11,9,.07),0 0 0 3px rgba(184,115,51,.15);}
+  .qty-suffix{font-size:13px; color:var(--stone);}
+
+  .add-line{width:100%; padding:12px; margin-top:2px; background:transparent;
+        border:1.5px dashed var(--border-card); border-radius:12px; color:var(--copper);
+        font-weight:700; font-size:14px; cursor:pointer; transition:background .15s,border-color .15s;}
+  .add-line:hover{background:rgba(184,115,51,.06); border-color:var(--copper);}
+
+  /* ── Your-total summary card ───────────────────────────────────────────────── */
+  .stage-summary{background:var(--cream); border:1px solid var(--border-card); border-radius:12px;
+        padding:16px 18px;}
+  .summary-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px;}
+  .summary-grid .lbl{font-size:10px; color:var(--stone); text-transform:uppercase; letter-spacing:.05em;}
+  .summary-grid .val{font-size:26px; font-weight:700; color:var(--ink);
+        font-family:'Cormorant Garamond',Georgia,serif; line-height:1.1;}
+  .next-note{margin-top:14px; padding:11px 14px; background:var(--surface-2); border-radius:10px;
+        font-size:12.5px; color:var(--stone); display:flex; gap:9px; align-items:flex-start;}
+  .next-note b{color:var(--ink);}
+
+  /* ── Frosted sticky CTA ────────────────────────────────────────────────────── */
+  .sticky-actions{position:sticky; bottom:14px; z-index:5; margin:22px 0 0; padding:14px 18px;
+        background:rgba(250,247,242,.80); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+        border:1px solid var(--border-card); border-radius:14px; box-shadow:0 8px 24px rgba(14,11,9,.10);
+        display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;}
+  .btn{padding:12px 20px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer;
+        border:1.5px solid transparent; font-family:inherit;}
+  .btn-primary{background:var(--copper); color:#fff; box-shadow:0 2px 8px rgba(184,115,51,.35);}
+  .btn-primary:hover{background:#a5641f;}
+  .btn-ghost{background:var(--white); color:var(--ink); border-color:var(--border-card);}
+  .btn-ghost:hover{border-color:var(--copper); color:var(--copper);}
+
+  .mock-note{max-width:760px; margin:0 auto 16px; font-size:12px; color:var(--stone);
+        background:#fff8e6; border:1px dashed var(--copper); border-radius:10px; padding:8px 12px;}
+  .state-tag{max-width:760px; margin:26px auto 12px; font-size:11px; font-weight:700;
+        letter-spacing:.08em; text-transform:uppercase; color:var(--copper);}
+
+  /* ── Locked / read-only (post Submit & Complete) ───────────────────────────── */
+  .submitted-chip{background:rgba(22,128,80,.22)!important; border-color:rgba(22,128,80,.45)!important; color:#bff0d4!important;}
+  .status-banner{background:rgba(22,128,80,.10); border:1px solid rgba(22,128,80,.35); color:#15663f;
+        border-radius:12px; padding:14px 18px; margin-bottom:18px; display:flex; gap:10px; align-items:flex-start; font-size:13.5px;}
+  .status-banner b{color:#0f4d2f;}
+  .ro-line{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px;
+        background:var(--surface-2); border:1px solid var(--border-card); border-radius:12px; margin-bottom:10px;}
+  .ro-dims{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .ro-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 11px; background:var(--cream);
+        border:1px solid var(--border-card); border-radius:999px; font-size:13px; color:var(--ink);}
+  .ro-qty{font-family:'Cormorant Garamond',Georgia,serif; font-size:22px; font-weight:700; color:var(--ink); white-space:nowrap;}
+  .ro-qty small{font-family:inherit; font-size:11px; color:var(--stone); font-weight:400;}
+  .locked-foot{margin-top:16px; font-size:12.5px; color:var(--stone); text-align:center;}
+
+  @media (max-width:600px){
+    body{padding:14px 10px;}
+    .hero{padding:22px 20px; border-radius:12px;} .hero h1{font-size:24px;}
+    .panel-head{padding:16px 18px 0;} .panel-body{padding:14px 18px 18px;}
+    .sticky-actions{bottom:8px; flex-direction:column-reverse;}
+    .sticky-actions .btn{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<div class="mock-note">🎨 MOCKUP · V2-1c-iii worker self-report — static preview for review. <b>This is a CUTTING-stage EXAMPLE</b>, not a universal form: the contribution schema (here colour/size/qty) is <b>stage-driven</b> — the stage engine stays open-closed, so future stages declare their own fields. Wires to <code>save_draft_contributions()</code> + <code>complete_worker_task()</code> (built + tested). No money shown (Option B); no factory totals / other workers (isolation). Shows two states below: <b>① editable draft</b> and <b>② submitted (locked)</b>.</div>
+
+<div class="state-tag">STATE ① — EDITABLE (draft / not yet submitted)</div>
+
+<div class="form-shell">
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Cutting</h1>
+    <p>Report the pieces you cut, then mark your work complete.</p>
+    <span class="hero-chip">ADDA · T-SHIRT-001</span>
+  </div>
+
+  <!-- PANEL 1 — contribution lines -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-num">1</div>
+      <div class="panel-title">What did you make?</div>
+    </div>
+    <div class="panel-body">
+      <p class="panel-sub">Add a line for each colour + size you worked on.</p>
+
+      <!-- line 1 (filled) -->
+      <div class="line-card">
+        <div class="line-head"><span class="line-no">Line 1</span><button class="line-remove" title="Remove">&times;</button></div>
+        <div class="line-field">
+          <span class="fld-label">Colour</span>
+          <div class="chip-row">
+            <span class="chip selected"><span class="swatch" style="background:#c0392b"></span>Red</span>
+            <span class="chip"><span class="swatch" style="background:#2c5aa0"></span>Blue</span>
+            <span class="chip"><span class="swatch" style="background:#1c1c1e"></span>Black</span>
+            <span class="chip"><span class="swatch" style="background:#f5f5f5"></span>White</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Size</span>
+          <div class="chip-row">
+            <span class="chip">S</span><span class="chip selected">M</span>
+            <span class="chip">L</span><span class="chip">XL</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Quantity</span>
+          <div class="qty-row"><input class="qty-input" type="number" value="120" min="1"><span class="qty-suffix">pieces</span></div>
+        </div>
+      </div>
+
+      <!-- line 2 (filled) -->
+      <div class="line-card">
+        <div class="line-head"><span class="line-no">Line 2</span><button class="line-remove" title="Remove">&times;</button></div>
+        <div class="line-field">
+          <span class="fld-label">Colour</span>
+          <div class="chip-row">
+            <span class="chip"><span class="swatch" style="background:#c0392b"></span>Red</span>
+            <span class="chip selected"><span class="swatch" style="background:#2c5aa0"></span>Blue</span>
+            <span class="chip"><span class="swatch" style="background:#1c1c1e"></span>Black</span>
+            <span class="chip"><span class="swatch" style="background:#f5f5f5"></span>White</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Size</span>
+          <div class="chip-row">
+            <span class="chip">S</span><span class="chip">M</span>
+            <span class="chip selected">L</span><span class="chip">XL</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Quantity</span>
+          <div class="qty-row"><input class="qty-input" type="number" value="80" min="1"><span class="qty-suffix">pieces</span></div>
+        </div>
+      </div>
+
+      <!-- line 3 (empty) -->
+      <div class="line-card" style="opacity:.85">
+        <div class="line-head"><span class="line-no">Line 3</span><button class="line-remove" title="Remove">&times;</button></div>
+        <div class="line-field">
+          <span class="fld-label">Colour</span>
+          <div class="chip-row">
+            <span class="chip"><span class="swatch" style="background:#c0392b"></span>Red</span>
+            <span class="chip"><span class="swatch" style="background:#2c5aa0"></span>Blue</span>
+            <span class="chip"><span class="swatch" style="background:#1c1c1e"></span>Black</span>
+            <span class="chip"><span class="swatch" style="background:#f5f5f5"></span>White</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Size</span>
+          <div class="chip-row">
+            <span class="chip">S</span><span class="chip">M</span><span class="chip">L</span><span class="chip">XL</span>
+          </div>
+        </div>
+        <div class="line-field">
+          <span class="fld-label">Quantity</span>
+          <div class="qty-row"><input class="qty-input" type="number" placeholder="0" min="1"><span class="qty-suffix">pieces</span></div>
+        </div>
+      </div>
+
+      <button class="add-line">+ Add another line</button>
+    </div>
+  </div>
+
+  <!-- PANEL 2 — your total -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-num">2</div>
+      <div class="panel-title">Your total</div>
+    </div>
+    <div class="panel-body">
+      <div class="stage-summary">
+        <div class="summary-grid">
+          <div><span class="lbl">Pieces you reported</span><span class="val">200</span></div>
+          <div><span class="lbl">Lines</span><span class="val">2</span></div>
+        </div>
+        <div class="next-note">
+          <span>ℹ️</span>
+          <span>Once you <b>submit &amp; complete</b>, this report will be used for production tracking and future Adda settlement. <b>Payment is processed separately.</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STICKY CTA -->
+  <div class="sticky-actions">
+    <button class="btn btn-ghost">Save draft</button>
+    <button class="btn btn-primary">Submit &amp; complete work</button>
+  </div>
+
+</div>
+
+<!-- ════════════════ STATE ② — SUBMITTED (locked) ════════════════ -->
+<div class="state-tag">STATE ② — SUBMITTED (locked / read-only after Submit &amp; Complete)</div>
+<div class="form-shell">
+
+  <div class="hero">
+    <h1>Cutting</h1>
+    <p>Your work for this stage has been submitted.</p>
+    <span class="hero-chip submitted-chip">✓ SUBMITTED · T-SHIRT-001</span>
+  </div>
+
+  <div class="status-banner">
+    <span>✅</span>
+    <span>Your work report has been submitted. This report will be used for production tracking and future Adda settlement. <b>Payment is processed separately.</b><br>
+      <span style="opacity:.8">Submitted 9 Jun 2026, 6:42 PM · Waiting for stage completion.</span></span>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">1</div><div class="panel-title">Your reported work</div></div>
+    <div class="panel-body">
+      <p class="panel-sub">Locked after submit — this is your final report. Need a change? Ask your manager.</p>
+      <div class="ro-line">
+        <div class="ro-dims">
+          <span class="ro-pill"><span class="swatch" style="background:#c0392b"></span>Red</span>
+          <span class="ro-pill">M</span>
+        </div>
+        <div class="ro-qty">120 <small>pcs</small></div>
+      </div>
+      <div class="ro-line">
+        <div class="ro-dims">
+          <span class="ro-pill"><span class="swatch" style="background:#2c5aa0"></span>Blue</span>
+          <span class="ro-pill">L</span>
+        </div>
+        <div class="ro-qty">80 <small>pcs</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-num">2</div><div class="panel-title">Your total</div></div>
+    <div class="panel-body">
+      <div class="stage-summary">
+        <div class="summary-grid">
+          <div><span class="lbl">Pieces you reported</span><span class="val">200</span></div>
+          <div><span class="lbl">Lines</span><span class="val">2</span></div>
+        </div>
+      </div>
+      <div class="locked-foot">No buttons here — your report is final. Only a manager can correct it if needed.</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

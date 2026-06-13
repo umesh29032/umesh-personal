@@ -36,7 +36,7 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         <div><span class="lbl">Total Barcodes</span><span class="val">{{ record.total_barcodes|default:0 }}</span></div>
         <div><span class="lbl">Batches</span><span class="val">{{ snapshot.batches|length }}</span></div>
         <div><span class="lbl">Generated At</span><span class="val">{% if record.generated_at %}{{ record.generated_at|date:"d M H:i" }}{% else %}—{% endif %}</span></div>
-        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ stage_record.active_workers|length }}</span></div>
     </div>
 </div>
 {% if can_reopen %}
@@ -100,7 +100,7 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     {% if stage_record %}
-        {% with workers=stage_record.workers.all %}
+        {% with workers=stage_record.active_workers %}
         {% if workers %}
             <div class="chip-row">
                 {% for w in workers %}
@@ -207,7 +207,7 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     <form method="post" action="{% url 'production:barcode-gen-complete' adda.code %}"
-          onsubmit="return confirm('Complete Barcode Generation and advance the Adda?');">
+          onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete Barcode Generation and advance the Adda?');">
         {% csrf_token %}
         {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
         <button type="submit" class="btn btn-primary">

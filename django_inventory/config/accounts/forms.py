@@ -14,16 +14,37 @@ Password security:
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .models import User, Skill
+from .models import User, Skill, UserType
+
+
+class UserTypeForm(forms.ModelForm):
+    """Create/edit form for UserType — admin can add new user types from UI."""
+    class Meta:
+        model = UserType
+        fields = ['code', 'label', 'description', 'is_active']
+        widgets = {
+            'code': forms.TextInput(attrs={
+                'placeholder': 'slug-key, e.g. franchise_owner',
+                'pattern': r'[-a-z0-9_]+',
+            }),
+            'label': forms.TextInput(attrs={'placeholder': 'Display name, e.g. Franchise Owner'}),
+            'description': forms.Textarea(attrs={'rows': 2}),
+        }
 
 
 class SkillForm(forms.ModelForm):
-    """Simple create/edit form for Skill objects (managed by Super Admin)."""
+    """Create/edit form for Skill objects — admin-managed from UI, no code changes needed."""
     class Meta:
         model = Skill
-        fields = ['name']
+        fields = ['name', 'label', 'description']
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Enter skill name (e.g., Python, Welding)'})
+            'name': forms.TextInput(attrs={
+                'placeholder': 'slug-key, e.g. stitching_master',
+                'pattern': r'[-a-z0-9_]+',
+                'title': 'Lowercase letters, numbers, hyphens, underscores only',
+            }),
+            'label': forms.TextInput(attrs={'placeholder': 'Display name, e.g. Stitching Master'}),
+            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional description'}),
         }
 
 

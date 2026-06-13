@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Q, Sum
 
-from inventory.services import MANAGEMENT_ROLES, user_has_perm, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_perm, user_has_role
 from expense.models import (
     PayrollSettlement, PayrollSettlementItem, StageWorkAssignment,
     WorkerAdvance, WorkerLedgerEntry,
@@ -27,7 +27,8 @@ _EARNING_CATS = (_CAT.STAGE_EARNING, _CAT.PRODUCTION_EARNING)
 def advance_remaining(advance: WorkerAdvance) -> Decimal:
     """How much of one advance is still outstanding = amount − Σ recovered."""
     recovered = (
-        PayrollSettlementItem.objects.filter(advance=advance)
+        PayrollSettlementItem.objects.filter(advance=advance,
+                                             reversed_at__isnull=True)
         .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO
     )
     return advance.amount - recovered
@@ -40,7 +41,8 @@ def advance_outstanding(worker) -> Decimal:
         .aggregate(s=Sum('amount'))['s'] or _ZERO
     )
     recovered = (
-        PayrollSettlementItem.objects.filter(advance__worker=worker)
+        PayrollSettlementItem.objects.filter(advance__worker=worker,
+                                             reversed_at__isnull=True)
         .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO
     )
     return given - recovered
@@ -160,6 +162,50 @@ def worker_summary(worker, *, since=None, until=None) -> dict:
     }
 
 
+def worker_balance_breakdown(worker) -> dict:
+    """Itemized derivation of a worker's payable — for reconciliation / disputes.
+
+    Same bottom line as worker_summary's pending_payable, but broken into the
+    components that net to it, so "why is the balance ₹X?" is a single call
+    instead of re-doing the reversal-netting math by hand over raw ledger rows.
+    All live sums (nothing stored); debits grouped by category.
+
+    Shape:
+      gross_earnings     — Σ earning credits (before reversal)
+      earnings_reversed  — Σ reversal of earning rows (voided allocations)
+      net_earnings       — gross − reversed
+      debits_by_category — {category: Σ amount} across every DEBIT category
+      total_credits / total_debits
+      pending_payable    — credits − debits (the bottom line)
+    """
+    qs = WorkerLedgerEntry.objects.filter(worker=worker)
+    earn_q = Q(entry_type=_ET.CREDIT, category__in=_EARNING_CATS)
+    earn_rev_q = Q(category=_CAT.REVERSAL, reverses__category__in=_EARNING_CATS)
+    agg = qs.aggregate(
+        gross=Sum('amount', filter=earn_q),
+        earn_reversed=Sum('amount', filter=earn_rev_q),
+        credits=Sum('amount', filter=Q(entry_type=_ET.CREDIT)),
+        debits=Sum('amount', filter=Q(entry_type=_ET.DEBIT)),
+    )
+    debits_by_cat = {
+        r['category']: r['s'] for r in
+        qs.filter(entry_type=_ET.DEBIT).values('category').annotate(s=Sum('amount'))
+    }
+    gross = agg['gross'] or _ZERO
+    earn_reversed = agg['earn_reversed'] or _ZERO
+    credits = agg['credits'] or _ZERO
+    debits = agg['debits'] or _ZERO
+    return {
+        'gross_earnings': gross,
+        'earnings_reversed': earn_reversed,
+        'net_earnings': gross - earn_reversed,
+        'debits_by_category': debits_by_cat,
+        'total_credits': credits,
+        'total_debits': debits,
+        'pending_payable': credits - debits,
+    }
+
+
 def worker_ledger(worker, *, limit=None):
     """Recent ledger rows for a worker (newest first)."""
     qs = WorkerLedgerEntry.objects.filter(worker=worker).order_by('-created_at')
@@ -177,11 +223,21 @@ def worker_assignments(worker, *, limit=None):
 
 
 def worker_production_stats(worker) -> dict:
-    """Adda counts + pieces produced for a worker (Q1/Q2). From non-voided
-    allocations: pieces = Σ allocated_quantity; Adda buckets by status."""
-    from production.models import Adda
-    base = StageWorkAssignment.objects.filter(worker=worker, voided_at__isnull=True)
-    pieces = base.aggregate(s=Sum('allocated_quantity'))['s'] or _ZERO
+    """Adda counts + pieces produced for a worker (Q1/Q2) — PRODUCTION truth
+    (V2-3 PR-C, owner D-V3.3): pieces = Σ reported_quantity on the worker's
+    completed/verified tasks, independent of settlement timing. Adda buckets
+    come from assignment truth (non-cancelled tasks). Pre-V2-1c allocations
+    that never had contributions are not counted — this is a productivity
+    view, not a money view (the ledger is)."""
+    from production.models import Adda, WorkerStageContribution, WorkerStageTask
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    pieces = (
+        WorkerStageContribution.objects
+        .filter(task__worker=worker, task__status__in=done)
+        .aggregate(s=Sum('reported_quantity'))['s'] or _ZERO
+    )
+    base = (WorkerStageTask.objects.filter(worker=worker)
+            .exclude(status=WorkerStageTask.Status.CANCELLED))
     by_status = (
         base.values('stage_record__adda__status')
         .annotate(n=Count('stage_record__adda', distinct=True))
@@ -193,6 +249,35 @@ def worker_production_stats(worker) -> dict:
         'active_addas': counts.get(Adda.Status.IN_PROGRESS, 0),
         'completed_addas': counts.get(Adda.Status.COMPLETED, 0),
     }
+
+
+def unsettled_expected(worker):
+    """Option B visibility (V2-3 PR-C): Σ frozen `expected_earning` of the
+    worker's completed-but-UNCREDITED contribution lines — what a future Adda
+    settlement would book. NEVER money (balances always come from the ledger).
+
+    Non-overlapping with "Earned" by construction — excludes lines already
+    credited era-B (active settlement_line; a VOIDED line counts as unsettled
+    again, mirroring the settlement guard) or era-A (non-voided allocation SWA
+    on the same worker+stage, the same coarse pair rule the settlement uses)."""
+    from production.models import WorkerStageContribution, WorkerStageTask
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    lines = (
+        WorkerStageContribution.objects
+        .filter(task__worker=worker, task__status__in=done,
+                expected_earning__isnull=False)
+        .filter(Q(settlement_line__isnull=True)
+                | Q(settlement_line__voided_at__isnull=False))
+        .select_related('task')
+    )
+    era_a_srs = set(
+        StageWorkAssignment.objects
+        .filter(worker=worker, voided_at__isnull=True,
+                adda_settlement__isnull=True)
+        .values_list('stage_record_id', flat=True)
+    )
+    return sum((c.expected_earning for c in lines
+                if c.task.stage_record_id not in era_a_srs), _ZERO)
 
 
 def worker_stage_earnings(worker):

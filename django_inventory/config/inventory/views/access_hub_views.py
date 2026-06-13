@@ -25,7 +25,7 @@ from production.models import Stage
 
 from ..models import Role, SidebarItemRule
 from ..services import ROLE_SUPER_ADMIN
-from ..services.permission_service import SIDEBAR
+from accounts.services.permission_service import SIDEBAR
 from .mixins import SuperAdminOnlyMixin
 
 User = get_user_model()
@@ -83,12 +83,12 @@ class AccessControlHubView(LoginRequiredMixin, SuperAdminOnlyMixin, TemplateView
         # ── Matrix 3: Users roster ───────────────────────────────────────────
         user_rows = []
         for u in (
-            User.objects.select_related('role')
+            User.objects.select_related('role', 'user_type')
             .prefetch_related('extra_roles', 'skills').order_by('email')
         ):
             user_rows.append({
                 'email': u.email,
-                'user_type': u.get_user_type_display(),
+                'user_type': u.user_type.label if u.user_type_id else None,
                 'role': u.role.name if u.role_id else None,
                 'extra_roles': [r.name for r in u.extra_roles.all()],
                 'skills': [s.get_name_display() for s in u.skills.all()],

@@ -1,0 +1,57 @@
+{% extends 'accounts/base.html' %}
+{% block title %}User Types{% endblock %}
+{% block page_title %}User Types{% endblock %}
+{% block extra_head %}
+{% include 'shared/_datatables_vendor_css.html' %}
+{% endblock %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;">
+    <div class="page-header">
+        <div class="page-header-text">
+            <h1>User Types</h1>
+            <p>Define what type of user someone is (display/classification only — Role controls access).</p>
+        </div>
+        <a href="{% url 'accounts:usertype_add' %}" class="btn btn-primary">+ Add User Type</a>
+    </div>
+    <div class="kpis" style="margin-bottom:24px;">
+        <div class="kpi"><div class="kpi-accent"></div><div class="kpi-label">Total Types</div><div class="kpi-value">{{ user_types|length }}</div></div>
+    </div>
+    <div class="card card-clip">
+        {% if user_types %}
+        <div class="table-responsive">
+            <table id="utypes-dt" style="width:100%;border-collapse:collapse;text-align:left;">
+                <thead style="background:var(--surface-2);">
+                    <tr>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Label</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Code</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Users</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);">Active</th>
+                        <th style="padding:14px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);text-align:right;" data-orderable="false">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ut in user_types %}
+                    <tr style="border-bottom:1px solid var(--border-subtle);">
+                        <td style="padding:16px 20px;font-weight:600;font-size:14px;" data-label="Label">{{ ut.label }}</td>
+                        <td style="padding:16px 20px;font-family:monospace;font-size:13px;" data-label="Code">{{ ut.code }}</td>
+                        <td style="padding:16px 20px;" data-label="Users">{{ ut.users.count }}</td>
+                        <td style="padding:16px 20px;" data-label="Active">{% if ut.is_active %}<span style="color:var(--success)">✓</span>{% else %}<span style="color:var(--danger)">✗</span>{% endif %}</td>
+                        <td style="padding:16px 20px;text-align:right;" data-label="Actions">
+                            <a href="{% url 'accounts:usertype_edit' ut.pk %}" class="action-link">Edit</a>
+                            <a href="{% url 'accounts:usertype_delete' ut.pk %}" class="action-link action-link-danger">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><h3>No user types yet</h3><p>Add your first user type.</p><a href="{% url 'accounts:usertype_add' %}" class="btn btn-primary">+ Add User Type</a></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+{% include 'shared/_datatables_vendor_js.html' %}
+<script>$(function(){initFancyDataTable('#utypes-dt',{pageLength:25,itemName:'user types',searchPlaceholder:'Filter…'});});</script>
+{% endblock %}

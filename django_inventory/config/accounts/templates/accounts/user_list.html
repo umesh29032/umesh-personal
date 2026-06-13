@@ -5,7 +5,7 @@
 
 {% block extra_head %}
 <!-- DataTables CSS only — overrides + filter-chip styles live in base.html now -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+{% include 'shared/_datatables_vendor_css.html' %}
 <style>
 /* ── Skill chips inside table rows (different from filter chips) ── */
 .skill-tag {
@@ -136,7 +136,7 @@
                                 </span>
                             {% elif user.user_type %}
                                 <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2);color:var(--text-secondary);">
-                                    {{ user.get_user_type_display }}
+                                    {{ user.user_type.label }}
                                 </span>
                             {% else %}
                                 <span style="color:var(--text-tertiary);">—</span>
@@ -208,8 +208,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+{% include 'shared/_datatables_vendor_js.html' %}
 <script>
 $(document).ready(function () {
     // Empty-state path — no table, just show skills filter

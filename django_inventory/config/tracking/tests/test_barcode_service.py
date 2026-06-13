@@ -14,7 +14,8 @@ from production.services import (
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
 from tracking.models import BarcodeBatch, BatchBarcode
-from tracking.services import generate_for_cutting, get_or_create_piece, resolve_value
+from production.stages.barcode_generation.assembly import generate_for_cutting
+from tracking.services import get_or_create_piece, resolve_value
 
 
 def _user():

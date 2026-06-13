@@ -10,6 +10,7 @@ Date filter: ?from=&to= ke saath created_at range filter.
 from datetime import datetime, time
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count
 from django.utils import timezone
 from django.views.generic import TemplateView
 
@@ -53,16 +54,20 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         ).count()
         ctx['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
 
-        # Iterate Stage rows (Stage table replaced hardcoded StageType enum).
-        stage_breakdown = []
-        for stage in Stage.active.order_by('name'):
-            stage_breakdown.append({
-                'label': stage.name,
-                'count': addas.filter(
-                    status=Adda.Status.IN_PROGRESS,
-                    current_stage__stage=stage,
-                ).count(),
-            })
+        # Single grouped aggregate instead of one COUNT per stage (was N+1):
+        # count in-progress Addas grouped by current stage, then map onto the
+        # active Stage list.
+        stage_counts = {
+            r['current_stage__stage']: r['n']
+            for r in addas.filter(
+                status=Adda.Status.IN_PROGRESS,
+                current_stage__stage__isnull=False,
+            ).values('current_stage__stage').annotate(n=Count('id'))
+        }
+        stage_breakdown = [
+            {'label': stage.name, 'count': stage_counts.get(stage.id, 0)}
+            for stage in Stage.active.order_by('name')
+        ]
         ctx['stage_breakdown'] = stage_breakdown
 
         recent = list(
@@ -70,10 +75,10 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             .prefetch_related('product__workflow_stages')
             .order_by('-started_at')[:12]
         )
-        # Attach layering snapshot per Adda for the dashboard table
-        from production.services import get_layering_snapshot
-        for a in recent:
-            a.layering_snap = get_layering_snapshot(a)
+        # Attach layering snapshot per Adda for the dashboard table (P5.1: bulk,
+        # N+1-free — was one get_layering_snapshot() call per row).
+        from production.services import attach_layering_snapshots
+        attach_layering_snapshots(recent)
         ctx['recent'] = recent
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')

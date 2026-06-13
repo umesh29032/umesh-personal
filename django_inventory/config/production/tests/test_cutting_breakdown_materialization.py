@@ -46,7 +46,7 @@ from production.services import (
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls
 from tracking.models import BarcodeBatch, BarcodeExportBatch
-from tracking.services import generate_from_breakdown
+from production.stages.barcode_generation.assembly import generate_from_breakdown
 
 
 def _admin(email='ad@brk.test'):
@@ -87,6 +87,10 @@ class _WorkspaceCuttingFixture(TestCase):
         cls.cutting_wf = WorkflowStage.objects.get(
             product=cls.product, stage__code=STAGE_CUTTING,
         )
+        # PAY-2 opt-out: this fixture exercises breakdown/barcode mechanics, not
+        # payroll. Cutting is seeded credits_workers=True (mig 0030); not relevant here.
+        cls.cutting_wf.credits_workers = False
+        cls.cutting_wf.save(update_fields=['credits_workers'])
 
         ProductPatternAssignment.objects.filter(product=cls.product).delete()
         cls.front = ProductPattern.objects.get_or_create(

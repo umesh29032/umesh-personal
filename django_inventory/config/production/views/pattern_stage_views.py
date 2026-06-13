@@ -1,5 +1,13 @@
 """Cutting-pattern stage views — workspace + 6 action handlers.
 
+RESPONSIBILITY: the cutting-pattern operator console (evidence photos/video,
+verification, complete/reopen). DELEGATES TO: pattern-stage services (typed
+record writes, completion validations, reopen via the _shared skeleton).
+INVARIANTS: assignment-gated (skill alone insufficient); evidence locks at
+complete; reopen rules live in the service skeleton (incl. the V2-3
+settled-stage block). MUST NOT ADD: cross-stage logic (each stage = own
+module), money paths, direct model writes.
+
 YEH FILE KYU HAI?
 ─────────────────
 Cutting-pattern stage ka user-facing layer. Service layer ko HTTP se connect
@@ -40,7 +48,7 @@ from django.views.generic import TemplateView
 from accounts.skills import (
     SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
 )
-from inventory.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_CUTTING_PATTERN
 from production.forms import PatternVerifyForm
 from production.models import (
@@ -157,7 +165,7 @@ def _build_pattern_context(request, adda: Adda) -> dict:
     has_helper_skill = user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)
 
     can_assign = is_management
-    is_assigned = bool(sr and sr.workers.filter(pk=user.pk).exists())
+    is_assigned = bool(sr and sr.is_worker_assigned(user))
     can_upload = sr is not None and sr.completed_at is None and (
         is_management or (is_assigned and has_master_skill)
     )
@@ -205,7 +213,7 @@ def _build_pattern_context(request, adda: Adda) -> dict:
         'can_reopen': can_reopen,
         'next_stage': next_stage,
         'start_form': PatternStartForm(initial={
-            'workers': list(sr.workers.values_list('pk', flat=True)) if sr else [],
+            'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_assign else None,
     }
 

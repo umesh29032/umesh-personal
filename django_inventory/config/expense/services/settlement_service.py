@@ -1,10 +1,15 @@
-"""Settlement service — sole writer of PayrollSettlement (+ its ledger debits).
+"""Payment service — sole writer of PayrollSettlement (+ its ledger debits).
 
-The owner settles a worker whenever they decide (no fixed cycle). A settlement:
-  • pays cash (settlement_payment debit) and/or
-  • recovers advances (advance_recovery debit), owner-controlled per advance (D3)
-Both reduce the payable. After a FULL settlement the worker's pending payable
-returns to 0 (a "fresh overview"); partial settlements leave the remainder owed.
+V2-2 NARROWED THIS TO PAYMENT-ONLY (Model A: settlement ≠ payment).
+A PayrollSettlement now means exactly one thing: CASH was paid
+(settlement_payment debit). Advance RECOVERY moved to the Adda settlement
+(adda_settlement_service) — owner-chosen per advance at finalize; any
+`recoveries` passed here is loudly REFUSED, by design (old-habit guard).
+
+WHY: earnings + recovery are an APPROVAL decision (Adda-scoped, reviewable,
+reversible via the settlement lifecycle); cash is fungible and worker-scoped.
+Mixing them again would re-couple money creation with money handover — the
+exact ambiguity V2-2 removed. See docs/ARCHITECTURE_V2.md §11 + ADR-0005.
 
 Immutable: a settlement is never edited. A mistake = reverse its ledger debits +
 a fresh settlement (same append-only discipline as the rest of the ledger).
@@ -14,6 +19,7 @@ for audit, but never read those snapshots back as the source of truth.
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
@@ -26,6 +32,9 @@ from expense.models import (
 )
 from expense.services import ledger_service, payroll_service
 from ._shared import _ensure_management
+
+# Module logger — debuggability for money writes (settlement + ledger debits).
+logger = logging.getLogger(__name__)
 
 _ZERO = Decimal('0.00')
 _CAT = WorkerLedgerEntry.Category
@@ -65,8 +74,22 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
     Each amount must be ≤ that advance's remaining (recomputed under lock).
     Invariant: amount_paid + Σrecoveries ≤ current payable (can't settle more
     than is owed). Equality = full settlement (payable → 0).
+
+    Side effects (money / multi-write):
+      • Acquires a PG transaction-scoped advisory lock (settlement-ref serialization).
+      • Row-locks WorkerProfile (get_or_create may INSERT it) + the worker's WorkerAdvance rows (FOR UPDATE).
+      • Writes PayrollSettlement (1 row) + PayrollSettlementItem (1 per recovery).
+      • Calls ledger_service.log_debit → writes WorkerLedgerEntry (settlement_payment and/or advance_recovery debit).
+      • Reads (no write) ledger_service.worker_balance + payroll_service.advance_remaining/advance_outstanding.
     """
     _ensure_management(user)
+
+    # V2-2 (Model A, §11.2): advance recovery RE-HOMED to the AddaSettlement
+    # finalize. This event is PAYMENT-ONLY now — cash debit, nothing else.
+    if recoveries:
+        raise ValidationError(
+            "Advance recovery now happens at Adda settlement (finalize), not at "
+            "payment. Settle the Adda first; pay cash here afterwards.")
 
     # Serialize settlement-reference allocation across ALL workers. _next_reference
     # reads the global max reference with an UNLOCKED select; the per-worker
@@ -154,4 +177,10 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
             entry_date=when, created_by=user, settlement=settlement,
             notes=f"Advance recovery in {settlement.reference}",
         )
+    logger.info(
+        "expense.settle ref=%s settlement_id=%s worker_id=%s paid=%s "
+        "advance_recovered=%s total_settled=%s payable_before=%s recoveries=%s",
+        settlement.reference, settlement.id, worker.id, paid, advance_deducted,
+        total_settled, payable_before, len(cleaned),
+    )
     return settlement

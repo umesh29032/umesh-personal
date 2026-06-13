@@ -2,7 +2,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -30,6 +30,9 @@ def _manager():
     return u
 
 
+# V2-3 PR-B lever-regression pin: this suite exercises the LEGACY allocation
+# path, kept alive behind the rollback lever. Default is settlement-only.
+@override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
 class AllocationTests(TestCase):
     def setUp(self):
         self.mgr = _manager()
@@ -107,6 +110,17 @@ class AllocationTests(TestCase):
     def test_worker_production_stats_and_stage_earnings(self):
         allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,
                             worker=self.worker, bundle_item=self.item, allocated_quantity=6)
+        # V2-3 PR-C (D-V3.3): stats come from PRODUCTION truth (contributions),
+        # not from allocations — the worker must have reported the work.
+        from production.services.worker_task_service import (
+            complete_worker_task, report_contributions, set_stage_workers,
+        )
+        from production.models import WorkerStageTask
+        set_stage_workers(self.cutting_sr, [self.worker.pk])
+        task = WorkerStageTask.objects.get(
+            stage_record=self.cutting_sr, worker=self.worker)
+        report_contributions(task, [{'reported_quantity': '6'}], actor=self.worker)
+        complete_worker_task(task, actor=self.worker)
         stats = worker_production_stats(self.worker)
         self.assertEqual(stats['pieces_produced'], Decimal('6'))
         self.assertEqual(stats['assigned_addas'], 1)
@@ -141,7 +155,7 @@ class AllocationTests(TestCase):
     def test_delete_item_with_live_allocation_refused_not_crash(self):
         """Deleting a bundle item that has a live worker allocation must raise a
         clean ValidationError, not a 500 ProtectedError (bundle_item is PROTECT)."""
-        from production.services.cutting_service import delete_bundle_item
+        from production.services import delete_bundle_item
         # delete_bundle_item resolves the SR from the Adda's current stage.
         self.adda.current_stage = self.cutting_sr.workflow_stage
         self.adda.save(update_fields=['current_stage'])
@@ -155,7 +169,7 @@ class AllocationTests(TestCase):
         """StageWorkAssignment is immutable (void only flags it), and bundle_item
         is PROTECT — so an item that was EVER allocated stays undeletable even
         after the allocation is voided. The pay audit trail is permanent."""
-        from production.services.cutting_service import delete_bundle_item
+        from production.services import delete_bundle_item
         self.adda.current_stage = self.cutting_sr.workflow_stage
         self.adda.save(update_fields=['current_stage'])
         a = allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,

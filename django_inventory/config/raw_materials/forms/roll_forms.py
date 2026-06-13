@@ -15,7 +15,7 @@ from datetime import date
 
 from django import forms
 
-from inventory.services import user_can_edit_financials
+from accounts.services import user_can_edit_financials
 from raw_materials.models import ClothColor, ClothType, ClothRoll, StorageLocation, WIDTH_CHOICES
 
 
@@ -53,8 +53,12 @@ class BulkRollForm(forms.Form):
         required=False, max_length=200,
         widget=forms.TextInput(attrs={**_BASE_INPUT_ATTRS, 'placeholder': 'optional'}),
     )
+    # C-1 (ADR-0009): PURCHASE price — a fact, never a market/replacement price.
+    # Stays optional (owner: honest-NULL over placeholder prices); unpriced
+    # consumed rolls are surfaced loudly on the costing dashboard instead.
     cost_per_kg = forms.DecimalField(
         required=False, max_digits=10, decimal_places=2,
+        help_text='Purchase price per kg (leave blank if unknown — never guess)',
         widget=forms.NumberInput(attrs={**_BASE_INPUT_ATTRS, 'step': '0.01', 'placeholder': '0.00'}),
     )
 

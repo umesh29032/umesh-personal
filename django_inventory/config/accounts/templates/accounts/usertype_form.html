@@ -1,0 +1,58 @@
+{% extends 'accounts/base.html' %}
+{% block page_title %}{% if form.instance.pk %}Edit User Type{% else %}New User Type{% endif %}{% endblock %}
+{% block content %}
+<div class="user-edit-shell" style="max-width:640px;">
+    <div class="user-hero">
+        <div class="user-hero-bg" style="background:linear-gradient(135deg,#0f1a2e 0%,#1a2840 40%,#2a1f0e 80%,#b87333 130%);"></div>
+        <div class="user-hero-inner">
+            <div class="user-hero-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:44px;height:44px;color:rgba(255,255,255,0.75);"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div class="user-hero-meta">
+                <h1 class="user-hero-name">{% if form.instance.pk %}Edit User Type{% else %}New User Type{% endif %}</h1>
+                <div class="user-hero-sub">
+                    <span class="hero-chip">Identity Classification</span>
+                    <span class="hero-chip hero-chip-muted">Does not control permissions</span>
+                </div>
+            </div>
+            <div class="user-hero-actions"><a href="{% url 'accounts:usertype_list' %}" class="hero-btn hero-btn-ghost">← Back</a></div>
+        </div>
+    </div>
+    {% if form.non_field_errors %}<div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>{% endif %}
+    <form method="post">
+        {% csrf_token %}
+        <section class="panel">
+            <header class="panel-head"><span class="panel-num">01</span><div><h2>Type Details</h2><p>New types can be added anytime without code changes.</p></div></header>
+            <div class="panel-body">
+                <div class="field">
+                    <label for="{{ form.label.id_for_label }}">Display Label *</label>
+                    {{ form.label }}
+                    {% if form.label.errors %}<small class="field-error">{{ form.label.errors|join:" " }}</small>{% endif %}
+                    <small>E.g. "Franchise Owner", "Supplier Partner"</small>
+                </div>
+                <div class="field">
+                    <label for="{{ form.code.id_for_label }}">Code Key *</label>
+                    {{ form.code }}
+                    {% if form.code.errors %}<small class="field-error">{{ form.code.errors|join:" " }}</small>{% endif %}
+                    <small>Lowercase slug, e.g. <code>franchise_owner</code>. Cannot change after assigning users.</small>
+                </div>
+                <div class="field">
+                    <label for="{{ form.description.id_for_label }}">Description</label>
+                    {{ form.description }}
+                </div>
+                <div class="field">
+                    <label>{{ form.is_active.label }}</label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        {{ form.is_active }} Show in user creation form
+                    </label>
+                </div>
+            </div>
+        </section>
+        <div class="form-actions">
+            <a href="{% url 'accounts:usertype_list' %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary">{% if form.instance.pk %}Update{% else %}Create{% endif %} User Type</button>
+        </div>
+    </form>
+</div>
+<style>{% include 'accounts/_user_form_styles.html' %}</style>
+{% endblock %}

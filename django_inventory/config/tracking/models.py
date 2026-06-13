@@ -14,20 +14,8 @@ Discipline:
 from django.conf import settings
 from django.db import models
 
-
-class TimeStampedModel(models.Model):
-    """Abstract base — tracking rows ke timestamps.
-
-    `created_at` insert pe set, baad mein change nahi.
-    `updated_at` mutations track karta hai — BatchBarcode ke liye useful (status badle).
-    History rows append-only hain to wahan updated_at = created_at rehta hai (harmless).
-    """
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
+# Shared kernel bases — single source in core (were duplicated per app).
+from core.models import AbstractHistoryEntry, FieldChangeMixin, TimeStampedModel
 
 
 class BarcodeBatch(TimeStampedModel):
@@ -93,6 +81,23 @@ class BarcodeBatch(TimeStampedModel):
             models.Index(fields=['adda', 'end_seq']),
         ]
         ordering = ['adda', 'start_seq']
+        # Range invariants — a batch is a contiguous inclusive seq block, and
+        # total_pieces is its denormalized width. These guard the lazy-scan
+        # lookup math (filter start_seq<=seq<=end_seq) from corrupt ranges.
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(end_seq__gte=models.F('start_seq')),
+                name='tracking_batch_seq_order',
+            ),
+            models.CheckConstraint(
+                check=models.Q(total_pieces__gt=0),
+                name='tracking_batch_pieces_positive',
+            ),
+            models.CheckConstraint(
+                check=models.Q(total_pieces=models.F('end_seq') - models.F('start_seq') + 1),
+                name='tracking_batch_pieces_consistent',
+            ),
+        ]
 
     def __str__(self):
         bits = [self.adda.code]
@@ -188,6 +193,10 @@ class BatchBarcode(TimeStampedModel):
             models.Index(fields=['status']),
             # Per-size/color status breakdown — "kitne medium-red dispatched"
             models.Index(fields=['size', 'color', 'status']),
+            # All scanned pieces in a batch (this is the table that grows largest).
+            models.Index(fields=['batch', 'status']),
+            # Recent-scans activity feed.
+            models.Index(fields=['-last_scanned_at']),
         ]
         ordering = ['adda', 'piece_seq']
 
@@ -198,8 +207,11 @@ class BatchBarcode(TimeStampedModel):
 # ── Per-domain history tables ─────────────────────────────────────────────────
 # Sirf history_service.log_*() in tables ko likhta hai. View-side create NAHI.
 
-class ClothRollHistory(TimeStampedModel):
-    """ClothRoll pe har state change ka audit row."""
+class ClothRollHistory(FieldChangeMixin, AbstractHistoryEntry):
+    """ClothRoll pe har state change ka audit row.
+
+    `actor` AbstractHistoryEntry se, field-diff trio FieldChangeMixin se aata hai.
+    """
 
     class ChangeType(models.TextChoices):
         CREATED = 'created', 'Created'
@@ -212,13 +224,6 @@ class ClothRollHistory(TimeStampedModel):
         'raw_materials.ClothRoll', on_delete=models.PROTECT, related_name='history',
     )
     change_type = models.CharField(max_length=32, choices=ChangeType.choices)
-    actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+',
-    )
-    # Audit triple — kya field, kya old/new value
-    field_name = models.CharField(max_length=64, blank=True)
-    old_value = models.CharField(max_length=200, blank=True)
-    new_value = models.CharField(max_length=200, blank=True)
     note = models.CharField(max_length=200, blank=True)
 
     class Meta:
@@ -227,8 +232,12 @@ class ClothRollHistory(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class AddaHistory(TimeStampedModel):
-    """Adda pe stage transitions + state changes ka audit log."""
+class AddaHistory(AbstractHistoryEntry):
+    """Adda pe stage transitions + state changes ka audit log.
+
+    `actor` AbstractHistoryEntry se. Field-diff trio NAHI (stage transitions log
+    karta hai, scalar diffs nahi) — isliye FieldChangeMixin use nahi karta.
+    """
 
     class ChangeType(models.TextChoices):
         CREATED = 'created', 'Created'
@@ -236,6 +245,7 @@ class AddaHistory(TimeStampedModel):
         STAGE_REOPENED = 'stage_reopened', 'Stage Reopened'
         STATUS_CHANGED = 'status_changed', 'Status Changed'
         ROLL_ASSIGNED = 'roll_assigned', 'Roll Assigned'
+        ROLL_REMOVED = 'roll_removed', 'Roll Removed'
         COMPLETED = 'completed', 'Completed'
         COST_FROZEN = 'cost_frozen', 'Cost Frozen'   # manufacturing cost snapshot at stage advance
         STAGE_STARTED = 'stage_started', 'Stage Started'
@@ -243,14 +253,15 @@ class AddaHistory(TimeStampedModel):
         BUNDLE_CREATED = 'bundle_created', 'Bundle Created'
         BARCODES_GENERATED = 'barcodes_generated', 'Barcodes Generated'
         EXPORTED = 'exported', 'Exported'
+        # V2-2: the financial closing events join the Adda timeline (Part 13).
+        SETTLEMENT_FINALIZED = 'settlement_finalized', 'Settlement Finalized'
+        SETTLEMENT_REVERSED = 'settlement_reversed', 'Settlement Reversed'
+        SETTLEMENT_SUPERSEDED = 'settlement_superseded', 'Settlement Superseded'
 
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='history',
     )
     change_type = models.CharField(max_length=32, choices=ChangeType.choices)
-    actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+',
-    )
     # Stage transition: NULL-NULL on CREATED, real values on STAGE_ADVANCED
     stage_from = models.ForeignKey(
         'production.WorkflowStage', on_delete=models.PROTECT,
@@ -285,8 +296,11 @@ class AddaHistory(TimeStampedModel):
         ordering = ['-created_at']
 
 
-class ProductHistory(TimeStampedModel):
-    """Product pe field-level edits ka audit log."""
+class ProductHistory(FieldChangeMixin, AbstractHistoryEntry):
+    """Product pe field-level edits ka audit log.
+
+    `actor` AbstractHistoryEntry se, field-diff trio FieldChangeMixin se.
+    """
 
     class ChangeType(models.TextChoices):
         CREATED = 'created', 'Created'
@@ -297,12 +311,6 @@ class ProductHistory(TimeStampedModel):
         'production.Product', on_delete=models.PROTECT, related_name='history',
     )
     change_type = models.CharField(max_length=32, choices=ChangeType.choices)
-    actor = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+',
-    )
-    field_name = models.CharField(max_length=64, blank=True)
-    old_value = models.CharField(max_length=200, blank=True)
-    new_value = models.CharField(max_length=200, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=['product', '-created_at'])]

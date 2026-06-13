@@ -14,7 +14,7 @@ Role-aware sections:
   • is_admin_view flag       — future admin-only metrics ke liye reserved
 """
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Sum
+from django.db.models import Count, Exists, OuterRef, Sum
 from django.shortcuts import render
 
 from ..services import MANAGEMENT_ROLES, user_has_role
@@ -30,7 +30,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
 
     try:
         from production.constants import STAGE_LAYERING
-        from production.models import Adda, AddaStageRecord, LayeringRecord
+        from production.models import Adda, AddaStageRecord, LayeringRecord, WorkerStageTask
         from production.services import user_activity_across_addas
         from accounts.skills import (
             SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
@@ -43,19 +43,30 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             or user_has_role(request.user, MANAGEMENT_ROLES)
         )
 
-        # All in-progress Addas — annotated with rolls count + per-stage pipeline state.
+        # In-progress Addas — annotated with rolls count + per-stage pipeline state.
+        addas_qs = Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+        # V2-1c-iv isolation: a worker sees ONLY Addas they're actively assigned to
+        # (an active WorkerStageTask on any stage). Management sees all. Exists()
+        # avoids a join so the rolls_count annotation stays correct.
+        if not user_has_role(request.user, MANAGEMENT_ROLES):
+            assigned = WorkerStageTask.objects.filter(
+                stage_record__adda=OuterRef('pk'), worker=request.user,
+            ).exclude(status=WorkerStageTask.Status.CANCELLED)
+            addas_qs = addas_qs.filter(Exists(assigned))
         active_addas = list(
-            Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+            addas_qs
             .select_related('product', 'current_stage')
             .prefetch_related('stage_records__workflow_stage', 'product__workflow_stages')
             .annotate(rolls_count=Count('rolls'))
             .order_by('-started_at')
         )
-        from production.services import get_layering_snapshot
         for a in active_addas:
             pipeline = []
             done_stages = []  # (label, stage_type) for revisit links — dashboard accordion
-            for s in a.product.workflow_stages.order_by('order'):
+            # Use the prefetched workflow_stages (.all() hits the prefetch cache).
+            # `.order_by()` here would issue a FRESH query per Adda (N+1) — sort
+            # in Python on the cached rows instead.
+            for s in sorted(a.product.workflow_stages.all(), key=lambda ws: ws.order):
                 if a.current_stage and a.current_stage.order == s.order:
                     state = 'current'
                 elif a.current_stage and a.current_stage.order > s.order:
@@ -74,17 +85,50 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     })
             a.pipeline = pipeline
             a.done_stages = done_stages
-            # Layering snapshot per Adda for per-stage info on user dashboard
-            a.layering_snap = get_layering_snapshot(a)
+        # P5.1: the layering snapshot is rendered ONLY in the skilled-user accordion.
+        # Bulk-attach it (a fixed handful of queries, N+1-free) for skilled users;
+        # skip entirely for everyone else (it's never rendered).
+        if is_skilled_user:
+            from production.services import attach_layering_snapshots
+            attach_layering_snapshots(active_addas)
+        else:
+            for a in active_addas:
+                a.layering_snap = None
 
         my_active_stages = (
             AddaStageRecord.objects
-            .filter(workers=request.user,
+            # V2-1b: "assigned to me" = an active WorkerStageTask (not the M2M).
+            .filter(worker_tasks__worker=request.user,
+                    worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
                     completed_at__isnull=True,
                     adda__status=Adda.Status.IN_PROGRESS)
-            .select_related('adda', 'workflow_stage', 'adda__product')
+            .select_related('adda', 'workflow_stage__stage', 'adda__product')
             .order_by('-created_at')
+            .distinct()
         )
+        # pt.2c: report badge per assigned stage — ONE extra query for all my
+        # tasks (annotate counts lines), then attach in Python. Badge states:
+        # submitted (task completed/verified) > draft (has lines) > needed.
+        my_active_stages = list(my_active_stages)
+        my_report_tasks = (
+            WorkerStageTask.objects
+            .filter(worker=request.user,
+                    stage_record__in=[sr.pk for sr in my_active_stages])
+            .exclude(status=WorkerStageTask.Status.CANCELLED)
+            .annotate(n_lines=Count('contributions'))
+        )
+        task_by_sr = {t.stage_record_id: t for t in my_report_tasks}
+        for sr in my_active_stages:
+            t = task_by_sr.get(sr.pk)
+            if t is None:
+                sr.report_badge = None
+            elif t.status in (WorkerStageTask.Status.COMPLETED,
+                              WorkerStageTask.Status.VERIFIED):
+                sr.report_badge = 'submitted'
+            elif t.n_lines:
+                sr.report_badge = 'draft'
+            else:
+                sr.report_badge = 'needed'
         my_activity = user_activity_across_addas(request.user, limit=30)
 
         if user_has_skill(request.user, SKILL_CUTTING_MASTER_HELPER):
@@ -97,14 +141,17 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     adda__status=Adda.Status.IN_PROGRESS,
                 )
                 .select_related('adda', 'workflow_stage', 'adda__product')
-                .prefetch_related('workers')
+                .prefetch_related('worker_tasks__worker')   # V2-1b: feeds active_workers (no N+1)
                 .annotate(rolls_count=Count('layering_roll_entries'))
                 .order_by('-started_at')
             )
             completed_qs = LayeringRecord.objects.filter(
                 stage_record__completed_by=request.user,
             )
-            active_assigned_qs = active_layering.filter(workers=request.user)
+            active_assigned_qs = active_layering.filter(
+                worker_tasks__worker=request.user,
+                worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
+            ).distinct()
             stats = completed_qs.aggregate(
                 total_layers=Sum('lay_count'),
                 total_minutes=Sum('duration_minutes'),

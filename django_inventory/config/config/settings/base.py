@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',  # specifically Google OAuth
 
     # local apps — hamara apna code
+    'core',           # shared abstract base models (TimeStampedModel, ActiveManager) — no tables
     'accounts',       # custom User model, RBAC roles
     'inventory',      # RBAC roles + dashboards (production lifecycle moved out 2026-05-19)
     'storefront',     # customer-facing pages
@@ -94,6 +95,7 @@ SITE_ID = 1
 # Order MATTER karta hai — upar se neeche request jaati hai, neeche se upar response aata hai
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',            # HTTPS redirect, security headers
+    'core.observability.RequestIDMiddleware',                   # P0.4: bind request id for log correlation (early)
     'whitenoise.middleware.WhiteNoiseMiddleware',               # static files (CSS/JS) directly serve karta hai bina nginx ke
     'django.contrib.sessions.middleware.SessionMiddleware',     # request.session available karta hai
     'django.middleware.common.CommonMiddleware',                # URL trailing slash, ALLOWED_HOSTS check
@@ -166,6 +168,18 @@ else:
             'CONN_MAX_AGE': 600,  # connection pool: 10 min tak reuse karo, naya connection mat banao
         }
     }
+
+# ─── Feature flags ──────────────────────────────────────────────────────────
+# (V2-1d) WORKER_TASK_DUAL_WRITE retired with the M2M dual-write — WorkerStageTask
+# is the sole assignment truth (migration 0035). See docs/archive/reviews/V2_1D_EXECUTION_REVIEW.md.
+
+# V2-3 PR-B / ADR-0007 cutover EXECUTED (owner D-V3.1, 2026-06-11): earnings
+# book ONLY at Adda settlement by default (era-B). env
+# LEDGER_CREDIT_AT_ALLOCATION=True is the ROLLBACK LEVER — restores legacy
+# allocation-time crediting (era-A). Symmetric double-credit guard makes BOTH
+# directions safe (allocation_service + adda_settlement_service). Physical
+# deletion of the legacy path stays soak-gated (separate future PR).
+LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain
@@ -291,10 +305,15 @@ _LOG_DIR.mkdir(exist_ok=True)  # logs/ folder create karo agar exist nahi karta 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,  # Django ke built-in loggers band mat karo
+    'filters': {
+        # P0.4: stamp every record with the request id (see core.observability).
+        'request_id': {'()': 'core.observability.RequestIDFilter'},
+    },
     'formatters': {
         # formatter = log line ka format decide karta hai
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',  # e.g.: INFO 2026-05-17 views Hello
+            # [{request_id}] correlates all lines of one request (P0.4).
+            'format': '{levelname} {asctime} {module} [{request_id}] {message}',
             'style': '{',
         },
         # Security log gets its own line format — flat key=value pairs are
@@ -309,20 +328,29 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',   # terminal mein print karo
             'formatter': 'verbose',
+            'filters': ['request_id'],
         },
+        # P0.4: RotatingFileHandler so logs don't grow unbounded (5MB × 5 backups).
         'file': {
-            'class': 'logging.FileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',  # sab Django logs yahan
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',  # sab app + Django logs yahan
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 5,
             'formatter': 'verbose',
+            'filters': ['request_id'],
         },
         'security_file': {
-            'class': 'logging.FileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': BASE_DIR / 'logs' / 'security.log',  # sirf login/rate-limit events yahan
+            'maxBytes': 5 * 1024 * 1024,
+            'backupCount': 5,
             'formatter': 'security',
         },
     },
     'root': {
-        'handlers': ['console'],  # unmatched loggers by default console pe jaate hain
+        # P0.4: app/service loggers (logging.getLogger(__name__)) propagate here →
+        # now persisted + rotated in django.log, not just console.
+        'handlers': ['console', 'file'],
         'level': 'INFO',
     },
     'loggers': {
@@ -341,3 +369,24 @@ LOGGING = {
         },
     },
 }
+
+# ─── Error aggregation (P0.4, OPTIONAL) ─────────────────────────────────────────
+# Activated ONLY when SENTRY_DSN is set AND sentry-sdk is installed — neither is
+# added speculatively (no DSN today). To switch on in production: add `sentry-sdk`
+# to requirements + set SENTRY_DSN in .env. Off = zero overhead, zero dependency.
+SENTRY_DSN = config('SENTRY_DSN', default='')
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[DjangoIntegration()],
+            traces_sample_rate=0.0,      # errors only; no perf tracing overhead by default
+            send_default_pii=False,
+        )
+    except ImportError:
+        import logging as _logging
+        _logging.getLogger('django').warning(
+            "SENTRY_DSN is set but sentry-sdk is not installed — skipping error aggregation."
+        )

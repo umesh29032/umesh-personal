@@ -1,0 +1,236 @@
+# Architecture Remediation Plan — Kapil Enterprises ERP
+
+> Companion to [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md).
+> **Update 2026-06-09:** migrations `0029/0030` (`credits_workers`) **APPLIED** to dev DB (rehearsed on a
+> clone, round-trip verified, suite green). The worker-tracking + settlement redesign is now §11-LOCKED in
+> [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md) + [V2_1_REVIEW.md](archive/reviews/V2_1_REVIEW.md) — that V2 track runs alongside
+> these M-phases (P1.2/P1.4 + M4.1 intersect it; see V2_1_REVIEW §7).
+> Status: APPROVED 2026-06-09, **Rev 2 (pre-mortem fixes applied)**. Baseline: **305 tests green**
+> (~103s, settings=config.settings.local). Branch: new_flask_app.
+> Rev 2 fixes: R1 production↔expense earnings seam, R2 model-discovery mechanism, C2 factory
+> seam = chokepoint-only (no columns), + migration-safety + perf-baseline + strangler-cutover phases.
+
+## 🔄 Rev 3 — RE-BASELINED 2026-06-10 (against current architecture)
+Re-derived after the V2 worker-tracking foundation shipped + the owner paused for a **stage-domain
+review**. Suite now **389 green**, dev DB through `0033`. What changed vs Rev 2 and how it re-sequences:
+
+**DONE (committed):** M0 4/6 · **M1 4/4 ✅** · M2 7/10. (~16/33 sub-phases; the M0→M1→M2 critical path —
+the heavy dimension lift — is banked; most dimensions already ~8.5–9.5 per the plan.)
+
+**New facts that re-shape the remaining plan:**
+- **A stage-domain review is now a gating phase (NEW · owner-requested).** Stage taxonomy/responsibilities,
+  machine sub-stages, Missing-Piece + Alter/Rework lifecycles, costing/settlement/reporting implications
+  (see [STAGE_DOMAIN_REVIEW_AGENDA.md](archive/reviews/STAGE_DOMAIN_REVIEW_AGENDA.md)). **This gates two M2 cleanups** —
+  P2.8 (dissolve `stage_views.py`) and P2.9 (draft `draft_*` polymorphic move) — because stage taxonomy may
+  reshape stage views + the draft model. Do P2.8/P2.9 **after** the stage review, not before.
+- **M4.1 is now UNBLOCKED.** It was deferred to post-V2-1; V2-1a/b/c (assignment foundation) are built, so the
+  accounts→production sync-edge relocation can proceed.
+- **V2 added new query surfaces** (`active_workers` in loops, dashboard task-scoping, `Exists` subquery) —
+  fold these into **M5/P5.1** N+1 audit (mostly pre-mitigated with prefetch, but verify with query counts).
+- **M6 docs grew** — the SYSTEM_DESIGN rewrite (P6.1) must now also fold in ARCHITECTURE_V2 + V2_1_REVIEW +
+  the foundation review. Bigger, but additive.
+- **P2.7 is RESHAPED by V2 — do NOT execute standalone now.** Its Rev-2 premise (confine the
+  *complete()→expense earnings* edge into one base-service file) is **obsolete under Option B**: earnings no
+  longer book at stage-complete, they book at **settlement** (V2-2). The `expense` imports remaining in
+  `stage_views.py` are the **SWA-transitional allocation UI** (the old M2.7 allocate-time model) that V2 will
+  repoint/retire. → **Fold P2.7 into the V2 settlement build (V2-2/V2-3), not a standalone M2 step.**
+
+**Re-sequenced remaining order (Rev 3):**
+1. **Finish M0** — P0.6 perf-baseline (`assertNumQueries` on hot pages — *started 2026-06-10*), then
+   P0.4 observability (Sentry/structured logging/request-id). *Independent; P0.6 seeds M5's regression oracle.*
+2. **🔶 Stage-domain review** (gating) — produces the locked stage taxonomy + Missing/Alter domain designs.
+3. **P2.8 + P2.9** — stage_views dissolution + draft polymorphic move, **now aligned with the new taxonomy**.
+   *(P2.7 folds into the V2 settlement build — see note above — not a standalone M2 step.)*
+5. **M3 — RBAC** — P3.1 unify skill-gating (delete hardcoded `SKILL_*`), P3.2 split `permission_service`,
+   P3.3 factory seam (chokepoint only), P3.4 sidebar dual-source.
+6. **M4 — Coupling** — P4.1 accounts→production (now unblocked), P4.2 production↔tracking cycle, P4.3 god-app
+   split, P4.4 strict import contract.
+7. **M5 — Scalability** — P5.1 N+1 + paginate (incl. the new V2 query surfaces), P5.2 ledger snapshots,
+   P5.3 denorm reconciliation.
+8. **M6 — Docs** — P6.1 SYSTEM_DESIGN rewrite (now incl. V2), P6.2 archive, P6.3 dead-weight, P6.4 coverage/types.
+9. **M7 — Verify** — P7.1 re-run the dimension review + load test, P7.2 scorecard sign-off.
+
+*(The V2 build track — pt.2b worker UI → V2-1d drop-M2M → V2-2 settlement → missing/alter modules — interleaves
+but is tracked separately in [ARCHITECTURE_V2.md](ARCHITECTURE_V2.md); the stage-domain review gates its resumption too.)*
+
+## Governing principle
+> **Architect for multi-factory / async / scale. Do NOT implement them.** Seams, not features.
+> Target = **8.5–9/10 at low complexity**, NOT a forced 10/10.
+
+## ▶️ OPERATIVE phased execution (Rev 4 — 2026-06-10, gate removed)
+**Owner decision 2026-06-10:** finish ALL dimensions now — do NOT block on the stage-domain review.
+Stage-coupled work is done **against the CURRENT flow** (Layering · Cutting-Pattern · Cutting ·
+Barcode-Gen), kept **simple (no speculative multi-stage machinery)**, and every stage-coupled touch point
+gets a durable reminder: an inline **`# FUTURE-STAGE-REDESIGN:`** comment pointing to
+[STAGE_DOMAIN_REVIEW_AGENDA.md](archive/reviews/STAGE_DOMAIN_REVIEW_AGENDA.md) (the living backlog). So the future
+"add stages + refactor" work has a checklist; nothing is over-built today.
+
+**Run one phase per `continue`. Each phase = shippable, gate-green, characterization-before-refactor,
+migrations rehearsed on a clone. Tech-giant discipline: small reversible PRs, simple > clever.**
+
+| Phase | Sub-phases | Lifts | Notes |
+|---|---|---|---|
+| **1 · Scalability — reads** | P5.1 (batch `get_layering_snapshot` + paginate lists) · finish P0.6 oracles | Scalability | in flight; current flow |
+| **2 · Scalability — infra** | P5.2 ledger closing-balance snapshots · P5.3 denorm-reconciliation command | Scalability, Data-Model | |
+| **3 · Observability** | P0.4 structured logging + rotation + request-id (Sentry optional/DSN) | Maintainability | |
+| **4 · RBAC — data-driven** | P3.1 unify skill-gating (delete hardcoded `SKILL_*`, gate mutations) · P3.4 sidebar single-source | RBAC | |
+| **5 · RBAC — structure** | P3.2 split `permission_service` + cache · P3.3 factory chokepoint (NO columns) | RBAC, Maintainability | seam only |
+| **6 · Coupling — edges** | P4.1 relocate accounts→production sync · P4.3 finalize production package · P2.7 confine expense edge | Coupling, Architecture | P2.7 current-flow + reminder (V2 reshapes later) |
+| **7 · Coupling — cycle** | P4.2 break production↔tracking cycle (cross-app migration) · P4.4 tighten `.importlinter` | Coupling | heaviest; migration |
+| **8 · Stage cleanups (current flow + reminders)** | P2.8 dissolve `stage_views.py` · P2.9 draft `draft_*` → per-handler storage | Tech-Debt, Architecture, Data-Model | done for the 4 current stages + `# FUTURE-STAGE-REDESIGN:` tags |
+| **9 · Docs** | P6.1 SYSTEM_DESIGN rewrite (incl. V2) · P6.2 archive/ADR · P6.3 dead-weight · P6.4 coverage/types | Maintainability | after structure settles |
+| **10 · Verify + re-score** | P7.1 re-run dimension review + load test + CSO · P7.2 scorecard sign-off | all | finale |
+
+*(The stage-domain review is no longer a blocking phase — it becomes the future backlog in
+STAGE_DOMAIN_REVIEW_AGENDA.md, fed by the `# FUTURE-STAGE-REDESIGN:` markers. The V2 build track stays
+separate; P2.8/P2.9 here are scoped to today's stages and stay V2-compatible.)*
+
+## 🗺️ Completion roadmap — how to finish all 22 remaining (wave plan, 2026-06-10)
+Ordered by dependency + safety. **Waves A–C need NO stage-review** (run them now). **Wave D is the
+owner-gated design gate.** E–G follow. Each wave: one PR per sub-phase, gate green, characterization
+before any refactor, migrations rehearsed on a clone (P0.5).
+
+**WAVE A — Safe scalability + observability** *(now · no gating · ~3–4 passes)* → Scalability, Maintainability
+- finish **P0.6** (add hot-page query oracles: costing, adda list, cutting workspace, allocation panel)
+- **P5.1** batch `get_layering_snapshot` (mgmt dashboard + `AddaDashboardView` ~72→handful) + paginate list pages
+- **P5.2** ledger closing-balance snapshots · **P5.3** denorm-reconciliation command
+- **P0.4** observability (structured logging + rotation + request-id; Sentry/GlitchTip when a DSN exists)
+
+**WAVE B — RBAC hardening** *(now · no gating · ~3 passes)* → RBAC, Maintainability
+- **P3.1** unify skill-gating data-driven (delete hardcoded `SKILL_*`; gate mutations) ·
+  **P3.2** split `permission_service` package + cache · **P3.4** sidebar single-source · **P3.3** factory chokepoint (no columns)
+
+**WAVE C — Coupling / cycle-breaks** *(now · heavier, migration-bearing · ~3–4 passes)* → Coupling, Architecture
+- **P4.1** relocate accounts→production sync edge *(unblocked post-V2-1)* · **P4.3** finalize production package split
+- **P4.2** break production↔tracking cycle (move barcode assembly — cross-app data migration) ·
+  **P4.4** tighten `.importlinter` (remove `ignore_imports`) — do LAST in this wave once edges are clean
+
+**WAVE D — 🔶 Stage-domain review** *(👤 owner-gated design exercise · the big one)* → unblocks E + V2
+- stage taxonomy/responsibilities · machine sub-stages · Missing-Piece + Alter/Rework lifecycles · packing/QC ·
+  costing + settlement + reporting implications → locked taxonomy + `MissingPieceCase`/`AlterCase` designs
+
+**WAVE E — Stage cleanups + V2 resume** *(after D)* → Tech-Debt, Architecture, Data-Model, Payroll
+- **P2.8** dissolve `stage_views.py` (per-stage views + formsets + N+1) · **P2.9** draft polymorphic-root move
+- *(V2 track resumes here: V2-1c-iii UI → V2-1d drop-M2M → V2-2 settlement [absorbs P2.7] → V2-3 SWA → Missing/Alter modules)*
+
+**WAVE F — Docs** *(after structure settles · ~2 passes)* → Maintainability
+- **P6.1** rewrite SYSTEM_DESIGN to reality (incl. V2) + doc-accuracy test · **P6.2** archive + ADRs ·
+  **P6.3** remove dead weight (legacy fallbacks, `stage_type` shim) · **P6.4** ~90% service coverage + mypy strictness
+
+**WAVE G — Verify + re-score** *(last)* → confirms all dimensions hit target
+- **P7.1** re-run the 10-dimension review + load test + CSO security pass · **P7.2** scorecard sign-off
+
+**Critical-path note:** A, B, C are independent of each other AND of the stage review — safe to run in any order
+now. D is the gate for E + the V2 build. F wants the structure final (after E). G is the finale. Doing A→B→C
+gets RBAC/Coupling/Scalability to target **without waiting on the stage review**.
+
+## Revised dimension targets
+
+| Dimension | Now | Target | Main driver |
+|---|---|---|---|
+| Architecture | 7.5 | **9** | cycles broken, facades, engine/logic/data separated |
+| Extensibility | 5.5 | **9.5** | stage registry — new stage = 1 folder + 0 edits |
+| Tech Debt | 6.5 | **9** | god-files split, copy-paste lifecycle removed |
+| Maintainability | 6.5 | **9** | CI gates, one source-of-truth doc, observability |
+| Scalability | 6.5 | **~8.5** | in-process wins + async-ready seams (no Redis/Celery yet) |
+| RBAC | 7 | **~9** | unified skill-gating + factory seam (no multi-factory UX) |
+| Payroll (corr.) | 8 | **10** | allocation↔completion contract, reopen voids credits |
+| Workflow | 7 | **9.5** | completion locking + registry |
+| Coupling | 7 | **9.5** | cycles forbidden by contract |
+| Data Model | 8 | **9.5** | clean polymorphic root, reconciliation checks |
+
+## Execution rules (non-negotiable)
+1. Service layer owns all multi-row writes; views stay thin (CLAUDE rule #4).
+2. **Characterization tests before every refactor** (M0.3) — refactors must be provably behavior-preserving.
+3. One concern per PR; `Edit` not `Write`; full suite + import-linter green before merge.
+4. No abstraction used <3 times.
+5. Re-score at each milestone boundary.
+
+---
+
+## M0 — Safety Net & Baseline  *(zero behavior change)*
+- **P0.1 Lock baseline.** ✅ 305 tests green recorded. TODO: commit current dirty tree to a baseline commit + tag `pre-refactor-baseline` (working tree is heavily uncommitted — needs a real rollback point). Add coverage report.
+- **P0.2 CI gate.** ruff + mypy(gradual) + pytest + import-linter + coverage floor. Pre-commit hooks.
+- **P0.3 Characterization + concurrency harness.** Golden tests for every stage lifecycle (start→complete→reopen), cost-freeze, allocation. Concurrency test helper. NOTE: when M2 moves views/services into `stages/<stage>/`, these tests' imports move with them — write them against the **service facade**, not module paths, to survive the move.
+- **P0.4 Observability baseline.** Structured logging + rotation + route service loggers to file + error aggregation (Sentry/GlitchTip) + request-id.
+- **P0.5 Migration-safety protocol (NEW).** Written rule, enforced for every schema phase: **NO drop-recreate on data that will ever be real; reversible `RunPython` only; rehearse each migration against a clone of the dev DB before applying.** (Memory shows a past "drop-recreate, data-loss OK because local" habit — banned going forward.) Covers R2 model move, C2 future factory wave, P2.9 draft move, M4.2 barcode relocation.
+- **P0.6 Performance baseline (NEW).** Capture per-hot-page **query counts + timings** now (dashboards, costing, adda list, cutting workspace, allocation panel) using `assertNumQueries`/silk. This is the regression oracle M5 needs — "no regression" is unprovable without it.
+
+## M1 — Correctness Hardening  *(surgical, high-trust)*
+- **P1.1 Lock stage completion/advance (WF-4).** select_for_update Adda + re-check under lock. Concurrency test.
+- **P1.2 Reopen voids worker credits (PAY-3).**
+- **P1.3 Allocation↔completion contract pt.1 (PAY-2).** DONE in M2.7 — payability via `WorkflowStage.credits_workers` (data, not a handler flag); block completing a payable stage with no allocations.
+- **P1.4 Reconciliation report (PAY-4).** Σ earnings vs processing_cost, per Adda/stage.
+
+## M2 — The Stage Engine  *(KEYSTONE — biggest multi-dimension lift)*
+- **P2.1 Define seam (includes the R1 earnings design — do NOT defer to P2.7).** `stages/base/handler.py` (StageHandler ABC + StageService template) + `registry.py` (register/get/import-time **model** autodiscovery, per R2; handlers self-register). Decide the earnings edge HERE: `handler.complete()` returns a `CompletionResult` (worker allocations as primitives); the **base StageService** owns the single `expense` earnings-facade call. Handlers never import expense. Service signatures take `user_id`+primitives (async-ready). No behavior change yet.
+- **P2.2–P2.5 Migrate each stage onto the seam** (one PR each, behind golden tests): layering → cutting_pattern → cutting → barcode_generation. Each stage's typed models get `Meta.app_label='production'` + move to `stages/<stage>/models.py` under the import-time autodiscovery (R2). Cutting also splits into bundle/breakup/completion services.
+- **P2.6 Replace ALL dispatch sites with registry** (StagePanelView, cost_service._quantity_for, adda_views snapshot, remove adda_service first-stage special-case WF-5, remove complete_cutting sentinel SVC-6). Grep clean: no `stage_type ==`.
+- **P2.6b Strangler cutover (NEW).** Do P2.6 behind a `STAGE_REGISTRY_ENABLED` flag: old `if/elif` and the registry **coexist**, run both in tests for parity, flip the flag, verify, THEN delete the old path in a follow-up PR. No big-bang swap of 6 sites in one commit.
+- **P2.7 Move the expense call into the base StageService** (completes R1/PAY-2): every paying stage credits workers through the base service's single facade call — relocating the import that lives in `stage_views.py:59-61` today into `stages/base/service.py`. Net module edge: one-way `production → expense`.
+- **P2.8 Presentation cleanup.** Dissolve stage_views.py into stages/<stage>/views.py + generic StageView (VF-2/3). Replace parallel-array POST parsing with formsets (VF-4). Fix allocation N+1 (VF-5).
+- **P2.9 Clean polymorphic root (DM-6) — DATA MIGRATION, not a line.** Move layering-specific draft_* off AddaStageRecord into per-handler draft storage. Migrate existing in-flight draft rows (reversible RunPython per P0.5).
+- **P2.9b Template + test sweep (NEW).** Migrate ~10 stage templates `stage_type → stage.code`; relocate moved view/service imports in tests. ⚠️ watch the recurring `{# #}` multi-line-comment regression — use `{% comment %}` for multi-line.
+- **P2.10 Open-closed proof.** Dummy stage in tests proves new stage = **+1 URL line, 0 other edits** (per the corrected claim in TARGET_ARCHITECTURE.md).
+
+## M3 — RBAC
+- **P3.1 Unify skill-gating data-driven (RBAC-3/4).** Delete hardcoded SKILL_* constants in services; gate mutations too.
+- **P3.2 Split permission_service into package (RBAC-6).** principal / perms / menu / role_editor; cache user_has_perm.
+- **P3.3 Factory SEAM ONLY — CHOKEPOINT, NO COLUMNS (Fork A + C2 correction):**
+  - P3.3a `current_factory()` helper (returns the single default factory today).
+  - P3.3b `TenantScopedManager`/queryset chokepoint that all tenant-data queries route through — a **no-op** while there is one factory.
+  - **NO `factory` FK columns added now.** Adding them = *implementing* multi-factory (forbidden by the principle) and half-scoping leaks across sites. When site #2 is funded: ONE migration wave adds the FK to **ALL** tenant-data tables + flips the chokepoint to a real filter.
+  - **OUT (deferred until 2nd site funded): the column migration, factory switcher UI, factory admin, factory dashboards, per-factory RBAC UX.**
+- **P3.4 Kill SIDEBAR dual-source.** Seed SidebarItemRule from code registry; sync test.
+
+## M4 — Coupling
+- **P4.1 Remove accounts→production back-edge (COUP-5) — specify the new home.** Moving `sync_layering_workers_for_skill` "to a view" is NOT enough: the user-edit views live in `accounts/views.py`, so an accounts view calling production keeps the `accounts→production` edge at module level. Relocate the orchestration to an **`inventory` orchestrator** (inventory already depends on production+accounts) OR a `production` service the inventory view calls. accounts (services AND views) must end with zero production imports — verified by import-linter.
+- **P4.2 Break production↔tracking cycle (COUP-2) — this is a MIGRATION-BEARING ownership move, not a facade.** A logging facade fixes only `production→tracking`. The `tracking→production` half (barcode gen/export reading production models) requires **relocating barcode-assembly into `production`**, leaving `tracking` a dumb range/scan primitive (cross-app model + data migration, per P0.5). Size it as a real phase.
+- **P4.3 Tame production god-app (COUP-4).** Finalize stages/ + cutting/ packages.
+- **P4.4 Strict import contract.** Tighten .importlinter: one-way `production→expense` + `production→tracking` allowed; all reverse edges + deep imports forbidden. Removes the current `ignore_imports` TODO for production↔tracking.
+
+## M5 — Scalability  *(cheap in-process wins + async-ready SEAMS only)*
+- **P5.1 Kill N+1 + paginate everything.** Query-count tests cap hot pages.
+- **P5.2 Ledger closing-balance snapshots (PAY-6 perf).** O(1) balance at any ledger size.
+- **P5.3 Denorm reconciliation (DM-4).** Periodic command verifying counters vs source.
+- **DEFERRED (seam ready, not built): Celery/Redis async tier, Redis cache.** Behind a flag; switch on at real load.
+
+## M6 — Maintainability & Docs
+- **P6.1 One source of truth.** Rewrite SYSTEM_DESIGN.md to reality (7 apps, Django 5.0.1, post-relocation RBAC); collapse the two ARCHITECTURE.md; fix false "raw_materials never imports production" claim; update PAYROLL doc (Settlement not WorkerPayment). Doc-accuracy spot-check test.
+- **P6.2 Archive discipline.** Dated audit/handoff docs → docs/archive/; introduce docs/adr/.
+- **P6.3 Remove dead weight (now safe).** Legacy fallbacks + back-compat shims (stage_type property) once templates use stage.code. Document inventory migration graveyard (do not delete).
+- **P6.4 Coverage + types.** ~90% service coverage; raise mypy strictness.
+
+## M7 — Verify
+- **P7.1 Re-run architecture review workflow + load test + CSO security pass.**
+- **P7.2 Scorecard sign-off vs targets above.**
+
+---
+
+## Deferred architectural improvements
+
+### Hardcode #1 — first-stage auto-start (DEFERRED, decided 2026-06-09)
+`adda_service.create_adda` couples Adda creation to layering in two places:
+(a) lines 86-92 — unconditional cutting_master/helper requirement (refuse creation if none);
+(b) lines 114-127 — `if first_stage.stage_type == STAGE_LAYERING:` auto-create the stage
+record + assign the skilled pool + log WORKERS_ASSIGNED.
+
+**Deferred — not a blocker.** It only affects the FIRST stage; it does NOT block adding
+mid/end stages (those start manually). All current products start with Layering, the
+behaviour is correct and required, and the Adda-creation path is race-locked
+(SELECT FOR UPDATE) — refactoring it now is higher risk than value.
+
+**Trigger to revisit:** a product whose first stage is NOT layering, or a second
+stage type that needs auto-start.
+
+**Future migration path (designed, not built):** add a `StageHandler.on_adda_created(*, adda, user)`
+hook (default no-op); `create_adda` calls `registry.get(first_stage.code).on_adda_created(...)`.
+LayeringHandler owns the skilled-pool snapshot; the creation precondition (a) moves behind
+a handler-declared requirement so a future non-cutting first stage isn't wrongly blocked.
+Behaviour-preserving; needs golden tests on the creation path. Independent of payroll/costing
+(it assigns the worker M2M, not StageWorkAssignment).
+
+## Scope focus
+The real business problems stay primary: **Adda · Stages · Payroll · Production Flow.**
+Critical path: **M0 → M1 → M2.** After M2 the system is already strong (most dimensions
+8.5–9.5). M3/M4 can partly parallelize. M5 infra deferred until load demands it.

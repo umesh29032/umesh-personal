@@ -5,15 +5,6 @@
 {% block extra_head %}
 <style>
     .settle { max-width: 720px; margin: 0 auto; }
-    .settle .hero-strip { background: linear-gradient(135deg, var(--copper) 0%, #8a5224 100%); color: #fff; border-radius: 16px; padding: 20px 22px; margin-bottom: 18px; }
-    .settle .hero-strip h1 { margin: 0; font-size: 20px; }
-    .settle .hero-strip p { margin: 4px 0 0; opacity: .9; font-size: 13px; }
-    .settle .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-    .settle .stat-card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px; }
-    .settle .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
-    .settle .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 6px; }
-    .settle .stat-card.payable .value { color: var(--copper); }
-    .settle .panel { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px; }
     .settle .panel h2 { font-size: 14px; margin: 0 0 12px; }
     .settle table.adv { width: 100%; border-collapse: collapse; font-size: 13px; }
     .settle table.adv th, .settle table.adv td { padding: 9px 6px; border-bottom: 1px solid var(--border-subtle); text-align: left; }
@@ -30,7 +21,6 @@
     .settle .preview .row.total { border-top: 1px dashed var(--border-subtle); margin-top: 6px; padding-top: 8px; font-weight: 700; }
     .settle .preview .warn { color: #b91c1c; font-weight: 600; }
     .settle .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid var(--border-subtle); padding: 14px 0; display: flex; justify-content: flex-end; gap: 10px; }
-    .settle .btn-copper { background: var(--copper); color: #fff; border: none; padding: 12px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; }
     .settle .btn-ghost { background: transparent; border: 1px solid var(--border-subtle); padding: 12px 18px; border-radius: 10px; text-decoration: none; color: var(--ink); }
     .settle .empty { color: var(--stone); font-style: italic; font-size: 13px; }
     @media (max-width: 640px) { .settle .stat-grid { grid-template-columns: 1fr; } }
@@ -39,9 +29,9 @@
 
 {% block content %}
 <div class="settle">
-    <div class="hero-strip">
-        <h1>Start Settlement</h1>
-        <p>{{ viewed_worker.get_full_name|default:viewed_worker.email }} · pay cash and/or recover advances. You decide how much of each advance to clear.</p>
+    <div class="hero-strip copper">
+        <h1>Pay Worker</h1>
+        <p>{{ viewed_worker.get_full_name|default:viewed_worker.email }} · cash payment against settled earnings. Advance recovery happens when the Adda is settled, not here.</p>
     </div>
 
     <div class="stat-grid">
@@ -60,23 +50,19 @@
 
         {% if outstanding_advances %}
         <div class="panel">
-            <h2>Recover Advances <span style="font-weight:400;color:var(--stone);font-size:12px;">— enter how much to recover from each (≤ remaining)</span></h2>
+            <h2>Outstanding Advances <span style="font-weight:400;color:var(--stone);font-size:12px;">— info only; recovery happens at Adda settlement</span></h2>
             <table class="adv">
-                <thead><tr><th>Date</th><th class="num">Remaining</th><th class="num">Recover now</th></tr></thead>
+                <thead><tr><th>Date</th><th class="num">Remaining</th></tr></thead>
                 <tbody>
                 {% for o in outstanding_advances %}
                     <tr>
                         <td>{{ o.advance.advance_date }}{% if o.advance.notes %} · <span style="color:var(--stone)">{{ o.advance.notes }}</span>{% endif %}</td>
                         <td class="num">₹{{ o.remaining|floatformat:2 }}</td>
-                        <td class="num">
-                            <input type="number" step="0.01" min="0" max="{{ o.remaining|floatformat:2 }}"
-                                   name="recover_{{ o.advance.id }}" class="js-recover"
-                                   data-max="{{ o.remaining|floatformat:2 }}" placeholder="0.00">
-                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--stone);">To recover these, settle the worker's Adda on the <a href="{% url 'expense:adda-settlement-list' %}">Adda Settlements</a> screen.</p>
         </div>
         {% endif %}
 
@@ -102,52 +88,37 @@
         </div>
 
         <div class="preview">
-            <div class="row"><span>Cash paid</span><span>₹<span id="pvPaid">0.00</span></span></div>
-            <div class="row"><span>Advance recovered</span><span>₹<span id="pvRecover">0.00</span></span></div>
-            <div class="row total"><span>Settles from payable</span><span>₹<span id="pvTotal">0.00</span></span></div>
+            <div class="row total"><span>Cash paid</span><span>₹<span id="pvPaid">0.00</span></span></div>
             <div class="row"><span>Payable after</span><span id="pvAfter">₹{{ payable|floatformat:2 }}</span></div>
-            <div class="row" id="pvWarnRow" style="display:none;"><span class="warn">⚠ Total exceeds pending payable</span><span></span></div>
+            <div class="row" id="pvWarnRow" style="display:none;"><span class="warn">⚠ Paid exceeds pending payable</span><span></span></div>
         </div>
 
         <div class="sticky-bar">
             <a class="btn-ghost" href="{% url 'expense:worker-detail' viewed_worker.pk %}">Cancel</a>
-            <button type="submit" class="btn-copper" id="settleBtn">Confirm Settlement</button>
+            <button type="submit" class="btn-copper" id="settleBtn">Confirm Payment</button>
         </div>
     </form>
 </div>
 
 <script>
 (function () {
-    // Live preview: cash + Σrecover vs pending payable. Pure UX; server re-validates.
+    // Live preview: cash paid vs pending payable. Pure UX; server re-validates.
     var payable = parseFloat(document.getElementById('payableVal').dataset.payable) || 0;
     var paidInput = document.getElementById('{{ form.amount_paid.id_for_label }}');
-    var recovers = Array.prototype.slice.call(document.querySelectorAll('.js-recover'));
-    var pvPaid = document.getElementById('pvPaid'), pvRecover = document.getElementById('pvRecover');
-    var pvTotal = document.getElementById('pvTotal'), pvAfter = document.getElementById('pvAfter');
+    var pvPaid = document.getElementById('pvPaid'), pvAfter = document.getElementById('pvAfter');
     var warnRow = document.getElementById('pvWarnRow'), btn = document.getElementById('settleBtn');
 
     function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
     function recalc() {
         var paid = num(paidInput.value);
-        var rec = 0;
-        recovers.forEach(function (r) {
-            var max = num(r.dataset.max), v = num(r.value);
-            if (v > max) { v = max; r.value = max.toFixed(2); }   // clamp to remaining
-            rec += v;
-        });
-        var total = paid + rec;
         pvPaid.textContent = paid.toFixed(2);
-        pvRecover.textContent = rec.toFixed(2);
-        pvTotal.textContent = total.toFixed(2);
-        var after = payable - total;
-        pvAfter.textContent = '₹' + after.toFixed(2);
-        var over = total > payable + 0.001;
+        pvAfter.textContent = '₹' + (payable - paid).toFixed(2);
+        var over = paid > payable + 0.001;
         warnRow.style.display = over ? 'flex' : 'none';
-        btn.disabled = over || total <= 0;
+        btn.disabled = over || paid <= 0;
         btn.style.opacity = btn.disabled ? '.5' : '1';
     }
     paidInput.addEventListener('input', recalc);
-    recovers.forEach(function (r) { r.addEventListener('input', recalc); });
     recalc();
 })();
 </script>

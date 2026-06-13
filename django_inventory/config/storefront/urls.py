@@ -1,5 +1,10 @@
 """
-Storefront URL configuration.
+Storefront URL configuration — public site + listing-team editor.
+
+Route groups / workflows:
+  /            public homepage (config-row composed; no auth)
+  /storefront/ listing-team CRUD for homepage cards/categories (role-gated)
+Future (G2, after G6/G5): order capture lands HERE — never in production.
 
 Public:
   /          → public_home  (mounted at root by config/urls.py)

@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.generic import TemplateView
 
-from inventory.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_has_role
 from production.models import CostMethod, Product, Stage, WorkflowStage
 from production.services import (
     add_stage_to_product_flow,

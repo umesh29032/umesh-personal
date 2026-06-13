@@ -105,7 +105,7 @@ content. Same look as form-shell tables.
     <div class="cp-summary-grid">
         <div><span class="lbl">Total Pieces</span><span class="val">{{ total_pieces }}</span></div>
         <div><span class="lbl">Breakup Rows</span><span class="val">{{ breakup|length }}</span></div>
-        <div><span class="lbl">Workers</span><span class="val">{{ cutting_stage_record.workers.count }}</span></div>
+        <div><span class="lbl">Workers</span><span class="val">{{ cutting_stage_record.active_workers|length }}</span></div>
         <div><span class="lbl">Barcodes</span><span class="val">{{ adda.total_pieces }}</span></div>
     </div>
     {% if cutting_record.notes %}<div class="cp-summary-notes">{{ cutting_record.notes }}</div>{% endif %}
@@ -173,7 +173,7 @@ content. Same look as form-shell tables.
             </form>
         {% elif cutting_stage_record %}
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                {% for w in cutting_stage_record.workers.all %}
+                {% for w in cutting_stage_record.active_workers %}
                     <span class="roll-id-chip">{{ w.email }}</span>
                 {% empty %}
                     <span style="font-size:12px; color:var(--stone); font-style:italic;">none assigned</span>
@@ -283,7 +283,7 @@ Cutting master reviews + saves edits as the verified suggestion.
                                     <span class="bulk-add-hint">×{{ a.pieces_count }}/garment</span>
                                     {% endif %}
                                 </span>
-                                <input type="number" data-bulk-count="{{ a.pattern.id }}" value="" min="1" step="1" class="sf-input bulk-add-count" placeholder="pieces" disabled>
+                                <input type="number" inputmode="numeric" data-bulk-count="{{ a.pattern.id }}" value="" min="1" step="1" class="sf-input bulk-add-count" placeholder="pieces" disabled>
                             </label>
                         {% empty %}
                             <div style="color:var(--stone);font-style:italic;font-size:12px;">No patterns assigned to product.</div>
@@ -561,7 +561,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                             <td data-label="Color">{{ b.color.name }}</td>
                             <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
                             <td data-label="Take">
-                                <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                                <input type="number" inputmode="numeric" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
                             </td>
                         </tr>
                         {% endif %}
@@ -665,6 +665,11 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                     {% if bundle.alloc_items %}
                     <div style="margin-top:10px;padding:10px;border:1px dashed var(--border-subtle);border-radius:8px;">
                         <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--stone);font-weight:700;margin-bottom:8px;">Worker Allocation</div>
+                        {% if not ledger_at_allocation %}
+                        {% comment %}V2-3 cutover: creation hidden — earnings book at settlement.
+                        Existing era-A rows below stay visible + voidable.{% endcomment %}
+                        <div style="font-size:12px;color:var(--stone);margin-bottom:6px;">Earnings are now booked when the Adda is settled (Payroll → Adda Settlements). Existing allocations below remain valid and can still be removed.</div>
+                        {% endif %}
                         {% for ai in bundle.alloc_items %}
                         <div style="padding:8px 0;border-bottom:1px solid var(--border-subtle);">
                             <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;">
@@ -674,11 +679,11 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                             {% for r in ai.rows %}
                             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;margin-top:4px;">
                                 <span>{{ r.worker.get_full_name|default:r.worker.email }} · {{ r.allocated_quantity }} pc · ₹{{ r.earning_amount_snapshot }}</span>
-                                {% if can_allocate %}
+                                {% if can_void %}
                                 <form method="post" action="{% url 'production:cutting-allocation-delete' adda.code r.pk %}" style="margin:0;" onsubmit="return confirm('Remove this allocation? Its earning is reversed.');">
                                     {% csrf_token %}
                                     {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-                                    <button type="submit" class="btn btn-ghost" style="padding:2px 8px;font-size:12px;color:var(--danger);" title="Remove">×</button>
+                                    <button type="submit" class="btn btn-ghost" style="padding:2px 8px;font-size:12px;color:var(--danger);" title="Remove" aria-label="Remove allocation">×</button>
                                 </form>
                                 {% endif %}
                             </div>
@@ -693,7 +698,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                                         <option value="{{ w.pk }}">{{ w.get_full_name|default:w.email }}</option>
                                     {% endfor %}
                                 </select>
-                                <input type="number" name="allocated_quantity" min="1" max="{{ ai.remaining }}" value="{{ ai.remaining }}" required class="sf-input" style="max-width:80px;">
+                                <input type="number" inputmode="numeric" name="allocated_quantity" min="1" max="{{ ai.remaining }}" value="{{ ai.remaining }}" required class="sf-input" style="max-width:80px;">
                                 <input type="text" name="notes" placeholder="notes (optional)" class="sf-input" style="max-width:160px;">
                                 <button type="submit" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">+ Allocate</button>
                             </form>
@@ -739,7 +744,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
                                     <td data-label="Color">{{ b.color.name }}</td>
                                     <td data-label="Available"><strong>{{ b.available_count }}</strong></td>
                                     <td data-label="Take">
-                                        <input type="number" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
+                                        <input type="number" inputmode="numeric" name="take_count" value="0" min="0" max="{{ b.available_count }}" step="1" class="sf-input" style="max-width:90px;" data-mselect-take>
                                     </td>
                                 </tr>
                                 {% endif %}
@@ -951,7 +956,7 @@ Each bundle: header card + nested item table + per-bundle add-item form.
             {% endif %}
 
             <form method="post" action="{% url 'production:cutting-workspace-complete' adda.code %}"
-                  onsubmit="return confirm('Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
+                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
                   style="margin-top:14px;">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
@@ -975,7 +980,8 @@ panel exactly so backward-compat URLs keep working.
     workers) live inside one <form> so the submit button carries everything.
     Earlier the pieces_cut form and workers form were separate; the submit
     button targeted only the workers form so pieces_cut never submitted.{% endcomment %}
-    <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-legacy-form-{{ adda.code }}" novalidate>
+    <form method="post" action="{% url 'production:cutting-complete' adda.code %}" id="cutting-legacy-form-{{ adda.code }}" novalidate
+          onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete cutting?');">
         {% csrf_token %}
         {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
         {% if cutting_form.non_field_errors %}<div class="field-error">{{ cutting_form.non_field_errors }}</div>{% endif %}

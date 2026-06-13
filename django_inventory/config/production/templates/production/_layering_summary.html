@@ -32,7 +32,7 @@ Renders nothing if state == 'absent'.
                 <div><span class="lbl">Leftover Length</span><span class="val">{{ snap.leftover_length_sum|floatformat:2 }} m</span></div>
                 <div><span class="lbl">Leftover Weight</span><span class="val">{{ snap.leftover_weight_sum|floatformat:2 }} KG</span></div>
                 <div><span class="lbl">Started</span><span class="val">{{ snap.started_at|date:"d M H:i"|default:"—" }}</span></div>
-                <div><span class="lbl">Workers</span><span class="val">{{ snap.workers.count }} assigned</span></div>
+                <div><span class="lbl">Workers</span><span class="val">{{ snap.workers|length }} assigned</span></div>
             </div>
         </div>
     {% endif %}

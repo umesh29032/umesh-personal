@@ -1,0 +1,228 @@
+{% comment %}
+V2-1c-iii pt.2b — worker report BODY (shared by standalone + embedded wrappers).
+SCHEMA-DRIVEN: every field below comes from StageHandler.contribution_schema() —
+this template hardcodes NO stage names and NO field names (anti-overfit rule,
+P2_SCHEMA_RENDER_VALIDATION §0). kind='choice' → chip picker; kind='quantity' →
+cream numeric input. New stages render here with zero edits.
+No money shown (Option B). No other worker's data (isolation, D8).
+{% endcomment %}
+<div class="worker-report form-shell">
+
+  {# ── HERO — stage display name + adda chip (D5: submitted chip when locked) ── #}
+  <div class="hero">
+    <h1>{{ stage_name }}</h1>
+    {% if locked %}
+      <p>Your work for this stage has been submitted.</p>
+      <span class="hero-chip submitted-chip">✓ SUBMITTED · {{ adda.code }}</span>
+    {% else %}
+      <p>Report the work you did, then mark it complete.</p>
+      <span class="hero-chip">ADDA · {{ adda.code }}</span>
+    {% endif %}
+  </div>
+
+  {% comment %}Standalone wrapper's base.html already renders messages — only the
+  chromeless embed needs them here (else they show twice).{% endcomment %}
+  {% if embedded and messages %}
+    {% for m in messages %}
+      <div class="flash flash-{{ m.tags }}">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if locked %}
+    {# ════ STATE ② — SUBMITTED (read-only, D5) ════ #}
+    <div class="status-banner">
+      <span>✅</span>
+      <span>Your work report has been submitted. This report will be used for production
+        tracking and future Adda settlement. <b>Payment is processed separately.</b><br>
+        <span class="banner-sub">Submitted {{ task.completed_at|date:"j M Y, g:i A" }} ·
+          Waiting for stage completion.</span></span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="panel-num">1</div>
+        <div class="panel-title">Your reported work</div></div>
+      <div class="panel-body">
+        <p class="panel-sub">Locked after submit — this is your final report. Need a change? Ask your manager.</p>
+        {% for line in saved_lines %}
+          <div class="ro-line">
+            <div class="ro-dims">
+              {% for cell in line.cells %}
+                {% if cell.kind == 'choice' %}
+                  <span class="ro-pill">{% if cell.swatch %}<span class="swatch" style="background:{{ cell.swatch }}"></span>{% endif %}{{ cell.label }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <div class="ro-qty">
+              {% for cell in line.cells %}{% if cell.kind == 'quantity' %}{{ cell.value|floatformat:"-2" }} <small>{{ cell.unit }}</small>{% endif %}{% endfor %}
+            </div>
+          </div>
+        {% empty %}
+          <p class="panel-sub">No lines were reported.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div class="panel-num">2</div><div class="panel-title">Your total</div></div>
+      <div class="panel-body">
+        <div class="stage-summary">
+          <div class="summary-grid">
+            <div><span class="lbl">Quantity you reported</span><span class="val">{{ total_quantity|floatformat:"-2" }}</span></div>
+            <div><span class="lbl">Lines</span><span class="val">{{ saved_lines|length }}</span></div>
+          </div>
+        </div>
+        <div class="locked-foot">No buttons here — your report is final. Only a manager can correct it if needed.</div>
+      </div>
+    </div>
+
+  {% else %}
+    {# ════ STATE ① — EDITABLE (draft) ════ #}
+    <form method="post" id="report-form"
+          action="{% url 'production:worker-report' adda.code stage_type %}{% if embedded %}?embedded=1{% endif %}">
+      {% csrf_token %}
+      <input type="hidden" name="line-count" id="line-count" value="0">
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-num">1</div>
+          <div class="panel-title">What did you make?</div></div>
+        <div class="panel-body">
+          <p class="panel-sub">Add a {{ schema.line_label }} for each kind of work you did.</p>
+          <div id="lines-wrap">
+            {% for fields in form_lines %}
+              {# prefilled draft line — same schema loop as the blank template below #}
+              <div class="line-card" data-line>
+                <div class="line-head"><span class="line-no">Line <span data-line-no>{{ forloop.counter }}</span></span>
+                  <button type="button" class="line-remove" data-remove title="Remove">&times;</button></div>
+                {% for f in fields %}
+                  <div class="line-field">
+                    <span class="fld-label">{{ f.label }}</span>
+                    {% if f.kind == 'choice' %}
+                      <input type="hidden" data-key="{{ f.key }}" value="{{ f.value|default_if_none:'' }}">
+                      <div class="chip-row" data-chips="{{ f.key }}">
+                        {% for o in f.options %}
+                          <button type="button" class="chip{% if o.selected %} selected{% endif %}" data-value="{{ o.value }}">
+                            {% if o.swatch %}<span class="swatch" style="background:{{ o.swatch }}"></span>{% endif %}{{ o.label }}</button>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <div class="qty-row">
+                        <input class="qty-input" type="number" inputmode="decimal" min="0" step="any"
+                               data-key="{{ f.key }}" value="{{ f.value|default_if_none:''|floatformat:'-2' }}">
+                        <span class="qty-suffix">{{ f.unit }}</span>
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+          <button type="button" class="add-line" id="add-line">+ Add another {{ schema.line_label }}</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><div class="panel-num">2</div><div class="panel-title">Your total</div></div>
+        <div class="panel-body">
+          <div class="stage-summary">
+            <div class="summary-grid">
+              <div><span class="lbl">Quantity reported</span><span class="val" id="sum-qty">0</span></div>
+              <div><span class="lbl">Lines</span><span class="val" id="sum-lines">0</span></div>
+            </div>
+            <div class="next-note"><span>ℹ️</span>
+              <span>Once you <b>submit &amp; complete</b>, this report will be used for production
+                tracking and future Adda settlement. <b>Payment is processed separately.</b></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-actions">
+        <button type="submit" class="btn btn-ghost" name="action" value="draft">Save draft</button>
+        <button type="submit" class="btn btn-primary" name="action" value="submit"
+                onclick="return confirm('Submit and complete your work report? You will not be able to edit it after this.');">
+          Submit &amp; complete work</button>
+      </div>
+    </form>
+
+    {# blank line template — cloned by JS; rendered from the SAME schema loop #}
+    <template id="line-template">
+      <div class="line-card" data-line>
+        <div class="line-head"><span class="line-no">Line <span data-line-no></span></span>
+          <button type="button" class="line-remove" data-remove title="Remove">&times;</button></div>
+        {% for f in schema.fields %}
+          <div class="line-field">
+            <span class="fld-label">{{ f.label }}</span>
+            {% if f.kind == 'choice' %}
+              <input type="hidden" data-key="{{ f.key }}" value="">
+              <div class="chip-row" data-chips="{{ f.key }}">
+                {% for o in f.options %}
+                  <button type="button" class="chip" data-value="{{ o.value }}">
+                    {% if o.swatch %}<span class="swatch" style="background:{{ o.swatch }}"></span>{% endif %}{{ o.label }}</button>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="qty-row">
+                <input class="qty-input" type="number" inputmode="decimal" min="0" step="any"
+                       data-key="{{ f.key }}" value="">
+                <span class="qty-suffix">{{ f.unit }}</span>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </template>
+
+    <script>
+      (function () {
+        // Schema-agnostic form mechanics: chips set their hidden input; inputs are
+        // renamed line-<i>-<key> at submit time; totals recomputed on any change.
+        var wrap = document.getElementById('lines-wrap');
+        var form = document.getElementById('report-form');
+
+        function renumber() {
+          var cards = wrap.querySelectorAll('[data-line]');
+          cards.forEach(function (card, i) {
+            card.querySelector('[data-line-no]').textContent = i + 1;
+            card.querySelectorAll('[data-key]').forEach(function (inp) {
+              inp.name = 'line-' + i + '-' + inp.getAttribute('data-key');
+            });
+          });
+          document.getElementById('line-count').value = cards.length;
+        }
+        function totals() {
+          var qty = 0, lines = 0;
+          wrap.querySelectorAll('[data-line]').forEach(function (card) {
+            var sum = 0;
+            card.querySelectorAll('.qty-input').forEach(function (inp) {
+              sum += parseFloat(inp.value) || 0;
+            });
+            if (sum > 0) { qty += sum; lines += 1; }
+          });
+          document.getElementById('sum-qty').textContent = (Math.round(qty * 100) / 100);
+          document.getElementById('sum-lines').textContent = lines;
+        }
+        function addLine() {
+          var tpl = document.getElementById('line-template');
+          wrap.appendChild(tpl.content.cloneNode(true));
+          renumber(); totals();
+        }
+        wrap.addEventListener('click', function (e) {
+          var chip = e.target.closest('.chip');
+          if (chip) {
+            var row = chip.closest('.chip-row');
+            var hidden = row.parentElement.querySelector('input[data-key="' + row.getAttribute('data-chips') + '"]');
+            row.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('selected'); });
+            chip.classList.add('selected');
+            hidden.value = chip.getAttribute('data-value');
+            return;
+          }
+          var rm = e.target.closest('[data-remove]');
+          if (rm) { rm.closest('[data-line]').remove(); renumber(); totals(); }
+        });
+        wrap.addEventListener('input', totals);
+        document.getElementById('add-line').addEventListener('click', addLine);
+        if (!wrap.querySelector('[data-line]')) addLine();   // start with one blank line
+        renumber(); totals();
+      })();
+    </script>
+  {% endif %}
+</div>
