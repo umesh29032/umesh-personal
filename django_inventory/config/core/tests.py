@@ -279,6 +279,41 @@ class PkalsNavigationGuardTests(SimpleTestCase):
             "CANONICAL_CHOKEPOINT_SERVICES — keep them identical (one source).",
         )
 
+    def test_pkals_v2_tool_parsers_succeed(self):
+        # The PKALS v2 read-only tools (scripts/pkals_canonical.py + pkals_impact.py)
+        # are thin wrappers over v1 artifacts. Validate their PARSERS against the live
+        # manifest + matrix here, so a reformat that would silently break
+        # /find-canonical or /impact fails the build instead (PKALS-LIVE: doc drift =
+        # an architecture bug; fail fast). The tools themselves are not run in CI.
+        import importlib.util
+        scripts = REPO_ROOT / 'scripts'
+
+        def _load(name):
+            spec = importlib.util.spec_from_file_location(name, scripts / f'{name}.py')
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+
+        canonical = _load('pkals_canonical')
+        impact = _load('pkals_impact')
+
+        # /find-canonical: manifest loads + a known topic resolves to its canonical.
+        manifest = canonical.load_manifest()
+        topic, score = canonical.match_topic(manifest, 'settlement')
+        self.assertTrue(topic and score >= 2,
+                        "pkals_canonical can't match 'settlement' — manifest match-terms changed?")
+        self.assertIn('adda_settlement_service', topic['canonical'])
+
+        # /impact: matrix parses to a healthy row count + a known file still matches.
+        file_rows, _concept = impact.parse_matrix()
+        self.assertGreaterEqual(
+            len(file_rows), 15,
+            f"CHANGE_IMPACT_MATRIX parsed only {len(file_rows)} file rows — table "
+            "format changed? /impact would mis-route.")
+        self.assertTrue(
+            impact.match_file('config/production/services/worker_task_service.py', file_rows),
+            "worker_task_service.py no longer matches any matrix row — /impact broken.")
+
 
 class ObservabilityTests(TestCase):
     """P0.4: request-id correlation (core.observability)."""
