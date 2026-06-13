@@ -135,6 +135,151 @@ class DocAccuracyTests(SimpleTestCase):
         self.assertTrue(permission_service.__name__.startswith('accounts.'))
 
 
+DOCS_ROOT = REPO_ROOT / 'docs'
+PKALS_ROOT = DOCS_ROOT / 'LEARNING_2_0'
+
+# The canonical single-writer chokepoint service MODULES the docs route to
+# (CHOKEPOINTS/ pages + AI_AGENT_GUIDE never-modify list). If one is renamed,
+# every canonical doc pointing at it goes stale — this list makes that a build
+# failure instead of silent drift. Paths are relative to config/.
+CANONICAL_CHOKEPOINT_SERVICES = (
+    'expense/services/adda_settlement_service.py',
+    'expense/services/allocation_service.py',
+    'expense/services/ledger_service.py',
+    'expense/services/settlement_service.py',
+    'production/services/cost_service.py',
+    'production/services/worker_task_service.py',
+    'tracking/services/history_service.py',
+)
+
+
+class PkalsNavigationGuardTests(SimpleTestCase):
+    """C-1 longevity hardening — cheap, drift-effective guards over the PKALS
+    knowledge system (docs/LEARNING_2_0). Reuses the DocAccuracyTests framework
+    (stdlib only, no DB). Validates REFERENCES, COUNTS, and NAVIGATION INTEGRITY
+    rather than prose — these are the failure modes that silently make 98 docs
+    lie after a rename/move/new-phase. See PKALS_LONGEVITY_HARDENING.md.
+    """
+
+    import re as _re
+    _LINK = _re.compile(r'\]\(([^)]+)\)')
+
+    def _pkals_markdown(self):
+        files = list(PKALS_ROOT.rglob('*.md'))
+        files.append(DOCS_ROOT / 'START_HERE.md')  # the single front door (H3)
+        return [f for f in files if f.exists()]
+
+    def test_pkals_internal_links_resolve(self):
+        # Reference integrity: every relative markdown/dir link inside PKALS (+ the
+        # front door) must point at a real path. Catches renamed/deleted/moved docs.
+        broken = []
+        for md in self._pkals_markdown():
+            for raw in self._LINK.findall(md.read_text()):
+                target = raw.split('#', 1)[0].strip()  # drop #anchor
+                if not target:
+                    continue  # pure in-page anchor
+                if target.startswith(('http://', 'https://', 'mailto:', 'tel:')):
+                    continue
+                if '<' in target or '*' in target:
+                    continue  # template placeholder like APPS/<app>/...
+                resolved = (md.parent / target).resolve()
+                if not resolved.exists():
+                    broken.append(f"{md.relative_to(REPO_ROOT)} -> {raw}")
+        self.assertEqual(
+            broken, [],
+            "PKALS has dangling internal links (a doc was renamed/moved/deleted "
+            "without updating its referrers). Fix the link or restore the target:\n"
+            + "\n".join(broken),
+        )
+
+    def test_adr_sequence_is_contiguous(self):
+        # Count integrity: ADRs are append-only 0001..N. A gap means one was
+        # deleted/misnamed, which breaks every 'read 0001-00NN' instruction.
+        import re
+        nums = sorted(
+            int(m.group(1))
+            for p in (DOCS_ROOT / 'adr').glob('[0-9][0-9][0-9][0-9]-*.md')
+            if (m := re.match(r'(\d{4})-', p.name))
+        )
+        self.assertTrue(nums, "no ADR files found under docs/adr/")
+        expected = list(range(1, nums[-1] + 1))
+        self.assertEqual(
+            nums, expected,
+            f"ADR numbering is not contiguous (gap/dupe). Found {nums}, expected "
+            f"1..{nums[-1]}. PKALS docs that enumerate ADRs will be wrong.",
+        )
+
+    def test_canonical_chokepoint_services_exist(self):
+        # Reference integrity (doc -> code): the services the CHOKEPOINTS pages +
+        # AI_AGENT_GUIDE never-modify list name MUST exist. A rename here silently
+        # invalidates the most load-bearing docs in PKALS.
+        missing = [
+            rel for rel in CANONICAL_CHOKEPOINT_SERVICES
+            if not (CONFIG_DIR / rel).exists()
+        ]
+        self.assertEqual(
+            missing, [],
+            "A canonical chokepoint service was renamed/moved; the CHOKEPOINTS "
+            f"docs + AI_AGENT_GUIDE now point at nothing: {missing}. Update both "
+            "the code reference and the docs, or fix this list.",
+        )
+
+    def test_front_door_navigation_chain_is_intact(self):
+        # Navigation integrity (the H3/H4 baseline): repo root must route to the
+        # single front door, and the front door must route to the one overview +
+        # the AI entry. Guards against re-fragmenting the entry path.
+        readme = (REPO_ROOT / 'README.md').read_text()
+        self.assertIn('docs/START_HERE.md', readme,
+                      "README.md no longer links the single front door START_HERE (H3).")
+        start = (DOCS_ROOT / 'START_HERE.md').read_text()
+        for must in ('PROJECT_KNOWLEDGE_MAP.md', 'AI_AGENT_GUIDE'):
+            self.assertIn(must, start,
+                          f"START_HERE.md no longer routes to {must} (H3/H4 chain broken).")
+
+    def test_ai_canonical_manifest_is_valid(self):
+        # Session-3A: the machine-readable routing manifest an AI agent reads FIRST
+        # must parse and every path it points at must resolve — otherwise it routes
+        # an agent into a wall (worse than no manifest). All paths repo-root-relative.
+        import json
+        manifest_path = PKALS_ROOT / 'AI_AGENT_GUIDE' / 'canonical_manifest.json'
+        self.assertTrue(manifest_path.exists(),
+                        "canonical_manifest.json missing — AI routing layer gone.")
+        data = json.loads(manifest_path.read_text())  # fails loudly on bad JSON
+
+        broken = []
+        # entry.* paths
+        for k, p in data.get('entry', {}).items():
+            if not (REPO_ROOT / p).exists():
+                broken.append(f"entry.{k} -> {p}")
+        # topics: canonical + also[]
+        for t in data.get('topics', []):
+            for p in [t.get('canonical', '')] + t.get('also', []):
+                if p and not (REPO_ROOT / p).exists():
+                    broken.append(f"topic {t.get('match', ['?'])[0]!r} -> {p}")
+        # never_modify writers + chokepoint services
+        for nm in data.get('never_modify', []):
+            p = nm.get('only_writer', '')
+            if p and not (REPO_ROOT / p).exists():
+                broken.append(f"never_modify {nm.get('target')!r} -> {p}")
+        for p in data.get('chokepoint_services', []):
+            if not (REPO_ROOT / p).exists():
+                broken.append(f"chokepoint_services -> {p}")
+        self.assertEqual(broken, [],
+                         "canonical_manifest.json points at paths that no longer "
+                         "exist (a doc/service was renamed/moved). Fix the manifest "
+                         "or restore the target:\n" + "\n".join(broken))
+
+        # Single source of truth: the manifest's chokepoint list must equal the
+        # constant the other guard methods use — they cannot silently diverge.
+        # (Constant is config-relative; manifest is repo-root-relative — align.)
+        self.assertEqual(
+            sorted(data.get('chokepoint_services', [])),
+            sorted(f'config/{c}' for c in CANONICAL_CHOKEPOINT_SERVICES),
+            "canonical_manifest.json chokepoint_services has drifted from "
+            "CANONICAL_CHOKEPOINT_SERVICES — keep them identical (one source).",
+        )
+
+
 class ObservabilityTests(TestCase):
     """P0.4: request-id correlation (core.observability)."""
 
