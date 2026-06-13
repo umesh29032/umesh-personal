@@ -48,3 +48,14 @@ urlpatterns += [
          {'document_root': settings.MEDIA_ROOT},
          name='media-protected'),
 ]
+
+# ─── Error handlers (P0-2) ────────────────────────────────────────────────────
+# Explicit so intent is discoverable. These point at Django's DEFAULT views,
+# which render the matching branded template (templates/403.html, 404.html,
+# 500.html) when DEBUG=False. We keep the default views deliberately: server_error
+# renders 500.html with an EMPTY context (no DB/context processors), so a 500 can
+# never cascade into another error — the templates carry the branding, the views
+# stay minimal. Replaces Django's bare unstyled 403/404/500 (Phase-G G-UX-1).
+handler403 = 'django.views.defaults.permission_denied'
+handler404 = 'django.views.defaults.page_not_found'
+handler500 = 'django.views.defaults.server_error'

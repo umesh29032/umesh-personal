@@ -20,6 +20,7 @@
 - Observability bundle live (error reporting — stack has the seams).
 - Backup→restore FIRE DRILL on the real VPS (never rehearsed end-to-end).
 - Frontend: verify the 6–8 DataTables lists once on real phone hardware.
+- **P0-2 DONE 2026-06-14** — branded `handler403/404/500` registered + `templates/{403,404,500}.html` (self-contained; 500 needs no DB/context). **MT-3 prod-config verified end-to-end:** `config.settings.production` loads + `check --deploy` = 0 issues; `collectstatic` (CompressedManifestStaticFilesStorage) = 130 copied/386 post-processed OK. **Deploy MUST set env:** `SECRET_KEY`, `REDIS_URL`, `ALLOWED_HOSTS` (CSV), `CSRF_TRUSTED_ORIGINS` (all fail-fast, no defaults) — and **run `collectstatic`** before serving (manifest storage). Nice-to-have: a few duplicate static files shadow-collected (e.g. `accounts/images/kid1.jpeg`, `accounts/css/auth.css`) — dedupe later, non-blocking.
 
 ## 2) During soak (riding alongside)
 - **G4 Adda-360 thin slice** — read-only page; THE soak instrument; first

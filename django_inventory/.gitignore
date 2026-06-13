@@ -28,6 +28,7 @@ config/media
 media/
 
 /staticfiles
+config/staticfiles/
 /static_root
 
 # Environment Variables
