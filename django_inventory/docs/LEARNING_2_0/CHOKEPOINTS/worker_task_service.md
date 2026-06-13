@@ -22,8 +22,9 @@ their own assigned task — assignment-gated). Never a model `.save` elsewhere.
 
 **Key functions:** `set_stage_workers` (roster full-replace, cancel-not-delete,
 `select_for_update` on active tasks) · `report_contributions` · `complete_worker_task`
-(freezes expected_*) · `set_verified_quantity` (settled lines REFUSE → reverse
-first) · `resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
+(freezes expected_*; **locks the task row + re-checks DB status — race-safe vs a
+concurrent stage-complete cancel, P0-5**) · `set_verified_quantity` (settled lines
+REFUSE → reverse first) · `resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
 
 **Invariants protected:** reported_quantity IMMUTABLE (owner §6) · roster =
 who actually participated (cancel, never delete) · ≤1 ACTIVE task per
@@ -50,7 +51,7 @@ Source: `config/production/services/worker_task_service.py`. Two real paths:
 **B) Worker reports + completes** — `report_contributions` → `complete_worker_task`:
 ```
 @transaction.atomic (report_contributions, WorkerStageContribution.objects.create(...) INSERT lines (reported_quantity) task.status = IN_PROGRESS ; save UPDATE WST
-@transaction.atomic (complete_worker_task, c.save(expected_rate, expected_earning) UPDATE — FREEZE per line (visibility) task.status = COMPLETED ; save UPDATE WST
+@transaction.atomic (complete_worker_task, WorkerStageTask.select_for_update lock + re-check DB status (P0-5: refuse if CANCELLED/COMPLETED) c.save(expected_rate, expected_earning) UPDATE — FREEZE per line (visibility) task.status = COMPLETED ; save UPDATE WST
 ```
 
 **C) Management correction** — `set_verified_quantity`:

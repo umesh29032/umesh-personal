@@ -201,10 +201,25 @@ def complete_worker_task(task, *, actor):
     """
     from production.models import WorkerStageTask
     from production.services import cost_service
+    # LOCK the task row + re-check its AUTHORITATIVE DB status (P0-5). The caller
+    # passes a `task` read earlier (in the view), so its in-memory status can be
+    # STALE vs a concurrent manager stage-complete — resolve_stage_tasks_on_complete
+    # cancels open tasks under its own select_for_update. Locking the row and reading
+    # the status from the DB (not the stale instance) serializes the two:
+    #   • manager's cancel committed first → status=CANCELLED → refuse (never
+    #     resurrect the task to COMPLETED);
+    #   • we acquire the lock first → set_stage_workers blocks, then keeps us
+    #     COMPLETED (completed/verified are never cancelled) → no stranded frozen
+    #     contributions.
+    # We keep operating on the caller's `task` object so its in-place mutation to
+    # COMPLETED (relied on by callers) is preserved. Also the prerequisite lock
+    # pattern for the future allocation draw-down race (S5).
+    locked_status = (WorkerStageTask.objects.select_for_update()
+                     .values_list('status', flat=True).get(pk=task.pk))
     _ensure_task_actor(task, actor)
-    if task.status in (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED):
+    if locked_status in (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED):
         raise ValidationError("Task already completed.")
-    if task.status == WorkerStageTask.Status.CANCELLED:
+    if locked_status == WorkerStageTask.Status.CANCELLED:
         raise ValidationError("Cannot complete a cancelled task.")
     ws = task.stage_record.workflow_stage
     # Same rate source as allocation_service: per-role override, else the stage

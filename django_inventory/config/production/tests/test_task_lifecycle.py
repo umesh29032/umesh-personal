@@ -5,6 +5,7 @@ rows are reported back, never silently dropped.
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -225,3 +226,51 @@ class LayeringDraftSkippedFeedbackTests(TestCase):
                          'leftover_length': None},
         })
         self.assertEqual(skipped, [])
+
+
+class CompleteTaskRaceTests(TestCase):
+    """P0-5: complete_worker_task locks + re-reads the task row, so a worker
+    complete cannot race a manager stage-complete (which cancels open tasks)."""
+
+    def setUp(self):
+        self.worker = _user('ctr-w@test', role_code='worker', is_super=False,
+                            skills=['cutting_master'])
+        product = Product.objects.create(code='CTR', name='CTR P')
+        stage, _ = Stage.objects.get_or_create(
+            code='ctr_cut', defaults={'name': 'CTR Cut'})
+        ws = WorkflowStage.objects.create(
+            product=product, stage=stage, order=1,
+            cost_rate=Decimal('3'), credits_workers=True)
+        self.adda = Adda.objects.create(code='CTR-001', product=product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws, started_at=timezone.now())
+        set_stage_workers(self.sr, [self.worker.pk])
+        self.task = WorkerStageTask.objects.get(
+            stage_record=self.sr, worker=self.worker)
+        report_contributions(self.task, [{'reported_quantity': '10'}],
+                             actor=self.worker)   # → in_progress + 1 contribution
+
+    def test_stale_complete_refuses_after_concurrent_cancel(self):
+        # Worker holds a task loaded BEFORE the manager closed the stage. Simulate
+        # the manager's cancel landing first (bypass save → DB-only, in-memory stale).
+        stale = WorkerStageTask.objects.get(pk=self.task.pk)   # in_progress in memory
+        WorkerStageTask.objects.filter(pk=self.task.pk).update(
+            status=WorkerStageTask.Status.CANCELLED)
+        with self.assertRaisesMessage(ValidationError, 'cancelled'):
+            complete_worker_task(stale, actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.CANCELLED)  # NOT resurrected
+        # contributions were never frozen (no stranded expected_*)
+        self.assertFalse(
+            self.task.contributions.exclude(expected_rate=None).exists())
+
+    def test_completed_task_survives_stage_resolve_no_strand(self):
+        complete_worker_task(self.task, actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)
+        # Manager closes the stage: resolve keeps completed/verified tasks.
+        resolve_stage_tasks_on_complete(self.sr)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)  # not stranded
+        self.assertTrue(   # frozen contribution remains visible to settlement
+            self.task.contributions.exclude(expected_rate=None).exists())
