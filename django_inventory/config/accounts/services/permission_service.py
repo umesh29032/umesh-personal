@@ -248,14 +248,15 @@ SIDEBAR: tuple[MenuSection, ...] = (
     MenuSection(
         label='Main',
         items=(
-            # Single unified Dashboard entry — same template + content for everyone.
-            # Management role → inventory_dashboard URL. Others → user_dashboard URL.
-            # Both routes render the same view content; this just keeps URL semantics
-            # backward-compatible with existing bookmarks.
-            MenuItem('Dashboard', 'inventory:inventory_dashboard',
+            # Personal "My Dashboard" — same template + content for everyone.
+            # Management role → inventory_dashboard URL; others → user_dashboard URL
+            # (identical content; both kept for bookmark compatibility). Labelled
+            # "My Dashboard" to disambiguate from the management "Operations"
+            # landing in the Production section (P1-1 sidebar dedupe / C-3).
+            MenuItem('My Dashboard', 'inventory:inventory_dashboard',
                      predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
                      match=('inventory/dashboard',)),
-            MenuItem('Dashboard', 'inventory:user_dashboard',
+            MenuItem('My Dashboard', 'inventory:user_dashboard',
                      predicate=lambda u: u and u.is_authenticated and not user_has_role(u, [ROLE_SUPER_ADMIN, ROLE_MANAGER]),
                      match=('my-dashboard',)),
             # Every worker's own earnings page lives in Main, NOT the Payroll
@@ -288,7 +289,7 @@ SIDEBAR: tuple[MenuSection, ...] = (
         label='Production',
         predicate=_any_role(*PRODUCTION_ROLES),
         items=(
-            MenuItem('Adda Dashboard', 'production:dashboard', match=('production/',)),
+            MenuItem('Operations', 'production:dashboard', match=('production/',)),
             MenuItem('Manufacturing Costing', 'production:costing', match=('production/costing',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Addas', 'production:adda-list', match=('production/addas',)),

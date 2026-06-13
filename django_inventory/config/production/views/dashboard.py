@@ -92,4 +92,15 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             )
             .order_by('-created_at')[:30]
         )
+
+        # Operations digest (P1-1) — management-only morning pulse. This view is
+        # the management LANDING (HomeView routes super_admin/manager here); the
+        # digest is gated to management so workers who navigate here don't see
+        # factory-wide money/pending counts.
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        if user_has_role(self.request.user, MANAGEMENT_ROLES):
+            from production.services.operations_digest import operations_digest
+            ctx['digest'] = operations_digest()
+        else:
+            ctx['digest'] = None
         return ctx

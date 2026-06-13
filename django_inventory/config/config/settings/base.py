@@ -181,6 +181,11 @@ else:
 # deletion of the legacy path stays soak-gated (separate future PR).
 LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
+# Operations digest (P1-1): an in-progress Adda whose current open stage has not
+# moved in this many days is flagged "stalled" on the management Operations
+# landing. Constant (not hardcoded in query logic) so the threshold is tunable.
+STALLED_ADDA_DAYS = config('STALLED_ADDA_DAYS', default=3, cast=int)
+
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain
 AUTH_PASSWORD_VALIDATORS = [

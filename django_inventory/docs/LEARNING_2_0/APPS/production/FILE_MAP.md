@@ -34,6 +34,7 @@ FILE_MAP: every important file in this app and how they connect.
  V2-3 settled-stage block lives here).
 - `access_service.py` — skill-gating reads. `activity_service.py` — timeline UNION.
 - `product_service.py`, `product_size_service.py` — masters. `reconciliation_service.py` — read-only counter check.
+- `operations_digest.py` — read-only management "morning pulse" (P1-1): stalled/pending-reports/active/completed-today + payroll totals. Foundation-independent; rendered on the Operations landing (management-gated in the view).
 
 ## stages/ — the OPEN-CLOSED engine
 `base/handler.py` (StageHandler contract: typed record, complete validations,

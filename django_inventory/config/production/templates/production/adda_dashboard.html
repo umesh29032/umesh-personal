@@ -1,6 +1,6 @@
 {% extends "accounts/base.html" %}
 
-{% block page_title %}Adda Dashboard{% endblock %}
+{% block page_title %}Operations{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -39,6 +39,27 @@
     }
     .adda-dash .stage-chip strong { font-size: 18px; color: var(--copper); line-height: 1; }
     .adda-dash .stage-chip span { font-size: 13px; }
+    /* Operations digest (P1-1) — mobile-first auto-fit grid; stacks on phones. */
+    .adda-dash .digest {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px; margin-bottom: 18px;
+    }
+    .adda-dash .digest-tile {
+        padding: 14px 16px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card); text-decoration: none; color: var(--ink);
+        display: flex; flex-direction: column; gap: 6px; min-height: 84px;
+        transition: all 0.15s;
+    }
+    .adda-dash a.digest-tile:hover { border-color: var(--copper); transform: translateY(-1px); }
+    .adda-dash .digest-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .adda-dash .digest-value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .adda-dash .digest-sub { font-size: 11px; color: var(--stone); }
+    .adda-dash .digest-tile.alert .digest-value { color: var(--danger); }
+    .adda-dash .digest-tile.warn  .digest-value { color: var(--warning); }
 </style>
 {# Shared accordion + time-log styles #}
 {% include 'inventory/_time_log_styles.html' %}
@@ -49,11 +70,46 @@
 <div class="adda-dash">
     <div class="page-header">
         <div class="page-header-text">
-            <h1>Adda Dashboard</h1>
+            <h1>Operations</h1>
             <p>Live snapshot of production batches.{% if filter_from or filter_to %} <strong>Filtered.</strong>{% endif %}</p>
         </div>
         <a href="{% url 'production:adda-create' %}" class="btn btn-primary">+ Start Adda</a>
     </div>
+
+    {% comment %} Operations digest (P1-1) — management-only morning pulse, locked priority order. {% endcomment %}
+    {% if digest %}
+    <div class="digest">
+        <a class="digest-tile {% if digest.stalled_count %}alert{% endif %}" href="{% url 'production:adda-list' %}">
+            <span class="digest-label">⚠ Stalled Addas</span>
+            <span class="digest-value">{{ digest.stalled_count }}</span>
+            <span class="digest-sub">no move in {{ digest.stalled_threshold_days }}+ days</span>
+        </a>
+        <a class="digest-tile {% if digest.pending_reports %}warn{% endif %}" href="{% url 'production:adda-list' %}">
+            <span class="digest-label">Pending Reports</span>
+            <span class="digest-value">{{ digest.pending_reports }}</span>
+            <span class="digest-sub">assigned, not submitted</span>
+        </a>
+        <div class="digest-tile">
+            <span class="digest-label">Active Addas</span>
+            <span class="digest-value">{{ digest.active_addas }}</span>
+            <span class="digest-sub">in progress</span>
+        </div>
+        <div class="digest-tile">
+            <span class="digest-label">Completed Today</span>
+            <span class="digest-value">{{ digest.completed_today }}</span>
+        </div>
+        <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
+            <span class="digest-label">Pending Payable</span>
+            <span class="digest-value">₹{{ digest.pending_payable|floatformat:2 }}</span>
+            <span class="digest-sub">owed to workers</span>
+        </a>
+        <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
+            <span class="digest-label">Advance Exposure</span>
+            <span class="digest-value">₹{{ digest.advance_exposure|floatformat:2 }}</span>
+            <span class="digest-sub">outstanding advances</span>
+        </a>
+    </div>
+    {% endif %}
 
     <form method="get" class="filter-card">
         <div class="field"><label>From (created)</label><input type="date" name="from" value="{{ filter_from }}"></div>

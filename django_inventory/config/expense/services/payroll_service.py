@@ -22,6 +22,24 @@ _CAT = WorkerLedgerEntry.Category
 _EARNING_CATS = (_CAT.STAGE_EARNING, _CAT.PRODUCTION_EARNING)
 
 
+def payroll_totals() -> dict:
+    """Factory-wide totals for the operations digest (P1-1). Same definitions as
+    the payroll overview, aggregated at the DB (derived live, never stored):
+      • pending_payable  = Σ ledger credits − Σ debits
+      • advance_exposure = Σ advances given − Σ recovered
+    """
+    led = WorkerLedgerEntry.objects.aggregate(
+        credits=Sum('amount', filter=Q(entry_type=_ET.CREDIT)),
+        debits=Sum('amount', filter=Q(entry_type=_ET.DEBIT)),
+    )
+    pending_payable = (led['credits'] or _ZERO) - (led['debits'] or _ZERO)
+    given = WorkerAdvance.objects.aggregate(s=Sum('amount'))['s'] or _ZERO
+    recovered = (PayrollSettlementItem.objects
+                 .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO)
+    return {'pending_payable': pending_payable,
+            'advance_exposure': given - recovered}
+
+
 # ── Advances (separate loan pool, derived — never stored) ──────────────────
 
 def advance_remaining(advance: WorkerAdvance) -> Decimal:

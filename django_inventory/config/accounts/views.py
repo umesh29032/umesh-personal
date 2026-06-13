@@ -53,7 +53,9 @@ from .models import Skill, User, UserType
 from .services import auth_service, user_service
 from .throttle import check_throttle, reset_throttle, format_retry
 # Centralised RBAC helper — replaces raw `is_superuser` checks (CLAUDE.md rule #6).
-from accounts.services.permission_service import user_has_role, ROLE_SUPER_ADMIN
+from accounts.services.permission_service import (
+    user_has_role, ROLE_SUPER_ADMIN, MANAGEMENT_ROLES,
+)
 
 security_logger = logging.getLogger("accounts.security")
 from .utils import (
@@ -218,10 +220,14 @@ class LogoutView(View):
 
 @method_decorator(login_required(login_url="/app/"), name="dispatch")
 class HomeView(View):
-    """Protected entry point — always redirects to the real inventory dashboard."""
+    """Protected entry point — ROLE-BASED landing (P1-1): management (super_admin
+    / manager) lands on the Operations dashboard; everyone else on their personal
+    My Dashboard. Fixes owner-lands-on-empty-worker-view (Phase-C C-1)."""
 
     def get(self, request):
-        return redirect("inventory:inventory_dashboard")
+        if user_has_role(request.user, MANAGEMENT_ROLES):
+            return redirect("production:dashboard")
+        return redirect("inventory:user_dashboard")
 
 
 # ─── User Management ──────────────────────────────────────────────────────────
