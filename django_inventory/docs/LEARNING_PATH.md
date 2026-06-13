@@ -60,6 +60,26 @@ Read: [LEARNING/09_SQL_BEGINNER_TO_ADVANCED.md](LEARNING/09_SQL_BEGINNER_TO_ADVA
 — levels 1–9 on this project's real tables. Do: `manage.py dbshell`, run the
 Level-3 balance SUM, then `print(qs.query)` on any queryset.
 
+## 7-day pacing (developer survival map)
+If you want a day-by-day cadence instead of "sittings", pace the steps above:
+- **Day 1** — steps 1–2 (business + the map) + [ARCHITECTURE_EXPLAINED](LEARNING_2_0/ARCHITECTURE_EXPLAINED/README.md) §1–6: cloth→Adda→stages→report→settle→pay + the two truths.
+- **Day 2** — step 3 + run it: walk a worker report (phone-size), settle an Adda, pay; match each screen to a [REQUEST_JOURNEY](LEARNING_2_0/REQUEST_JOURNEYS/README.md).
+- **Day 3** — the money: step 5 + [CHOKEPOINTS](LEARNING_2_0/CHOKEPOINTS/README.md); read `adda_settlement_service.py` + `ledger_service.py` with the chokepoint docs open.
+- **Day 4** — production truth: step 4 + the open-closed stage engine (`production/stages/base/`).
+- **Day 5** — data: step 10 (SQL) + [LEARNING/02](LEARNING/02_DATABASE_RELATIONSHIPS.md); `dbshell`, run the live-balance SUM, `print(qs.query)`.
+- **Day 6** — your app: its [APPS/<app>/](LEARNING_2_0/APPS/) page + GUIDE + README.
+- **Day 7** — change safely (see below).
+
+## Common beginner mistakes (avoid from day 1)
+Writing a model in a view (services own writes) · reading `expected_*` as money
+(it's visibility; real money is the ledger at settlement) · adding a stage with
+if/else instead of a handler package (open-closed) · a new menu item without a
+`SidebarItemRule` (URL left unprotected) · a UI without 360/768/1280 verification
+(rule 11) · forgetting docs-sync (rule 12). For the NEVER-modify list, the safe
+bug-trace path, and the safe add-a-feature path, the canonical reference is the
+[AI_AGENT_GUIDE](LEARNING_2_0/AI_AGENT_GUIDE/README.md) (it serves humans too);
+mandatory ADR order is the [DECISION_GRAPH](LEARNING_2_0/PROJECT_BRAIN/DECISION_GRAPH.md).
+
 ## Owner shortcut
 Steps 1→3→5 + the My Earnings/settlement screens = enough to RUN the factory.
 The rest deepens at your pace.
