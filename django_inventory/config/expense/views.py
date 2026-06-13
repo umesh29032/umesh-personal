@@ -32,7 +32,7 @@ from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, View
 from django.views.generic.edit import FormView
 
 from accounts.services import MANAGEMENT_ROLES, user_has_role
@@ -298,8 +298,12 @@ class AddaSettlementListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         return ctx
 
 
-class AddaSettlementStartView(LoginRequiredMixin, _ManagementOnly, TemplateView):
-    """POST-only: open (or resume) the draft for one Adda."""
+class AddaSettlementStartView(LoginRequiredMixin, _ManagementOnly, View):
+    """POST-only: open (or resume) the draft for one Adda.
+
+    Base is `View` (not `TemplateView`): the action has no GET surface, so a
+    stray GET (bookmark/refresh/back) returns 405 — never the 500 that a
+    template-less `TemplateView.get()` raised (P0-1)."""
 
     def post(self, request, adda_pk):
         from production.models import Adda

@@ -71,6 +71,12 @@ class AccessTests(_Base):
             self.assertEqual(self.client.get(url).status_code, 403)
             self.assertEqual(self.client.post(url).status_code, 403)
 
+    def test_management_get_on_start_returns_405_not_500(self):
+        # P0-1 regression: settlement-start is POST-only. A management GET
+        # (bookmark/refresh) must 405, never 500 (template-less TemplateView).
+        url = reverse('expense:adda-settlement-start', args=[self.adda.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+
 
 class QueueAndDraftTests(_Base):
     def test_queue_shows_ready_adda_and_start_creates_draft(self):
