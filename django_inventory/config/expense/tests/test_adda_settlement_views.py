@@ -204,6 +204,18 @@ class CutoverLeverTests(_Base):
                                 worker=self.w1, allocated_quantity=Decimal('5'))
         self.assertEqual(WorkerLedgerEntry.objects.count(), 0)
 
+    def test_setting_absent_falls_back_to_settlement_first(self):
+        # P0-3 / E-2: if LEDGER_CREDIT_AT_ALLOCATION is removed entirely, the
+        # getattr fallback MUST be settlement-first (refuse), never allocation-era.
+        from django.conf import settings as dj_settings
+        with override_settings():
+            del dj_settings.LEDGER_CREDIT_AT_ALLOCATION  # simulate total absence
+            self.assertFalse(getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', False))
+            with self.assertRaisesMessage(ValidationError, 'Adda'):
+                allocate_stage_work(user=self.mgmt, stage_record=self.sr_pay,
+                                    worker=self.w1, allocated_quantity=Decimal('5'))
+        self.assertEqual(WorkerLedgerEntry.objects.count(), 0)
+
     @override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
     def test_symmetric_guard_blocks_allocation_after_settlement(self):
         self._contribute(self.w1, 10)
