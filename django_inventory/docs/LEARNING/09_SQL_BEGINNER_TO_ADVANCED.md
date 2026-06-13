@@ -160,8 +160,10 @@ COMMIT;                                  -- sab ek saath; ya ROLLBACK = kuch nah
 ```
 
 `FOR UPDATE` wahi hai jo Django `select_for_update()` banata hai. Lock ORDER
-fixed rakhna (advisory 5374 → ADST → SR → profile → advance) deadlock ka
-ilaaj hai. `SELECT pg_advisory_xact_lock(5374)` = naam-wala app-level lock.
+fixed rakhna deadlock ka ilaaj hai — exact order canonical hai
+[CHOKEPOINTS/adda_settlement_service.md](../LEARNING_2_0/CHOKEPOINTS/adda_settlement_service.md)
+me (binding spec: ARCHITECTURE_V2 §11.5). `SELECT pg_advisory_xact_lock(5374)` =
+naam-wala app-level lock.
 
 ## Level 8 — Django ORM ↔ SQL (translation table)
 

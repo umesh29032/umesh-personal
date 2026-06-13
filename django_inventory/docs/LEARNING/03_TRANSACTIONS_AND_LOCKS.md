@@ -27,3 +27,5 @@ table ke. Global key = ADR-0010 ka "one namespace" decision enforced.
 ## What breaks without all this
 Double-credit (same line paid twice), phantom drafts, deadlocked settlement
 day, ya — worst — aadha-likha money event jo kabhi reconcile nahi hota.
+
+> Canonical settlement lock order lives in docs/LEARNING_2_0/CHOKEPOINTS/adda_settlement_service.md — this lesson teaches the general pattern, not the per-flow order.

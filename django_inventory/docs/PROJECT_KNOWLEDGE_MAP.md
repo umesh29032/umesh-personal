@@ -29,6 +29,10 @@ One sentence: **workers report work → owner settles the Adda (earnings book)
 
 ## 2) Request flow (what happens on one click)
 
+> **CANONICAL** for the generic request pattern (View→Service→Model→history).
+> Per-app specifics live in APPS/<app>/REQUEST_MAP; exact call chains in
+> REQUEST_JOURNEYS. Those reference this; they don't redefine the pattern.
+
 ```
 Browser ──▶ urls.py ──▶ SidebarAccessMiddleware (menu hidden ⇒ URL blocked)
         ──▶ View  (permission_service / skill+assignment gates;
@@ -62,8 +66,8 @@ converges into WSC through worker_task_service. No second door, ever.
             (reads production truth; NEVER edits it)
  settlement queue ─▶ DRAFT (ADST-0007; scratchpad, no money)
         │ discard ok
-        ▼ FINALIZE  — adda_settlement_service, lock order:
-        │   advisory 5374 → ADST row → stage records → profiles → advances
+        ▼ FINALIZE  — adda_settlement_service (strict lock order — canonical:
+        │   docs/LEARNING_2_0/CHOKEPOINTS/adda_settlement_service.md)
         ├─ per line:  SWA earning line + ledger CREDIT (stage_earning)
         │             qty = verified-else-reported × frozen expected_rate
         ├─ per chosen advance: ledger DEBIT (advance_recovery) + PSI row
@@ -128,7 +132,12 @@ its parent · SET_NULL for optional references.
 
 Full service-connection diagram: [LEARNING/04_SERVICE_LAYER.md](LEARNING/04_SERVICE_LAYER.md).
 
-## 7) The five chokepoint services (why they exist, what breaks without them)
+## 7) The chokepoint services (why they exist, what breaks without them)
+
+> Canonical list of the single-writer services. Other docs say "the chokepoint
+> services" and link here — this table (not a hard-coded count) is the source of
+> truth, and the underlying `*_service.py` files are guarded against rename by
+> `core.tests.PkalsNavigationGuardTests`.
 
 | Service | Sole writer of | Who may call | Invariant it protects | If removed/bypassed |
 |---|---|---|---|---|
@@ -138,8 +147,9 @@ Full service-connection diagram: [LEARNING/04_SERVICE_LAYER.md](LEARNING/04_SERV
 | `allocation_service` | era-A SWAs (+era-A void) | lever-ON only (rollback) | symmetric double-credit guard; era-B lines refuse void | legacy path racing settlements |
 | `cost_service` | processing_cost freeze; `role_rate_for` | stage services | standard-cost frozen price-at-time; grouped members yield NO rate (C-1 — no double pay) | retro cost rewrites; grouped double-pay |
 
-(`history_service` = sixth: every `*History` row. `consume_leftover` =
-material-consumption writer, C-1.)
+(`history_service` also single-writes every `*History` row; `consume_leftover`
+writes material consumption, C-1. The list above is the canonical set; it is not
+a fixed number — phases may add a single-writer service.)
 
 ## 8) Phase history (how we got here)
 
@@ -186,3 +196,16 @@ responsive; every UI review documents 360/768/1280 verification ·
 honest-NULL (unknown ≠ zero) · backfill only known facts · work-that-happened
 is immutable · soft-state over delete · one writer per truth table (CI gates
 4/4, 4b/4, 4c/4) · gate must pass (`bash scripts/check.sh`).
+
+---
+
+> **This is the ONE overview** (H4) and the AI routing manifest's `entry.overview`.
+> If any other doc disagrees on the big picture, this wins; deeper facets link
+> down from here (§7 = the chokepoint canonical list; §2 = the request-flow
+> canonical). Front door for all readers: [START_HERE.md](START_HERE.md).
+
+### Verification Sources
+Synthesized from the apps' models/services, the ADRs, ARCHITECTURE_V2, and the
+chokepoint services. **Verified from code** (verified against commit f067daf0,
+2026-06-12; re-verify the cited file if it changed). Finalized 2026-06-13 after
+the consolidation + longevity-hardening sessions. Confidence: High.
