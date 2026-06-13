@@ -66,7 +66,7 @@
 | Frontend B-scope: legacy-page CSS migration, button-NAME unification, DataTables→data-label conversions | post-soak / touch-time | consolidation review (archived) |
 | Stage-panel partial splits + JS→static extraction | when next forced; pairs with WhiteNoise work | frontend audit Phase 9 |
 | REMEDIATION_PLAN phases 4–13 (god-files, M4 cycle-break, logging) | parked; import-linter: restate WSC.settlement_line as NAMED exemption | REMEDIATION_PLAN |
-| docs/PAGES + docs/FLOWS skeletons | fill per-page as screens are touched | doc audit gap list |
+| docs/PAGES skeletons | fill per-page as screens are touched (docs/FLOWS archived 2026-06-13 — flows live in LEARNING_2_0/DATA_FLOWS + REQUEST_JOURNEYS) | doc audit gap list |
 | ARCH_READINESS_REVIEW → archive | after soak passes | doc audit |
 | Per-worker cross-Adda verified-qty rollup screen | only if asked; data derivable | readiness §1 |
 | Period-close concept · retention policy for append-only tables | named, far | foundation audit §C |

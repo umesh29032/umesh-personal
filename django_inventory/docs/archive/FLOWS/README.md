@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-06-13** -- superseded scaffold (it only ever indexed docs living elsewhere). Flow documentation now lives in: docs/production/ (subsystem deep-dives) + docs/LEARNING_2_0/DATA_FLOWS/ (write-path view) + docs/LEARNING_2_0/REQUEST_JOURNEYS/ (call-chain view).
+
 # docs/FLOWS/ — end-to-end flow documentation
 
 One file per cross-cutting flow (spans models + services + views). Each should
