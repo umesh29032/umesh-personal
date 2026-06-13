@@ -1,6 +1,8 @@
 # Production Tracking — Overview
 
-**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]) + **stage costing** + **worker payroll** (`expense` app). 292 tests green. `manage.py check` clean. Last touched 2026-06-02.
+**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]) + **stage costing** + **worker payroll** (`expense` app). `manage.py check` clean. (Current test count: run `bash scripts/check.sh`.)
+
+> **V2 note:** this subsystem doc covers **cloth → stages → cutting → barcode** and is current for that scope (last subsystem verification 2026-06-02). The **worker-truth model** — `WorkerStageTask` / `WorkerStageContribution` — and the **settlement** architecture shipped later (V2, 2026-06-09→11) and live in **[../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md)** (how workers report + how earnings are settled). This page intentionally does not re-document those.
 
 End-to-end factory tracking subsystem for Kapil Enterprises: raw cloth intake → batch (Adda) production → layering → cutting-pattern design → cutting → barcode generation → export to vendor. Each priced stage freezes a `processing_cost` on advance (`cost_service`); worker earnings flow to the `expense` app's ledger. Replaces the gutted batch/cloth code in the old `inventory` app (which now owns RBAC + dashboard + the Access Control hub).
 

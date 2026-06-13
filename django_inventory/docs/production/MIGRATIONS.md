@@ -133,9 +133,16 @@ INSTALLED_APPS = [
 
 ---
 
-## Current migration state (2026-06-02)
+## Migration state — snapshot 2026-06-02 (pre-V2)
 
-The table above is the original plan. Live counts per app now:
+> **This table is a 2026-06-02 snapshot.** V2 (worker-truth + settlement,
+> 2026-06-09→11) added later migrations NOT listed below — e.g. `production` 0026+
+> (`WorkerStageTask`/`WorkerStageContribution`; legacy M2M roster dropped in
+> migration **0035**) and `expense` 0006+ (advances, `AddaSettlement`). For the
+> exact current state run `env/bin/python config/manage.py showmigrations` (or
+> `ls config/<app>/migrations/`). Worker-truth/settlement design: [../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md).
+
+The table below is the original plan + state as of the snapshot date:
 
 | App | Latest | Notable later migrations |
 |---|---|---|

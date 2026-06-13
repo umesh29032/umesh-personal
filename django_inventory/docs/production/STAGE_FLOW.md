@@ -1,8 +1,10 @@
 # Production App — Stage Flow & Model Connections
 
 > Focused reference: **what each stage creates** + **how every model wires into the end-to-end flow**.
-> Verified against live code at commit `4fd746d2` (2026-06-01). 196/196 tests green.
-> Companion to [OVERVIEW.md](OVERVIEW.md). For whole-project scope see `/SYSTEM_DESIGN.md`.
+> Verified against live code at commit `4fd746d2` (2026-06-01, pre-V2); the stage-flow
+> model wiring below is unchanged since. **Worker-truth + settlement: see [../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md).**
+> Current test count: run `bash scripts/check.sh`. Companion to [OVERVIEW.md](OVERVIEW.md);
+> whole-project scope: `/SYSTEM_DESIGN.md`.
 
 The `production` app is a **4-stage factory pipeline**. It rests on one polymorphic spine
 (`Adda` → `AddaStageRecord`); each stage hangs a typed `OneToOne` record off that spine and
