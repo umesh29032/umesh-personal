@@ -223,6 +223,110 @@ class AntiEnumerationTests(BaseSecurityTest):
         self.assertEqual(r1.status_code, r2.status_code)
         self.assertEqual(r1.url, r2.url)
 
+    def test_login_verify_step_unknown_email_same_as_known(self):
+        # PA-02-1: the OTP-verify STEP must also be indistinguishable. Before the
+        # decoy-OTP fix, a wrong code for an unknown email hit "Session expired"
+        # (→ redirect to login) while a known email got "Invalid OTP" (→ stay on
+        # verify) — an enumeration oracle one step deeper than the redirect.
+        User.objects.create_user(email="known@t.com", password="Str0ngP@ssw0rd!")
+        urls = []
+        for email in ("known@t.com", "ghost@t.com"):
+            c = Client()
+            c.post(reverse("accounts:login"), {"email": email})
+            r = c.post(reverse("accounts:verify_otp"), {"otp": "000000"})
+            urls.append((r.status_code, r.url))
+        self.assertEqual(urls[0], urls[1])
+        # both stay on the verify page (wrong OTP), neither bounces to login
+        self.assertEqual(urls[0][1], reverse("accounts:verify_otp"))
+
+    def test_forgot_password_unknown_email_same_as_known(self):
+        # PA-02-1: forgot-password previously set reset_email ONLY for existing
+        # emails, so ResetPasswordVerifyView showed "Session expired" for unknown
+        # vs "Invalid OTP" for known. Now both reach the same verify outcome.
+        User.objects.create_user(email="known@t.com", password="Str0ngP@ssw0rd!")
+        results = []
+        for email in ("known@t.com", "ghost@t.com"):
+            c = Client()
+            r1 = c.post(reverse("accounts:forgot_password"), {"email": email})
+            r2 = c.post(reverse("accounts:reset_password_verify"),
+                        {"otp": "000000", "password": "Str0ngP@ssw0rd!"})
+            results.append((r1.status_code, r1.url, r2.status_code, r2.url))
+        self.assertEqual(results[0], results[1])
+        # forgot-password → verify page; wrong OTP → stays on verify page
+        self.assertEqual(results[0][1], reverse("accounts:reset_password_verify"))
+        self.assertEqual(results[0][3], reverse("accounts:reset_password_verify"))
+
+
+# ─── Email case-insensitivity (PA-02-2) ─────────────────────────────────────
+
+class EmailCaseInsensitiveAuthTests(BaseSecurityTest):
+    """A mixed-case-local-part email (e.g. from `createsuperuser`) must still be
+    reachable by the OTP-login / password-reset flows, which lowercase input.
+    BaseUserManager.normalize_email lowercases only the DOMAIN, so without an
+    iexact lookup such an account was silently locked out."""
+
+    def test_otp_login_resolves_mixed_case_email_end_to_end(self):
+        from django.core import mail
+        import re
+        User.objects.create_user(email="Mixed.Case@t.com", password="Str0ngP@ssw0rd!")
+        mail.outbox.clear()
+        c = Client()
+        # user types the lowercase form
+        r = c.post(reverse("accounts:login"), {"email": "mixed.case@t.com"})
+        self.assertEqual(r.url, reverse("accounts:verify_otp"))
+        # existing-user branch ran → a real OTP was emailed (decoy sends nothing)
+        self.assertEqual(len(mail.outbox), 1)
+        otp = re.search(r"\b(\d{6})\b", mail.outbox[0].body).group(1)
+        r2 = c.post(reverse("accounts:verify_otp"), {"otp": otp})
+        self.assertEqual(r2.url, reverse("accounts:home"))
+        self.assertIn("_auth_user_id", c.session)  # logged in
+
+    def test_forgot_password_recognises_mixed_case_email(self):
+        from django.core import mail
+        User.objects.create_user(email="Reset.Me@t.com", password="Str0ngP@ssw0rd!")
+        mail.outbox.clear()
+        c = Client()
+        r = c.post(reverse("accounts:forgot_password"), {"email": "reset.me@t.com"})
+        self.assertEqual(r.url, reverse("accounts:reset_password_verify"))
+        self.assertEqual(len(mail.outbox), 1)  # real reset OTP sent, not a decoy
+
+
+# ─── Auth pages are not cacheable (PA-02-3) ─────────────────────────────────
+
+class AuthPageCacheControlTests(BaseSecurityTest):
+    def test_auth_get_pages_set_no_store(self):
+        for name in ("accounts:login", "accounts:login_password",
+                     "accounts:forgot_password",
+                     "accounts:reset_password_verify"):
+            r = self.client.get(reverse(name))
+            self.assertIn("no-store", r.headers.get("Cache-Control", ""),
+                          msg=f"{name} must be uncacheable (never_cache)")
+
+
+# ─── Native self-signup disabled (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ─
+
+class SignupDisabledTests(BaseSecurityTest):
+    """Internal ERP = pre-provisioned users only. The public signup routes were
+    removed; accounts come from a Super Admin or a pre-provisioned Google link."""
+
+    def test_signup_url_names_are_not_reversible(self):
+        from django.urls import NoReverseMatch
+        for name in ("accounts:signup", "accounts:signup_verify",
+                     "accounts:signup_resend_otp"):
+            with self.assertRaises(NoReverseMatch, msg=f"{name} must be unrouted"):
+                reverse(name)
+
+    def test_signup_paths_return_404(self):
+        for path in ("/app/signup/", "/app/signup/verify/", "/app/signup/resend-otp/"):
+            self.assertEqual(self.client.get(path).status_code, 404,
+                             msg=f"{path} must be gone (signup disabled)")
+
+    def test_login_pages_have_no_signup_link(self):
+        for name in ("accounts:login", "accounts:login_password"):
+            html = self.client.get(reverse(name)).content.decode()
+            self.assertNotIn("Create one", html,
+                             msg=f"{name} must not advertise self-signup")
+
 
 # ─── Password login lockout ─────────────────────────────────────────────────
 

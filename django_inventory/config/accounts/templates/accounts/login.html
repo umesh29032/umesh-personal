@@ -608,7 +608,7 @@
 
             <div class="form-links">
                 <a href="{% url 'accounts:login_password' %}">Sign in with password instead</a>
-                <a href="{% url 'accounts:signup' %}">No account? <span>Create one →</span></a>
+                {# Self-signup disabled (PA-02-OPEN-SIGNUP) — accounts are admin-provisioned. #}
             </div>
         </div>
     </div>

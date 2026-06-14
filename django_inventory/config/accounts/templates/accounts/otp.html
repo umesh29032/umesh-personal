@@ -294,6 +294,13 @@
             .otp-digit { height: 52px; font-size: 24px; }
             .heading { font-size: 30px; }
         }
+        /* Very small phones (≤360px): drop the decorative separator and tighten
+           the gap so 6 OTP boxes get a usable touch width instead of ~30px (PA-02-4). */
+        @media (max-width: 360px) {
+            .card-body { padding: 28px 16px 24px; }
+            .otp-row { gap: 4px; }
+            .otp-sep { display: none; }
+        }
     </style>
 </head>
 <body>

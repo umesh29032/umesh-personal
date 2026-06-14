@@ -63,6 +63,8 @@
 
         @keyframes riseIn { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @media (max-width: 480px) { .card-body { padding: 32px 24px 28px; } .otp-digit { height: 52px; font-size: 24px; } .heading { font-size: 28px; } }
+        /* ≤360px: drop separator + tighten gap so 6 OTP boxes stay usably wide (PA-02-4). */
+        @media (max-width: 360px) { .card-body { padding: 28px 16px 24px; } .otp-row { gap: 4px; } .otp-sep { display: none; } }
     </style>
 </head>
 <body>

@@ -63,6 +63,8 @@ from .utils import (
     can_resend_otp,
     check_otp_from_session,
     clear_otp_session,
+    generate_otp,
+    store_otp_in_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,10 +72,13 @@ logger = logging.getLogger(__name__)
 
 # ─── Authentication ────────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class LoginView(View):
     """
     Step 1: User enters email → OTP is generated and emailed.
     Only sends OTP to existing users to prevent account enumeration.
+    never_cache: keep auth pages out of the bfcache so the back button after
+    logout can't redisplay a stale OTP/login screen (PA-02-3).
     """
 
     def get(self, request):
@@ -97,10 +102,14 @@ class LoginView(View):
         if not can_resend_otp(request, prefix="otp"):
             return redirect("accounts:verify_otp")
 
-        # Only send OTP to existing users — don't auto-create accounts.
-        # Always show the same redirect to prevent account enumeration.
-        if User.objects.filter(email=email).exists():
-            request.session["otp_email"] = email
+        # Anti-enumeration: the OTP page must look identical whether or not the
+        # email exists. Real accounts get a REAL OTP emailed; unknown emails get
+        # a DECOY OTP stashed in-session (never emailed) so the verify step ALSO
+        # behaves identically — a wrong code returns "Invalid OTP" either way,
+        # instead of leaking existence via a different message/redirect.
+        # email__iexact (not exact) so a mixed-case-local account isn't missed.
+        request.session["otp_email"] = email
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="otp",
                 subject=f"Your Login OTP — {settings.SITE_NAME}",
@@ -108,9 +117,9 @@ class LoginView(View):
                 messages.error(request, "Failed to send OTP. Please try again.")
                 return render(request, "accounts/login.html")
         else:
-            # Store email in session so the OTP page renders, but no OTP is sent.
-            # This prevents account enumeration (attacker can't tell if email exists).
-            request.session["otp_email"] = email
+            # Decoy: random un-emailed OTP hash so a non-existent account is
+            # indistinguishable from a real one on the verify page.
+            store_otp_in_session(request, generate_otp(), prefix="otp")
             request.session.modified = True
 
         return redirect("accounts:verify_otp")
@@ -136,7 +145,7 @@ class ResendOTPView(View):
 
         # Only send OTP if the user actually exists — mirrors LoginView logic.
         # For non-existent emails we still redirect to the OTP page (anti-enumeration).
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="otp",
                 subject=f"Your New Login OTP — {settings.SITE_NAME}",
@@ -146,6 +155,7 @@ class ResendOTPView(View):
         return redirect("accounts:verify_otp")
 
 
+@method_decorator(never_cache, name="dispatch")
 class VerifyOTPView(View):
     """Step 2: User enters the 6-digit OTP to complete login."""
 
@@ -180,10 +190,14 @@ class VerifyOTPView(View):
             return redirect("accounts:verify_otp")
 
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
-            messages.error(request, "Account not found. Please sign up.")
-            return redirect("accounts:signup")
+            # Native signup is disabled (PA-02-OPEN-SIGNUP); accounts are
+            # admin-provisioned. With the decoy-OTP anti-enumeration this branch
+            # is only reachable by guessing a decoy code — send them back to login
+            # with a neutral message rather than a (removed) signup page.
+            messages.error(request, "Account not found. Contact your administrator.")
+            return redirect("accounts:login")
 
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
@@ -359,6 +373,7 @@ class UserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
 
 # ─── Password Login ───────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class PasswordLoginView(DjangoLoginView):
     template_name = "accounts/login_password.html"
     redirect_authenticated_user = True
@@ -396,8 +411,14 @@ class PasswordLoginView(DjangoLoginView):
         return super().form_valid(form)
 
 
-# ─── Signup ───────────────────────────────────────────────────────────────────
+# ─── Signup — DISABLED (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ────────────
+# These three views are NO LONGER ROUTED (see accounts/urls.py). Native public
+# self-signup contradicted the "pre-provisioned users only" invariant on this
+# internal ERP, so the routes + login-page links were removed in the Production
+# Audit. The classes are kept (unrouted) for a clean, reversible re-enable if
+# invite/allowlist onboarding is ever scoped. Do not re-add routes without that.
 
+@method_decorator(never_cache, name="dispatch")
 class SignupView(FormView):
     template_name = "accounts/signup.html"
     form_class = SignupForm
@@ -430,6 +451,7 @@ class SignupView(FormView):
         return super().form_valid(form)
 
 
+@method_decorator(never_cache, name="dispatch")
 class SignupVerifyView(View):
     def get(self, request):
         if not request.session.get("signup_email"):
@@ -527,6 +549,7 @@ class ResendSignupOTPView(View):
 
 # ─── Password Reset ───────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class ForgotPasswordView(View):
     def get(self, request):
         return render(request, "accounts/forgot_password.html")
@@ -540,21 +563,32 @@ class ForgotPasswordView(View):
             messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
             return redirect("accounts:forgot_password")
 
-        # Don't reveal whether the email exists (prevents account enumeration)
-        if User.objects.filter(email=email).exists():
-            request.session["reset_email"] = email
+        # Anti-enumeration: behave identically whether or not the email exists.
+        # Real accounts get a REAL reset OTP emailed; unknown emails get a DECOY
+        # OTP stashed in-session (never emailed) AND reset_email set, so neither the
+        # redirect nor the verify step can distinguish the two. Previously the
+        # session key was set only for existing emails, so a non-existent email hit
+        # the "Session expired" branch in ResetPasswordVerifyView while a real one
+        # reached "Invalid OTP" — a clean enumeration oracle (PA-02-1).
+        # email__iexact so a mixed-case-local account isn't missed (PA-02-2).
+        request.session["reset_email"] = email
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="reset",
                 subject=f"Password Reset OTP — {settings.SITE_NAME}",
             ):
                 messages.error(request, "Failed to send reset email. Please try again.")
                 return redirect("accounts:forgot_password")
+        else:
+            store_otp_in_session(request, generate_otp(), prefix="reset")
+        request.session.modified = True
 
         # Always show the same message regardless of whether email exists
         messages.info(request, "If this email is registered, an OTP has been sent.")
         return redirect("accounts:reset_password_verify")
 
 
+@method_decorator(never_cache, name="dispatch")
 class ResetPasswordVerifyView(View):
     def get(self, request):
         return render(request, "accounts/reset_otp.html")
@@ -585,10 +619,10 @@ class ResetPasswordVerifyView(View):
                 return redirect("accounts:forgot_password")
             return redirect("accounts:reset_password_verify")
 
-        # Defense in depth — even though reset_email is only set when the email
-        # exists, treat a missing user as a tampered session and bail.
+        # Defense in depth — a missing user here means either a tampered session
+        # or a decoy-OTP reset for a non-existent email; treat both as bail.
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             request.session.pop("reset_email", None)
             request.session.modified = True

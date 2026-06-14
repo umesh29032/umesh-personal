@@ -53,7 +53,7 @@ config/accounts/
 ├── decorators.py       # login_required_view (function-view decorator)
 ├── admin.py            # Django admin registration for User + Skill
 ├── apps.py             # AppConfig
-├── tests.py            # 21 security tests (argon2, forms, throttle, lockout, etc.)
+├── tests.py            # 37 security tests (argon2, forms, throttle, lockout, anti-enum, email-case, no-cache, etc.)
 └── migrations/         # DB schema history
 ```
 
@@ -87,9 +87,18 @@ Browser                          LoginView                       VerifyOTPView
    |<-- redirect /app/home/ (→ inventory dashboard) ----------------   |
 ```
 
-**Anti-enumeration:** If the email does NOT exist, `LoginView` still stores the
-email in the session and redirects to the OTP page — the browser cannot tell
-whether the email was found or not.
+**Anti-enumeration (hardened 2026-06-14, PA-02-1):** If the email does NOT exist,
+`LoginView`/`ForgotPasswordView` still store the email in the session, redirect to
+the OTP page, AND stash a **decoy OTP** (a random, un-emailed hash). So both the
+redirect *and* the verify step are identical to a real account — a wrong code
+returns "Invalid OTP" either way, instead of leaking existence via a different
+message ("Session expired") or redirect. Email lookups use `email__iexact`
+(PA-02-2) so a mixed-case-local account (e.g. from `createsuperuser`) is never
+silently locked out of OTP login / reset.
+
+**No-cache (PA-02-3):** every auth page view is `@never_cache` (login, verify,
+signup, signup-verify, password login, forgot, reset) so the back button after
+logout can't redisplay a stale auth screen.
 
 **OTP security (utils.py):**
 - `secrets.randbelow()` — OS CSPRNG, not `random`
@@ -121,9 +130,17 @@ Argon2 hash for a blocked IP/email (denial-of-service hardening).
 
 ---
 
-### Signup
+### Signup — DISABLED (Production Audit PA-02-OPEN-SIGNUP, owner decision 2026-06-14)
 
-Self-registration for new users (e.g., a new worker getting their own account).
+**This is an internal ERP: "pre-provisioned users only".** Native public
+self-registration was removed — the 3 signup routes (`/app/signup/*`) are gone
+(404) and the "Create one →" links are off both login pages. Accounts are
+created by a Super Admin (`/app/users/add/`) or by a pre-provisioned Google
+address linking on first OAuth. The `SignupView/SignupVerifyView/SignupForm`
+classes remain (unrouted) so signup can be re-enabled deliberately if
+invite/allowlist onboarding is ever scoped — restore the routes + imports.
+
+The (now-unrouted) flow is kept below for reference:
 Two-step: fill form → verify email OTP → account created.
 
 ```
