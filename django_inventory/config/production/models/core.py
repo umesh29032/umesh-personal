@@ -383,3 +383,51 @@ class StagePoolSnapshot(TimeStampedModel):
 
     def __str__(self):
         return f'pool sr={self.stage_record_id} c={self.color_id} s={self.size_id} good={self.good}'
+
+
+class WorkerStageAllocation(TimeStampedModel):
+    """A worker's allocated slice of a CONSUMING stage's available upstream pool
+    (Foundation S4 / Phase 3, addendum C2 — Option B).
+
+    PRODUCTION-TRUTH ONLY — capacity/quantity control. It carries NO money: no rate, no
+    earning, no ledger, no settlement FK. Money lives solely at settlement
+    (`StageWorkAssignment`, born at finalize, = good × frozen rate); this model never
+    influences earning/rate/settlement/costing math (see allocation_service decoupling
+    note + the `WorkerStageAllocation`-has-no-money test). Distinct from the settlement
+    earning line `StageWorkAssignment`.
+
+    Born when management allocates work (pre-work); draws down the upstream pool
+    (`allocation_service.allocate`, under the D2 advisory lock). Append-only: corrected by
+    `voided_at` (never deleted — owner data-history rule); voiding returns the qty to the
+    pool's derived `available`. `stage_record` = the CONSUMING stage; the pool SOURCE is
+    resolved upstream by the service. `color`/`size` NULL for a QUANTITY-grain stage.
+    """
+    # PROTECT: an allocation is production history — never orphaned/lost.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='worker_allocations',
+    )
+    worker = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    allocated_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    created_by = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+    # Set = voided (correction); never deleted. Voided rows leave the `available` sum.
+    voided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['stage_record', 'worker', 'pk']
+        indexes = [models.Index(fields=['stage_record', 'worker'])]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(allocated_quantity__gt=0),
+                name='prod_workerstageallocation_qty_positive',
+            ),
+        ]
+
+    def __str__(self):
+        v = ' voided' if self.voided_at else ''
+        return f'alloc sr={self.stage_record_id} w={self.worker_id} qty={self.allocated_quantity}{v}'

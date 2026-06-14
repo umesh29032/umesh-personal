@@ -30,6 +30,7 @@ from .core import (
     AddaStageRoleRate,
     RateCorrectionAudit,
     StagePoolSnapshot,
+    WorkerStageAllocation,
 )
 from .adda import (
     Adda,
@@ -77,6 +78,7 @@ __all__ = [
     'AddaStageRoleRate',
     'RateCorrectionAudit',
     'StagePoolSnapshot',
+    'WorkerStageAllocation',
     'Adda',
     'AddaStageRecord',
     'LayeringRecord',

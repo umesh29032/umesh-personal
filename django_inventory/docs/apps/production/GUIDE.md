@@ -6,7 +6,7 @@
 ## models/ (split by domain — har file = ek concern)
 | File | What lives here | Pattern / why |
 |---|---|---|
-| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1/S2). RateCorrectionAudit = append-only re-rate audit (S1.1) |
+| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot, WorkerStageAllocation | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1/S2). RateCorrectionAudit = append-only re-rate audit (S1.1) |
 | `adda.py` | Adda, AddaStageRecord (+ pending_report_workers helper) | SR = stage ka polymorphic parent; processing_cost frozen (honest-NULL) |
 | `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK. **S3: good/alter/missing columns (good NOT NULL = payable; alter/missing immutable observations); reported dual-written = good (renamed-not-dropped @S6); constraint wsc_gam_nonneg_sum_positive** |
 | `layering.py` | LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll | per-roll verify + MANDATORY leftovers (G1 ke facts) |
@@ -21,7 +21,7 @@
 | `cost_service.py` | processing_cost freeze/clear; `role_rate_for` (grouped-member guard C-1) |
 | `flow_service.py` | WorkflowStage CRUD + grouping guards |
 | `stage_rate_service.py` | ★ sole writer of AddaStageRoleRate: snapshot/freeze/lock/edit + `rerate_stage_role` (S1.1 super-admin correct-until-settlement + recalc + RateCorrectionAudit) |
-| `pool_service.py` | S4/P2: handler-dispatched piece-pool — `pool_good` (cutting→APSCPB, downstream→StagePoolSnapshot), `materialize_stage_pool` (write-once), `clear_stage_pool`. POOL-ONLY |
+| `pool_service.py` | ★ S4/P2+P3: THE piece-pool chokepoint — sole writer of StagePoolSnapshot + WorkerStageAllocation. `pool_good`/`materialize_stage_pool`/`clear_stage_pool` (snapshot) + `allocate`/`void_allocation`/`available` (draw-down, D2 advisory lock). POOL-ONLY, decoupled from cost/rate/settlement |
 | `_shared.py` | auth helpers + ★ reopen_stage_record skeleton (V2-3 settled-block) |
 | `access_service.py` | skill-gating reads |
 | `activity_service.py` | timeline UNION reads |

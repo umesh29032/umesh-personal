@@ -86,13 +86,19 @@ from .flow_service import (
     set_stage_cost,
     set_stage_grain,
 )
-from .pool_service import clear_stage_pool, materialize_stage_pool, pool_good
+from .pool_service import (
+    allocate, available, clear_stage_pool, materialize_stage_pool, pool_good,
+    void_allocation,
+)
 
 __all__ = [
     'set_stage_grain',
     'pool_good',
     'materialize_stage_pool',
     'clear_stage_pool',
+    'allocate',
+    'available',
+    'void_allocation',
     'create_adda',
     'advance_to_next_stage',
     'create_product',
