@@ -370,6 +370,9 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
         ctx = super().get_context_data(**kwargs)
         s = ctx['s'] = self._settlement()
         ctx['chain'] = self._chain(s)
+        # S5: super-admin gets the audited reconciliation-override field on the finalize form.
+        from accounts.services import ROLE_SUPER_ADMIN, user_has_role
+        ctx['is_super_admin'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
         if s.status == AddaSettlement.Status.DRAFT:
             lines, skip_a, skip_b = adst.preview_lines(s)
             by_worker = {}
@@ -412,9 +415,12 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
         try:
             if action == 'finalize':
                 variance, recoveries = self._parse_finalize_inputs(request)
+                # S5: optional super-admin audited override of an M-6 over-allocation block.
+                override = request.POST.get('reconciliation_override', '').strip() or None
                 adst.finalize_adda_settlement(
                     settlement=s, user=request.user,
-                    variance=variance, recoveries=recoveries)
+                    variance=variance, recoveries=recoveries,
+                    reconciliation_override=override)
                 messages.success(request, f"{s.reference} finalized — earnings booked.")
             elif action in ('reverse', 'supersede'):
                 notes = request.POST.get('notes', '').strip()

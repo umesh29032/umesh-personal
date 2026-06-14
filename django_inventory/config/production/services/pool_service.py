@@ -225,6 +225,73 @@ def worker_allocated(stage_record, worker, color_id=None, size_id=None) -> Decim
     return agg['q'] or Decimal('0')
 
 
+def preview_bound_violations(adda=None) -> list:
+    """S5 / S4-005 rollout safety — the PRE-FLIP audit. Returns every COMPLETED contribution
+    set that WOULD fail the allocation bound if ENFORCE_ALLOCATION_BOUND were enabled, on
+    pool-participant stages (allocation_dimensions != NONE): `over_bound` (Σ good+alter+missing
+    > Σ active allocated) or `unallocated` (allocated=0, reported>0). Read-only. `adda=None`
+    scans all; else one Adda. Run this + clear violations BEFORE flipping the flag on."""
+    from collections import defaultdict
+
+    from django.db.models import Sum
+
+    from production.models import (
+        AddaStageRecord, WorkerStageAllocation, WorkerStageContribution, WorkerStageTask,
+    )
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    srs = (AddaStageRecord.objects
+           .exclude(workflow_stage__allocation_dimensions=ALLOC_DIM_NONE)
+           .select_related('workflow_stage__stage', 'adda'))
+    if adda is not None:
+        srs = srs.filter(adda=adda)
+    out = []
+    for sr in srs:
+        produced = defaultdict(lambda: Decimal('0'))
+        for c in (WorkerStageContribution.objects
+                  .filter(task__stage_record=sr, task__status__in=done)
+                  .select_related('task')):
+            produced[(c.task.worker_id, c.color_id, c.size_id)] += (
+                c.good_quantity + c.alter_quantity + c.missing_quantity)
+        for (worker_id, color_id, size_id), got in produced.items():
+            allocated = (WorkerStageAllocation.objects
+                         .filter(stage_record=sr, worker_id=worker_id,
+                                 color_id=color_id, size_id=size_id, voided_at__isnull=True)
+                         .aggregate(q=Sum('allocated_quantity'))['q'] or Decimal('0'))
+            kind = None
+            if allocated == 0 and got > 0:
+                kind = 'unallocated'
+            elif got > allocated:
+                kind = 'over_bound'
+            if kind:
+                out.append({
+                    'adda': sr.adda.code, 'stage': sr.workflow_stage.stage.code,
+                    'worker_id': worker_id, 'color_id': color_id, 'size_id': size_id,
+                    'reported': got, 'allocated': allocated, 'kind': kind,
+                })
+    return out
+
+
+def bound_soft_warning(task):
+    """S5 / S4-005 — non-blocking over-allocation hint for the worker report UI. Returns a
+    message if this task's good+alter+missing would exceed the worker's allocation on a
+    pool-participant stage (else None). NEVER raises; independent of ENFORCE_ALLOCATION_BOUND
+    (it warns during the ramp, before the hard gate is ever turned on)."""
+    from collections import defaultdict
+
+    sr = task.stage_record
+    if sr.workflow_stage.allocation_dimensions == ALLOC_DIM_NONE:
+        return None
+    reported = defaultdict(lambda: Decimal('0'))
+    for c in task.contributions.all():
+        reported[(c.color_id, c.size_id)] += (
+            c.good_quantity + c.alter_quantity + c.missing_quantity)
+    for (color_id, size_id), got in reported.items():
+        if got > worker_allocated(sr, task.worker, color_id, size_id):
+            return ("Heads up: reported quantity exceeds what's allocated to this worker for "
+                    "these dimensions. Allowed now, but refused once allocation enforcement is on.")
+    return None
+
+
 def check_allocation_bound(task) -> None:
     """Strict complete-time bound (S4/Phase 4, I-5). For each DIMENSION the worker actually
     REPORTED on a pool-participant stage, refuse if Σ(good+alter+missing) exceeds Σ active

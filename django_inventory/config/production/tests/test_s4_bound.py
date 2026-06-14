@@ -182,3 +182,43 @@ class BoundEnforcedTests(_Base):
         c.verified_quantity = Decimal('100'); c.save(update_fields=['verified_quantity'])
         complete_worker_task(self.task, actor=self.worker)
         self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)
+
+
+class PreviewAndSoftWarnTests(_Base):
+    """S5 / S4-005 rollout safety — preview (pre-flip audit) + non-blocking soft-warn.
+    ENFORCE_ALLOCATION_BOUND stays OFF (default) so over-bound contributions can complete."""
+
+    def test_preview_lists_over_bound(self):
+        ssr = self._setup()
+        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 5)
+        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
+        complete_worker_task(self.task, actor=self.worker)   # flag off → completes
+        v = pool_service.preview_bound_violations(adda=ssr.adda)
+        self.assertTrue(any(x['kind'] == 'over_bound' for x in v))
+
+    def test_preview_lists_unallocated(self):
+        ssr = self._setup()
+        self._cut(self.red, self.m, 50)                       # NO allocation created
+        self._report([{'reported_quantity': '4', 'color_id': self.red.pk, 'size_id': self.m.pk}])
+        complete_worker_task(self.task, actor=self.worker)
+        v = pool_service.preview_bound_violations(adda=ssr.adda)
+        self.assertTrue(any(x['kind'] == 'unallocated' for x in v))
+
+    def test_preview_clean_within_bound(self):
+        ssr = self._setup()
+        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 10)
+        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
+        complete_worker_task(self.task, actor=self.worker)
+        self.assertEqual(pool_service.preview_bound_violations(adda=ssr.adda), [])
+
+    def test_soft_warning_over_returns_message(self):
+        ssr = self._setup()
+        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 5)
+        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
+        self.assertIsNotNone(pool_service.bound_soft_warning(self.task))   # 8 > 5
+
+    def test_soft_warning_within_bound_none(self):
+        ssr = self._setup()
+        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 10)
+        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
+        self.assertIsNone(pool_service.bound_soft_warning(self.task))      # 8 ≤ 10

@@ -188,6 +188,16 @@ LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=Fals
 # PRODUCTION-CAPACITY rule only — reads no rate/earning/verified/settlement/cost data.
 ENFORCE_ALLOCATION_BOUND = config('ENFORCE_ALLOCATION_BOUND', default=False, cast=bool)
 
+# Foundation S5 — M-6 settlement reconciliation BLOCK. Default False = WARN-only (today's
+# behavior: an over-allocated settlement is recorded + warned, never blocked). True = finalize
+# REFUSES when a stage settled MORE than it produced (Σ settled good > cost_quantity_snapshot)
+# beyond the tolerance, unless a super-admin supplies an audited override reason. Quantity-only
+# (good vs produced) — reads no rate/earning/cost. Kill-switch: flip False to disable instantly.
+ENFORCE_SETTLEMENT_RECONCILIATION = config('ENFORCE_SETTLEMENT_RECONCILIATION', default=False, cast=bool)
+# Allowed over-allocation margin (ABSOLUTE pieces, global) before the BLOCK fires. Default 0 =
+# strict when enforcement is on. Absorbs legit rounding / minor discrepancies.
+SETTLEMENT_RECONCILIATION_TOLERANCE = config('SETTLEMENT_RECONCILIATION_TOLERANCE', default='0')
+
 # Operations digest (P1-1): an in-progress Adda whose current open stage has not
 # moved in this many days is flagged "stalled" on the management Operations
 # landing. Constant (not hardcoded in query logic) so the threshold is tunable.

@@ -224,7 +224,8 @@ def discard_draft(*, settlement, user):
 
 
 @transaction.atomic
-def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None):
+def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None,
+                             reconciliation_override=None):
     """The settlement money-write (§11.5). NO CASH — payment is a separate event.
 
     variance:  {worker_id: {'packed': int, 'missing': int, 'rejected': int,
@@ -418,15 +419,49 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         settlement.reference, adda.code, len(workers), len(lines),
         len(skip_a), len(skip_b), expected_total)
 
-    # M-6 reconciliation — WARN mode (S1.1, addendum D-β + H1/H2). SWAs are written
-    # above, so allocated_qty is final.
-    record_reconciliation_evidence(settlement, adda)
+    # M-6 reconciliation (S1.1 WARN → S5 configurable BLOCK). SWAs are written above, so
+    # reconcile reads the final allocated. Quantity-only (settled good vs produced output) —
+    # reads no rate/earning/cost. Block = over_allocated beyond tolerance, when ENFORCE on,
+    # without an audited super-admin override. Raising rolls back the whole atomic finalize
+    # (SWAs + ledger + items) → nothing books on a block.
+    from decimal import Decimal as _Dec
+
+    from django.conf import settings as _dj
+    from expense.services import reconciliation_service as _recon
+    _tol = _Dec(str(getattr(_dj, 'SETTLEMENT_RECONCILIATION_TOLERANCE', '0') or '0'))
+    over_rows = [
+        r for r in _recon.reconcile_stage_pay(adda=adda)
+        if r['flag'] == 'over_allocated' and (r['allocated_qty'] - r['output_qty']) > _tol
+    ]
+    _override = (reconciliation_override or '').strip()
+    if over_rows and getattr(_dj, 'ENFORCE_SETTLEMENT_RECONCILIATION', False):
+        _detail = '; '.join(
+            f"'{r['stage']}' settled {r['allocated_qty']} but produced {r['output_qty']} "
+            f"(over by {r['allocated_qty'] - r['output_qty']})" for r in over_rows)
+        if not _override:
+            raise ValidationError(
+                f"Cannot finalize {settlement.reference}: settled more than produced — "
+                f"{_detail}. Tolerance {_tol}. Correct the verified quantity (Review Reports), "
+                f"void the over-allocation, or finalize with a super-admin override (reason "
+                f"required).")
+        from accounts.services import ADMIN_ROLES, user_has_role
+        if not user_has_role(user, ADMIN_ROLES):
+            raise ValidationError(
+                f"Only a super admin can override a settlement-reconciliation block ({_detail}).")
+    _did_override = bool(over_rows and _override
+                         and getattr(_dj, 'ENFORCE_SETTLEMENT_RECONCILIATION', False))
+    record_reconciliation_evidence(
+        settlement, adda,
+        override_reason=(_override if _did_override else ''),
+        overridden_by=(user if _did_override else None))
     return settlement
 
 
-def record_reconciliation_evidence(settlement, adda) -> int:
+def record_reconciliation_evidence(settlement, adda, *, override_reason='', overridden_by=None) -> int:
     """Persist append-only M-6 evidence (H2) for every stage where settled quantity
-    exceeds recorded output (the B-1 leak: paid > produced) + WARN-log it.
+    exceeds recorded output (the B-1 leak: paid > produced) + WARN-log it. S5: when a
+    super-admin overrode an ENFORCE_SETTLEMENT_RECONCILIATION block, the rows carry the
+    audited override_reason + overridden_by.
 
     H1: scoped to SETTLEMENT_WARN_FLAGS (over_allocated only) — no_output_qty /
     grouped_paid / unpriced_paid are different concerns and were noise. H2: the row
@@ -454,6 +489,7 @@ def record_reconciliation_evidence(settlement, adda) -> int:
             adda_settlement=settlement, stage_record=sr_by_code[r['stage']],
             flag=r['flag'], output_qty=r['output_qty'],
             allocated_qty=r['allocated_qty'], qty_delta=r['qty_delta'],
+            override_reason=override_reason, overridden_by=overridden_by,
         )
         for r in warn_rows if r['stage'] in sr_by_code
     ])

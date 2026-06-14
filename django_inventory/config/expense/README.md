@@ -88,6 +88,16 @@ only (H1 — `no_output_qty`/`grouped_paid`/`unpriced_paid` stay in `reconcile_p
 full report, not the settlement WARN — they were noise). Persisted, not log-scraped,
 so the soak's B-1 metric survives later corrections. WARN-only in S1.1; S5 → BLOCK.
 
+**M-6 BLOCK (S5):** when `ENFORCE_SETTLEMENT_RECONCILIATION` (default **False**=WARN) is on,
+`finalize` **refuses** an `over_allocated` stage (settled good > produced `cost_quantity_snapshot`)
+beyond `SETTLEMENT_RECONCILIATION_TOLERANCE` (abs pieces, default 0) — quantity-only (no
+rate/earning); pre-check rolls back the atomic finalize so nothing books. A **super-admin** may
+finalize anyway with `reconciliation_override=<reason>` (stamped append-only on
+`SettlementReconciliationEvidence.override_reason/overridden_by`, migration 0011). Actionable
+block diagnostics; super-admin override field on the settlement screen. Both this flag and
+`ENFORCE_ALLOCATION_BOUND` ship OFF + are enabled per the
+[enforcement rollout runbook](../../docs/ENFORCEMENT_ROLLOUT_RUNBOOK_2026_06_14.md).
+
 ### Why this design exists / what breaks if bypassed
 
 - **Why one writer per money table?** Paise ka hisaab tab hi bharosemand hai

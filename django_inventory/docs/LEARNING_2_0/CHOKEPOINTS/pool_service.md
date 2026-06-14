@@ -31,6 +31,10 @@ pool good via the stage HANDLER strategy. Writes NOTHING in expense.
   refuses if `Σ(good+alter+missing) > Σ active allocated` per REPORTED dimension (under-
   consume passes; unallocated reported dim fails). Gated by `ENFORCE_ALLOCATION_BOUND`
   (default False); pool-participant stages only; reads NO verified/settlement/rate/cost.
+- *Rollout safety (S5/S4-005):* `preview_bound_violations(adda=None)` (over_bound + unallocated
+  completions — the pre-flip audit, behind `preview_allocation_bound` mgmt command) +
+  `bound_soft_warning(task)` (non-blocking worker-report hint, works with the flag OFF). See the
+  [enforcement rollout runbook](../../ENFORCEMENT_ROLLOUT_RUNBOOK_2026_06_14.md).
 
 **Lock (D2):** `pg_advisory_xact_lock(_POOL_LOCK_CLASS=5375, objid(source_sr, color, size))` —
 TWO-INT advisory namespace, provably disjoint from settlement's single-bigint

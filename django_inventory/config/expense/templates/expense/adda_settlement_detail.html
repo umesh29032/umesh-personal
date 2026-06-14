@@ -181,6 +181,16 @@
                     onclick="return confirm('Finalize {{ s.reference }}? This books earnings and recoveries to the ledger.');">Finalize settlement</button>
             {% endif %}
         </div>
+        {% comment %} S5: super-admin audited override — only needed if finalize is BLOCKED by an
+        over-allocation (settled more than produced). Leave blank for a normal finalize. {% endcomment %}
+        {% if is_super_admin and workers %}
+        <div class="field" style="margin-top:14px;">
+            <label for="recon-override" style="font-size:.85rem;">Reconciliation override reason
+                <span style="color:var(--ink-soft,#6b6b6b);">(super-admin; required only if finalize is blocked by over-allocation)</span></label>
+            <textarea id="recon-override" name="reconciliation_override" rows="2" class="sf-input"
+                      placeholder="Why settle more than produced? (audited)"></textarea>
+        </div>
+        {% endif %}
     </form>
 
     {% else %}

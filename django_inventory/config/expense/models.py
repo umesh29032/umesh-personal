@@ -578,6 +578,13 @@ class SettlementReconciliationEvidence(TimeStampedModel):
     allocated_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     # output − allocated; negative = over-allocated (the leak). Null if no output qty.
     qty_delta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    # S5: when ENFORCE_SETTLEMENT_RECONCILIATION blocked this finalize and a super-admin
+    # overrode it, the audited reason + actor (append-only). Blank/null on a normal WARN row.
+    override_reason = models.TextField(blank=True)
+    overridden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         ordering = ['-created_at']

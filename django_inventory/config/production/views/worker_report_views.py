@@ -198,6 +198,11 @@ class WorkerReportView(LoginRequiredMixin, View):
                 messages.success(request, "Work report submitted — thank you!")
             else:
                 messages.success(request, "Draft saved. You can keep editing until you submit.")
+            # S5/S4-005: non-blocking over-allocation hint (works even with the hard bound off).
+            from production.services import bound_soft_warning
+            _warn = bound_soft_warning(task)
+            if _warn:
+                messages.warning(request, _warn)
         except ValidationError as exc:
             messages.error(request, '; '.join(exc.messages))
         except PermissionDenied:
