@@ -29,6 +29,28 @@ class CuttingHandler(StageHandler):
     # the (colour,size) breakup exist. Owner-locked 2026-06-14.
     pool_grain = ALLOC_DIM_COLOR_SIZE
 
+    # S4/D3 (Option B): Cutting's pool good is AddaProductSizeColorPieceBreakdown — the
+    # single source of truth (C1), NOT duplicated into StagePoolSnapshot.
+    def pool_good(self, stage_record) -> dict:
+        """{(color_id, size_id): Decimal} from the verified cut-piece breakdown
+        (APSCPB), never from StagePoolSnapshot. Empty if cutting not completed."""
+        from decimal import Decimal
+
+        from django.db.models import Sum
+
+        from production.models import AddaProductSizeColorPieceBreakdown as Breakdown
+        cr = getattr(stage_record, 'cutting', None)   # OneToOne reverse; None pre-complete
+        if cr is None:
+            return {}
+        rows = (Breakdown.objects.filter(cutting_record=cr)
+                .values('color_id', 'size_id').annotate(g=Sum('verified_piece_count')))
+        return {(r['color_id'], r['size_id']): Decimal(r['g']) for r in rows}
+
+    def materialize_pool(self, stage_record) -> int:
+        """No-op: APSCPB is materialised by cutting completion (_materialize_breakdown),
+        and is the single source of truth — cutting writes NO StagePoolSnapshot row."""
+        return 0
+
     def snapshot(self, adda):
         from production.services import get_cutting_snapshot
         return get_cutting_snapshot(adda)

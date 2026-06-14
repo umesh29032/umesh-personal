@@ -340,3 +340,46 @@ class RateCorrectionAudit(TimeStampedModel):
     def __str__(self):
         return (f'RateCorrection sr={self.stage_record_id} role={self.role_id} '
                 f'{self.old_rate}->{self.new_rate} by={self.actor_id}')
+
+
+class StagePoolSnapshot(TimeStampedModel):
+    """Frozen per-(colour,size) good a DOWNSTREAM pool-producing stage makes available
+    to allocate (Foundation S4 / D2-D3, Option B).
+
+    Owner-locked 2026-06-14: CUTTING does NOT get a row — its pool good is
+    `AddaProductSizeColorPieceBreakdown` (the single source of truth, C1/B), never
+    duplicated here. This table exists ONLY for downstream pool-producing stages that
+    lack an equivalent frozen artifact (e.g. a future stitching stage that self-reports).
+    The pool SOURCE is handler-dispatched (`handler.pool_good`); this model is the base
+    handler's source.
+
+    Immutable: `good` is materialized write-once at the producing stage's complete
+    (`handler.materialize_pool` → `pool_service`); reopen clears + refreezes. Only `good`
+    is stored — `available` (= good + recovered − Σ non-voided allocations) is DERIVED at
+    draw-down under the D2 advisory lock. `created_at` (TimeStampedModel) = materialized-at.
+    """
+    # CASCADE: a pool snapshot is meaningless without its stage record.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.CASCADE, related_name='pool_snapshots',
+    )
+    # Grain dims (NULL for a QUANTITY-grain stage). PROTECT mirrors WorkerStageContribution.
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    good = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        unique_together = [('stage_record', 'color', 'size')]
+        ordering = ['stage_record', 'color', 'size']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(good__gte=0),
+                name='prod_stagepoolsnapshot_good_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return f'pool sr={self.stage_record_id} c={self.color_id} s={self.size_id} good={self.good}'

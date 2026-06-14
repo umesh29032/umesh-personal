@@ -11,7 +11,8 @@ ke chalti rahein. App label + table names same hain → koi schema migration nah
 
 Subdomain map:
   core.py      → CostMethod, Product, Stage, WorkflowStage, WorkflowStageRoleRate,
-                 AddaStageRoleRate, RateCorrectionAudit
+                 AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions,
+                 StagePoolSnapshot
   adda.py      → Adda, AddaStageRecord  (polymorphic stage-execution parent)
   layering.py  → LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll
   cutting.py   → CuttingRecord, ProductPattern(+Assignment), CuttingPatternRecord(+Photo),
@@ -28,6 +29,7 @@ from .core import (
     WorkflowStageRoleRate,
     AddaStageRoleRate,
     RateCorrectionAudit,
+    StagePoolSnapshot,
 )
 from .adda import (
     Adda,
@@ -74,6 +76,7 @@ __all__ = [
     'WorkflowStageRoleRate',
     'AddaStageRoleRate',
     'RateCorrectionAudit',
+    'StagePoolSnapshot',
     'Adda',
     'AddaStageRecord',
     'LayeringRecord',

@@ -84,9 +84,15 @@ from .flow_service import (
     move_stage_in_product_flow,
     remove_stage_from_product_flow,
     set_stage_cost,
+    set_stage_grain,
 )
+from .pool_service import clear_stage_pool, materialize_stage_pool, pool_good
 
 __all__ = [
+    'set_stage_grain',
+    'pool_good',
+    'materialize_stage_pool',
+    'clear_stage_pool',
     'create_adda',
     'advance_to_next_stage',
     'create_product',

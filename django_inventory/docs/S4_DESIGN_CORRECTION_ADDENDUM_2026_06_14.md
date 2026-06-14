@@ -35,6 +35,21 @@ premise is **false**.
 - **No barcode migration.** Explicitly out of scope. If a true unification is ever wanted,
   it is a separate, independently-reviewed refactor — never a precondition for S4.
 
+### 🔒 C1 LOCK refinement 2026-06-14 (owner — Option B): APSCPB IS the Cutting pool source; no SPS row at Cutting.
+Discovered at Phase-2 build time: **Cutting writes ZERO `WorkerStageContribution`** (it is a
+manager workspace — bundles/breakup; roster via `set_stage_workers`, no `report_contributions`).
+Cutting's per-(color,size) good is **`AddaProductSizeColorPieceBreakdown.verified_piece_count`**
+(frozen at cutting-complete, cleared on reopen — already pool-snapshot-shaped). Therefore
+the original "SPS reads contribution good" was wrong at the pool's own origin.
+**Locked (B):** `AddaProductSizeColorPieceBreakdown` remains the **single source of truth**
+for Cutting output — it is **NOT** duplicated into `StagePoolSnapshot`. `StagePoolSnapshot`
+exists **only for downstream pool-producing stages** that lack an equivalent frozen artifact.
+APSCPB is **untouched** (no schema change, no migration); it merely gains a second read-
+consumer (barcode **+** the pool). Avoids two copies of Cutting truth → no APSCPB↔SPS drift.
+**Current-flow note:** layering/cutting_pattern/barcode = NONE, cutting = COLOR_SIZE → the
+current flow has a pool **source (cutting)** but **no consumer**; SPS materializes **no rows**
+today. The allocation foundation lands ahead of future piece-consuming stages (e.g. stitching).
+
 ---
 
 ## C2 — `WorkerStageAllocation` (WSA) as production-truth; relationship to `StageWorkAssignment` (SWA)
@@ -164,16 +179,20 @@ orthogonality below.)
   definable** — coarsening among piece-pool stages is summation; you never split a scalar
   back into colors (= invented data, the thing the foundation forbids).
 
-## D2 — `StagePoolSnapshot` lock predicate (the one M-3 discipline)
+## D2 — pool draw-down serialization  🔒 LOCKED 2026-06-14 (advisory lock)
 
 - **Keying.** `StagePoolSnapshot` is keyed `(stage_record, [color, size])` at the stage's
   grain (color/size NULL for `QUANTITY` stages).
-- **Lock predicate (THE rule):** the allocation draw-down locks the SPS row via
-  `select_for_update().get(stage_record_id=<in-memory id>, color=…, size=…)` — it locks the
-  **SPS row by its own key** and **NEVER locks `AddaStageRecord`.** The in-memory
-  `stage_record_id` is trusted (a stage record's identity is stable within a transaction; the
-  SPS row itself is the anchor). This is the addendum's option (a), explicitly **not** option
-  (b) "lock the stage record."
+- **🔒 Lock (THE rule, Option-B refinement):** the allocation draw-down serializes on a
+  **pg advisory lock keyed by `(source_stage_record_id, color_id, size_id)`** — NOT a row
+  lock, and **NEVER `AddaStageRecord`.** Rationale: under B the pool source at Cutting is
+  `AddaProductSizeColorPieceBreakdown` (immutable once frozen → read lock-free; no single
+  mutex row, since APSCPB is per size/color/**bundle**). An advisory lock keyed by the source
+  stage_record + dims serializes concurrent allocations against a dim uniformly, whether the
+  source is APSCPB or SPS. Uses a **distinct advisory `classid`** from settlement's xact lock
+  `5374` → the production-allocation and settlement lock domains share **no** lock object →
+  still disjoint, still no deadlock. Available is computed under the advisory lock by reading
+  the (immutable) source good and subtracting Σ non-voided allocations.
 - **Why this keeps the two domains disjoint (no deadlock):** the **settlement** domain locks
   `AddaSettlement → AddaStageRecord → WorkerProfile → WorkerAdvance`. The **production-
   allocation** domain locks `WorkerStageTask → AddaStageRoleRate → StagePoolSnapshot →
@@ -192,18 +211,24 @@ orthogonality below.)
   draw-down does not silently create it — allocation against an unmaterialized pool is an
   invariant violation surfaced (the producing stage must have completed + materialized first).
 
-## D3 — coarse-stage "good" source
+## D3 — pool "good" source  🔒 LOCKED 2026-06-14 (handler-dispatched)
 
-- **`StagePoolSnapshot.good` = `Σ WorkerStageContribution.good_quantity` at the producing
-  stage's grain**, materialized **write-once at that stage's complete** (immutable; reopen
-  clears + refreezes per the existing reopen discipline).
-  - `COLOR_SIZE` stage: `Σ good` grouped by `(color,size)`.
-  - `QUANTITY` stage: `Σ good` as a scalar.
-- **NOT `cost_quantity_snapshot`.** `cost_quantity_snapshot` is the **handler output** (e.g.
-  `CuttingRecord.pieces_cut`, lay count) = the standard-cost basis (ADR-0009) — a *different*
-  number from the workers' summed good. (Their divergence is exactly the B-1 reconciliation
-  signal: `cost_quantity_snapshot` vs `Σ good`.) The pool must use the **workers' good** (the
-  payable production truth), never the handler number.
+- **🔒 Source is per-stage, dispatched through the stage HANDLER — `handler.pool_good(
+  stage_record) → {(color,size): Decimal}`** — NO stage-name conditionals in the allocation
+  services (matches the open-closed handler-strategy architecture):
+  - **Cutting handler → `AddaProductSizeColorPieceBreakdown`** (`Σ verified_piece_count`
+    grouped by `(color,size)`). This is the locked single source of Cutting output (C1/B);
+    APSCPB is **not** duplicated into SPS.
+  - **Downstream pool-producing stages (base) → `StagePoolSnapshot.good`** (materialized
+    write-once at that stage's complete; immutable; reopen clears+refreezes). `COLOR_SIZE` →
+    grouped by `(color,size)`; `QUANTITY` → scalar.
+  - A future stage with its own frozen artifact overrides `pool_good` (extensible).
+- **NEVER `cost_quantity_snapshot`.** That is the **handler scalar** (`pieces_cut`, lay count)
+  = the standard-cost basis (ADR-0009) — a *different* number, and its divergence from the
+  pool good is exactly the B-1 reconciliation signal. APSCPB (`verified_piece_count`,
+  per-(color,size)) is finer + distinct from `cost_quantity_snapshot`; the pool uses APSCPB,
+  never the scalar. *(Where a stage genuinely self-reports — a future stitching-type stage —
+  its `pool_good` is `Σ WorkerStageContribution.good_quantity`, written via that stage's SPS.)*
 - **Pool composition (downstream).** The pool *available to allocate at* stage N is the
   **upstream** producing stage's good, aggregated to N's (never-finer, by D1) grain:
   `available(N, dims) = snapshot(N−1).good[dims] + recovered_alter(N−1, dims) − Σ non-voided

@@ -151,5 +151,49 @@ class StageHandler(ABC):
             ],
         }
 
+    # ── Piece-pool source (S4 / D2-D3, Option B) — handler-dispatched, no stage-name
+    # conditionals in the allocation services. Cutting OVERRIDES both (its pool source
+    # is AddaProductSizeColorPieceBreakdown, never duplicated into StagePoolSnapshot).
+    def pool_good(self, stage_record) -> dict:
+        """The frozen good this stage makes available to allocate downstream, as
+        ``{(color_id, size_id): Decimal}`` at the stage's grain. Base source =
+        StagePoolSnapshot (materialized at complete). Pool-only — no money/settlement."""
+        from django.db.models import Sum
+
+        from production.models import StagePoolSnapshot
+        rows = (StagePoolSnapshot.objects.filter(stage_record=stage_record)
+                .values('color_id', 'size_id').annotate(g=Sum('good')))
+        return {(r['color_id'], r['size_id']): r['g'] for r in rows}
+
+    def materialize_pool(self, stage_record) -> int:
+        """Write-once freeze of this stage's pool good into StagePoolSnapshot = Σ
+        WorkerStageContribution.good_quantity at the stage's grain. Only for non-NONE
+        grain; idempotent (skips if already materialised). Cutting overrides to a no-op
+        (APSCPB is its snapshot). Returns rows written. Caller is atomic."""
+        from django.db.models import Sum
+
+        from production.constants import ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE
+        from production.models import (
+            StagePoolSnapshot, WorkerStageContribution, WorkerStageTask,
+        )
+        dim = stage_record.workflow_stage.allocation_dimensions
+        if dim == ALLOC_DIM_NONE:
+            return 0   # not a piece-pool stage
+        if StagePoolSnapshot.objects.filter(stage_record=stage_record).exists():
+            return 0   # write-once (already materialised)
+        done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+        qs = WorkerStageContribution.objects.filter(
+            task__stage_record=stage_record, task__status__in=done)
+        if dim == ALLOC_DIM_COLOR_SIZE:
+            grouped = qs.values('color_id', 'size_id').annotate(g=Sum('good_quantity'))
+            rows = [StagePoolSnapshot(stage_record=stage_record, color_id=r['color_id'],
+                                      size_id=r['size_id'], good=r['g']) for r in grouped]
+        else:   # QUANTITY (scalar; dims NULL)
+            from decimal import Decimal
+            total = qs.aggregate(g=Sum('good_quantity'))['g'] or Decimal('0')
+            rows = [StagePoolSnapshot(stage_record=stage_record, color=None, size=None, good=total)]
+        StagePoolSnapshot.objects.bulk_create(rows)
+        return len(rows)
+
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<StageHandler {self.code!r}>"
