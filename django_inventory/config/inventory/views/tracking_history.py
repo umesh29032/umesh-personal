@@ -10,7 +10,9 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView
 
-from accounts.services import MANAGEMENT_ROLES, PRODUCTION_ROLES, user_has_role
+from accounts.services import (
+    MANAGEMENT_ROLES, PRODUCTION_ROLES, user_can_view_financials, user_has_role,
+)
 from production.models import Adda, WorkerStageTask
 from raw_materials.models import ClothRoll
 from tracking.models import AddaHistory, ClothRollHistory
@@ -62,7 +64,14 @@ class RollHistoryView(LoginRequiredMixin, _ProductionRoleMixin, TemplateView):
         roll = get_object_or_404(ClothRoll, pk=self.kwargs['roll_pk'])
         _require_roll_history_access(self.request.user, roll)
         ctx['roll'] = roll
-        ctx['events'] = ClothRollHistory.objects.filter(roll=roll).select_related('actor').order_by('-created_at')
+        events = ClothRollHistory.objects.filter(roll=roll).select_related('actor').order_by('-created_at')
+        # PA-03-1: supplier + cost_per_kg are FINANCIAL fields (view-gated to
+        # FINANCIAL_ROLES on the roll list/detail). Their CHANGE history exposes
+        # the same values, so drop those rows server-side for non-financial users
+        # — otherwise a worker/manager reads cost_per_kg via the audit timeline.
+        if not user_can_view_financials(self.request.user):
+            events = events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['events'] = events
         return ctx
 
 

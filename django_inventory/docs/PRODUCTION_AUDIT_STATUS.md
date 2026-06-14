@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 02 — Authentication Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 03 — RBAC Audit |
+| **Current phase** | PHASE 03 — RBAC Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 04 — Navigation Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-14 |
-| **Green test baseline** | **649 tests, all passing** (was 641; +8 Phase-02 regression tests) |
-| **Open blockers** | None (PA-02-OPEN-SIGNUP resolved: owner chose to disable native signup; done + verified) |
+| **Green test baseline** | **652 tests, all passing** (was 641; +11 audit regression tests) |
+| **Open blockers** | None (PA-03-WORKER-SKILL resolved: owner confirmed assignment-only gating is by-design → WONTFIX) |
 
 ---
 
@@ -27,8 +27,8 @@
 | # | Phase | Status | Notes |
 |---|-------|--------|-------|
 | 01 | System Mapping | ✅ COMPLETE | `docs/AUDIT_SYSTEM_MAP.md` written; 151 URLs / 151 views / 31 services / 36 forms / 109 templates mapped + nav/RBAC + infra. Map cross-validated vs actual `urls.py`. |
-| 02 | Authentication Audit | ✅ COMPLETE | 18 candidates → 8 fixed (incl. owner-approved signup disable), 5 documented-no-fix, 5 refuted. Code+browser+DB+live verified. 649 tests green. |
-| 03 | RBAC Audit | ⬜ PENDING | every role: access · visibility · restrictions · privilege escalation |
+| 02 | Authentication Audit | ✅ COMPLETE · commit `1dc05424` | 18 candidates → 8 fixed (incl. owner-approved signup disable), 5 documented-no-fix, 5 refuted. Code+browser+DB+live verified. 649 tests green. |
+| 03 | RBAC Audit | ✅ COMPLETE | Empirical URL×role matrix (7 principals × ~80 no-arg URLs) + adversarial code workflow. 1 real leak fixed (PA-03-1), 1 owner-decision, 2 documented defense-in-depth. URL-layer RBAC sound. 652 tests green. |
 | 04 | Navigation Audit | ⬜ PENDING | sidebar links · buttons · actions · redirects |
 | 05 | CRUD Audit | ⬜ PENDING | every module: C/R/U/D + DB persistence |
 | 06 | Master Data Audit | ⬜ PENDING | products · stages · roles · workers · addas · materials · suppliers · customers |
@@ -65,9 +65,14 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-02-NEXT (was [4]) | LOW | 02 | accounts/auth | 📋 DOC (intentional) | PasswordLoginView ignores `?next` (always → home). Deliberate anti-open-redirect; minor deep-link UX only. |
 | PA-02-403 (was [13]) | LOW | 02 | accounts/auth | 📋 DOC (intentional) | Denial UX inconsistent: managed URLs → 302 redirect+flash; unmanaged action URLs → bare 403. Both deny correctly. |
 | PA-02-TIMING (was [10]) | LOW | 02 | accounts/auth | 📋 DOC (impractical) | Timing side-channel on email existence (DB hit + email send). Not practically exploitable; message/redirect oracle (the real one) now closed by PA-02-1. |
+| PA-03-1 | MEDIUM | 03 | inventory/tracking-history | ✅ FIXED | Roll-history timeline leaked `supplier`/`cost_per_kg` change values to non-financial users (worker/manager) though roll list/detail hide them. Filtered server-side by `user_can_view_financials`. |
+| PA-03-WORKER-SKILL | MEDIUM | 03 | production/worker-report | ✅ WONTFIX (by-design) | `WorkerReportView` POST gates by manager ASSIGNMENT, not stage SKILL. Owner confirmed (2026-06-14) assignment-only is intended (manager authorizes by assigning; skill-gating would block untagged workers). Real lever for future = the assignment UI ("at least one assignee skilled" check). |
+| PA-03-2 (workflow [2]) | LOW | 03 | production/stage-actions | 📋 DOC (service holds) | Layering/Cutting action POST views lack `StageViewAccessMixin` (fail-fast), but the service layer (`_ensure_*_skill`) already raises PermissionDenied → write blocked. Defense-in-depth gap, not a bypass. |
+| PA-03-3 (workflow [4]) | LOW | 03 | production/layering | 📋 DOC (service holds) | `LayeringFullCreateAndAttachView` accepts financial POST params from a worker, but the service rejects them with PermissionDenied → no write. Defense-in-depth gap, not a bypass. |
 
 ### Issues fixed
-PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP — all with regression tests (649 green). Full reports below.
+Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
+Phase 03: PA-03-1 (financial-history leak). All with regression tests (652 green). Full reports below.
 
 ### Open blockers
 - None.
@@ -170,6 +175,44 @@ Plus: `core` (abstract base models, no tables), Django admin `/admin/`, allauth 
 
 ### Not bugs (refuted on re-verification)
 [11] SignupForm DOES call `validate_password` (forms.py:188). [15] OTP attempts feedback is correct. (Plus [3][4][10][13] documented above as intentional/not-exploitable.)
+
+---
+
+## PHASE 03 — RBAC AUDIT · RESULT
+
+**Scope:** URL access · sidebar visibility · view permissions · stage-panel permissions · financial-field visibility · multi-role (role+extra_roles) · super-admin bypass · privilege escalation · direct-URL bypass · hidden-action visibility · POST/action authorization · anonymous access · role=None containment. Every finding verified at 4 layers: **URL / UI-visibility / service-action / DB-impact** (a boundary holds only if all four agree).
+
+**Method:** (1) read the full RBAC stack (`permission_service`, `access_service`, `SidebarAccessMiddleware`, all view mixins). (2) Built an **empirical URL×role access matrix** — `manage.py shell` (rolled back), one user per principal {anon, role=None, worker, listing_team, accountant, manager, super_admin} × every no-arg URL (~80), recording GET status. (3) Adversarial code workflow (6 lenses → 4 findings → per-finding verify). (4) Independent re-verification of every finding against code + matrix.
+
+### Empirical matrix — KEY RESULTS (URL layer)
+- **No anonymous bypass:** every protected URL → 302 to login. **No role=None bypass:** role=None reaches only its empty personal dashboard + self-scoped my-earnings; all management/production/admin → 302/403/404.
+- **Admin surface super-only:** `user_list/add`, `skill_*`, `role_*`, `usertype_*`, `access-control`, `sidebar-access` → only super_admin 200; others 403 or middleware-redirect. **Django `/admin/` → staff/superuser only** (non-staff 302).
+- **Payroll/settlement** (`payroll-overview`, `adda-settlement-list`, `advance-add`) → management only (worker/accountant/listing 403).
+- **Storefront** (category/product) → listing_team only. **Financial costing** (`production:costing`) → management only (worker 403).
+- **Deliberate (verified vs mixin code, NOT bugs):** worker (PRODUCTION_ROLES) can reach `adda-create`, `cloth-type/color/storage-create`, `pending-reports`, `stalled-addas`, `tracking:export-list`. `ProductionRoleMixin` docstring: *"master CRUD ke liye sufficient hai"*; `SuperAdminOnlyMixin` reserves the irreversible `roll-bulk-create` for super-admin. Factory-floor users are trusted operators by design.
+- **No privilege escalation at URL layer:** user/role/skill edit forms (which expose `is_superuser`/`role`/`extra_roles`) are super-admin-only; `self_edit_blockers` prevents self-demotion/lockout.
+
+### BUG PA-03-1 — Financial field-change values leak via roll history
+- **Severity:** MEDIUM · **Module:** inventory/tracking-history · **URL:** `tracking:roll-history` · **Role:** worker, manager (non-financial) · **Device:** both
+- **4-layer verification:** URL → `RollHistoryView` reachable by PRODUCTION_ROLES + object isolation ✓. **UI-visibility → FAIL:** `roll_history.html` renders `{{ e.field_name }}: {{ e.old_value }} → {{ e.new_value }}` for every event, and `roll_service` logs `supplier`/`cost_per_kg` changes → a worker/manager sees cost values the roll list/detail correctly hide (`user_can_view_financials` = FINANCIAL_ROLES). service/DB → read-only.
+- **Root cause:** the financial-field view-gate (`user_can_view_financials`) was applied to the roll list/detail but not to the history timeline. `inventory/views/tracking_history.py`.
+- **Fix:** filter the events queryset server-side — `if not user_can_view_financials(user): events = events.exclude(field_name__in=('supplier','cost_per_kg'))`. Values never reach the client.
+- **Verification:** `FinancialHistoryLeakTests` (3): worker + manager don't see `123.45`/`cost_per_kg`; super_admin (financial) does. 652 tests green. (Note: AddaHistory checked — its COST_FROZEN metadata is NOT rendered, no leak there.)
+- **Status:** ✅ FIXED
+
+### OWNER DECISION — PA-03-WORKER-SKILL (workflow finding #1)
+- **Severity:** MEDIUM · **Module:** production/worker-report · **URL:** `production:worker-report` (POST)
+- **4-layer:** URL → unmanaged action URL, middleware passes. UI → form renders for the assigned user. **service-action → no SKILL gate** (`WorkerReportView` = `LoginRequiredMixin + View`; `save_draft_contributions`/`report_contributions` check task ownership/assignment, not skill). DB → `WorkerStageContribution` rows persist → flow to settlement.
+- **Finding:** an **assigned-but-unskilled** worker can submit production contributions. The stage workspace requires skill+assignment (`StageViewAccessMixin`); the report surface requires assignment only — by documented intent (view comment: *"skill alone is not enough — you report only on stages you are actively assigned to"*).
+- **Why not auto-fixed:** the report surface is deliberately ASSIGNMENT-gated (a manager authorizes by assigning). Adding a skill gate is a behavior change that would **block legitimately-assigned workers whose skill M2M isn't tagged** — real production-halt risk in a factory where skills may be sparsely populated. Exploitation needs a manager to deliberately assign an unskilled worker; quantities are management-reviewed before settlement (`AddaReportReviewView`). No privilege escalation / data exposure.
+- **Owner decision (2026-06-14): KEEP assignment-only gating → WONTFIX (by-design).** A manager authorizes by assigning; skill-gating the report path would block legitimately-assigned workers whose skill M2M isn't tagged (production-halt risk). The future lever, if ever desired, is the *assignment* UI — `LayeringStartView` currently only checks "at least one assignee has the skill", not all. No code changed.
+
+### Documented, not fixed (defense-in-depth gaps — service layer already blocks)
+- **PA-03-2:** Layering/Cutting action POST views (`_LayeringActionBase`, `_CuttingActionBase`) lack `StageViewAccessMixin` (no fail-fast at view), but `_ensure_layering_skill`/`_ensure_cutting_skill` in the service raise PermissionDenied → **write blocked**. Boundary holds at the service layer; adding the mixin is consistency hardening (carries the same skill/assignment interaction as PA-03-WORKER-SKILL).
+- **PA-03-3:** `LayeringFullCreateAndAttachView` accepts financial POST params from a worker, but the service rejects them (PermissionDenied) → no write. Same pattern: boundary holds at the service layer.
+
+### Financial-field write-path (verified SAFE)
+Cloth-roll `supplier`/`cost_per_kg`: forms **pop** the fields for non-financial users (`BulkRollForm`/`RollEditForm.__init__`), AND `update_roll_details` uses `if x is not None` (None = unchanged → no data loss) PLUS a service-level `user_can_edit_financials` re-check. Mass-assignment + data-loss both refuted — solid defense-in-depth.
 
 ---
 

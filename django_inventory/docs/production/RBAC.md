@@ -70,7 +70,21 @@ def bulk_create_rolls(user, *, supplier=None, cost_per_kg=None, **rest):
 {% endif %}
 ```
 
-All three layers must agree. Removing one creates a hole.
+### History/audit layer — strip financial CHANGE rows (Production Audit PA-03-1, 2026-06-14)
+
+The roll **history timeline** logs every field change, including `supplier` and
+`cost_per_kg` (old → new). Showing those rows to a non-financial user leaks the
+same values the list/detail hide. Filter them server-side in the view so the
+values never reach the client:
+
+```python
+# inventory/views/tracking_history.py — RollHistoryView.get_context_data
+events = ClothRollHistory.objects.filter(roll=roll).select_related('actor')...
+if not user_can_view_financials(self.request.user):
+    events = events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+```
+
+All four layers (form · service · template · history) must agree. Removing one creates a hole. Any NEW surface that renders a financial value or its audit trail must apply `user_can_view_financials` too.
 
 ## View-level gating — `RoleRequiredMixin`
 

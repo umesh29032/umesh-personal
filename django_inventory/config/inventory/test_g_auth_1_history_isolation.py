@@ -95,3 +95,58 @@ class HistoryIsolationTests(TestCase):
 
     def test_roll_super_admin_allowed(self):
         self.assertEqual(self._status(self.sa, self._roll_url()), 200)
+
+
+class FinancialHistoryLeakTests(TestCase):
+    """PA-03-1: supplier/cost_per_kg are financial fields (view-gated to
+    FINANCIAL_ROLES on the roll list/detail). Their CHANGE history must not leak
+    those values via the roll-history timeline to non-financial users who can
+    still reach the page (assigned worker, manager)."""
+
+    def setUp(self):
+        from raw_materials.services import update_roll_details
+        self.sa = _u('fh-sa@test', 'super_admin', is_super=True)   # management + financial
+        self.mgr = _u('fh-mgr@test', 'manager')                    # management, NOT financial
+        self.worker = _u('fh-w@test', 'worker')                    # assigned, NOT financial
+
+        product = Product.objects.create(code='FHL', name='FHL Prod')
+        stage, _ = Stage.objects.get_or_create(code='fhl_s', defaults={'name': 'FHL S'})
+        ws = WorkflowStage.objects.create(
+            product=product, stage=stage, order=1,
+            cost_rate=Decimal('3'), credits_workers=True)
+        self.adda = Adda.objects.create(
+            code='FHL-001', product=product, status=Adda.Status.IN_PROGRESS)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws, started_at=timezone.now())
+        set_stage_workers(self.sr, [self.worker.pk])
+
+        rolls = bulk_create_rolls(
+            user=self.sa, cloth_type=ClothType.objects.get(name='Cotton'),
+            storage_location=StorageLocation.objects.get(code='ROHINI'),
+            purchased_date=date.today(),
+            breakup=[{'color': ClothColor.objects.get(name='Red'), 'qty': 1}])
+        self.roll = rolls[0]
+        AddaHistory.objects.create(
+            adda=self.adda, change_type=AddaHistory.ChangeType.ROLL_ASSIGNED,
+            roll=self.roll, actor=self.mgr)
+        # super-admin (financial) sets a cost → creates a cost_per_kg history row
+        update_roll_details(user=self.sa, roll=self.roll, cost_per_kg=Decimal('123.45'))
+
+    def _html(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse('tracking:roll-history', args=[self.roll.pk])).content.decode()
+
+    def test_assigned_worker_does_not_see_cost_value(self):
+        html = self._html(self.worker)
+        self.assertNotIn('123.45', html)
+        self.assertNotIn('cost_per_kg', html)
+
+    def test_manager_does_not_see_cost_value(self):
+        html = self._html(self.mgr)
+        self.assertNotIn('123.45', html)
+        self.assertNotIn('cost_per_kg', html)
+
+    def test_super_admin_sees_cost_value(self):
+        # financial role → the cost change IS visible (proves the data exists and
+        # is only filtered for non-financial users, not globally hidden).
+        self.assertIn('123.45', self._html(self.sa))

@@ -186,6 +186,17 @@ Include `{% include 'accounts/_user_form_styles.html' %}` at end of `{% block ex
 | `.form-error` | Error text |
 | `.form-actions` | Sticky action bar (generic — see also `.sticky-actions`, `.sf-footer`) |
 
+## Multi-box input groups (OTP `.otp-row` / `.otp-digit`) — mobile rule
+
+Proven by the Phase-02 audit fix (PA-02-4). When a row holds many fixed-size
+boxes (the 6-digit OTP inputs: `.otp-row` of `.otp-digit`, optionally split by a
+decorative `.otp-sep`), the boxes must stay touch-usable on the smallest phones:
+
+- `.otp-digit` uses `flex: 1 1 0` so the boxes share the row width evenly.
+- At `@media (max-width: 480px)` shrink height/font (`height: 52px; font-size: 24px;`) — **keep this consistent across all OTP pages** (login `otp.html`, signup, reset). reset_otp.html was missing it; that was the bug.
+- At `@media (max-width: 360px)` **drop the decorative separator** (`.otp-sep { display: none; }`), tighten the gap (`.otp-row { gap: 4px; }`) and reduce card padding so each box reaches ~39–46px wide instead of ~30px. Decorative dividers are the first thing to sacrifice for touch width on narrow screens.
+- Target ≥44px touch width where the box count allows; document the residual if the count makes 44px impossible at 320px (6 boxes cannot, ~39px is the achievable floor — acceptable for single-char numeric input).
+
 ## Selects — fancy-select (automatic)
 
 Just write `<select>`. base.html JS auto-upgrades to custom dropdown that escapes iframe/transform/overflow clipping bugs.
