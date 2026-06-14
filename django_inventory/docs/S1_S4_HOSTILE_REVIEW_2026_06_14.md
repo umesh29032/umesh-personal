@@ -16,7 +16,11 @@ the live flow. **The foundation's core is verified correct.**
 
 ## MUST FIX (money-safety) — before S5
 
-### F1 🔴 CRITICAL — `rerate_stage_role` races `finalize` (S1-RACE-001 / S1-BOUNDARY-001)
+### F1 🔴 CRITICAL — `rerate_stage_role` races `finalize` (S1-RACE-001 / S1-BOUNDARY-001) — ✅ FIXED 2026-06-14
+**Fixed:** `rerate_stage_role` now acquires `pg_advisory_xact_lock(5374)` (the settlement
+`_REF_LOCK`, shared with finalize/reverse) FIRST, before the settled-check → serialized
+against finalize; the race window is closed. Lock-order docstrings updated (rerate joins the
+settlement serialization boundary). 47/47 + full suite green; golden ₹225 byte-identical.
 `rerate_stage_role`'s settled-check is an **unlocked** `.exists()` read
 (`stage_rate_service.py:145-149`); it then locks the WSC rows only at `:161`. A concurrent
 `finalize_adda_settlement` can write `settlement_line` (`adda_settlement_service.py:338-339`)

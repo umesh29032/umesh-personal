@@ -23,18 +23,29 @@ per stage — one role's completion locks only that role's rate row.
 S1.1 — rerate_stage_role(): super-admin override of the completion lock, bounded by
 SETTLEMENT instead (owner rate-correction requirement). Recalcs completed-but-
 unsettled expected_*, refuses once actively settled, writes an append-only
-RateCorrectionAudit (mandatory reason). Full lock order: task → AddaStageRoleRate →
-WorkerStageContribution (AddaStageRoleRate is the common gate; disjoint from the
-settlement lock domain → no deadlock).
+RateCorrectionAudit (mandatory reason). Lock order (F1, 2026-06-14): advisory 5374
+(the settlement serialization lock — shared with finalize/reverse) → AddaStageRoleRate
+row → WorkerStageContribution rows. Taking 5374 FIRST serializes rerate against finalize
+so the settled-check can't be overtaken; all three take 5374 first → no deadlock. (rerate
+DELIBERATELY joins the settlement boundary — it is not disjoint from it.)
 """
 import logging
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 logger = logging.getLogger('production')
+
+# F1 (hostile-review fix 2026-06-14): the SETTLEMENT serialization advisory lock,
+# shared verbatim with expense.adda_settlement_service._REF_LOCK (5374). This is a
+# DELIBERATE settlement-boundary choice — rerate is a settlement-boundary operation, so
+# it must serialize against finalize/reverse (which hold this same lock). It is NOT a
+# generic locking pattern for other services: only rerate / finalize / reverse take 5374,
+# and taking it here is what closes the rerate-vs-finalize race (the unguarded settled-
+# check could otherwise be overtaken by a concurrent finalize writing settlement_line).
+_SETTLEMENT_REF_LOCK = 5374
 
 
 def ensure_stage_role_rates(stage_record) -> int:
@@ -119,9 +130,11 @@ def rerate_stage_role(stage_record, role, new_rate, *, actor, reason):
     reflect the correction with NO per-worker manual edit. Writes an append-only
     RateCorrectionAudit row (mandatory `reason`) in the same transaction.
 
-    Lock order (M-3 global): AddaStageRoleRate row → WorkerStageContribution rows.
-    complete locks task → AddaStageRoleRate → WSC; this enters at AddaStageRoleRate
-    (no task lock) — AddaStageRoleRate is the common serialization gate, so no cycle.
+    Lock order (F1): pg advisory xact lock 5374 (the SETTLEMENT serialization lock,
+    shared with finalize/reverse) → AddaStageRoleRate row → WorkerStageContribution rows.
+    Taking 5374 FIRST serializes rerate against finalize/reverse — so the settled-check
+    below cannot be overtaken by a concurrent finalize writing settlement_line (the
+    rerate-vs-finalize race). All three operations acquire 5374 first → no deadlock.
     Returns (row, recalc_count).
     """
     from accounts.services import ADMIN_ROLES, user_has_role
@@ -137,7 +150,13 @@ def rerate_stage_role(stage_record, role, new_rate, *, actor, reason):
     if new_rate < 0:
         raise ValidationError("Rate cannot be negative.")
 
-    # Gate first (lock order): the rate row.
+    # F1: serialize against settlement (finalize/reverse hold this same lock) BEFORE the
+    # settled-check — closes the window where a concurrent finalize writes settlement_line
+    # between an unguarded check and the recalc. rerate is a settlement-boundary op.
+    with connection.cursor() as cur:
+        cur.execute('SELECT pg_advisory_xact_lock(%s)', [_SETTLEMENT_REF_LOCK])
+
+    # Gate (lock order): the rate row.
     row = (AddaStageRoleRate.objects.select_for_update()
            .get(stage_record=stage_record, role=role))
 

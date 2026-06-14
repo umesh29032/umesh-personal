@@ -25,14 +25,16 @@ Lock order (deadlock-free, global, mirrors create_settlement — §11.5):
   → AddaStageRecord rows (freeze the quantity inputs)
   → per-worker WorkerProfile → that worker's WorkerAdvance rows.
 
-Production-truth lock domain (S1.1, M-3 / addendum) — SEPARATE and DISJOINT from
-the settlement order above, so the two never deadlock:
+Production-truth lock domain (S1.1, M-3 / addendum):
   WorkerStageTask → AddaStageRoleRate → WorkerStageContribution
-  (worker_task_service.complete_worker_task and stage_rate_service.rerate_stage_role;
-  rerate enters at AddaStageRoleRate — the common gate — with no task lock).
-Finalize reads c.expected_rate (already frozen) and never locks AddaStageRoleRate or
-the task; complete/rerate never lock AddaSettlement/WorkerProfile/WorkerAdvance. The
-two domains touch no shared row → no cross-domain wait.
+  (worker_task_service.complete_worker_task — disjoint from the settlement order above;
+  it never locks AddaSettlement/WorkerProfile/WorkerAdvance, and finalize never locks the
+  task / AddaStageRoleRate → no cross-domain wait).
+F1 (2026-06-14): stage_rate_service.rerate_stage_role is the ONE production-side op that
+DELIBERATELY joins the settlement serialization — it takes the advisory lock 5374 FIRST
+(then AddaStageRoleRate → WSC), exactly as finalize/reverse do, because re-rating is a
+settlement-boundary correction that must not race a finalize. All three acquire 5374
+first → still no deadlock.
 """
 from __future__ import annotations
 
