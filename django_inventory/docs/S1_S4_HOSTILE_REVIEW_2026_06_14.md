@@ -54,7 +54,11 @@ group → **grouped member double-pay** (violates C-1). Verified.
 
 ## SHOULD FIX (cheap, correctness/robustness) — before S5
 
-### F3 🟡 MEDIUM — `void_allocation` resolves source before locking (S4-VOID-007)
+### F3 🟡 MEDIUM — `void_allocation` resolves source before locking (S4-VOID-007) — ✅ FIXED 2026-06-14
+**Fixed at the root:** `move_stage_in_product_flow` now refuses to reorder a flow while the
+product has any in-flight (non-completed/cancelled) Adda → `_upstream_pool_source` stays stable
+for an active Adda's lifetime, eliminating the void/allocate source-resolution window. Tests:
+reorder refused with in-flight Adda; allowed with none / only terminal Addas. Full suite green.
 `void_allocation` (`pool_service.py:284-286`) resolves `_upstream_pool_source` then acquires
 the advisory lock — a brief window vs a concurrent `move_stage_in_product_flow` reorder.
 - **Fix:** acquire the pool lock first (or resolve+lock atomically); cheap reorder of statements.

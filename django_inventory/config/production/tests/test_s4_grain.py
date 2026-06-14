@@ -15,7 +15,7 @@ from inventory.models import Role
 from production.constants import (
     ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE, ALLOC_DIM_QUANTITY, STAGE_CUTTING,
 )
-from production.models import CostMethod, Product, Stage, WorkflowStage
+from production.models import Adda, CostMethod, Product, Stage, WorkflowStage
 from production.services import flow_service
 
 
@@ -133,3 +133,33 @@ class OrthogonalityTests(TestCase):
         self.assertTrue(ws.credits_workers)                 # unchanged
         self.assertEqual(ws.cost_method, CostMethod.PER_PIECE)   # unchanged
         self.assertEqual(ws.cost_rate, Decimal('5'))            # unchanged
+
+
+class MoveStageInFlightGuardTests(TestCase):
+    """F3 (hostile-review fix): a product flow cannot be reordered while any Adda is
+    in-flight — the upstream pool source must stay stable for an active Adda's lifetime."""
+    def _two_stage_product(self):
+        mgr = _mgr('f3-mgr@test')
+        p = Product.objects.create(code='F3', name='F3')
+        a = WorkflowStage.objects.create(product=p, stage=_stage('f3a'), order=1, cost_rate=Decimal('1'))
+        b = WorkflowStage.objects.create(product=p, stage=_stage('f3b'), order=2, cost_rate=Decimal('1'))
+        return mgr, p, a, b
+
+    def test_reorder_allowed_without_inflight_adda(self):
+        mgr, p, a, b = self._two_stage_product()
+        flow_service.move_stage_in_product_flow(user=mgr, workflow_stage=b, direction='up')
+        b.refresh_from_db(); self.assertEqual(b.order, 1)
+
+    def test_reorder_refused_with_inflight_adda(self):
+        mgr, p, a, b = self._two_stage_product()
+        Adda.objects.create(code='F3-IP', product=p, status=Adda.Status.IN_PROGRESS)
+        with self.assertRaisesMessage(ValidationError, 'in progress'):
+            flow_service.move_stage_in_product_flow(user=mgr, workflow_stage=b, direction='up')
+        b.refresh_from_db(); self.assertEqual(b.order, 2)   # unchanged (rolled back)
+
+    def test_reorder_allowed_with_only_terminal_addas(self):
+        mgr, p, a, b = self._two_stage_product()
+        Adda.objects.create(code='F3-DONE', product=p, status=Adda.Status.COMPLETED)
+        Adda.objects.create(code='F3-CXL', product=p, status=Adda.Status.CANCELLED)
+        flow_service.move_stage_in_product_flow(user=mgr, workflow_stage=b, direction='up')
+        b.refresh_from_db(); self.assertEqual(b.order, 1)

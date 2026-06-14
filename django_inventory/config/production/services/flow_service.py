@@ -172,6 +172,18 @@ def move_stage_in_product_flow(*, user, workflow_stage: WorkflowStage, direction
         raise ValidationError(f"Invalid direction: {direction!r}")
 
     product = workflow_stage.product
+    # F3 (hostile-review fix 2026-06-14): never reorder a flow while an Adda is in-flight.
+    # Reordering changes stage `order` → changes pool_service._upstream_pool_source for an
+    # active Adda → the void/allocate source-resolution race (S4-VOID-007). The upstream
+    # pool source must stay STABLE for an active Adda's lifetime. Terminal Addas
+    # (completed/cancelled) don't constrain it.
+    if (Adda.objects.filter(product=product)
+            .exclude(status__in=(Adda.Status.COMPLETED, Adda.Status.CANCELLED))
+            .exists()):
+        raise ValidationError(
+            "Cannot reorder this product's flow while an Adda is in progress — the upstream "
+            "pool source must stay stable for the life of an active Adda. Complete or cancel "
+            "the in-flight Addas first.")
     if direction == 'up':
         neighbor = (
             WorkflowStage.objects
