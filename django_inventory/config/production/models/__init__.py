@@ -20,6 +20,7 @@ Subdomain map:
   barcode.py   → BarcodeGenerationRecord, LabelPrintQueue
 """
 from .core import (
+    AllocationDimensions,
     CostMethod,
     Product,
     Stage,
@@ -69,6 +70,7 @@ __all__ = [
     'Product',
     'Stage',
     'WorkflowStage',
+    'AllocationDimensions',
     'WorkflowStageRoleRate',
     'AddaStageRoleRate',
     'RateCorrectionAudit',

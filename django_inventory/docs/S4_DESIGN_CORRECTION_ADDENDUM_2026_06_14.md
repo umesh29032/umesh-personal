@@ -125,24 +125,44 @@ chokepoint; legacy rows grandfathered + audited, never back-invented.
 
 ---
 
-## D1 — `allocation_dimensions` + grain monotonicity
+## D1 — `allocation_dimensions` + grain monotonicity  🔒 LOCKED 2026-06-14 (owner)
 
-- **`allocation_dimensions`** = a per-`WorkflowStage` declaration, enum `{COLOR_SIZE,
-  QUANTITY}` (extensible). `COLOR_SIZE` → pool/allocation/contributions tracked per
-  `(color,size)`. `QUANTITY` → tracked as a single scalar (color/size NULL).
-- **Source + default.** Seeded from the stage's `handler.contribution_schema` (Cutting →
-  `COLOR_SIZE`; Layering/Barcode/Pattern → `QUANTITY`), **editable per-product** in the flow
-  editor (a product may legitimately track a stage finer or coarser). **Default = `QUANTITY`**
-  (the safe coarse grain) for any stage that doesn't declare.
-- **Grain monotonicity ("may only coarsen downstream").** Enforced at **flow-edit time**
-  (config, before any Adda runs — cheap, declarative). Rule: walking stages in `order`,
-  `grain(stage N)` must be **equal-or-coarser** than `grain(stage N−1)`. Concretely
-  `COLOR_SIZE → QUANTITY` is allowed (coarsen = aggregate); `QUANTITY → COLOR_SIZE` is
-  **rejected** (re-fining would require inventing per-color data). The flow editor refuses to
-  save a flow that violates this. Cutting (finest) must be ≥ every downstream stage.
-- **Why it matters:** monotonicity guarantees the pool composition (D3) is **always
-  definable** — coarsening is summation; you never need to split a scalar back into colors
-  (= invented data, the thing the whole foundation forbids).
+**Owner-locked business truth: the piece-pool starts at CUTTING.** Layering tracks cloth
+(rolls/layers/length) and Cutting Pattern is planning — **neither has piece quantities**;
+pieces first exist at Cutting. So Layering + Cutting Pattern are **pre-piece** and do **not**
+participate in `StagePoolSnapshot` or the allocation bound. (They still settle + pay — see
+orthogonality below.)
+
+- **`allocation_dimensions`** = a per-`WorkflowStage` declaration, **3-state** enum
+  `{NONE, QUANTITY, COLOR_SIZE}`. It governs **piece-pool behavior ONLY**:
+  - `NONE` — **not a piece-pool stage** (pre-piece / identity / planning). No SPS row, no
+    allocation bound. (Layering, Cutting Pattern, Barcode Generation.)
+  - `COLOR_SIZE` — piece-pool stage at `(color,size)` grain — the **pool source** (Cutting).
+  - `QUANTITY` — piece-pool stage at scalar grain (a future downstream piece stage, e.g.
+    stitching).
+- **🔒 Orthogonality (owner lock).** `allocation_dimensions` is **NOT** the source of truth
+  for settlement or costing. It defines **only** pool participation. The two other axes stay
+  independent and authoritative:
+  - **Settlement participation** = `WorkflowStage.credits_workers` (unchanged sole source).
+  - **Costing / earning unit** = `WorkflowStage.cost_method` (`fixed_cost`/`per_layer`/
+    `per_piece`/`per_bundle`, unchanged sole source).
+  - A `NONE` stage still settles (`credits_workers=True`) and pays by its `cost_method` (e.g.
+    Layering = NONE + settles + per_layer/fixed). No code path lets `allocation_dimensions`
+    gate settlement or costing.
+- **Source + default.** **Default = `NONE`** (a stage is not a piece-pool participant unless
+  declared — pool is the exception). Seeded from the stage **handler's `pool_grain`** class
+  attribute (Cutting → `COLOR_SIZE`; all others → `NONE`); per-product editable in the flow
+  editor (a future product may declare a downstream piece stage `QUANTITY`).
+- **Grain monotonicity ("may only coarsen downstream").** Enforced at **flow-edit time**.
+  Applies **only among non-`NONE` (piece-pool) stages**, in flow `order`: their grain must be
+  **non-increasing** — `COLOR_SIZE → QUANTITY` allowed (coarsen = aggregate); a later
+  piece-pool stage **finer** than an earlier one is **rejected** (re-fining = inventing
+  per-color data). `NONE` stages are skipped (the pre-piece Layering→Cutting "coarse→fine"
+  step is therefore NOT a violation — Layering isn't in the chain). Cutting, as the first
+  piece-pool stage, is the source (finest).
+- **Why it matters:** with pre-piece stages excluded, the pool composition (D3) is **always
+  definable** — coarsening among piece-pool stages is summation; you never split a scalar
+  back into colors (= invented data, the thing the foundation forbids).
 
 ## D2 — `StagePoolSnapshot` lock predicate (the one M-3 discipline)
 

@@ -19,6 +19,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+# Leaf constants module (no model import) — safe at handler load time.
+from production.constants import ALLOC_DIM_NONE
+
 
 @dataclass(frozen=True)
 class WorkerAllocation:
@@ -62,6 +65,10 @@ class StageHandler(ABC):
       template_partial path to the stage's panel partial
       required_skill  skill code gating the stage, or None (data-driven via
                       production.Stage.access_by_skill is preferred — see M3.1)
+      pool_grain      piece-pool grain this stage participates at (S4 / D1), one of
+                      ALLOC_DIM_{NONE,QUANTITY,COLOR_SIZE}. Default NONE = not a
+                      piece-pool stage. Seeds WorkflowStage.allocation_dimensions.
+                      POOL-ONLY — orthogonal to settlement + costing.
 
     Payability (does completing this stage credit workers?) is NOT a handler
     attribute — it lives on WorkflowStage.credits_workers (data). See cost/credit.
@@ -71,6 +78,9 @@ class StageHandler(ABC):
     name: str = ''
     template_partial: str = ''
     required_skill: str | None = None
+    # Piece-pool grain (S4/D1). NONE = pre-piece / not a pool stage. Cutting overrides
+    # to COLOR_SIZE (the pool source). Pool behaviour ONLY — not settlement/costing.
+    pool_grain: str = ALLOC_DIM_NONE
 
     @abstractmethod
     def snapshot(self, adda) -> dict:

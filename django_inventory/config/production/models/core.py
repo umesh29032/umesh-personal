@@ -8,6 +8,24 @@ from django.db import models
 
 # Shared bases — single source in core app (TimeStampedModel + ActiveManager).
 from core.models import ActiveManager, TimeStampedModel
+from production.constants import (
+    ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE, ALLOC_DIM_QUANTITY,
+)
+
+
+class AllocationDimensions(models.TextChoices):
+    """Piece-pool grain a WorkflowStage participates at (Foundation S4 / D1).
+
+    Governs PIECE-POOL behaviour ONLY — orthogonal to settlement
+    (WorkflowStage.credits_workers) and costing (WorkflowStage.cost_method). A NONE
+    stage still settles + pays; it just has no StagePoolSnapshot / allocation bound.
+    Owner-locked 2026-06-14: the piece-pool starts at CUTTING; pre-piece stages
+    (layering, cutting_pattern, barcode_generation) are NONE.
+    """
+
+    NONE = ALLOC_DIM_NONE, 'Not a piece-pool stage'
+    QUANTITY = ALLOC_DIM_QUANTITY, 'Quantity (scalar)'
+    COLOR_SIZE = ALLOC_DIM_COLOR_SIZE, 'Colour + Size'
 
 
 class CostMethod(models.TextChoices):
@@ -172,6 +190,15 @@ class WorkflowStage(TimeStampedModel):
     # Adda-stage snapshot will freeze/copy it (like cost_rate_snapshot), never
     # relocating this field.
     credits_workers = models.BooleanField(default=False)
+    # PIECE-POOL grain (S4 / D1). Governs ONLY whether this stage participates in
+    # StagePoolSnapshot + the allocation bound, and at what grain. ORTHOGONAL to
+    # settlement (credits_workers) and costing (cost_method) — a NONE stage still
+    # settles + pays per its cost_method. Default NONE = pool is opt-in (pool starts
+    # at cutting). Seeded from the stage handler's pool_grain; flow-editable.
+    allocation_dimensions = models.CharField(
+        max_length=16, choices=AllocationDimensions.choices,
+        default=AllocationDimensions.NONE,
+    )
 
     class Meta:
         # Same product mein 2 stages same order ya same stage na ho

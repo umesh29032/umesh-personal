@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from production.constants import STAGE_CUTTING
+from production.constants import ALLOC_DIM_COLOR_SIZE, STAGE_CUTTING
 from production.stages.base import CompletionResult, ReopenResult, StageHandler, register
 
 
@@ -25,6 +25,9 @@ class CuttingHandler(StageHandler):
     code = STAGE_CUTTING
     name = 'Cutting'
     template_partial = 'production/_stage_panel_cutting.html'
+    # S4/D1: Cutting is the piece-pool SOURCE — first stage where piece quantities +
+    # the (colour,size) breakup exist. Owner-locked 2026-06-14.
+    pool_grain = ALLOC_DIM_COLOR_SIZE
 
     def snapshot(self, adda):
         from production.services import get_cutting_snapshot

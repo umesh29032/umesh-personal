@@ -19,11 +19,57 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import F, Max
 
+from production.constants import (
+    ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE, ALLOC_DIM_QUANTITY,
+)
 from production.models import (
-    Adda, AddaStageRecord, CostMethod, Product, Stage, WorkflowStage,
+    Adda, AddaStageRecord, AllocationDimensions, CostMethod, Product, Stage,
+    WorkflowStage,
 )
 
 from ._shared import _ensure_can_manage
+
+# Piece-pool grain ranks (S4/D1). NONE is excluded — pre-piece stages do NOT
+# participate in the chain. Among PARTICIPANTS, finer = higher rank; grain may
+# only coarsen (non-increasing) downstream. POOL-ONLY — never gates settlement/cost.
+_GRAIN_RANK = {ALLOC_DIM_COLOR_SIZE: 2, ALLOC_DIM_QUANTITY: 1}
+
+
+def _validate_grain_monotonicity(product: Product) -> None:
+    """Refuse a flow where a piece-pool stage is FINER than an earlier piece-pool
+    stage (re-fining downstream = inventing per-colour data). Checks only non-NONE
+    (piece-pool) stages in flow order; NONE (pre-piece) stages are skipped — so the
+    legitimate layering(NONE)→cutting(COLOR_SIZE) step is not a violation. Cutting,
+    the first piece-pool stage, is the source (finest)."""
+    participants = [
+        ws for ws in WorkflowStage.objects.filter(product=product).order_by('order')
+        if ws.allocation_dimensions != ALLOC_DIM_NONE
+    ]
+    prev_rank = None
+    prev_label = None
+    for ws in participants:
+        rank = _GRAIN_RANK[ws.allocation_dimensions]
+        if prev_rank is not None and rank > prev_rank:
+            raise ValidationError(
+                f"'{ws.stage.name}' tracks a finer piece-pool grain "
+                f"({ws.get_allocation_dimensions_display()}) than the earlier "
+                f"'{prev_label}'. Piece-pool grain may only coarsen downstream — "
+                "it can never re-fine.")
+        prev_rank, prev_label = rank, ws.stage.name
+
+
+@transaction.atomic
+def set_stage_grain(*, user, workflow_stage: WorkflowStage, allocation_dimensions: str) -> WorkflowStage:
+    """Set a WorkflowStage's PIECE-POOL grain (S4/D1). POOL-ONLY — does not touch
+    settlement (credits_workers) or costing (cost_method). Validates monotonicity
+    across the product's flow (rolls back on violation)."""
+    _ensure_can_manage(user)
+    if allocation_dimensions not in AllocationDimensions.values:
+        raise ValidationError(f"Invalid allocation dimensions: {allocation_dimensions!r}")
+    workflow_stage.allocation_dimensions = allocation_dimensions
+    workflow_stage.save(update_fields=['allocation_dimensions', 'updated_at'])
+    _validate_grain_monotonicity(workflow_stage.product)
+    return workflow_stage
 
 
 @transaction.atomic
@@ -48,11 +94,23 @@ def add_stage_to_product_flow(*, user, product: Product, stage: Stage) -> Workfl
     # Seed the binding cost from the Stage library defaults (admin can edit
     # later via set_stage_cost). cost_rate stays NULL if no default seeded —
     # surfaced as an "unpriced" badge; freeze tolerates it (succeed-and-flag).
-    return WorkflowStage.objects.create(
+    # S4/D1: seed the piece-pool grain from the stage handler's pool_grain
+    # (data-driven; NONE if no handler registered). POOL-ONLY — independent of
+    # cost_method / credits_workers above.
+    from production.stages.base import registry
+    pool_grain = (
+        registry.get(stage.code).pool_grain
+        if registry.has(stage.code) else ALLOC_DIM_NONE
+    )
+    ws = WorkflowStage.objects.create(
         product=product, stage=stage, order=next_order,
         cost_method=stage.default_cost_method or CostMethod.PER_PIECE,
         cost_rate=stage.default_cost_rate,
+        allocation_dimensions=pool_grain,
     )
+    # A finer piece-pool stage appended after a coarser one is illegal (re-fining).
+    _validate_grain_monotonicity(product)
+    return ws
 
 
 @transaction.atomic
@@ -157,6 +215,9 @@ def move_stage_in_product_flow(*, user, workflow_stage: WorkflowStage, direction
             "This reorder would place a stage at or after the stage it is billed "
             "at. Ungroup the cost first, then reorder."
         )
+    # S4/D1: a reorder can place a finer piece-pool stage after a coarser one
+    # (re-fining). Re-validate; raising rolls back the atomic swap.
+    _validate_grain_monotonicity(product)
 
 
 def _validate_cost_grouping(ws: WorkflowStage, method: str, rate, billed_at) -> None:
