@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 03 — RBAC Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 04 — Navigation Audit |
+| **Current phase** | PHASE 04 — Navigation Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 05 — CRUD Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-14 |
-| **Green test baseline** | **652 tests, all passing** (was 641; +11 audit regression tests) |
-| **Open blockers** | None (PA-03-WORKER-SKILL resolved: owner confirmed assignment-only gating is by-design → WONTFIX) |
+| **Green test baseline** | **652 tests, all passing** |
+| **Open blockers** | None |
 
 ---
 
@@ -28,8 +28,8 @@
 |---|-------|--------|-------|
 | 01 | System Mapping | ✅ COMPLETE | `docs/AUDIT_SYSTEM_MAP.md` written; 151 URLs / 151 views / 31 services / 36 forms / 109 templates mapped + nav/RBAC + infra. Map cross-validated vs actual `urls.py`. |
 | 02 | Authentication Audit | ✅ COMPLETE · commit `1dc05424` | 18 candidates → 8 fixed (incl. owner-approved signup disable), 5 documented-no-fix, 5 refuted. Code+browser+DB+live verified. 649 tests green. |
-| 03 | RBAC Audit | ✅ COMPLETE | Empirical URL×role matrix (7 principals × ~80 no-arg URLs) + adversarial code workflow. 1 real leak fixed (PA-03-1), 1 owner-decision, 2 documented defense-in-depth. URL-layer RBAC sound. 652 tests green. |
-| 04 | Navigation Audit | ⬜ PENDING | sidebar links · buttons · actions · redirects |
+| 03 | RBAC Audit | ✅ COMPLETE · commit `0213aaa7` | Empirical URL×role matrix (7 principals × ~80 no-arg URLs) + adversarial code workflow. 1 real leak fixed (PA-03-1), 1 owner-decision (WONTFIX), 2 documented defense-in-depth. URL-layer RBAC sound. 652 tests green. |
+| 04 | Navigation Audit | ✅ COMPLETE | Static dead-link scan (all 390 url names; every template `{% url %}` + py `reverse/redirect` resolves) + adversarial workflow (redirect/cancel/breadcrumb/loop/orphan) + browser mobile-nav. 1 dead-link fixed (PA-04-1, dormant template). Nav integrity clean. 652 green. |
 | 05 | CRUD Audit | ⬜ PENDING | every module: C/R/U/D + DB persistence |
 | 06 | Master Data Audit | ⬜ PENDING | products · stages · roles · workers · addas · materials · suppliers · customers |
 | 07 | Stage Engine Audit | ⬜ PENDING | layering · cutting_pattern · cutting · barcode: create/assign/complete/reopen/settlement-impact |
@@ -69,6 +69,7 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-03-WORKER-SKILL | MEDIUM | 03 | production/worker-report | ✅ WONTFIX (by-design) | `WorkerReportView` POST gates by manager ASSIGNMENT, not stage SKILL. Owner confirmed (2026-06-14) assignment-only is intended (manager authorizes by assigning; skill-gating would block untagged workers). Real lever for future = the assignment UI ("at least one assignee skilled" check). |
 | PA-03-2 (workflow [2]) | LOW | 03 | production/stage-actions | 📋 DOC (service holds) | Layering/Cutting action POST views lack `StageViewAccessMixin` (fail-fast), but the service layer (`_ensure_*_skill`) already raises PermissionDenied → write blocked. Defense-in-depth gap, not a bypass. |
 | PA-03-3 (workflow [4]) | LOW | 03 | production/layering | 📋 DOC (service holds) | `LayeringFullCreateAndAttachView` accepts financial POST params from a worker, but the service rejects them with PermissionDenied → no write. Defense-in-depth gap, not a bypass. |
+| PA-04-1 | LOW | 04 | accounts/templates | ✅ FIXED | Dormant `signup_otp.html` had 2 broken `{% url %}` (`accounts:signup`, `accounts:signup_resend_otp` — removed in Phase 02). Unreachable (no route) so no live 500, but a dead-link landmine. Repointed to `accounts:login`. |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
@@ -213,6 +214,34 @@ Plus: `core` (abstract base models, no tables), Django admin `/admin/`, allauth 
 
 ### Financial-field write-path (verified SAFE)
 Cloth-roll `supplier`/`cost_per_kg`: forms **pop** the fields for non-financial users (`BulkRollForm`/`RollEditForm.__init__`), AND `update_roll_details` uses `if x is not None` (None = unchanged → no data loss) PLUS a service-level `user_can_edit_financials` re-check. Mass-assignment + data-loss both refuted — solid defense-in-depth.
+
+---
+
+## PHASE 04 — NAVIGATION AUDIT · RESULT
+
+**Scope:** every sidebar item · dashboard card · action button · breadcrumb · redirect · cancel/back · success/error redirect · CTA · modal action · row-action · cross-module path. 12 requirements incl. dead links, orphans, back/forward, loops, mobile nav, hidden-action-via-direct-URL, breadcrumb-hierarchy.
+
+**Method:** (1) **Static dead-link scan** — extracted every `{% url 'name' %}` from all 116 templates + every `reverse/reverse_lazy/redirect('name')` from all app `.py`, checked each against the 390 resolver-registered names. (2) Adversarial workflow (6 lenses: redirect-targets, cancel/back/CTA, breadcrumbs, loops/orphans, mobile-nav). (3) Browser testing (headless Chromium, super-admin) of mobile nav + live navigation.
+
+### Static dead-link result — CLEAN
+- **390** url names registered. **121** distinct template `{% url %}` names + **63** py `reverse/redirect` names checked. **Every reachable reference resolves.** Only broken refs were the **dormant signup cluster** (unrouted since Phase 02) — `signup_otp.html` (fixed, PA-04-1) + internal `reverse()` calls inside the 3 unrouted signup view classes (never execute; restore-on-re-enable). `accounts:<name>` flagged = a docstring placeholder (false positive). Post-fix re-scan: **0 broken template refs.**
+- 8 variable `{% url var %}` tags (sidebar/menu) aren't statically checkable; covered by `build_menu_for`'s own `resolved_url() is None → skip` guard + the Phase-03 matrix (all sidebar URLs resolved + RBAC-correct).
+
+### Adversarial workflow — only the 2 dormant signup links (PA-04-1); 4 other lenses CLEAN
+- **Redirect targets:** no broken/wrong/looping redirects found. **Cancel/back/CTA:** clean (except dead signup). **Breadcrumbs:** none found to mismatch. **Loops:** `SidebarAccessMiddleware` exempts the dashboards (`_EXEMPT_URL_NAMES`) + re-checks the referer before redirecting to it → no redirect loop. **Orphans:** none flagged as wrongly-unlinked (detail/edit reached via row-actions = intentional).
+
+### Browser — mobile nav + navigation (PASS)
+- Mobile drawer (375px): `.sidebar` off-canvas (left:-260) + `.hamburger` toggle → opens (left:0) with `.overlay`; **26 nav items reachable**; overlay-click closes (left:-260). No horizontal overflow at **320 / 414** on `/production/`, `/production/addas/`, `/raw-materials/`, `/expense/payroll/`, `/app/users/`.
+- Live: sidebar link (Addas) → `/production/addas/`; browser **back** returns correctly.
+
+### BUG PA-04-1 — Dead `{% url %}` in dormant signup OTP template
+- **Severity:** LOW (unreachable; latent) · **Module:** accounts/templates · **File:** `accounts/templates/accounts/signup_otp.html:74,107`
+- **Detail:** back-link → `{% url 'accounts:signup' %}` and resend-link → `{% url 'accounts:signup_resend_otp' %}` — both routes removed in Phase 02 (PA-02-OPEN-SIGNUP). Would `NoReverseMatch` (500) **if** the template rendered, but it's unrouted + not `{% include %}`d anywhere → unreachable today.
+- **Fix:** repointed both to `{% url 'accounts:login' %}` + a comment noting the re-enable restoration targets. Keeps the dormant cluster reversible without a render-time landmine.
+- **Verification:** static scan re-run → 0 broken template refs; 652 tests green (incl. `test_signup_url_names_are_not_reversible`).
+- **Status:** ✅ FIXED
+
+**No other navigation issues found.** Nav integrity (links, redirects, mobile, loops, orphans) is clean.
 
 ---
 

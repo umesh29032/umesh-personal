@@ -71,7 +71,10 @@
 <div class="card">
     <div class="card-accent"></div>
     <div class="card-body">
-        <a href="{% url 'accounts:signup' %}" class="back-link">
+        {# PA-04: native signup is disabled (PA-02-OPEN-SIGNUP) — this template is
+           unrouted/dormant. Links point to login so they never 500 on render.
+           If signup is re-enabled, restore: back→accounts:signup, resend→accounts:signup_resend_otp. #}
+        <a href="{% url 'accounts:login' %}" class="back-link">
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5l-5 5 5 5"/></svg>
             Back
         </a>
@@ -104,7 +107,7 @@
 
         <div class="resend-area">
             <p class="timer-text" id="timerText">Resend code in <strong id="countdown">60</strong>s</p>
-            <a href="{% url 'accounts:signup_resend_otp' %}" class="resend-link" id="resendLink">↺ Resend Code</a>
+            <a href="{% url 'accounts:login' %}" class="resend-link" id="resendLink">↺ Resend Code</a>
         </div>
     </div>
 </div>
