@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 05B — Operational CRUD ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 06 — Master Data Audit |
+| **Current phase** | PHASE 06 — Master Data Integrity/Config/Seed/Drift ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 07 — Stage Engine Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **663 tests, all passing** (was 641; +22 audit regression tests) |
-| **Open blockers** | None (storefront validation gaps PA-05A-SF1..4 still documented for a small follow-up) |
+| **Green test baseline** | **671 tests, all passing** (was 641; +30 audit regression tests) |
+| **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
 
@@ -32,7 +32,7 @@
 | 04 | Navigation Audit | ✅ COMPLETE · commit `0637337a` | Static dead-link scan (all 390 url names; every template `{% url %}` + py `reverse/redirect` resolves) + adversarial workflow (redirect/cancel/breadcrumb/loop/orphan) + browser mobile-nav. 1 dead-link fixed (PA-04-1, dormant template). Nav integrity clean. 652 green. |
 | 05A | CRUD Audit — Master Data | ✅ COMPLETE · commit `9be49e17` | Behavioral C/R/U/D probes (real DB writes, rolled back) on 7 surfaces + delete-in-use probes + adversarial workflow (21 candidates). 5 fixed, 5 refuted, 4 storefront gaps documented. Mobile CRUD PASS. 660 green. |
 | 05B | CRUD Audit — Operational | ✅ COMPLETE · commit `15371a08` | Adversarial workflow (38 candidates, 6 money/qty/inventory flows) + code-level verification + live mobile worker-report test. 2 fixed (finalize crash, breakup atomic); rest refuted/documented (money writes are service-locked+atomic+tested). 663 green. |
-| 06 | Master Data Audit | ⬜ PENDING | products · stages · roles · workers · addas · materials · suppliers · customers |
+| 06 | Master Data — Integrity / Config / Seed / **Drift** | ✅ COMPLETE | Refined scope (a–e incl. owner-added Configuration Drift Audit). Adversarial workflow (16 candidates: DB-integrity/seed/flow-config/WorkerProfile/config-drift) + live DB drift probes + constraint-enforcement probes. 2 fixed (WorkerProfile validation); rest documented/refuted. Constraints enforced; reconcile_denorm clean; no drift on real products. 671 green. |
 | 07 | Stage Engine Audit | ⬜ PENDING | layering · cutting_pattern · cutting · barcode: create/assign/complete/reopen/settlement-impact |
 | 08 | Raw Material Audit | ⬜ PENDING | cloth roll: inbound · stock · consumption · adjustments |
 | 09 | Inventory Audit | ⬜ PENDING | |
@@ -85,13 +85,21 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-05B-ADV | — | 05B | expense/advance | 📋 DOC (not a bug) | "Duplicate advance on refresh / no dedup / no reverse": PRG is present (FormView redirects); duplicate advances are LEGITIMATE (same worker can get ₹500 twice) so dedup would be wrong; "reverse advance" is a missing FEATURE, not a defect (recovery happens at settlement) — not built per no-feature rule. |
 | PA-05B-RACE | LOW | 05B | production/expense | 📋 DOC | `report_contributions`/`save_draft`/`assign_roll_to_adda` check status without `select_for_update` → a true concurrent double-submit (same single user) could race. Mitigated by `@transaction.atomic` + status guards; single-actor surfaces; low likelihood. Not touching the locked foundation services for a theoretical race. |
 | PA-05B-FND | — | 05B | production/expense | 📋 DOC (foundation-covered) | Allocation "CSRF/idempotency/double-credit/authz": CSRF is global middleware; over-allocation is refused always-on (S4); `LEDGER_CREDIT_AT_ALLOCATION=False` (no money at allocation); service permission-checks. AJAX draft `204` is correct (not a PRG page). reopen view-authz → service guards (= PA-03-2 class). |
+| PA-06-1 | HIGH | 06 | expense/WorkerProfile | ✅ FIXED | `opening_advance` (seeds Advance Outstanding = money) had no validator/constraint → negative accepted, corrupting recovery math. Form `min_value=0` (mirrors AdvanceForm). |
+| PA-06-2 | MEDIUM | 06 | expense/WorkerProfile | ✅ FIXED | bank_ifsc / bank_account_number / cross-field had no validation → malformed payout details savable. Blank-tolerant IFSC format + numeric account + "account⇒require IFSC+name" clean. |
+| PA-06-DRIFT-OVERALLOC | MEDIUM | 06 | expense/reconciliation | 📋 DOC (known, not mutated) | `3-PATTI-001` cutting: 120 allocated vs 105 produced (over_allocated). KNOWN pre-foundation dev data; `reconcile_pay` detects it (tooling works); S4/S5 prevents new ones (flags off pending soak). NOT mutated — voiding it would hide bug evidence (per cleanup rule). Remediation = enable enforcement flags post-soak OR void the 15-pc delta. |
+| PA-06-SEED | LOW | 06 | accounts/sidebar | 📋 DOC | 6 SIDEBAR code items have no SidebarItemRule row → fall back to in-code predicates (functionally correct, never silently hidden). Only 4/6 fit the role-rule model (my-earnings is ungated, pattern-list is perm-gated). Governance nicety, not a functional bug. Optional: seed the 4 role-gated rows. |
+| PA-06-TESTDATA | LOW | 06 | dev DB | 📋 DOC (dev-data) | Stray test products (CROSS-TEST, TEST-VERIFY, TEST-86f27f0a) with handler-less stages (cross_cutting, verify, verify-86f27f0a) — leaked test fixtures in the dev DB. No production-code impact (real products all have handlers). Recommend dev-DB cleanup. |
+| PA-06-FLOW | LOW | 06 | production/flow_service | 📋 DOC (propose, defer) | `add_stage_to_product_flow` doesn't verify the stage has a registered handler → a handler-less stage can be configured (a flow dead-end). Mitigated: worker-report fails **gracefully** (403 "No handler registered", no crash). Smallest fix = `registry.has(stage.code)` guard — DEFERRED (documented-future TM-1 manual stages may legitimately lack a handler; owner call). |
+| PA-06-WP-UPI | LOW | 06 | expense/WorkerProfile | 📋 DOC | `upi_id` has no format validation. Left unvalidated (UPI handle format varies; strict regex risks false-positives) — documented as data-quality. |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
 Phase 03: PA-03-1 (financial-history leak).
 Phase 04: PA-04-1 (dead signup links).
 Phase 05A: PA-05A-1..5 (Skill delete guard, Role extra-role guard, Role messages, pattern int-parse, UserCreate IntegrityError).
-Phase 05B: PA-05B-1 (settlement finalize int-parse crash), PA-05B-2 (cutting breakup atomic). All with regression tests (663 green). Full reports below.
+Phase 05B: PA-05B-1 (settlement finalize int-parse crash), PA-05B-2 (cutting breakup atomic).
+Phase 06: PA-06-1 (WorkerProfile opening_advance ≥ 0), PA-06-2 (WorkerProfile bank-detail validation). All with regression tests (671 green). Full reports below.
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -326,6 +334,32 @@ Logged in as the assigned worker, opened `production:worker-report` (live task o
 - **PA-05B-FND** allocation CSRF (global middleware) / over-allocation (refused always-on) / double-credit (`LEDGER_CREDIT_AT_ALLOCATION=False`) / AJAX `204` (correct for auto-save) / reopen view-authz (service guards) — all already covered.
 
 **UI_COMPONENTS.md:** no change — both fixes are backend (input parsing, transaction wrapping); no reusable UI rule emerged. The worker-report mobile pattern is exemplary but is existing behavior already covered by the form-shell pattern.
+
+---
+
+## PHASE 06 — MASTER DATA: INTEGRITY / CONFIG / SEED / DRIFT · RESULT
+
+**Boundary (approved):** NOT a re-audit of 05A CRUD or 05B operational flows. Five sub-areas: (a) DB integrity at rest, (b) seed correctness, (c) per-product flow config, (d) WorkerProfile master data, (e) **Configuration Drift Audit** (owner-added) — DB-valid-but-architecture-violating configs. Supplier/Customer = no models (out of scope).
+
+**Method:** adversarial workflow (5 lenses → 16 candidates → verify) + my own live DB drift probes (dumped every WorkflowStage vs architecture invariants) + constraint-enforcement probes + ran `reconcile_denorm`/`reconcile_pay`.
+
+### Verified SOUND
+- **Constraints enforced:** CheckConstraint blocks negative `cost_rate` (IntegrityError); FK PROTECT holds (05A delete-in-use probes). **`reconcile_denorm`: ✓ clean** (denormalized counters match source).
+- **No config drift on REAL products:** every real `WorkflowStage` satisfies the invariants — registered handler, valid `allocation_dimensions`, pre-piece stages (layering/cutting_pattern/barcode_generation)=NONE, valid/empty `cost_method`, `cost_rate ≥ 0`, unique (product, order).
+- **`cost_method=''` on layering = INTENTIONAL** (not drift): migration 0026 sets it; rows are `credits=False`, `cost_billed_at=cutting` (layering cost billed at cutting); `cost_service` handles empty method (`if not method or rate is None`). Refuted.
+
+### Fixed (2) — WorkerProfile master-data validation (form-level, no migration)
+- **PA-06-1 (HIGH):** `opening_advance` (seeds Advance Outstanding = money) accepted negative → corrupts recovery math. Form `min_value=0`. Tests: `WorkerProfileFormValidationTests`.
+- **PA-06-2 (MEDIUM):** bank IFSC/account/cross-field unvalidated → malformed payout details savable. Blank-tolerant IFSC regex (normalized upper), numeric account (9–18), "account ⇒ require IFSC + name" clean. (Updated 1 existing test that used invalid placeholder bank data.)
+
+### Configuration Drift Audit (e) — findings
+- **Over-allocation `3-PATTI-001`** (120 allocated vs 105 produced): real drift, but KNOWN pre-foundation dev data; `reconcile_pay` correctly flags it; S4/S5 foundation prevents new ones (enforcement flags off pending soak). **Not mutated** (voiding it would hide bug evidence). Remediation path documented.
+- **Stray test data:** 3 test products with handler-less stages (dev-DB cruft, no production impact) → recommend cleanup.
+- **Flow editor** allows configuring a handler-less stage → graceful 403 at report-time (no crash). Guard proposed but DEFERRED (TM-1 manual-stage tension).
+- **6 sidebar items unseeded** → functionally-correct in-code fallback; only 4/6 fit the role-rule model → governance nicety, documented.
+
+### UI_COMPONENTS.md
+No change — both fixes are backend form validation; no reusable UI rule emerged.
 
 ---
 

@@ -156,6 +156,12 @@ block diagnostics; super-admin override field on the settlement screen. Both thi
 CASH payment · `/advances/add/` · `/expense/settlements/…` the settlement
 queue/detail/actions. All money POSTs: management-gated + confirm dialogs.
 
+**WorkerProfileForm validation (Production Audit PA-06):** `opening_advance` is
+money (seeds Advance Outstanding) → `min_value=0` (never negative). Bank payout
+details are format-validated, blank-tolerant: IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`
+(normalized upper), account number 9–18 digits, and an account number requires
+both an IFSC and an account-holder name (no half-entered payout details).
+
 ## Common mistakes (developers: DO NOT)
 
 1. Never `WorkerLedgerEntry.objects.create(...)` outside ledger_service.
