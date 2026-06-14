@@ -8,7 +8,7 @@
 |---|---|---|
 | `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; TM-1 field aayega yahin). AddaStageRoleRate = frozen resolved payable rate (S1/S2). RateCorrectionAudit = append-only re-rate audit (S1.1) |
 | `adda.py` | Adda, AddaStageRecord (+ pending_report_workers helper) | SR = stage ka polymorphic parent; processing_cost frozen (honest-NULL) |
-| `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK |
+| `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK. **S3: good/alter/missing columns (good NOT NULL = payable; alter/missing immutable observations); reported dual-written = good (renamed-not-dropped @S6); constraint wsc_gam_nonneg_sum_positive** |
 | `layering.py` | LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll | per-roll verify + MANDATORY leftovers (G1 ke facts) |
 | `cutting.py` | CuttingRecord, ProductSize, PatternVerification, PieceBreakup, Bundle(+items), ProductPattern | cutting = first real quantities; breakup = expected denominators |
 | `barcode.py` | BarcodeGenerationRecord | archetype-E stage record |

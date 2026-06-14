@@ -156,9 +156,14 @@ def report_contributions(task, lines, *, actor):
         qty = Decimal(str(line['reported_quantity']))
         if qty <= 0:
             raise ValidationError("reported_quantity must be greater than 0.")
+        # Foundation S3 (RC-3 dual-write): the worker UI submits ONE quantity = the
+        # payable good. good_quantity is the truth; reported_quantity is dual-written
+        # equal (legacy column, kept valid through S3→S5, renamed-not-dropped at S6).
+        # alter/missing default 0 — the future Missing/Alter modules set them.
         created.append(WorkerStageContribution.objects.create(
             task=task,
             reported_quantity=qty,
+            good_quantity=qty,
             color_id=line.get('color_id'),
             size_id=line.get('size_id'),
             bundle_item_id=line.get('bundle_item_id'),
@@ -247,7 +252,9 @@ def complete_worker_task(task, *, actor):
             task.stage_record_id, getattr(role, 'pk', None), task.pk)
     for c in task.contributions.all():
         c.expected_rate = rate
-        c.expected_earning = (c.reported_quantity * rate).quantize(
+        # S3: visibility earning is on the PAYABLE good (good == reported in the thin
+        # slice; diverges once Missing/Alter ship). Settlement pays good via the resolver.
+        c.expected_earning = (c.good_quantity * rate).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP)
         c.role_snapshot = role
         c.save(update_fields=['expected_rate', 'expected_earning',

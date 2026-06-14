@@ -97,7 +97,8 @@ def _display_lines(task, schema):
             else:
                 cells.append({'kind': 'quantity', 'key': f['key'], 'value': raw,
                               'unit': f.get('unit', '')})
-        out.append({'cells': cells, 'quantity': c.reported_quantity})
+        # S3: display the payable-good qty (good == reported in the thin slice).
+        out.append({'cells': cells, 'quantity': c.good_quantity})
     return out
 
 

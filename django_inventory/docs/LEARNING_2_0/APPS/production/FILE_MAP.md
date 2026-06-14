@@ -17,6 +17,9 @@ FILE_MAP: every important file in this app and how they connect.
 - `worker_task.py` — **WorkerStageTask** (WHO; partial-unique active per
  sr+worker), **WorkerStageContribution** (WHAT; reported immutable, verified
  correction, frozen expected_*, `settlement_line` provenance). THE production truth.
+ **S3: `good_quantity` (NOT NULL, payable — settlement pays this) + `alter_quantity`/
+ `missing_quantity` (immutable observations, default 0). `reported_quantity` dual-written
+ = good (renamed-not-dropped @S6). Constraint `wsc_gam_nonneg_sum_positive` (each≥0 ∧ sum>0).**
 - `layering.py` — LayeringRecord, LayeringRollEntry (per-roll verify),
  RemainingClothOfClothRoll (leftover + weight, mandatory at complete).
 - `cutting.py` — CuttingRecord, ProductSize, CuttingPatternVerification,

@@ -140,7 +140,18 @@ class WorkerStageContribution(TimeStampedModel):
         null=True, blank=True, related_name='+',
     )
     # Worker-entered; LOCKED after submit. Corrections go to verified_quantity.
+    # Foundation S3: LEGACY claim column — kept + dual-written (= good_quantity) through
+    # S3→S5 for legacy reads; renamed-not-dropped at S6 (one-way, soak-gated).
     reported_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    # Foundation S3 (good/alter/missing): production-truth split at the stage's grain.
+    # good_quantity = the PAYABLE-good count (what settlement pays — settlement_resolver).
+    # alter/missing = immutable COUNT OBSERVATIONS (same-stage/grain/Adda netting only,
+    # addendum M-7). Thin slice: good = the one quantity the worker submits, alter=missing=0;
+    # they diverge only once the future Missing/Alter modules observe defects. NOT NULL —
+    # dual-write always populates it + the resolver depends on it (NULL has no meaning).
+    good_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    alter_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    missing_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     # Manager/supervisor/super_admin only; null until reviewed.
     verified_quantity = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True,
@@ -182,10 +193,20 @@ class WorkerStageContribution(TimeStampedModel):
         indexes = [models.Index(fields=['task'])]
         ordering = ['task', 'pk']
         constraints = [
-            # reported quantity is a real claim → strictly positive.
+            # Foundation S3 (RC-3): good/alter/missing each ≥ 0 AND the contribution
+            # observes SOMETHING (sum > 0). Replaces wsc_reported_quantity_positive — a
+            # fully-alter/missing row has good=0 (legal here, illegal under reported>0),
+            # so the legacy check is dropped in the SAME migration as this add.
             models.CheckConstraint(
-                check=models.Q(reported_quantity__gt=0),
-                name='wsc_reported_quantity_positive',
+                check=(
+                    (models.Q(good_quantity__gte=0)
+                     & models.Q(alter_quantity__gte=0)
+                     & models.Q(missing_quantity__gte=0))
+                    & (models.Q(good_quantity__gt=0)
+                       | models.Q(alter_quantity__gt=0)
+                       | models.Q(missing_quantity__gt=0))
+                ),
+                name='wsc_gam_nonneg_sum_positive',
             ),
             # nullable money/qty snapshots are non-negative WHEN set.
             models.CheckConstraint(
@@ -203,4 +224,4 @@ class WorkerStageContribution(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f'contrib task={self.task_id} qty={self.reported_quantity}'
+        return f'contrib task={self.task_id} good={self.good_quantity}'

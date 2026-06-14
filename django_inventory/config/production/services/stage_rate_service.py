@@ -165,7 +165,8 @@ def rerate_stage_role(stage_record, role, new_rate, *, actor, reason):
     n = 0
     for c in recalc:
         c.expected_rate = new_rate
-        c.expected_earning = (c.reported_quantity * new_rate).quantize(
+        # S3: recalc on the PAYABLE good (mirror of complete's freeze).
+        c.expected_earning = (c.good_quantity * new_rate).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP)
         c.save(update_fields=['expected_rate', 'expected_earning', 'updated_at'])
         n += 1

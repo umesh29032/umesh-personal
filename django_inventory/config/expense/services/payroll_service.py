@@ -242,17 +242,18 @@ def worker_assignments(worker, *, limit=None):
 
 def worker_production_stats(worker) -> dict:
     """Adda counts + pieces produced for a worker (Q1/Q2) — PRODUCTION truth
-    (V2-3 PR-C, owner D-V3.3): pieces = Σ reported_quantity on the worker's
-    completed/verified tasks, independent of settlement timing. Adda buckets
-    come from assignment truth (non-cancelled tasks). Pre-V2-1c allocations
-    that never had contributions are not counted — this is a productivity
+    (V2-3 PR-C, owner D-V3.3): pieces = Σ good_quantity on the worker's
+    completed/verified tasks (S3 — payable-good, so productivity follows what
+    settlement pays; good == reported in the thin slice), independent of settlement
+    timing. Adda buckets come from assignment truth (non-cancelled tasks). Pre-V2-1c
+    allocations that never had contributions are not counted — this is a productivity
     view, not a money view (the ledger is)."""
     from production.models import Adda, WorkerStageContribution, WorkerStageTask
     done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
     pieces = (
         WorkerStageContribution.objects
         .filter(task__worker=worker, task__status__in=done)
-        .aggregate(s=Sum('reported_quantity'))['s'] or _ZERO
+        .aggregate(s=Sum('good_quantity'))['s'] or _ZERO
     )
     base = (WorkerStageTask.objects.filter(worker=worker)
             .exclude(status=WorkerStageTask.Status.CANCELLED))

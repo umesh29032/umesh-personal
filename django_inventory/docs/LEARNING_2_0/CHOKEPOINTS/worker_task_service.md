@@ -4,6 +4,12 @@ roster full-replace, cancel-not-delete) → worker reports (report_contributions
 → submit freezes expected_* (complete_worker_task) → management can correct
 (set_verified_quantity, settled lines refuse). CI gate [4/4]. reported_quantity
 is immutable forever; expected_* is visibility only, never money.
+**S3 (good/alter/missing):** report_contributions now DUAL-WRITES `good_quantity =
+reported_quantity` (RC-3; worker UI still submits one qty = good; alter/missing default
+0). Settlement pays `good_quantity` (resolver); expected_earning freezes on good. The
+legacy `reported_quantity` is kept + dual-written through S3→S5, renamed-not-dropped at
+S6. DB constraint swapped: `wsc_reported_quantity_positive` → `wsc_gam_nonneg_sum_positive`
+(each ≥ 0 AND sum > 0; a good=0 all-defect row is now legal).
 
 # Chokepoint: worker_task_service (production truth)
 

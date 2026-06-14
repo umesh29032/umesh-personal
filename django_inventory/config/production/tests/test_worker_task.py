@@ -181,19 +181,23 @@ class ContributionModelTest(TestCase):
         self.worker = User.objects.create_user(email='cn-worker@test', password='x')
         self.task = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
 
-    def test_reported_quantity_must_be_positive(self):
+    def test_gam_sum_must_be_positive(self):
+        # S3 (RC-3): legacy reported>0 check replaced by good/alter/missing each ≥ 0
+        # AND sum > 0. A row that observed NOTHING (all zero) is rejected.
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 WorkerStageContribution.objects.create(
-                    task=self.task, reported_quantity=Decimal('0'))
+                    task=self.task, reported_quantity=Decimal('0'),
+                    good_quantity=Decimal('0'),
+                    alter_quantity=Decimal('0'), missing_quantity=Decimal('0'))
 
     def test_multiple_lines_per_task(self):
-        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('120'))
-        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('80'))
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('120'), good_quantity=Decimal('120'))
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('80'), good_quantity=Decimal('80'))
         self.assertEqual(self.task.contributions.count(), 2)
 
     def test_expected_fields_null_until_frozen(self):
-        c = WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('5'))
+        c = WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('5'), good_quantity=Decimal('5'))
         # Option B: no money at report time — expected_* freeze only at complete (V2-1c-ii).
         self.assertIsNone(c.expected_rate)
         self.assertIsNone(c.expected_earning)
@@ -203,7 +207,7 @@ class ContributionModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 WorkerStageContribution.objects.create(
-                    task=self.task, reported_quantity=Decimal('5'),
+                    task=self.task, reported_quantity=Decimal('5'), good_quantity=Decimal('5'),
                     verified_quantity=Decimal('-1'))
 
 

@@ -13,9 +13,11 @@ from production.models import Adda, AddaStageRecord, Product, Stage, WorkflowSta
 
 
 class _C:
-    """Minimal contribution stand-in for the pure resolver (no DB needed)."""
-    def __init__(self, reported, verified=None):
-        self.reported_quantity = Decimal(reported)
+    """Minimal contribution stand-in for the pure resolver (no DB needed).
+    S3: resolver reads good_quantity (dual-written = reported in the thin slice)."""
+    def __init__(self, good, verified=None):
+        self.good_quantity = Decimal(good)
+        self.reported_quantity = Decimal(good)        # dual-write mirror
         self.verified_quantity = None if verified is None else Decimal(verified)
 
 
