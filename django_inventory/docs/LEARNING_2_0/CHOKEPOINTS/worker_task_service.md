@@ -41,6 +41,11 @@ Production-capacity only (no verified/settlement/rate/cost read).
 **Who can call:** stage services + the worker report view (workers only via
 their own assigned task — assignment-gated). Never a model `.save` elsewhere.
 
+**S4/Phase 5 reopen:** the shared `reopen_stage_record` skeleton now refuses upstream reopen
+while a downstream consumer (non-voided `WorkerStageAllocation` / completed contribution /
+future AlterCase) exists (`_shared._downstream_consumer_guard`, uniform across stages,
+actionable error) + clears the reopened stage's `StagePoolSnapshot` (`pool_service.clear_stage_pool`).
+
 **Key functions:** `set_stage_workers` (roster full-replace, cancel-not-delete,
 `select_for_update` on active tasks) · `report_contributions` · `complete_worker_task`
 (freezes expected_*; **locks the task row + re-checks DB status — race-safe vs a

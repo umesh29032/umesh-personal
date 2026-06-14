@@ -41,7 +41,9 @@ FILE_MAP: every important file in this app and how they connect.
 - **S4/Phase 2 `StagePoolSnapshot`** (`models/core.py`, migration prod **0041**) — frozen per-(colour,size) `good` a DOWNSTREAM pool-producing stage offers; immutable, write-once at complete; reopen clears+refreezes. **Cutting gets NO row (Option B): its pool good is `AddaProductSizeColorPieceBreakdown`, the single source of truth.** Handler strategy: base `StageHandler.pool_good`/`materialize_pool` (SPS); `CuttingHandler` overrides (APSCPB read; materialize no-op).
 - **S4/D1 grain:** `WorkflowStage.allocation_dimensions` (`models/core.py`, enum `AllocationDimensions` {NONE,QUANTITY,COLOR_SIZE}, default NONE) = piece-pool participation, **orthogonal to `credits_workers` (settlement) + `cost_method` (costing)**. Seeded from each handler's `pool_grain` class attr (`stages/base/handler.py` default NONE; `stages/cutting/handler.py` = COLOR_SIZE, the pool source). Owner-locked: piece-pool starts at cutting; layering/cutting_pattern/barcode = NONE. Migration prod 0040.
 - `_shared.py` — auth helpers + `reopen_stage_record` (template-method skeleton;
- V2-3 settled-stage block lives here).
+ V2-3 settled-stage block lives here). **S4/P5: `_downstream_consumer_guard` (uniform M-4 reopen
+ guard — refuse while a downstream non-voided WSA / completed contribution / future AlterCase
+ exists; actionable error names the furthest stage + action) + `clear_stage_pool` wiring.**
 - `access_service.py` — skill-gating reads. `activity_service.py` — timeline UNION.
 - `product_service.py`, `product_size_service.py` — masters. `reconciliation_service.py` — read-only counter check.
 - `operations_digest.py` — read-only management "morning pulse" (P1-1): stalled/pending-reports/active/completed-today + payroll totals. Foundation-independent; rendered on the Operations landing (management-gated in the view).
