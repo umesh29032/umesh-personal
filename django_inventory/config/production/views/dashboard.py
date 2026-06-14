@@ -147,3 +147,38 @@ class StalledAddaListView(LoginRequiredMixin, ProductionRoleMixin, TemplateView)
         ctx['rows'] = rows
         ctx['threshold'] = threshold
         return ctx
+
+
+class PendingReportListView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+    """F-3 drill-down for the digest's Pending Reports tile. Uses the SAME
+    `pending_report_tasks()` as the digest (no second calc path → counts always
+    reconcile). Management/super_admin see all; a worker sees ONLY their own queue
+    (existing isolation preserved — they never see other workers' pending tasks).
+    Read-only — no settlement / costing / payroll / production-truth touch."""
+    template_name = 'production/pending_reports.html'
+
+    def get_context_data(self, **kwargs):
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from production.services.operations_digest import pending_report_tasks
+
+        ctx = super().get_context_data(**kwargs)
+        tasks = pending_report_tasks()
+        is_mgmt = user_has_role(self.request.user, MANAGEMENT_ROLES)
+        if not is_mgmt:
+            tasks = tasks.filter(worker=self.request.user)   # own queue only
+
+        now = timezone.now()
+        rows = []
+        for t in tasks:                          # created_at ASC → oldest waiting first
+            hours = (now - t.created_at).total_seconds() / 3600
+            rows.append({
+                'adda': t.stage_record.adda,
+                'stage': t.stage_record.workflow_stage.stage.name,
+                'worker': t.worker,
+                'status': t.get_status_display(),
+                'assigned': t.created_at,
+                'age_display': f'{int(hours)}h' if hours < 48 else f'{int(hours // 24)}d',
+            })
+        ctx['rows'] = rows
+        ctx['is_management'] = is_mgmt
+        return ctx

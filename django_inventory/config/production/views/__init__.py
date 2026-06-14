@@ -1,4 +1,4 @@
-from .dashboard import AddaDashboardView, StalledAddaListView
+from .dashboard import AddaDashboardView, StalledAddaListView, PendingReportListView
 from .product_views import (
     ProductArchiveView, ProductCreateView, ProductListView,
     ProductSizesEditView, ProductUpdateView,
@@ -60,6 +60,7 @@ from .stage_views import (
 __all__ = [
     'AddaDashboardView',
     'StalledAddaListView',
+    'PendingReportListView',
     'AddaReportReviewView',
     'WorkerReportView',
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',

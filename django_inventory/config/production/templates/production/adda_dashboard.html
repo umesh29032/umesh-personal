@@ -84,7 +84,7 @@
             <span class="digest-value">{{ digest.stalled_count }}</span>
             <span class="digest-sub">no move in {{ digest.stalled_threshold_days }}+ days</span>
         </a>
-        <a class="digest-tile {% if digest.pending_reports %}warn{% endif %}" href="{% url 'production:adda-list' %}">
+        <a class="digest-tile {% if digest.pending_reports %}warn{% endif %}" href="{% url 'production:pending-reports' %}">
             <span class="digest-label">Pending Reports</span>
             <span class="digest-value">{{ digest.pending_reports }}</span>
             <span class="digest-sub">assigned, not submitted</span>

@@ -32,12 +32,30 @@ def stalled_stage_records():
     )
 
 
+def pending_report_tasks():
+    """THE single pending-report path (F-3): actionable worker tasks — assigned or
+    in-progress on a still-OPEN stage (a worker is on the hook but hasn't
+    submitted). Oldest-first (= longest waiting first). Shared by the digest tile
+    (count) AND the drill-down view (list) so the two ALWAYS reconcile. Reuses the
+    WorkerStageTask lifecycle only — no allocation logic (foundation scope)."""
+    from production.models import WorkerStageTask
+    return (
+        WorkerStageTask.objects
+        .filter(status__in=(WorkerStageTask.Status.ASSIGNED,
+                            WorkerStageTask.Status.IN_PROGRESS),
+                stage_record__completed_at__isnull=True)
+        .select_related('worker', 'stage_record__adda__product',
+                        'stage_record__workflow_stage__stage')
+        .order_by('created_at')
+    )
+
+
 def operations_digest() -> dict:
     """Return the six digest tiles (priority order):
       1. stalled Addas   2. pending reports   3. active Addas
       4. completed today 5. pending payable   6. advance exposure
     """
-    from production.models import Adda, WorkerStageTask
+    from production.models import Adda
     from expense.services import payroll_service
 
     now = timezone.now()
@@ -48,16 +66,8 @@ def operations_digest() -> dict:
     stalled_count = stalled_qs.values('adda').distinct().count()
     stalled_top = list(stalled_qs[:5])
 
-    # 2. Pending reports — assigned/in-progress tasks on still-open stages (a
-    #    worker is on the hook but hasn't submitted). Surfacing this before the
-    #    stage auto-cancels them (F3) is the point.
-    pending_reports = (
-        WorkerStageTask.objects
-        .filter(status__in=(WorkerStageTask.Status.ASSIGNED,
-                            WorkerStageTask.Status.IN_PROGRESS),
-                stage_record__completed_at__isnull=True)
-        .count()
-    )
+    # 2. Pending reports — SINGLE source (shared with the drill-down → reconciles).
+    pending_reports = pending_report_tasks().count()
 
     # 3. Active + 4. completed today (global, not date-filtered like the KPI cards)
     active_addas = Adda.objects.filter(status=Adda.Status.IN_PROGRESS).count()

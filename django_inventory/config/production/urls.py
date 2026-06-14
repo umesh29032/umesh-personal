@@ -39,6 +39,7 @@ app_name = 'production'
 urlpatterns = [
     path('',                              views.AddaDashboardView.as_view(),   name='dashboard'),
     path('stalled/',                      views.StalledAddaListView.as_view(), name='stalled-addas'),
+    path('pending-reports/',              views.PendingReportListView.as_view(), name='pending-reports'),
     path('costing/',                      views.ProductionCostingView.as_view(), name='costing'),
 
     # Products
