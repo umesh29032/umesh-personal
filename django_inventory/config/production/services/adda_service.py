@@ -116,6 +116,9 @@ def create_adda(user, *, product: Product) -> Adda:
             adda=adda, workflow_stage=first_stage,
             started_at=timezone.now(),
         )
+        # S2: freeze the payable-rate snapshot at stage-start (addendum M-5/D-α).
+        from production.services.stage_rate_service import ensure_stage_role_rates
+        ensure_stage_role_rates(sr)
         # Dual-write chokepoint: M2M (authoritative) + WorkerStageTask (V2-1a).
         from production.services.worker_task_service import set_stage_workers
         set_stage_workers(sr, skilled_pks)   # M2M snapshot — manager refine kar sakta

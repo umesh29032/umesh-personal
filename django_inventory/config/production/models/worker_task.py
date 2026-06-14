@@ -169,6 +169,14 @@ class WorkerStageContribution(TimeStampedModel):
         'production.CuttingBundleItem', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',
     )
+    # Foundation S2 (addendum M-5): the worker's role FROZEN at complete, so the
+    # payable rate resolves against the role that did the work — never the live
+    # mutable User.role (which a later role change would otherwise re-price).
+    # NULL only on pre-S2 rows (their pay already froze via the legacy live path).
+    role_snapshot = models.ForeignKey(
+        'accounts.Role', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         indexes = [models.Index(fields=['task'])]

@@ -24,6 +24,7 @@ from .core import (
     Stage,
     WorkflowStage,
     WorkflowStageRoleRate,
+    AddaStageRoleRate,
 )
 from .adda import (
     Adda,
@@ -67,6 +68,7 @@ __all__ = [
     'Stage',
     'WorkflowStage',
     'WorkflowStageRoleRate',
+    'AddaStageRoleRate',
     'Adda',
     'AddaStageRecord',
     'LayeringRecord',

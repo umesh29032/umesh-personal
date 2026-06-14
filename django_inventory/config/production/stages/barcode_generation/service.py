@@ -112,6 +112,9 @@ def get_or_create_barcode_stage_record(adda: Adda, user) -> AddaStageRecord:
     if created and not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    # S2: freeze the payable-rate snapshot at stage-start (idempotent; M-5/D-α).
+    from production.services.stage_rate_service import ensure_stage_role_rates
+    ensure_stage_role_rates(sr)
     return sr
 
 

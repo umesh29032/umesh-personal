@@ -53,6 +53,20 @@
     </div>
     {% endif %}
 
+    {% comment %} M-6 reconciliation WARNING (S1 / D-β): paid-more-than-produced surfaced, not blocked. {% endcomment %}
+    {% if reconciliation_warnings %}
+    <div class="card" style="border-left:5px solid var(--warning); background:var(--warning-bg); margin:14px 0; padding:14px 16px;">
+        <strong style="color:var(--warning); text-transform:uppercase; letter-spacing:.06em; font-size:12px;">⚠ Quantity reconciliation</strong>
+        <p style="margin:6px 0 8px; font-size:13px; color:var(--ink);">Settled quantity exceeds recorded output on:</p>
+        <ul style="margin:0; font-size:13px;">
+            {% for r in reconciliation_warnings %}
+            <li><code>{{ r.stage }}</code> — output {{ r.output_qty|default:"—" }}, settled {{ r.allocated_qty }} ({{ r.flag }}{% if r.qty_delta != None %}, Δ {{ r.qty_delta }}{% endif %})</li>
+            {% endfor %}
+        </ul>
+        <p style="margin:8px 0 0; font-size:11px; color:var(--stone);">Warn-only (verify the worker reports). Settlement enforcement arrives with the Production-Truth Foundation (S5).</p>
+    </div>
+    {% endif %}
+
     {% if s.status == 'draft' %}
     {# ── DRAFT: recomputable preview + variance + recovery + finalize ── #}
     <div class="panel muted" style="font-size:12px;">

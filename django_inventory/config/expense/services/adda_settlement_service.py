@@ -39,6 +39,7 @@ from expense.models import (
     StageWorkAssignment, WorkerAdvance, WorkerProfile,
 )
 from expense.services import ledger_service, payroll_service
+from expense.services.settlement_resolver import settlement_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +181,7 @@ def settlement_queue():
         if not lines:
             continue                       # fully credited — nothing pending
         expected = sum(
-            _q((c.verified_quantity if c.verified_quantity is not None
-                else c.reported_quantity) * (c.expected_rate or _ZERO))
+            _q(settlement_quantity(c) * (c.expected_rate or _ZERO))
             for c in lines)
         ready.append({
             'adda': adda,
@@ -311,7 +311,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         first_swa = None
 
         for c in wlines:
-            qty = c.verified_quantity if c.verified_quantity is not None else c.reported_quantity
+            qty = settlement_quantity(c)               # resolver (S1) — default = verified ?? reported
             rate = c.expected_rate or _ZERO            # frozen at complete (Option B)
             amount = _q(qty * rate)
             # D-S grain (locked): ONE SWA per contribution line — dimension-true.
@@ -401,6 +401,21 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         "skipped_era_a=%s skipped_era_b=%s expected=%s",
         settlement.reference, adda.code, len(workers), len(lines),
         len(skip_a), len(skip_b), expected_total)
+
+    # M-6 reconciliation — WARN mode (S1, addendum D-β): surface any stage where
+    # settled quantity exceeds the recorded physical output (the B-1 leak: paid >
+    # produced). LOGGED + carried back for surfacing now; S5 flips this to a BLOCK
+    # with tolerance + an audited override. Does NOT block finalize in S1.
+    from expense.services import reconciliation_service as _recon
+    settlement.reconciliation_warnings = [
+        r for r in _recon.reconcile_stage_pay(adda=adda)
+        if r['flag'] in _recon.HARD_FLAGS
+    ]
+    if settlement.reconciliation_warnings:
+        logger.warning(
+            "adda_settlement.reconciliation_warn ref=%s adda=%s flags=%s",
+            settlement.reference, adda.code,
+            [(r['stage'], r['flag'], str(r['qty_delta'])) for r in settlement.reconciliation_warnings])
     return settlement
 
 

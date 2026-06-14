@@ -28,7 +28,8 @@ FILE_MAP: every important file in this app and how they connect.
  Key: set_stage_workers, report_contributions, complete_worker_task,
  set_verified_quantity, resolve_stage_tasks_on_complete.
 - `adda_service.py` — create_adda (race-safe per-product code via select_for_update), stage advance.
-- `cost_service.py` ★ — freeze/clear processing_cost; role_rate_for (grouped-member guard).
+- `cost_service.py` ★ — freeze/clear processing_cost; role_rate_for (grouped-member guard); **`resolved_payable_rate` (S2): the single resolved-rate source — grouped→0/override/base/0 — for the AddaStageRoleRate snapshot + complete-time freeze.**
+- `stage_rate_service.py` — **Foundation S2: sole writer of `AddaStageRoleRate` (frozen resolved payable rate per (stage_record, role)). `ensure_stage_role_rates` (snapshot at stage-start, idempotent) · `frozen_rate_for(lock=)` · `mark_locked` (first-completion immutability) · `edit_until_lock` (management, refuses post-lock). Lock order: task → AddaStageRoleRate (contracts 1 & 2).**
 - `flow_service.py` — WorkflowStage CRUD + grouping guards.
 - `_shared.py` — auth helpers + `reopen_stage_record` (template-method skeleton;
  V2-3 settled-stage block lives here).

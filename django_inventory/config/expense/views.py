@@ -46,6 +46,7 @@ from expense.services import (
     worker_summary,
 )
 from expense.services import payroll_service
+from expense.services.settlement_resolver import settlement_quantity
 
 User = get_user_model()
 _ET = WorkerLedgerEntry.EntryType
@@ -342,7 +343,7 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
 
     @staticmethod
     def _line_dict(c):
-        qty = c.verified_quantity if c.verified_quantity is not None else c.reported_quantity
+        qty = settlement_quantity(c)               # resolver (S1) — default = verified ?? reported
         rate = c.expected_rate or _ZERO
         return {
             'contribution': c,
@@ -391,6 +392,13 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
             ctx['recoveries'] = (s.recovery_lines
                                  .select_related('advance', 'advance__worker')
                                  .order_by('id'))
+        # M-6 reconciliation (WARN, S1 / D-β): surface stages where settled qty
+        # exceeds recorded output (the B-1 leak) on the settlement detail.
+        from expense.services import reconciliation_service as _recon
+        ctx['reconciliation_warnings'] = [
+            r for r in _recon.reconcile_stage_pay(adda=s.adda)
+            if r['flag'] in _recon.HARD_FLAGS
+        ]
         return ctx
 
     # ── POST actions: finalize / reverse / supersede / discard ──────────────

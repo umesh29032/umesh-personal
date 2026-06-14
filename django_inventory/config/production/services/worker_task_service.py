@@ -222,23 +222,42 @@ def complete_worker_task(task, *, actor):
     if locked_status == WorkerStageTask.Status.CANCELLED:
         raise ValidationError("Cannot complete a cancelled task.")
     ws = task.stage_record.workflow_stage
-    # Same rate source as allocation_service: per-role override, else the stage
-    # rate. C-1 (ADR-0009): a grouped MEMBER stage freezes rate 0 outright —
-    # its labor is paid via the payer stage's grouped rate, never twice.
-    if ws.cost_billed_at_id is not None:
-        rate = Decimal('0')
-    else:
-        rate = cost_service.role_rate_for(ws, task.worker.role) or ws.cost_rate or Decimal('0')
+    from production.services import stage_rate_service
+    # Foundation S2 (addendum M-5): freeze the worker's ROLE now, and pay the rate
+    # FROZEN on the Adda (AddaStageRoleRate), not the live workflow — so a later
+    # workflow-rate edit or a worker role change never re-prices this work.
+    role = task.worker.role
+    # Contract 2: snapshots are created at stage-start; this is the safety net —
+    # if it has to create them here, a creation site was missed (surface it).
+    if stage_rate_service.ensure_stage_role_rates(task.stage_record):
+        logger.warning(
+            "stage_rate.snapshot_missing_at_complete sr=%s task=%s — created late; "
+            "a stage-record creation site is not calling ensure_stage_role_rates "
+            "(contract 2; expected only for pre-S2 records)",
+            task.stage_record_id, task.pk)
+    # Lock the rate row (contract 1: lock order task → AddaStageRoleRate) and read
+    # the frozen rate. Fallback to the live resolution ONLY when no snapshot exists
+    # (pre-S2 records) — and warn, never silently fall back forever (contract 2).
+    rate, rate_row = stage_rate_service.frozen_rate_for(task.stage_record, role, lock=True)
+    if rate is None:
+        rate = cost_service.resolved_payable_rate(ws, role)
+        logger.warning(
+            "stage_rate.live_fallback sr=%s role=%s task=%s — no frozen rate; using "
+            "live resolution (legit only for pre-S2 / off-roster role)",
+            task.stage_record_id, getattr(role, 'pk', None), task.pk)
     for c in task.contributions.all():
         c.expected_rate = rate
         c.expected_earning = (c.reported_quantity * rate).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP)
-        c.save(update_fields=['expected_rate', 'expected_earning', 'updated_at'])
+        c.role_snapshot = role
+        c.save(update_fields=['expected_rate', 'expected_earning',
+                              'role_snapshot', 'updated_at'])
+    stage_rate_service.mark_locked(rate_row)   # first completion → rate immutable
     task.status = WorkerStageTask.Status.COMPLETED
     task.completed_at = timezone.now()
     task.save(update_fields=['status', 'completed_at', 'updated_at'])
-    logger.info("worker_task.complete task=%s contributions=%s rate=%s",
-                task.pk, task.contributions.count(), rate)
+    logger.info("worker_task.complete task=%s contributions=%s rate=%s role=%s",
+                task.pk, task.contributions.count(), rate, getattr(role, 'pk', None))
     return task
 
 

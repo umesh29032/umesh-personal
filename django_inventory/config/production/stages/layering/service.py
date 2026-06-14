@@ -276,6 +276,9 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
         adda=adda, workflow_stage=stage,
         defaults={'started_at': timezone.now()},
     )
+    # S2: freeze the payable-rate snapshot at stage-start (idempotent; M-5/D-α).
+    from production.services.stage_rate_service import ensure_stage_role_rates
+    ensure_stage_role_rates(sr)
     if not created and sr.completed_at is not None:
         raise ValidationError("Layering stage already completed for this Adda")
     if not created and sr.started_at is None:

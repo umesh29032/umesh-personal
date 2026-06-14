@@ -16,6 +16,11 @@ taaki settlement un numbers pe bharosa kar sake.
 completed/verified/cancelled) + `WorkerStageContribution` (WHAT — color/size/
 qty lines). Also freezes `expected_rate`/`expected_earning` at complete, and
 sets `verified_quantity` (P1 management correction). CI gate **[4/4]**.
+**Foundation S2:** complete freezes the worker's `role_snapshot` and pays the rate
+FROZEN on `AddaStageRoleRate[(stage_record, role)]` (`stage_rate_service`), NOT the
+live workflow — so a later workflow-rate edit or worker role change never re-prices
+the work (addendum M-5). Reads the frozen row under lock (order: task → AddaStageRoleRate,
+contract 1); live-fallback + WARN only when no snapshot exists (pre-S2 / contract 2).
 
 **Who can call:** stage services + the worker report view (workers only via
 their own assigned task — assignment-gated). Never a model `.save` elsewhere.

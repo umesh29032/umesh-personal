@@ -233,3 +233,48 @@ class WorkflowStageRoleRate(TimeStampedModel):
 
     def __str__(self):
         return f"{self.workflow_stage} · {self.role} = {self.cost_rate}"
+
+
+class AddaStageRoleRate(TimeStampedModel):
+    """Frozen RESOLVED payable rate for one (AddaStageRecord, role) — Foundation S2.
+
+    DISTINCT from WorkflowStageRoleRate: that is the per-role TEMPLATE override
+    (an INPUT); THIS is the resolved OUTPUT (cost_service.resolved_payable_rate —
+    grouped-member→0 / role override / stage base / 0), snapshotted when the
+    AddaStageRecord is created (stage-start, addendum D-α), owner-editable until
+    that stage's FIRST task completion, then IMMUTABLE (locked_at set in the
+    completing transaction — addendum contract 1). complete_worker_task and
+    settlement read THIS, never the live workflow, so editing a WorkflowStage rate
+    later never moves an in-flight Adda's pay (addendum M-5).
+
+    Race contract: edit_until_lock() and complete_worker_task() both
+    select_for_update THIS row in the documented lock order (task →
+    AddaStageRoleRate) — whoever wins the row lock decides; a locked row refuses
+    edits. Deterministic.
+    """
+    # CASCADE = a frozen rate is meaningless without its stage record (mirrors
+    # WorkflowStageRoleRate). A completed/locked stage record is PROTECTed by its
+    # contributions, so CASCADE only ever reaches un-locked snapshots.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.CASCADE, related_name='role_rates',
+    )
+    role = models.ForeignKey(
+        'accounts.Role', on_delete=models.PROTECT, related_name='+',
+    )
+    rate = models.DecimalField(max_digits=10, decimal_places=4)
+    # Set in the transaction of this (stage_record, role)'s FIRST task completion.
+    # Non-null ⇒ immutable (edit_until_lock refuses).
+    locked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('stage_record', 'role')]
+        ordering = ['stage_record', 'role__name']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rate__gte=0),
+                name='prod_addastagerolerate_rate_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return f'AddaStageRoleRate sr={self.stage_record_id} role={self.role_id} rate={self.rate}'

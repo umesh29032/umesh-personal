@@ -981,6 +981,9 @@ def complete_cutting_legacy(
         started_at=timezone.now(),
         completed_at=timezone.now(), completed_by=user,
     )
+    # S2: freeze the payable-rate snapshot at stage creation (addendum M-5/D-α).
+    from production.services.stage_rate_service import ensure_stage_role_rates
+    ensure_stage_role_rates(sr)
     from production.services.worker_task_service import set_stage_workers
     set_stage_workers(sr, worker_ids or [])   # dual-write (legacy complete: tasks seed 'completed')
 

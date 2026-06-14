@@ -174,6 +174,20 @@ def role_rate_for(workflow_stage, role):
     return rr.cost_rate if rr is not None else None
 
 
+def resolved_payable_rate(workflow_stage, role):
+    """The FROZEN payable rate a worker of `role` earns on this stage — the single
+    source for both the AddaStageRoleRate snapshot (Foundation S2) and the
+    complete-time freeze in complete_worker_task. Encodes the full resolution:
+      grouped MEMBER stage (cost_billed_at set) → 0 (paid via the payer; never twice)
+      else → per-role override (role_rate_for) → else stage base ws.cost_rate → else 0.
+    NOTE: the grouped-member → 0 short-circuit MUST come first — role_rate_for
+    returns None for a grouped member, which would otherwise fall through to the
+    base rate (a second payment). Same order as the legacy complete-time logic."""
+    if workflow_stage.cost_billed_at_id is not None:
+        return Decimal('0')
+    return role_rate_for(workflow_stage, role) or workflow_stage.cost_rate or Decimal('0')
+
+
 def adda_cost_summary(adda) -> dict:
     """Per-Adda manufacturing-cost rollup (Q3/Q4/Q8). Honest-NULL: surfaces how
     many stages are unpriced rather than coercing NULL→0 (which would silently
