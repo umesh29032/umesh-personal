@@ -33,6 +33,10 @@ contract 1); live-fallback + WARN only when no snapshot exists (pre-S2 / contrac
 expected_*, refuses once actively settled, and writes an append-only
 `RateCorrectionAudit`. Full lock order: task → AddaStageRoleRate → WorkerStageContribution
 (disjoint from the settlement lock domain — no deadlock).
+**S4/Phase 4:** `complete` calls `pool_service.check_allocation_bound(task)` BEFORE any freeze
+(refused → freezes nothing) — Strict bound `Σ(good+alter+missing) ≤ Σ active allocated` per
+reported dim on pool-participant stages, gated by `ENFORCE_ALLOCATION_BOUND` (default False).
+Production-capacity only (no verified/settlement/rate/cost read).
 
 **Who can call:** stage services + the worker report view (workers only via
 their own assigned task — assignment-gated). Never a model `.save` elsewhere.

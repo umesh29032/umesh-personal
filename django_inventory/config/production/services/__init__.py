@@ -87,8 +87,8 @@ from .flow_service import (
     set_stage_grain,
 )
 from .pool_service import (
-    allocate, available, clear_stage_pool, materialize_stage_pool, pool_good,
-    void_allocation,
+    allocate, available, check_allocation_bound, clear_stage_pool,
+    materialize_stage_pool, pool_good, void_allocation, worker_allocated,
 )
 
 __all__ = [
@@ -99,6 +99,8 @@ __all__ = [
     'allocate',
     'available',
     'void_allocation',
+    'worker_allocated',
+    'check_allocation_bound',
     'create_adda',
     'advance_to_next_stage',
     'create_product',

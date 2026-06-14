@@ -26,6 +26,11 @@ pool good via the stage HANDLER strategy. Writes NOTHING in expense.
   refuse if `qty > available`; no money) · `void_allocation(wsa, *, actor)` (append-only; qty
   returns) · `available(consuming_sr, dims)` · `_upstream_pool_source` (nearest non-NONE
   upstream) · `recovered_alter`/`found_missing` (M-7 stubs → 0).
+- *Bound (Phase 4):* `worker_allocated(sr, worker, color, size)` = Σ active (non-voided) WSA
+  for that worker/dims; `check_allocation_bound(task)` (called by `complete_worker_task`) —
+  refuses if `Σ(good+alter+missing) > Σ active allocated` per REPORTED dimension (under-
+  consume passes; unallocated reported dim fails). Gated by `ENFORCE_ALLOCATION_BOUND`
+  (default False); pool-participant stages only; reads NO verified/settlement/rate/cost.
 
 **Lock (D2):** `pg_advisory_xact_lock(_POOL_LOCK_CLASS=5375, objid(source_sr, color, size))` —
 TWO-INT advisory namespace, provably disjoint from settlement's single-bigint

@@ -181,6 +181,13 @@ else:
 # deletion of the legacy path stays soak-gated (separate future PR).
 LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
+# Foundation S4 / Phase 4 — Strict allocation-bound enforcement at complete. Default
+# False = OFF (the kill-switch + back-compat: complete_worker_task behaves exactly as
+# pre-S4; existing flows untouched). True = pool-participant stages enforce
+# Σ(good+alter+missing) per (worker, stage, colour, size) ≤ Σ active allocated. A
+# PRODUCTION-CAPACITY rule only — reads no rate/earning/verified/settlement/cost data.
+ENFORCE_ALLOCATION_BOUND = config('ENFORCE_ALLOCATION_BOUND', default=False, cast=bool)
+
 # Operations digest (P1-1): an in-progress Adda whose current open stage has not
 # moved in this many days is flagged "stalled" on the management Operations
 # landing. Constant (not hardcoded in query logic) so the threshold is tunable.

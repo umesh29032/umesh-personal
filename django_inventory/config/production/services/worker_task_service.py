@@ -226,6 +226,11 @@ def complete_worker_task(task, *, actor):
         raise ValidationError("Task already completed.")
     if locked_status == WorkerStageTask.Status.CANCELLED:
         raise ValidationError("Cannot complete a cancelled task.")
+    # Foundation S4/Phase 4: Strict allocation bound BEFORE any freeze (a refused complete
+    # freezes nothing). No-op unless ENFORCE_ALLOCATION_BOUND on + a pool-participant stage.
+    # Production-CAPACITY only (good+alter+missing ≤ Σ active allocated) — reads no money.
+    from production.services import pool_service
+    pool_service.check_allocation_bound(task)
     ws = task.stage_record.workflow_stage
     from production.services import stage_rate_service
     # Foundation S2 (addendum M-5): freeze the worker's ROLE now, and pay the rate
