@@ -265,12 +265,23 @@ SIDEBAR: tuple[MenuSection, ...] = (
             MenuItem('My Earnings', 'expense:my-earnings', match=('expense/my',)),
         ),
     ),
+    # P1-2 (C-2): the core manufacturing flow is the primary operational area, so
+    # Production sits directly below Main, with Raw Materials production-adjacent;
+    # Storefront (secondary e-commerce) moves below them. ORDER-ONLY change —
+    # section/item contents, predicates, url_names + labels are untouched, so
+    # permissions / SidebarItemRule visibility / URLs / routes are unchanged.
     MenuSection(
-        label='Storefront',
-        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM),
+        label='Production',
+        predicate=_any_role(*PRODUCTION_ROLES),
         items=(
-            MenuItem('Featured Products', 'storefront:product_list', match=('storefront/products',)),
-            MenuItem('Categories', 'storefront:category_list', match=('storefront/categories',)),
+            MenuItem('Operations', 'production:dashboard', match=('production/',)),
+            MenuItem('Manufacturing Costing', 'production:costing', match=('production/costing',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
+            MenuItem('Products', 'production:product-list', match=('production/products',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            MenuItem('Product Patterns', 'production:pattern-list', match=('production/patterns',),
+                     predicate=_any_perm('production.view_productpattern', 'production.change_productpattern')),
         ),
     ),
     MenuSection(
@@ -286,17 +297,11 @@ SIDEBAR: tuple[MenuSection, ...] = (
         ),
     ),
     MenuSection(
-        label='Production',
-        predicate=_any_role(*PRODUCTION_ROLES),
+        label='Storefront',
+        predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_LISTING_TEAM),
         items=(
-            MenuItem('Operations', 'production:dashboard', match=('production/',)),
-            MenuItem('Manufacturing Costing', 'production:costing', match=('production/costing',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
-            MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
-            MenuItem('Products', 'production:product-list', match=('production/products',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
-            MenuItem('Product Patterns', 'production:pattern-list', match=('production/patterns',),
-                     predicate=_any_perm('production.view_productpattern', 'production.change_productpattern')),
+            MenuItem('Featured Products', 'storefront:product_list', match=('storefront/products',)),
+            MenuItem('Categories', 'storefront:category_list', match=('storefront/categories',)),
         ),
     ),
     MenuSection(
