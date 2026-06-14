@@ -10,7 +10,7 @@ Date filter: ?from=&to= ke saath created_at range filter.
 from datetime import datetime, time
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count
+from django.db.models import Count, Exists, OuterRef
 from django.utils import timezone
 from django.views.generic import TemplateView
 
@@ -103,4 +103,47 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             ctx['digest'] = operations_digest()
         else:
             ctx['digest'] = None
+        return ctx
+
+
+class StalledAddaListView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+    """H-2B drill-down for the digest's Stalled Addas tile. Uses the SAME
+    `stalled_stage_records()` as the digest (no second stalled-calc path → the
+    tile count and this list always reconcile). Worker isolation: non-management
+    see only stalled Addas they hold a live task on (same rule as the dashboard /
+    history). Read-only — no settlement / costing / production-truth touch."""
+    template_name = 'production/stalled_addas.html'
+
+    def get_context_data(self, **kwargs):
+        from django.conf import settings
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from production.models import WorkerStageTask
+        from production.services.operations_digest import stalled_stage_records
+
+        ctx = super().get_context_data(**kwargs)
+        srs = stalled_stage_records()
+        if not user_has_role(self.request.user, MANAGEMENT_ROLES):
+            assigned = WorkerStageTask.objects.filter(
+                stage_record__adda_id=OuterRef('adda_id'), worker=self.request.user,
+            ).exclude(status=WorkerStageTask.Status.CANCELLED)
+            srs = srs.filter(Exists(assigned))
+
+        now = timezone.now()
+        threshold = getattr(settings, 'STALLED_ADDA_DAYS', 3)
+        seen, rows = set(), []
+        for sr in srs:                       # started_at ASC → longest-stalled first
+            if sr.adda_id in seen:
+                continue                     # one row per Adda (oldest open stage)
+            seen.add(sr.adda_id)
+            days = (now - sr.started_at).days
+            rows.append({
+                'adda': sr.adda,
+                'stage': sr.workflow_stage.stage.name,
+                'status': sr.adda.get_status_display(),
+                'days': days,
+                'since': sr.started_at,
+                'severity': 'critical' if days >= threshold * 2 else 'warning',
+            })
+        ctx['rows'] = rows
+        ctx['threshold'] = threshold
         return ctx

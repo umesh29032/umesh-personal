@@ -1,0 +1,81 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Stalled Addas{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* H-2B stalled drill-down — mobile-first card grid, no horizontal scroll. */
+    .stalled-list .page-header { margin-bottom: 6px; }
+    .stalled-list .sub { color: var(--stone); font-size: 13px; margin-bottom: 18px; }
+    .stalled-cards {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+    }
+    .stalled-card {
+        display: block; text-decoration: none; color: var(--ink);
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-left-width: 5px; border-radius: 14px; padding: 16px 18px;
+        box-shadow: var(--shadow-card); transition: transform .15s, border-color .15s;
+    }
+    .stalled-card:hover { transform: translateY(-1px); border-color: var(--copper); }
+    .stalled-card.warning  { border-left-color: var(--warning); }
+    .stalled-card.critical { border-left-color: var(--danger); }
+    .stalled-card .code { font-family: monospace; font-weight: 700; font-size: 15px; }
+    .stalled-card .days {
+        float: right; font-weight: 700; font-size: 22px; line-height: 1;
+    }
+    .stalled-card.warning  .days { color: var(--warning); }
+    .stalled-card.critical .days { color: var(--danger); }
+    .stalled-card .meta {
+        margin-top: 10px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+        font-size: 12px;
+    }
+    .stalled-card .meta dt { color: var(--stone); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; font-weight: 700; }
+    .stalled-card .meta dd { margin: 0; }
+    .stalled-card .sev {
+        display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .08em; padding: 2px 8px; border-radius: 999px;
+    }
+    .stalled-card.warning  .sev { background: var(--warning-bg); color: var(--warning); }
+    .stalled-card.critical .sev { background: var(--danger-bg);  color: var(--danger); }
+    .stalled-empty {
+        text-align: center; padding: 48px 20px; color: var(--stone);
+        background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px;
+    }
+    .stalled-empty .big { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--ink); margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stalled-list">
+    <div class="page-header">
+        <div class="page-header-text"><h1>Stalled Addas</h1></div>
+        <a href="{% url 'production:dashboard' %}" class="btn btn-ghost">← Operations</a>
+    </div>
+    <p class="sub">In-progress Addas whose current stage hasn't moved in {{ threshold }}+ days.
+       <strong>Critical</strong> = {{ threshold }}×2+ days. Longest stalled first.</p>
+
+    {% if rows %}
+    <div class="stalled-cards">
+        {% for r in rows %}
+        <a class="stalled-card {{ r.severity }}" href="{% url 'production:adda-detail' r.adda.code %}">
+            <span class="days">{{ r.days }}d</span>
+            <span class="code">{{ r.adda.code }}</span>
+            <dl class="meta">
+                <dt>Product</dt><dd>{{ r.adda.product.name }}</dd>
+                <dt>Stage</dt><dd>{{ r.stage }}</dd>
+                <dt>Status</dt><dd>{{ r.status }}</dd>
+                <dt>Stalled since</dt><dd>{{ r.since|date:"d M Y, H:i" }}</dd>
+            </dl>
+            <span class="sev">{{ r.severity }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="stalled-empty">
+        <div class="big">Nothing stalled 🎉</div>
+        <div>Every in-progress Adda has moved within the last {{ threshold }} days.</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

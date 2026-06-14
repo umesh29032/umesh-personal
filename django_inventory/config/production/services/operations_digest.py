@@ -9,8 +9,27 @@ Management-gated by the caller (the view), not here — this is a pure read.
 """
 from datetime import timedelta
 
+
 from django.conf import settings
 from django.utils import timezone
+
+
+def stalled_stage_records():
+    """THE single stalled-detection path (H-2B): open stages on in-progress Addas
+    that haven't moved in STALLED_ADDA_DAYS, oldest-first (= longest stalled first).
+    Shared by the digest tile (count) AND the drill-down view (list), so the two
+    ALWAYS reconcile — there is no second stalled-calculation anywhere."""
+    from production.models import Adda, AddaStageRecord
+    cutoff = timezone.now() - timedelta(days=getattr(settings, 'STALLED_ADDA_DAYS', 3))
+    return (
+        AddaStageRecord.objects
+        .filter(adda__status=Adda.Status.IN_PROGRESS,
+                completed_at__isnull=True,
+                started_at__isnull=False,
+                started_at__lt=cutoff)
+        .select_related('adda', 'adda__product', 'workflow_stage__stage')
+        .order_by('started_at')
+    )
 
 
 def operations_digest() -> dict:
@@ -18,25 +37,14 @@ def operations_digest() -> dict:
       1. stalled Addas   2. pending reports   3. active Addas
       4. completed today 5. pending payable   6. advance exposure
     """
-    from production.models import Adda, AddaStageRecord, WorkerStageTask
+    from production.models import Adda, WorkerStageTask
     from expense.services import payroll_service
 
     now = timezone.now()
     threshold_days = getattr(settings, 'STALLED_ADDA_DAYS', 3)
-    stalled_cutoff = now - timedelta(days=threshold_days)
 
-    # 1. Stalled — in-progress Addas whose CURRENT open stage started before the
-    #    cutoff (hasn't moved in `threshold_days`). Count distinct Addas; surface
-    #    the oldest few for the drill list.
-    stalled_qs = (
-        AddaStageRecord.objects
-        .filter(adda__status=Adda.Status.IN_PROGRESS,
-                completed_at__isnull=True,
-                started_at__isnull=False,
-                started_at__lt=stalled_cutoff)
-        .select_related('adda', 'workflow_stage__stage')
-        .order_by('started_at')
-    )
+    # 1. Stalled — SINGLE source (shared with the drill-down → always reconciles).
+    stalled_qs = stalled_stage_records()
     stalled_count = stalled_qs.values('adda').distinct().count()
     stalled_top = list(stalled_qs[:5])
 

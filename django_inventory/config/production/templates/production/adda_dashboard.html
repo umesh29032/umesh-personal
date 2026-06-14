@@ -79,7 +79,7 @@
     {% comment %} Operations digest (P1-1) — management-only morning pulse, locked priority order. {% endcomment %}
     {% if digest %}
     <div class="digest">
-        <a class="digest-tile {% if digest.stalled_count %}alert{% endif %}" href="{% url 'production:adda-list' %}">
+        <a class="digest-tile {% if digest.stalled_count %}alert{% endif %}" href="{% url 'production:stalled-addas' %}">
             <span class="digest-label">⚠ Stalled Addas</span>
             <span class="digest-value">{{ digest.stalled_count }}</span>
             <span class="digest-sub">no move in {{ digest.stalled_threshold_days }}+ days</span>
