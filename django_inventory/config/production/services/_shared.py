@@ -151,6 +151,13 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     from production.services.cost_service import clear_stage_cost
     clear_stage_cost(sr)
 
+    # F4: re-float + unlock the worker-rate snapshot, SYMMETRIC with the cost re-freeze
+    # above — re-complete re-freezes the rate at the current resolved value (grouped→0 via
+    # the F2 structural guard). Reopen is a production-truth correction; cost-freeze and
+    # worker-rate-freeze behave consistently. Settlement remains the final money boundary.
+    from production.services.stage_rate_service import refloat_rates_on_reopen
+    refloat_rates_on_reopen(sr)
+
     # PAY-3 (narrowed V2-3 PR-A): reopen reverses the ALLOCATION-era worker
     # earnings for this stage (era-A only — adda_settlement IS NULL). The frozen
     # manufacturing cost is cleared above; era-A ledger credits must be voided

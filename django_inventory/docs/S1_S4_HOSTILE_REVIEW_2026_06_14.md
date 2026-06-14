@@ -63,7 +63,13 @@ reorder refused with in-flight Adda; allowed with none / only terminal Addas. Fu
 the advisory lock — a brief window vs a concurrent `move_stage_in_product_flow` reorder.
 - **Fix:** acquire the pool lock first (or resolve+lock atomically); cheap reorder of statements.
 
-### F4 🟡 MEDIUM — reopen clears cost but not `AddaStageRoleRate.locked_at` (S1-COST-SNAPSHOT-001)
+### F4 🟡 MEDIUM — reopen clears cost but not `AddaStageRoleRate.locked_at` (S1-COST-SNAPSHOT-001) — ✅ FIXED 2026-06-14
+**Fixed (owner: symmetric model):** `stage_rate_service.refloat_rates_on_reopen(sr)` re-resolves
+each `AddaStageRoleRate` row from the current config + clears `locked_at`, wired into the reopen
+skeleton right after `clear_stage_cost` — so cost-freeze and worker-rate-freeze behave
+symmetrically (re-complete re-freezes the rate at the current value; grouped→0 via the F2
+guard). Documented in the reopen contract. Tests: reopen re-resolves+unlocks (5→8); grouped
+re-resolves to 0. Full suite green; golden ₹225 byte-identical.
 Reopen runs `clear_stage_cost` but leaves the rate row **locked** → asymmetric (cost
 re-freezes at re-complete; worker rate stays frozen). Recoverable (super_admin `rerate`), but
 inconsistent.
@@ -95,3 +101,11 @@ implementation-level (a concurrency window + a structural-invariant gap + two ro
 nits), all fixable now without production data. **Fix F1+F2 (must) and F3+F4 (should), then
 proceed: browser E2E (step 3) → S5 (flag-off) → S6-reversible.** S4-005/TEST-WARN-003 fold
 into S5's rollout scope. The irreversible S6 column DROP remains post-deploy (step 9).
+
+## ✅ ALL FOUR FIXED 2026-06-14 — foundation review CLOSED
+F1 `8faa0230` · F2 `890665ce` · F3 `ad00c3b2` · F4 (this commit). Each its own gated commit,
+golden ₹225 byte-identical + full suite green after every step. No architectural uncertainty
+remained; no production data was needed. **Next: step 3 browser/manual E2E of the corrected
+system; then S5 (flag-off) + S6-reversible.** Deferred (correctly): S4-005 + TEST-WARN-003 →
+S5 rollout scope (soft-warn + pre-flip audit utility); S6 irreversible DROP → post-deploy
+(step 9).

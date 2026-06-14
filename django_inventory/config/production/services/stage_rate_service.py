@@ -91,6 +91,29 @@ def mark_locked(row) -> None:
         row.save(update_fields=['locked_at', 'updated_at'])
 
 
+def refloat_rates_on_reopen(stage_record) -> int:
+    """F4 (hostile-review fix 2026-06-14): on reopen, RE-RESOLVE + UNLOCK the stage's
+    AddaStageRoleRate rows — symmetric with clear_stage_cost re-freezing the manufacturing
+    cost. Each row's rate is re-resolved from the CURRENT config (cost_service.
+    resolved_payable_rate) and locked_at cleared, so re-complete re-freezes the worker rate
+    at the current value. Grouped stages re-resolve to 0 (and the F2 structural guard also
+    enforces 0 at complete). Reopen is a production-truth correction; the worker rate follows
+    the same lifecycle as cost. Settlement stays the final money boundary (a settled stage
+    can't reopen). Returns the number of rows refloated."""
+    from production.models import AddaStageRoleRate
+    from production.services import cost_service
+    ws = stage_record.workflow_stage
+    n = 0
+    for row in (AddaStageRoleRate.objects
+                .filter(stage_record=stage_record).select_related('role')):
+        row.rate = cost_service.resolved_payable_rate(ws, row.role)
+        row.locked_at = None
+        row.save(update_fields=['rate', 'locked_at', 'updated_at'])
+        n += 1
+    logger.info("stage_rate.refloat_on_reopen sr=%s rows=%s", stage_record.pk, n)
+    return n
+
+
 @transaction.atomic
 def edit_until_lock(stage_record, role, new_rate, *, actor):
     """Management edits a snapshot rate BEFORE the stage's first completion.

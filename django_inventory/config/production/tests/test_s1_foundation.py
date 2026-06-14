@@ -20,6 +20,7 @@ from production.models import (
     WorkflowStage, WorkflowStageRoleRate, WorkerStageTask,
 )
 from production.services import cost_service, stage_rate_service
+from production.services._shared import reopen_stage_record
 from production.services.worker_task_service import (
     complete_worker_task, report_contributions, set_stage_workers,
 )
@@ -354,3 +355,49 @@ class GroupedGuardTests(TestCase):
         self.assertEqual(cost_service.effective_pay_rate(ws, Decimal('5')), Decimal('0'))   # grouped
         ungrouped_sr, ungrouped_ws = _stage_record(cost_rate='5', code='f2hu')
         self.assertEqual(cost_service.effective_pay_rate(ungrouped_ws, Decimal('5')), Decimal('5'))
+
+
+class ReopenRefloatTests(TestCase):
+    """F4 (hostile-review fix): reopen re-floats the worker rate SYMMETRICALLY with the
+    manufacturing-cost re-freeze — re-resolve + unlock AddaStageRoleRate, so re-complete
+    re-freezes at the current resolved value (grouped→0 via the F2 structural guard)."""
+
+    def _completed_stage(self, *, cost_rate='5', code='f4'):
+        sr, ws = _stage_record(cost_rate=cost_rate, code=code)
+        stage_rate_service.ensure_stage_role_rates(sr)
+        w = _worker(f'f4-{code}@test')
+        set_stage_workers(sr, [w.pk])
+        t = WorkerStageTask.objects.get(stage_record=sr, worker=w)
+        report_contributions(t, [{'reported_quantity': '10'}], actor=w)
+        complete_worker_task(t, actor=w)                 # freeze rate=5, lock the row
+        sr.completed_at = timezone.now(); sr.save(update_fields=['completed_at'])  # stage done
+        return sr, ws
+
+    def test_reopen_refloats_and_unlocks(self):
+        sr, ws = self._completed_stage()
+        worker_role = Role.objects.get(code='worker')
+        row = AddaStageRoleRate.objects.get(stage_record=sr, role=worker_role)
+        self.assertEqual(row.rate, Decimal('5')); self.assertIsNotNone(row.locked_at)
+        ws.cost_rate = Decimal('8'); ws.save(update_fields=['cost_rate'])   # config changed
+        admin = _worker('f4-adm@test', code='super_admin')
+        reopen_stage_record(adda=sr.adda, stage_code=ws.stage.code,
+                            stage_label=ws.stage.name, user=admin)
+        row.refresh_from_db()
+        self.assertEqual(row.rate, Decimal('8'))         # re-resolved from current config
+        self.assertIsNone(row.locked_at)                 # unlocked
+        # re-complete would re-freeze at the new resolved value:
+        rate, _ = stage_rate_service.frozen_rate_for(sr, worker_role)
+        self.assertEqual(rate, Decimal('8'))
+
+    def test_reopen_grouped_refloats_to_zero(self):
+        sr, ws = self._completed_stage(code='f4g')
+        payer_stage, _ = Stage.objects.get_or_create(code='f4gp', defaults={'name': 'payer'})
+        payer = WorkflowStage.objects.create(product=ws.product, stage=payer_stage, order=9,
+                                             cost_rate=Decimal('9'))
+        ws.cost_billed_at = payer; ws.save(update_fields=['cost_billed_at'])   # grouped now
+        admin = _worker('f4g-adm@test', code='super_admin')
+        reopen_stage_record(adda=sr.adda, stage_code=ws.stage.code,
+                            stage_label=ws.stage.name, user=admin)
+        row = AddaStageRoleRate.objects.get(stage_record=sr, role=Role.objects.get(code='worker'))
+        self.assertEqual(row.rate, Decimal('0'))         # grouped re-resolves to 0
+        self.assertIsNone(row.locked_at)

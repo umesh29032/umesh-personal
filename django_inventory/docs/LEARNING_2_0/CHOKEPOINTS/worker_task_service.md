@@ -45,6 +45,11 @@ their own assigned task — assignment-gated). Never a model `.save` elsewhere.
 while a downstream consumer (non-voided `WorkerStageAllocation` / completed contribution /
 future AlterCase) exists (`_shared._downstream_consumer_guard`, uniform across stages,
 actionable error) + clears the reopened stage's `StagePoolSnapshot` (`pool_service.clear_stage_pool`).
+**F4 reopen contract (symmetric):** reopen re-resolves + unlocks the worker-rate snapshot
+(`stage_rate_service.refloat_rates_on_reopen`) right after `clear_stage_cost` re-floats the
+manufacturing cost — re-complete re-freezes the rate at the current resolved value (grouped→0
+via the F2 guard). Cost-freeze and worker-rate-freeze behave consistently; settlement stays the
+final money boundary (a settled stage can't reopen).
 
 **Key functions:** `set_stage_workers` (roster full-replace, cancel-not-delete,
 `select_for_update` on active tasks) · `report_contributions` · `complete_worker_task`
