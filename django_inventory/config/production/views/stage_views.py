@@ -1120,32 +1120,35 @@ class CuttingBreakupSaveView(_CuttingActionBase):
             messages.error(request, "No rows submitted.")
             return redirect(self.workspace_url(code, request))
 
+        # PA-05B-2: bulk save is all-or-nothing. Previously each row was upserted
+        # in its own implicit transaction and the handler returned on the first
+        # bad row — leaving earlier rows persisted (partial write). Wrap the whole
+        # batch in one transaction and RAISE on any row error so it rolls back.
+        from django.db import transaction
         saved = 0
-        for row_idx, (sid, cid, pid, cnt, rid) in enumerate(zip(size_ids, color_ids, pattern_ids, counts, roll_ids), start=1):
-            # Reject incomplete rows — surface a clear error to the user.
-            if not (sid and cid and pid):
-                messages.error(
-                    request,
-                    f"Row {row_idx}: pattern, size, and color are all required.",
-                )
-                return redirect(self.workspace_url(code, request))
-            try:
-                size_id = int(sid); color_id = int(cid)
-                pattern_id = int(pid); count = int(cnt)
-                roll_id = int(rid) if rid else None
-            except (TypeError, ValueError):
-                messages.error(request, f"Row {row_idx}: invalid number in form.")
-                return redirect(self.workspace_url(code, request))
-            try:
-                upsert_breakup_row(
-                    adda=adda, size_id=size_id, color_id=color_id,
-                    pattern_id=pattern_id, count=count, roll_id=roll_id,
-                    user=request.user,
-                )
-                saved += 1
-            except (PermissionDenied, ValidationError) as exc:
-                messages.error(request, self._service_error(exc))
-                return redirect(self.workspace_url(code, request))
+        try:
+            with transaction.atomic():
+                for row_idx, (sid, cid, pid, cnt, rid) in enumerate(zip(size_ids, color_ids, pattern_ids, counts, roll_ids), start=1):
+                    # Reject incomplete rows — surface a clear error to the user.
+                    if not (sid and cid and pid):
+                        raise ValidationError(
+                            f"Row {row_idx}: pattern, size, and color are all required.")
+                    try:
+                        size_id = int(sid); color_id = int(cid)
+                        pattern_id = int(pid); count = int(cnt)
+                        roll_id = int(rid) if rid else None
+                    except (TypeError, ValueError):
+                        raise ValidationError(f"Row {row_idx}: invalid number in form.")
+                    upsert_breakup_row(
+                        adda=adda, size_id=size_id, color_id=color_id,
+                        pattern_id=pattern_id, count=count, roll_id=roll_id,
+                        user=request.user,
+                    )
+                    saved += 1
+        except (PermissionDenied, ValidationError) as exc:
+            # Whole batch rolled back — nothing saved, so the form stays consistent.
+            messages.error(request, self._service_error(exc))
+            return redirect(self.workspace_url(code, request))
         if saved == 0:
             messages.error(request, "Nothing saved — check that all rows are complete.")
         else:

@@ -232,3 +232,28 @@ class CutoverLeverTests(_Base):
             user=self.mgmt, stage_record=self.sr_pay, worker=self.w1,
             allocated_quantity=Decimal('10'))
         self.assertIsNone(swa.adda_settlement_id)        # era-A marker stays NULL
+
+
+class FinalizeInputParseTests(TestCase):
+    """PA-05B-1: _parse_finalize_inputs must raise ValidationError (graceful, the
+    view catches it) — NOT an unhandled ValueError (500) — on tampered keys where
+    the worker-id / advance-id segment is non-numeric."""
+
+    def _parse(self, post):
+        from django.test import RequestFactory
+        from expense.views import AddaSettlementDetailView
+        req = RequestFactory().post('/x/', post)
+        return AddaSettlementDetailView._parse_finalize_inputs(req)
+
+    def test_malformed_variance_worker_id_raises_validationerror(self):
+        with self.assertRaises(ValidationError):
+            self._parse({'var_abc_packed': '5'})
+
+    def test_malformed_recovery_advance_id_raises_validationerror(self):
+        with self.assertRaises(ValidationError):
+            self._parse({'recover_abc': '100'})
+
+    def test_valid_inputs_parse_correctly(self):
+        variance, recoveries = self._parse({'var_7_packed': '5', 'recover_3': '100'})
+        self.assertEqual(variance, {7: {'packed': 5}})
+        self.assertEqual(recoveries, {3: Decimal('100')})

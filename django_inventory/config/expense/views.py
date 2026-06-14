@@ -454,20 +454,26 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
             if not raw:
                 continue
             if key.startswith('var_'):
+                # PA-05B-1: int(wid) must be INSIDE the try — a tampered key like
+                # 'var_abc_packed' otherwise raises an unhandled ValueError → 500.
                 try:
                     _, wid, field = key.split('_', 2)
+                    wid = int(wid)
                     val = int(raw)
                 except ValueError:
                     raise ValidationError(f"Invalid variance value for {key}.")
                 if field not in ('packed', 'missing', 'rejected', 'alter') or val < 0:
                     raise ValidationError(f"Invalid variance input {key}.")
                 if val:
-                    variance.setdefault(int(wid), {})[field] = val
+                    variance.setdefault(wid, {})[field] = val
             elif key.startswith('recover_'):
+                # PA-05B-1: int(advance_id) must be INSIDE the try too — 'recover_abc'
+                # otherwise raises an unhandled ValueError → 500.
                 try:
+                    adv_id = int(key.split('_', 1)[1])
                     amt = Decimal(raw)
-                except InvalidOperation:
+                except (ValueError, InvalidOperation):
                     raise ValidationError(f"Invalid recovery amount for {key}.")
                 if amt > 0:
-                    recoveries[int(key.split('_', 1)[1])] = amt
+                    recoveries[adv_id] = amt
         return variance, recoveries
