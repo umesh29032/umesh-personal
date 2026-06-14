@@ -90,35 +90,42 @@
 
 ## 3. Foundation sprints (V2 — with gates + prod-scale design)
 
-### Sprint 1 — S1 (resolver) + S2 (AddaStageRoleRate) · gates: MT-1, MT-7, MT-8
+> **🟢 STATUS 2026-06-14 — FOUNDATION COMPLETE (S1, S1.1, S3, S4, F1-F4, S5 all DONE + committed; 641 tests green).**
+> Prod migrations 0037→0042 + expense 0010/0011. Only **S6** (reported_quantity drop, irreversible) remains — post-deploy soak-gated. **There is no separate "S2"** — AddaStageRoleRate landed inside S1. Both enforcement flags ship OFF. Per-sprint status below; current-state narrative in [FOUNDATION_STATUS_SUMMARY_2026_06_14.md](FOUNDATION_STATUS_SUMMARY_2026_06_14.md).
+
+### Sprint 1 — S1 (resolver + AddaStageRoleRate) + S1.1 (hostile-review hardening) · gates: MT-1, MT-7, MT-8 — **DONE ✅ (prod 0037, 0038; expense 0010; committed)**
+> S2 (AddaStageRoleRate) folded into S1. S1.1 added: H1 WARN→over_allocated, H2 SettlementReconciliationEvidence, super-admin `rerate_stage_role` + RateCorrectionAudit, M1 per-(stage,role) lock. **F1-F4 hostile-review fixes** (after the S1–S4 review): F1 rerate joins settlement advisory lock 5374; F2 grouped→0 structural guard (`effective_pay_rate`); F3 no flow-reorder while Adda in-flight; F4 reopen re-floats the worker rate.
 - **Migrations:** `AddaStageRoleRate (adda_stage_record, role, rate, locked_at)`; **prod-scale batched** backfill (most-recent completed `expected_rate` per (stage_record, role); **conflict → flag Adda for review**, RC-4).
 - **Services:** `settlement_quantity(c, policy)` (default = current, byte-identical); Adda-start rate copy; `complete_worker_task`/settlement read frozen rate (fallback workflow rate if no snapshot); **MT-8 gate** (flagged Adda can't settle unreviewed). P0-5 task-lock already landed.
 - **Views/Templates:** Adda-start rate review/edit.
 - **Tests:** golden ₹225 chain identical before/after; rate-lock at first completion; backfill on a **prod-scale synthetic fixture**; conflict-flag path; MT-8 gate.
 - **Rollout risks:** resolver must be behavior-preserving (golden-gated); rate-source change must not move historical numbers; backfill conflict handling.
 
-### Sprint 2 — S3 (good/alter/missing + constraint sequencing) · gates: MT-1, MT-7
+### Sprint 2 — S3 (good/alter/missing + constraint sequencing) · gates: MT-1, MT-7 — **DONE ✅ (prod 0039, RC-3 one migration; committed)**
+> Note: the worker-UI Good/Alter/Missing capture was intentionally NOT built (S3 = thin slice: columns + resolver + dual-write only); separate worker-report capture stays aligned with the future Missing/Alter modules.
 - **Migrations:** add `good_quantity`/`alter_quantity`/`missing_quantity`; **drop legacy `wsc_reported_quantity_positive`** + add new `sum>0, each≥0` constraint **in the same migration** (RC-3); batched backfill `good ← reported`.
 - **Services:** write good/alter/missing; **dual-write `reported_quantity = good_quantity`** (RC-3) until S6; reads → `good_quantity`.
 - **Views/Templates:** worker self-report form gains Good/Alter/Missing (carved-out screen; mobile-first).
 - **Tests:** constraint swap on prod-scale dump (no failure); allocation-era insert with only good set **succeeds** (RC-3 proof); 18 read-sites migrated; dual-write invariant.
 - **Rollout risks:** constraint sequencing (the RC-3 proof test is mandatory); read-site sweep completeness.
 
-### Sprint 3 — S4 (WorkerStageAllocation + pool, Strict, no enforcement) · gates: MT-1, MT-7
+### Sprint 3 — S4 (allocation_dimensions + StagePoolSnapshot + WorkerStageAllocation + complete-bound + reopen-guard) · gates: MT-1, MT-7 — **DONE ✅ (prod 0040, 0041, 0042; all 5 phases, service+tests only, INERT until a piece-consumer stage exists; committed)**
+> Corrected design (S4_DESIGN_CORRECTION_ADDENDUM): pool starts at CUTTING; cutting pool good = AddaProductSizeColorPieceBreakdown (single source, not duplicated); WorkerStageAllocation is a NEW production-only model distinct from `expense.StageWorkAssignment`; advisory lock classid 5375 disjoint from settlement 5374.
 - **Migrations:** `WorkerStageAllocation (stage_record, worker, color, size, allocated_quantity, allocated_by)` + `WorkerStageAllocationHistory`; index `(stage_record, color, size)`.
 - **Services:** allocation service (allocate/reassign/top-up/reduce-≥-reported) audited via `history_service`; pool fn `Σ good + Σ recovered(=0) − Σ allocated`; auto-even-split default; `select_for_update` on allocations.
 - **Views/Templates:** manager allocation screen (carved-out; Strict; auto-split-then-adjust).
 - **Tests:** pool derivation; `Σ alloc ≤ pool`; reduce-below-reported rejected; re-cut raises pool; history audit; auto-split.
 - **Rollout risks:** naming vs `expense.StageWorkAssignment`; pool query cost (indexed); no enforcement yet.
 
-### Sprint 4 — S5 (enforcement only) · gates: MT-1, MT-6, MT-7
+### Sprint 4 — S5 (M-6 finalize BLOCK + allocation-bound rollout safety) · gates: MT-1, MT-6, MT-7 — **DONE ✅ (settings + expense 0011; committed)**
+> Two flags, both default OFF: `ENFORCE_ALLOCATION_BOUND` (complete-time bound, P4) + `ENFORCE_SETTLEMENT_RECONCILIATION` (M-6 finalize BLOCK + tolerance + super-admin audited override). Rollout safety: `preview_bound_violations` + `preview_allocation_bound` command + worker-report soft-warn + ENFORCEMENT_ROLLOUT_RUNBOOK. Deploy OFF → soak → resolve → enable.
 - **Migrations:** feature flag (setting, default off). **No drop.**
 - **Services:** enforce `good+alter+missing ≤ allocation` (Strict); color/size from allocation; allocation draw-down `select_for_update` (P0-5 pattern); forward-only.
 - **Views/Templates:** bounded report form (cap never sent to client).
 - **Tests:** over-report rejected; cap not leaked; flag-off = exactly old behavior; historical Addas still settle; **MT-6 multi-worker load test** (no joint over-pool).
 - **Rollout risks:** behavior change (flag = kill switch); RC-5 floor discipline (validated in staging); worker retraining (RC-12).
 
-### Sprint 5 — S6 (reported_quantity retirement + drop) · gates: MT-1, soak, rollback review, prod validation
+### Sprint 5 — S6 (reported_quantity retirement + drop) · gates: MT-1, soak, rollback review, prod validation — **PENDING (the only remaining foundation step; irreversible; post-deploy soak-gated)**
 - **Prereq:** S5 enforcement **proven in production through a soak window**; confirm **zero** readers of `reported_quantity` remain; MT-1 backup.
 - **Migrations:** stop the dual-write; **drop `reported_quantity`** (one-way; backup = only rollback).
 - **Tests:** full suite green with the column gone; golden settlement reconciliation unaffected.
@@ -126,12 +133,12 @@
 
 ---
 
-## 4. Updated confidence score: **8.5 / 10**
+## 4. Confidence score: **9.5 / 10** (post-foundation, 2026-06-14)
 
-RC-1 (now resolved: disposable staging + prod-scale migration design), RC-2 (S5/S6 split, drop is no longer mislabeled), and RC-3 (constraint sequencing with a mandatory proof test) are the three former blockers — all addressed. MT-1…MT-8 are now explicit gates. The remaining 1.5 points reflect residual **operational** uncertainty (RC-5 floor discipline, RC-6 verify discipline) that can only be retired by real staging usage — by design, not a doc fix.
+RC-1/RC-2/RC-3 (former blockers) are now **proven by shipping** — the constraint swap (RC-3) ran, the S5/S6 split holds, the migrations are prod-scale. Foundation S1, S1.1, S3, S4 (5 phases), F1-F4, S5 are DONE + committed; **641 tests green; golden ₹225 byte-identical throughout**; a full hostile review (S1–S4) + browser E2E validated the corrected system. MT-1…MT-8 remain explicit gates. The residual 0.5 is **operational** (RC-5 floor discipline, RC-6 verify discipline) — retired only by real production usage with the enforcement flags enabled after the soak (per ENFORCEMENT_ROLLOUT_RUNBOOK), by design.
 
-## 5. Updated ship-to-staging recommendation: **B — staging-first, CONFIRMED and now internally consistent.**
-Ship to staging after the **Step-1 staging bundle** (P0 + role-landing + nav + stalled-alert), with **disposable data** (never promoted) and **verify-before-settle discipline**. This is now consistent: the foundation builds on a clean prod DB, its migrations are prod-scale-designed, and staging exists to validate the workflow + the one open operational assumption (RC-5). Evidence basis unchanged from V1 §final (money engine reconciles + is hardened; over-report is mitigatable + visible + forward-only-fixable; foundation UX benefits from real usage).
+## 5. Ship recommendation: **deploy the foundation (both enforcement flags OFF), soak, then enable.**
+Foundation is built + reviewed + browser-validated. Rollout: deploy with `ENFORCE_ALLOCATION_BOUND` + `ENFORCE_SETTLEMENT_RECONCILIATION` **OFF** → run `preview_allocation_bound` + `reconcile_pay --all` during the soak → resolve violations → enable enforcement (super-admin override available for accepted overages). **S6 (irreversible `reported_quantity` drop)** stays for after the soak proves enforcement, with MT-1 backup + a rollback review. Money engine reconciles + is hardened (F1 race closed, F2 grouped→0 structural, M-6 BLOCK available); over-allocation is now visible (preview/WARN), blockable (S5), and forward-only-fixable.
 
 ## 6. Remaining blocking risks: **NONE (code/migration).**
 With RC-1/RC-2/RC-3 resolved + MT-1…MT-8 gated, there are **no remaining blocking code or migration risks**. Two **residual operational risks to validate during staging** (not blockers, but monitor):

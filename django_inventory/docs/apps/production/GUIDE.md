@@ -6,7 +6,7 @@
 ## models/ (split by domain — har file = ek concern)
 | File | What lives here | Pattern / why |
 |---|---|---|
-| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot, WorkerStageAllocation | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1/S2). RateCorrectionAudit = append-only re-rate audit (S1.1) |
+| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot, WorkerStageAllocation | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1; snapshot at stage-start, locked at first completion, per (stage_record,role)). RateCorrectionAudit = append-only re-rate audit (S1.1) |
 | `adda.py` | Adda, AddaStageRecord (+ pending_report_workers helper) | SR = stage ka polymorphic parent; processing_cost frozen (honest-NULL) |
 | `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK. **S3: good/alter/missing columns (good NOT NULL = payable; alter/missing immutable observations); reported dual-written = good (renamed-not-dropped @S6); constraint wsc_gam_nonneg_sum_positive** |
 | `layering.py` | LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll | per-roll verify + MANDATORY leftovers (G1 ke facts) |
@@ -20,13 +20,13 @@
 | `adda_service.py` | Adda create (race-safe per-product counter) + stage advance |
 | `cost_service.py` | processing_cost freeze/clear; `role_rate_for` (grouped-member guard C-1) |
 | `flow_service.py` | WorkflowStage CRUD + grouping guards |
-| `stage_rate_service.py` | ★ sole writer of AddaStageRoleRate: snapshot/freeze/lock/edit + `rerate_stage_role` (S1.1 super-admin correct-until-settlement + recalc + RateCorrectionAudit) |
-| `pool_service.py` | ★ S4/P2+P3: THE piece-pool chokepoint — sole writer of StagePoolSnapshot + WorkerStageAllocation. `pool_good`/`materialize_stage_pool`/`clear_stage_pool` (snapshot) + `allocate`/`void_allocation`/`available` (draw-down, D2 advisory lock). POOL-ONLY, decoupled from cost/rate/settlement |
-| `_shared.py` | auth helpers + ★ reopen_stage_record skeleton (V2-3 settled-block) |
+| `stage_rate_service.py` | ★ sole writer of AddaStageRoleRate: snapshot/freeze/lock/edit + `rerate_stage_role` (S1.1 super-admin correct-until-settlement + recalc + RateCorrectionAudit). **F1: rerate joins settlement advisory lock 5374. F4: `refloat_rates_on_reopen` (re-resolve+unlock, symmetric w/ cost). cost_service.`effective_pay_rate` = F2 grouped→0 structural guard.** |
+| `pool_service.py` | ★ S4/P2-P5: THE piece-pool chokepoint — sole writer of StagePoolSnapshot + WorkerStageAllocation. `pool_good`/`materialize_stage_pool`/`clear_stage_pool` (snapshot) + `allocate`/`void_allocation`/`available` (draw-down, D2 advisory lock 5375) + `check_allocation_bound` (P4 complete-time Σ(good+alter+missing)≤allocated, `ENFORCE_ALLOCATION_BOUND`) + `preview_bound_violations`/`bound_soft_warning` (S5 rollout safety). POOL-ONLY, decoupled from cost/rate/settlement |
+| `_shared.py` | auth helpers + ★ reopen_stage_record skeleton (settled-block + **S4/P5 `_downstream_consumer_guard`: refuse reopen if any downstream stage has a non-voided WorkerStageAllocation or completed contribution; + `clear_stage_pool` wiring; F4 rate re-float**) |
 | `access_service.py` | skill-gating reads |
 | `activity_service.py` | timeline UNION reads |
 | `product_service.py` / `product_size_service.py` | masters |
-| `reconciliation_service.py` | counter sanity (read-only) |
+| `reconciliation_service.py` | (expense app) settlement reconciliation: `reconcile_stage_pay` + `SETTLEMENT_WARN_FLAGS` (over_allocated); S5 M-6 finalize BLOCK lives in `adda_settlement_service` (`ENFORCE_SETTLEMENT_RECONCILIATION`) |
 
 ## stages/ — the OPEN-CLOSED engine
 `base/handler.py` (contract: typed record, complete validations,

@@ -1,4 +1,4 @@
-# PENDING BACKLOG — everything still to do, one place (2026-06-12)
+# PENDING BACKLOG — everything still to do, one place (2026-06-14)
 
 > THE consolidated open-items list. Big-picture order lives in
 > [ROADMAP_REVIEW_POST_C1_2026_06_11.md](ROADMAP_REVIEW_POST_C1_2026_06_11.md)
