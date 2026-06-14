@@ -29,6 +29,13 @@ from expense.models import StageWorkAssignment
 
 # Always a defect — these should never happen by design.
 HARD_FLAGS = frozenset({'over_allocated', 'grouped_paid', 'unpriced_paid', 'no_output_qty'})
+# The M-6 settlement WARN (S1.1, H1) is the B-1 leak ONLY: paid MORE than produced.
+# Scoped narrower than HARD_FLAGS on purpose — no_output_qty / grouped_paid /
+# unpriced_paid are different integrity concerns (and can't be the S5 BLOCK basis,
+# e.g. you can't block a fixed-cost stage for having no output qty). Surfacing them
+# as settlement warnings was noise that drowned the real leak. The full HARD_FLAGS
+# set stays the `reconcile_pay` integrity report's domain.
+SETTLEMENT_WARN_FLAGS = frozenset({'over_allocated'})
 # The known PAY-2 gap — expected until allocation is wired into every paying
 # stage at completion (M2.7); reported as a warning, not a hard failure.
 SOFT_FLAGS = frozenset({'unpaid', 'under_allocated'})

@@ -65,6 +65,11 @@ urlpatterns = [
     path('addas/start/',            views.AddaCreateView.as_view(),  name='adda-create'),
     path('addas/<str:code>/',       views.AddaDetailView.as_view(),  name='adda-detail'),
 
+    # Stage role-rate correction (S1.1, super-admin only): list + correct.
+    path('addas/<str:code>/stage-rates/', views.StageRateListView.as_view(), name='stage-rates'),
+    path('addas/<str:code>/stage-rates/<int:sr_id>/<int:role_id>/correct/',
+         views.StageRateCorrectView.as_view(), name='stage-rate-correct'),
+
     # Per-stage panel — canonical URL for both standalone view and iframe embed.
     # ?embedded=1 strips hero/nav so the panel fits inside iframe / accordion.
     path('addas/<str:code>/stage/<str:stage_type>/',    views.StagePanelView.as_view(),         name='stage-panel'),

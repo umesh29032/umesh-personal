@@ -24,6 +24,15 @@ Lock order (deadlock-free, global, mirrors create_settlement — §11.5):
   → AddaSettlement row (double-finalize reject)
   → AddaStageRecord rows (freeze the quantity inputs)
   → per-worker WorkerProfile → that worker's WorkerAdvance rows.
+
+Production-truth lock domain (S1.1, M-3 / addendum) — SEPARATE and DISJOINT from
+the settlement order above, so the two never deadlock:
+  WorkerStageTask → AddaStageRoleRate → WorkerStageContribution
+  (worker_task_service.complete_worker_task and stage_rate_service.rerate_stage_role;
+  rerate enters at AddaStageRoleRate — the common gate — with no task lock).
+Finalize reads c.expected_rate (already frozen) and never locks AddaStageRoleRate or
+the task; complete/rerate never lock AddaSettlement/WorkerProfile/WorkerAdvance. The
+two domains touch no shared row → no cross-domain wait.
 """
 from __future__ import annotations
 
@@ -402,21 +411,50 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         settlement.reference, adda.code, len(workers), len(lines),
         len(skip_a), len(skip_b), expected_total)
 
-    # M-6 reconciliation — WARN mode (S1, addendum D-β): surface any stage where
-    # settled quantity exceeds the recorded physical output (the B-1 leak: paid >
-    # produced). LOGGED + carried back for surfacing now; S5 flips this to a BLOCK
-    # with tolerance + an audited override. Does NOT block finalize in S1.
-    from expense.services import reconciliation_service as _recon
-    settlement.reconciliation_warnings = [
-        r for r in _recon.reconcile_stage_pay(adda=adda)
-        if r['flag'] in _recon.HARD_FLAGS
-    ]
-    if settlement.reconciliation_warnings:
-        logger.warning(
-            "adda_settlement.reconciliation_warn ref=%s adda=%s flags=%s",
-            settlement.reference, adda.code,
-            [(r['stage'], r['flag'], str(r['qty_delta'])) for r in settlement.reconciliation_warnings])
+    # M-6 reconciliation — WARN mode (S1.1, addendum D-β + H1/H2). SWAs are written
+    # above, so allocated_qty is final.
+    record_reconciliation_evidence(settlement, adda)
     return settlement
+
+
+def record_reconciliation_evidence(settlement, adda) -> int:
+    """Persist append-only M-6 evidence (H2) for every stage where settled quantity
+    exceeds recorded output (the B-1 leak: paid > produced) + WARN-log it.
+
+    H1: scoped to SETTLEMENT_WARN_FLAGS (over_allocated only) — no_output_qty /
+    grouped_paid / unpriced_paid are different concerns and were noise. H2: the row
+    is PERSISTED (not log-scraped) so the soak's B-1 metric survives later
+    corrections/reversals. Returns the number of evidence rows written. S5 will gate
+    finalize on this signal (BLOCK + tolerance + audited override); S1.1 only records.
+    """
+    from expense.models import SettlementReconciliationEvidence
+    from production.models import AddaStageRecord
+    from expense.services import reconciliation_service as _recon
+    warn_rows = [
+        r for r in _recon.reconcile_stage_pay(adda=adda)
+        if r['flag'] in _recon.SETTLEMENT_WARN_FLAGS
+    ]
+    if not warn_rows:
+        return 0
+    # Resolve stage codes back to this Adda's stage records for the FK.
+    sr_by_code = {
+        sr.workflow_stage.stage.code: sr
+        for sr in AddaStageRecord.objects.filter(adda=adda, completed_at__isnull=False)
+        .select_related('workflow_stage__stage')
+    }
+    created = SettlementReconciliationEvidence.objects.bulk_create([
+        SettlementReconciliationEvidence(
+            adda_settlement=settlement, stage_record=sr_by_code[r['stage']],
+            flag=r['flag'], output_qty=r['output_qty'],
+            allocated_qty=r['allocated_qty'], qty_delta=r['qty_delta'],
+        )
+        for r in warn_rows if r['stage'] in sr_by_code
+    ])
+    logger.warning(
+        "adda_settlement.reconciliation_warn ref=%s adda=%s flags=%s",
+        settlement.reference, adda.code,
+        [(r['stage'], r['flag'], str(r['qty_delta'])) for r in warn_rows])
+    return len(created)
 
 
 @transaction.atomic

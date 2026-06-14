@@ -55,3 +55,22 @@ S1's core is **sound**: the frozen rate is correct (resolved == old live logic; 
 But ship these before S3 (all small, mostly): **H1** (WARN noise — the one that quietly defeats the soak's purpose), **M3** (dead code), **M4** (wiring test), **M5** (lock-order doc); and get owner rulings on **M1** (per-role lock semantics) and **H2** (persist variance). S3 (good/alter/missing) is largely independent of these, so they don't *block* it — but H1's noise + H2's gap degrade the very staging evidence the foundation sequencing depends on, so fixing them now (not "later") is the right call.
 
 **Recommend:** a tiny **S1.1 hardening pass** (H1 + M3 + M4 + M5, ~1 sitting) + the two owner rulings, then S3.
+
+---
+
+## E. RESOLUTION — S1.1 SHIPPED 2026-06-14 (572/572 green, golden ₹225 byte-identical)
+
+Owner rulings: **M1** = keep per-(stage_record, role) lock (NOT whole-stage). **H2** = persist evidence. Plus a new owner requirement — super-admin rate correction until settlement (Option 1: keep M1 for normal edits + add a super-admin override).
+
+| Item | Resolution |
+|---|---|
+| **H1** | `reconciliation_service.SETTLEMENT_WARN_FLAGS = {over_allocated}`; finalize + detail both filter on it. `no_output_qty`/grouped/unpriced stay in `reconcile_pay`'s full report only. |
+| **H2** | `expense.SettlementReconciliationEvidence` (migration 0010) — append-only, written at finalize by `record_reconciliation_evidence`; soak B-1 metric now queryable + survives later corrections. |
+| **M1** | Confirmed per-(stage_record, role); documented in `AddaStageRoleRate` docstring + lock-order docs. |
+| **M3** | Dead `settlement.reconciliation_warnings` attribute removed (replaced by the persisted write). |
+| **M4** | `CreationSiteWiringTests.test_create_adda_snapshots_first_stage` — asserts the creation path snapshots (not just the helper). |
+| **M5** | `adda_settlement_service` docstring now documents the production-truth lock domain (task → AddaStageRoleRate → WorkerStageContribution) as DISJOINT from the settlement order — no deadlock. |
+| **Rate-correction req** | `stage_rate_service.rerate_stage_role` (super-admin, until-settlement, auto-recalc of completed-but-unsettled expected_*, refuse-if-settled, mandatory `reason`, append-only `RateCorrectionAudit` migration 0038) + thin super-admin UI (`production:stage-rates`/`stage-rate-correct`, mobile-first). M1 preserved: normal `edit_until_lock` still locks at completion; rerate is the explicit owner override. |
+| **L2** | Deferred to S3 as planned (resolver `reported_quantity`→`good_quantity` + alter/missing golden fixture). |
+
+**Verdict upgraded: GO for S3.** All Critical/High/Medium resolved or explicitly deferred (L2→S3). The mandatory **M-1…M-4 re-review still gates S4** (grain/pool/lock/reopen).

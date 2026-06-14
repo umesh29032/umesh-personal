@@ -465,9 +465,16 @@
                 <h1>{{ adda.code }}</h1>
                 <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
             </div>
-            <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
-                ● {{ adda.get_status_display }}
-            </span>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
+                    ● {{ adda.get_status_display }}
+                </span>
+                {% if is_super_admin %}
+                {# S1.1: super-admin rate-correction entry — before-settlement only. #}
+                <a href="{% url 'production:stage-rates' code=adda.code %}"
+                   style="font-size:13px;color:rgba(255,255,255,0.85);text-decoration:underline;">Stage Rates</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 

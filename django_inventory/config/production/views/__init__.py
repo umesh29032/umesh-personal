@@ -4,6 +4,7 @@ from .product_views import (
     ProductSizesEditView, ProductUpdateView,
 )
 from .adda_views import AddaListView, AddaCreateView, AddaDetailView
+from .rate_views import StageRateListView, StageRateCorrectView
 from .access_views import (
     StageListView, StageCreateView, StageUpdateView, StageDeleteView,
 )
@@ -66,6 +67,7 @@ __all__ = [
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',
     'ProductSizesEditView',
     'AddaListView', 'AddaCreateView', 'AddaDetailView',
+    'StageRateListView', 'StageRateCorrectView',
     'LayeringWorkspaceView',
     'StagePanelView',
     'LayeringStartView',

@@ -278,3 +278,38 @@ class AddaStageRoleRate(TimeStampedModel):
 
     def __str__(self):
         return f'AddaStageRoleRate sr={self.stage_record_id} role={self.role_id} rate={self.rate}'
+
+
+class RateCorrectionAudit(TimeStampedModel):
+    """Append-only financial audit of a super-admin re-rate (S1.1, owner 2026-06-14).
+
+    A rate correction is a FINANCIAL event — it must survive log rotation and be
+    queryable (e.g. all re-rates in the soak window, Σ delta). So it gets its own
+    typed, immutable row rather than a free-text AddaHistory note. Written ONLY by
+    stage_rate_service.rerate_stage_role, in the same transaction as the recalc, so
+    audit and money move together. `reason` is mandatory (service enforces non-empty).
+    """
+    # PROTECT everywhere — a financial audit must never be cascaded away.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='rate_corrections',
+    )
+    role = models.ForeignKey('accounts.Role', on_delete=models.PROTECT, related_name='+')
+    old_rate = models.DecimalField(max_digits=10, decimal_places=4)
+    new_rate = models.DecimalField(max_digits=10, decimal_places=4)
+    # How many completed-but-unsettled contributions were re-priced by this action.
+    recalc_count = models.PositiveIntegerField(default=0)
+    reason = models.TextField()
+    actor = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(old_rate__gte=0) & models.Q(new_rate__gte=0),
+                name='prod_ratecorrection_rates_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return (f'RateCorrection sr={self.stage_record_id} role={self.role_id} '
+                f'{self.old_rate}->{self.new_rate} by={self.actor_id}')

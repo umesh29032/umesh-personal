@@ -21,6 +21,12 @@ FROZEN on `AddaStageRoleRate[(stage_record, role)]` (`stage_rate_service`), NOT 
 live workflow — so a later workflow-rate edit or worker role change never re-prices
 the work (addendum M-5). Reads the frozen row under lock (order: task → AddaStageRoleRate,
 contract 1); live-fallback + WARN only when no snapshot exists (pre-S2 / contract 2).
+**S1.1:** a super-admin can correct a rate UNTIL settlement via
+`stage_rate_service.rerate_stage_role` — it OVERRIDES this completion lock (M1 per-
+(stage,role) is preserved for normal edits), recalcs completed-but-unsettled
+expected_*, refuses once actively settled, and writes an append-only
+`RateCorrectionAudit`. Full lock order: task → AddaStageRoleRate → WorkerStageContribution
+(disjoint from the settlement lock domain — no deadlock).
 
 **Who can call:** stage services + the worker report view (workers only via
 their own assigned task — assignment-gated). Never a model `.save` elsewhere.

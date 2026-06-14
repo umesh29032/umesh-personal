@@ -392,12 +392,15 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
             ctx['recoveries'] = (s.recovery_lines
                                  .select_related('advance', 'advance__worker')
                                  .order_by('id'))
-        # M-6 reconciliation (WARN, S1 / D-β): surface stages where settled qty
-        # exceeds recorded output (the B-1 leak) on the settlement detail.
+        # M-6 reconciliation (WARN, S1.1 / D-β + H1): surface stages where settled
+        # qty exceeds recorded output (the B-1 leak) on the settlement detail. Live
+        # recompute shows CURRENT state; scoped to over_allocated only (H1 — the
+        # other HARD_FLAGS were noise). The persisted evidence (written at finalize)
+        # is the soak's historical record; this banner is the live view.
         from expense.services import reconciliation_service as _recon
         ctx['reconciliation_warnings'] = [
             r for r in _recon.reconcile_stage_pay(adda=s.adda)
-            if r['flag'] in _recon.HARD_FLAGS
+            if r['flag'] in _recon.SETTLEMENT_WARN_FLAGS
         ]
         return ctx
 

@@ -9,12 +9,14 @@ from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
+from expense.models import StageWorkAssignment
 from inventory.models import Role
 from production.models import (
-    Adda, AddaStageRecord, AddaStageRoleRate, Product, Stage,
+    Adda, AddaStageRecord, AddaStageRoleRate, Product, RateCorrectionAudit, Stage,
     WorkflowStage, WorkflowStageRoleRate, WorkerStageTask,
 )
 from production.services import cost_service, stage_rate_service
@@ -156,3 +158,145 @@ class EditUntilLockTests(TestCase):
         report_contributions(t, [{'reported_quantity': '10'}], actor=w)
         complete_worker_task(t, actor=w)
         self.assertEqual(t.contributions.get().expected_rate, Decimal('8'))   # edited, not 5
+
+
+class RerateTests(TestCase):
+    """S1.1: super-admin re-rate override (Option 1) — keeps the M1 completion lock
+    for normal edits, but a super-admin can correct UNTIL settlement with auto-recalc."""
+    def setUp(self):
+        self.sr, self.ws = _stage_record(cost_rate='5', code='rr')
+        stage_rate_service.ensure_stage_role_rates(self.sr)
+        self.w = _worker('s1-rr-w@test')                    # role=worker
+        self.admin = _worker('s1-rr-admin@test', code='super_admin')
+        self.worker_role = Role.objects.get(code='worker')
+        set_stage_workers(self.sr, [self.w.pk])
+        self.task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w)
+        report_contributions(self.task, [{'reported_quantity': '10'}], actor=self.w)
+        complete_worker_task(self.task, actor=self.w)       # freezes rate=5, LOCKS worker row
+
+    def test_recalcs_completed_unsettled(self):
+        row, n = stage_rate_service.rerate_stage_role(
+            self.sr, self.worker_role, Decimal('8'), actor=self.admin, reason='wrong rate at setup')
+        self.assertEqual(n, 1)
+        c = self.task.contributions.get(); c.refresh_from_db()
+        self.assertEqual(c.expected_rate, Decimal('8'))
+        self.assertEqual(c.expected_earning, Decimal('80.00'))   # 10 × 8
+        self.assertEqual(AddaStageRoleRate.objects.get(
+            stage_record=self.sr, role=self.worker_role).rate, Decimal('8'))
+
+    def test_overrides_the_completion_lock(self):
+        # The worker row IS locked (a completion happened) → edit_until_lock refuses,
+        # but rerate (super-admin) overrides until settlement.
+        self.assertIsNotNone(AddaStageRoleRate.objects.get(
+            stage_record=self.sr, role=self.worker_role).locked_at)
+        with self.assertRaises(ValidationError):
+            stage_rate_service.edit_until_lock(self.sr, self.worker_role, Decimal('7'), actor=self.admin)
+        stage_rate_service.rerate_stage_role(self.sr, self.worker_role, Decimal('7'), actor=self.admin, reason='x')
+        self.assertEqual(AddaStageRoleRate.objects.get(
+            stage_record=self.sr, role=self.worker_role).rate, Decimal('7'))
+
+    def test_refuses_non_super_admin(self):
+        mgr = _worker('s1-rr-mgr@test', code='manager')
+        with self.assertRaises(PermissionDenied):
+            stage_rate_service.rerate_stage_role(self.sr, self.worker_role, Decimal('8'), actor=mgr, reason='x')
+
+    def test_refuses_empty_reason(self):
+        with self.assertRaisesMessage(ValidationError, 'reason'):
+            stage_rate_service.rerate_stage_role(self.sr, self.worker_role, Decimal('8'), actor=self.admin, reason='   ')
+
+    def test_refuses_negative(self):
+        with self.assertRaises(ValidationError):
+            stage_rate_service.rerate_stage_role(self.sr, self.worker_role, Decimal('-1'), actor=self.admin, reason='x')
+
+    def test_refuses_when_actively_settled(self):
+        c = self.task.contributions.get()
+        swa = StageWorkAssignment.objects.create(
+            stage_record=self.sr, worker=self.w, entered_by=self.w, allocated_quantity=Decimal('10'),
+            earning_rate_snapshot=Decimal('5'), earning_amount_snapshot=Decimal('50'))
+        c.settlement_line = swa; c.save(update_fields=['settlement_line'])
+        with self.assertRaisesMessage(ValidationError, 'settlement'):
+            stage_rate_service.rerate_stage_role(self.sr, self.worker_role, Decimal('8'), actor=self.admin, reason='x')
+
+    def test_allowed_after_settlement_voided(self):
+        c = self.task.contributions.get()
+        swa = StageWorkAssignment.objects.create(
+            stage_record=self.sr, worker=self.w, entered_by=self.w, allocated_quantity=Decimal('10'),
+            earning_rate_snapshot=Decimal('5'), earning_amount_snapshot=Decimal('50'),
+            voided_at=timezone.now())                       # reversed → re-rate allowed again
+        c.settlement_line = swa; c.save(update_fields=['settlement_line'])
+        row, n = stage_rate_service.rerate_stage_role(
+            self.sr, self.worker_role, Decimal('9'), actor=self.admin, reason='re-rate after reversal')
+        self.assertEqual(n, 1)
+        c.refresh_from_db(); self.assertEqual(c.expected_rate, Decimal('9'))
+
+    def test_writes_append_only_audit(self):
+        stage_rate_service.rerate_stage_role(
+            self.sr, self.worker_role, Decimal('8'), actor=self.admin, reason='typo at setup')
+        a = RateCorrectionAudit.objects.get(stage_record=self.sr, role=self.worker_role)
+        self.assertEqual(a.old_rate, Decimal('5'))
+        self.assertEqual(a.new_rate, Decimal('8'))
+        self.assertEqual(a.recalc_count, 1)
+        self.assertEqual(a.actor, self.admin)
+        self.assertEqual(a.reason, 'typo at setup')
+
+
+class CreationSiteWiringTests(TestCase):
+    """M4: every AddaStageRecord creation path must produce rate snapshots — not just
+    the ensure_stage_role_rates helper. Catches a removed call at a creation site."""
+    def test_create_adda_snapshots_first_stage(self):
+        from production.services import create_adda
+        product = Product.objects.create(code='WIRE', name='Wire')
+        stage, _ = Stage.objects.get_or_create(code='layering', defaults={'name': 'Layering'})
+        WorkflowStage.objects.create(product=product, stage=stage, order=1,
+                                     cost_rate=Decimal('4'), credits_workers=True)
+        admin = _worker('wire-admin@test', code='super_admin')
+        # create_adda requires a cutting_master-skilled user to exist.
+        from accounts.models import Skill
+        admin.skills.add(Skill.objects.get_or_create(
+            name='cutting_master', defaults={'label': 'Cutting Master'})[0])
+        adda = create_adda(user=admin, product=product)
+        sr = adda.stage_records.first()
+        self.assertIsNotNone(sr)
+        rows = AddaStageRoleRate.objects.filter(stage_record=sr)
+        self.assertEqual(rows.count(), 3)                   # super_admin, manager, worker
+        self.assertTrue(all(r.rate == Decimal('4') for r in rows))
+
+
+class RerateUITests(TestCase):
+    """S1.1 UI: thin super-admin 'Correct Rate' flow — gated + applies via the service."""
+    def setUp(self):
+        self.sr, self.ws = _stage_record(cost_rate='5', code='ui')
+        stage_rate_service.ensure_stage_role_rates(self.sr)
+        self.adda = self.sr.adda
+        self.admin = _worker('ui-admin@test', code='super_admin')
+        self.mgr = _worker('ui-mgr@test', code='manager')
+        self.worker_role = Role.objects.get(code='worker')
+
+    def test_list_requires_super_admin(self):
+        url = reverse('production:stage-rates', kwargs={'code': self.adda.code})
+        self.client.force_login(self.mgr)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_correct_post_applies_and_recalcs(self):
+        w = _worker('ui-w@test'); set_stage_workers(self.sr, [w.pk])
+        t = WorkerStageTask.objects.get(stage_record=self.sr, worker=w)
+        report_contributions(t, [{'reported_quantity': '10'}], actor=w)
+        complete_worker_task(t, actor=w)
+        url = reverse('production:stage-rate-correct', kwargs={
+            'code': self.adda.code, 'sr_id': self.sr.pk, 'role_id': self.worker_role.pk})
+        self.client.force_login(self.admin)
+        resp = self.client.post(url, {'new_rate': '8', 'reason': 'ui correction', 'confirm': 'on'})
+        self.assertEqual(resp.status_code, 302)
+        c = t.contributions.get(); c.refresh_from_db()
+        self.assertEqual(c.expected_rate, Decimal('8'))
+
+    def test_correct_requires_confirm(self):
+        url = reverse('production:stage-rate-correct', kwargs={
+            'code': self.adda.code, 'sr_id': self.sr.pk, 'role_id': self.worker_role.pk})
+        self.client.force_login(self.admin)
+        resp = self.client.post(url, {'new_rate': '8', 'reason': 'no confirm'})   # confirm missing
+        self.assertEqual(resp.status_code, 200)             # re-render with error, no redirect
+        self.assertEqual(AddaStageRoleRate.objects.get(
+            stage_record=self.sr, role=self.worker_role).rate, Decimal('5'))   # unchanged

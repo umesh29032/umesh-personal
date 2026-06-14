@@ -103,11 +103,13 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         # (built-in defense). Admins edit access on the Stage library
         # (/production/stages/). (Old StageAccessRule table was dropped in
         # migration 0011.)
-        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from accounts.services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
         from production.services import stage_access_map
 
         user = self.request.user
         is_management = user_has_role(user, MANAGEMENT_ROLES)
+        # S1.1: super-admin "Stage Rates" entry (rate correction) is gated here.
+        ctx['is_super_admin'] = user_has_role(user, [ROLE_SUPER_ADMIN])
         access_by_type = stage_access_map(user, [s.stage_type for s in stages])
         has_layering_access = access_by_type.get('layering', False)
 

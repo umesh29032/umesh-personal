@@ -79,6 +79,14 @@ Worker visibility ladder (V2-3): **Expected (unsettled)** — frozen
 | StageWorkAssignment | `allocation_service` (era-A, lever-only) + `adda_settlement_service` (era-B) | **CI gate [4c/4]** |
 | PayrollSettlement(+Item) | `settlement_service` (payment-only since V2-2) | review |
 | WorkerAdvance | `payroll_service.record_advance` | review |
+| SettlementReconciliationEvidence | `adda_settlement_service.record_reconciliation_evidence` (S1.1, H2) | review |
+
+**M-6 reconciliation (S1.1):** at finalize, `record_reconciliation_evidence` PERSISTS
+an append-only `SettlementReconciliationEvidence` row per stage where settled qty >
+recorded output (the B-1 leak). Scoped to `SETTLEMENT_WARN_FLAGS = {over_allocated}`
+only (H1 — `no_output_qty`/`grouped_paid`/`unpriced_paid` stay in `reconcile_pay`'s
+full report, not the settlement WARN — they were noise). Persisted, not log-scraped,
+so the soak's B-1 metric survives later corrections. WARN-only in S1.1; S5 → BLOCK.
 
 ### Why this design exists / what breaks if bypassed
 

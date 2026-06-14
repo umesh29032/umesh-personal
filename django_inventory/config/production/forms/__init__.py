@@ -23,6 +23,7 @@ from .cutting import (
     CuttingStartForm,
 )
 from .cutting_pattern import PatternVerifyForm, SizeAllocationForm
+from .rate_forms import StageRateCorrectionForm
 
 
 __all__ = [
@@ -43,4 +44,6 @@ __all__ = [
     # Cutting-pattern stage
     'PatternVerifyForm',
     'SizeAllocationForm',
+    # Stage rate correction (S1.1)
+    'StageRateCorrectionForm',
 ]

@@ -553,3 +553,35 @@ class AddaSettlementItem(TimeStampedModel):
 
     def __str__(self):
         return f"{self.adda_settlement_id}/{self.worker_id}: payable {self.final_payable}"
+
+
+class SettlementReconciliationEvidence(TimeStampedModel):
+    """Append-only persisted M-6 reconciliation evidence (S1.1, H2 + addendum D-β).
+
+    Written at finalize for every stage where settled quantity exceeded recorded
+    output (the B-1 leak: paid > produced). PERSISTED — not log-scraped — so the
+    staging soak's B-1-frequency / RC-6 metric survives later corrections or
+    reversals that would clean a live re-run of reconcile_stage_pay. One row per
+    flagged (settlement, stage). S5 will gate finalize on this signal (BLOCK +
+    tolerance + audited override); S1.1 only records it.
+    """
+    # PROTECT — settlements are never hard-deleted (void/supersede instead), and
+    # the evidence must outlive any later correction.
+    adda_settlement = models.ForeignKey(
+        AddaSettlement, on_delete=models.PROTECT, related_name='reconciliation_evidence',
+    )
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='+',
+    )
+    flag = models.CharField(max_length=32)   # 'over_allocated' (extensible)
+    output_qty = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    allocated_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # output − allocated; negative = over-allocated (the leak). Null if no output qty.
+    qty_delta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['flag', 'created_at'])]
+
+    def __str__(self):
+        return f"recon {self.adda_settlement_id}/{self.stage_record_id}: {self.flag} Δ{self.qty_delta}"

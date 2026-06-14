@@ -1,0 +1,67 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Stage Rates · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+{# Page-scoped (rule 10/11): mobile-first stacked cards; no table — each stage a card. #}
+<style>
+  .stage-rates{max-width:880px;margin:0 auto;}
+  .stage-rates .hero{margin-bottom:16px;}
+  .stage-rates .stage-card{background:var(--card-bg,#fff);border:1px solid var(--border-card);
+    border-radius:12px;box-shadow:var(--shadow-card);padding:14px 16px;margin-bottom:14px;}
+  .stage-rates .stage-card h3{margin:0 0 10px;font-size:1.05rem;}
+  .stage-rates .rate-row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;
+    justify-content:space-between;padding:10px 0;border-top:1px solid var(--border-card);}
+  .stage-rates .rate-row:first-of-type{border-top:none;}
+  .stage-rates .rl{display:flex;flex-direction:column;gap:2px;}
+  .stage-rates .rl .role{font-weight:600;}
+  .stage-rates .rl .rate{font-size:1.1rem;}
+  .stage-rates .pill{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;text-transform:uppercase;}
+  .stage-rates .pill.locked{background:#eef2f7;color:#5b6b80;}
+  .stage-rates .pill.settled{background:#fbeaea;color:#8a2b2b;}
+  .stage-rates .pill.open{background:#e8f5ea;color:#2e6b3a;}
+  .stage-rates .actions{display:flex;align-items:center;gap:8px;}
+  @media (min-width:600px){.stage-rates .rate-row{flex-wrap:nowrap;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stage-rates">
+    <div class="hero">
+        <h1>Stage Rates — {{ adda.code }}</h1>
+        <p>Super-admin: correct a stage's payable rate before settlement. Locked = a worker has completed (normal edits closed); you may still correct here until the stage is settled. Settled rows require a reversal first.</p>
+        <a href="{% url 'production:adda-detail' code=adda.code %}" class="btn btn-ghost">← Back to Adda</a>
+    </div>
+
+    {% for s in stages %}
+    <div class="stage-card">
+        <h3>{{ s.stage_record.workflow_stage.get_stage_type_display }}</h3>
+        {% for r in s.rates %}
+        <div class="rate-row">
+            <div class="rl">
+                <span class="role">{{ r.role.name }}</span>
+                <span class="rate">₹{{ r.rate }}</span>
+            </div>
+            <div class="actions">
+                {% if r.settled %}
+                    <span class="pill settled">Settled</span>
+                {% elif r.locked %}
+                    <span class="pill locked">Locked</span>
+                {% else %}
+                    <span class="pill open">Editable</span>
+                {% endif %}
+                {% if r.settled %}
+                    <span class="muted" style="font-size:.8rem;color:#8a2b2b;">reverse first</span>
+                {% else %}
+                    <a class="btn btn-sm btn-primary"
+                       href="{% url 'production:stage-rate-correct' code=adda.code sr_id=s.stage_record.pk role_id=r.role.pk %}">Correct</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% empty %}
+    <div class="stage-card"><p class="muted">No stage rate snapshots yet for this Adda.</p></div>
+    {% endfor %}
+</div>
+{% endblock %}

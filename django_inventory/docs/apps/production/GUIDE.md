@@ -6,7 +6,7 @@
 ## models/ (split by domain — har file = ek concern)
 | File | What lives here | Pattern / why |
 |---|---|---|
-| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate) | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; TM-1 field aayega yahin) |
+| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; TM-1 field aayega yahin). AddaStageRoleRate = frozen resolved payable rate (S1/S2). RateCorrectionAudit = append-only re-rate audit (S1.1) |
 | `adda.py` | Adda, AddaStageRecord (+ pending_report_workers helper) | SR = stage ka polymorphic parent; processing_cost frozen (honest-NULL) |
 | `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK |
 | `layering.py` | LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll | per-roll verify + MANDATORY leftovers (G1 ke facts) |
@@ -20,6 +20,7 @@
 | `adda_service.py` | Adda create (race-safe per-product counter) + stage advance |
 | `cost_service.py` | processing_cost freeze/clear; `role_rate_for` (grouped-member guard C-1) |
 | `flow_service.py` | WorkflowStage CRUD + grouping guards |
+| `stage_rate_service.py` | ★ sole writer of AddaStageRoleRate: snapshot/freeze/lock/edit + `rerate_stage_role` (S1.1 super-admin correct-until-settlement + recalc + RateCorrectionAudit) |
 | `_shared.py` | auth helpers + ★ reopen_stage_record skeleton (V2-3 settled-block) |
 | `access_service.py` | skill-gating reads |
 | `activity_service.py` | timeline UNION reads |
