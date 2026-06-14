@@ -300,3 +300,57 @@ class RerateUITests(TestCase):
         self.assertEqual(resp.status_code, 200)             # re-render with error, no redirect
         self.assertEqual(AddaStageRoleRate.objects.get(
             stage_record=self.sr, role=self.worker_role).rate, Decimal('5'))   # unchanged
+
+
+class GroupedGuardTests(TestCase):
+    """F2 (hostile-review fix): grouped→0 is a STRUCTURAL invariant — a grouped member
+    never pays, even if its AddaStageRoleRate snapshot is a STALE non-zero (frozen before
+    the stage was grouped). Grouped status wins at complete, rerate, and the money boundary."""
+
+    def _ungrouped_then_grouped(self, code='f2g'):
+        product = Product.objects.create(code='F2' + code, name='F2 ' + code)
+        stage, _ = Stage.objects.get_or_create(code=code, defaults={'name': code})
+        payer_stage, _ = Stage.objects.get_or_create(code=code + 'p', defaults={'name': 'payer'})
+        ws = WorkflowStage.objects.create(product=product, stage=stage, order=1,
+                                          cost_rate=Decimal('5'), credits_workers=True)
+        payer = WorkflowStage.objects.create(product=product, stage=payer_stage, order=2,
+                                             cost_rate=Decimal('9'), credits_workers=True)
+        adda = Adda.objects.create(code='F2-' + code, product=product, status=Adda.Status.IN_PROGRESS)
+        sr = AddaStageRecord.objects.create(adda=adda, workflow_stage=ws, started_at=timezone.now())
+        stage_rate_service.ensure_stage_role_rates(sr)        # snapshot rate=5 (UNGROUPED)
+        ws.cost_billed_at = payer; ws.save(update_fields=['cost_billed_at'])   # group it AFTER
+        return sr, ws
+
+    def test_snapshot_stale_nonzero_but_complete_pays_zero(self):
+        sr, ws = self._ungrouped_then_grouped()
+        worker_role = Role.objects.get(code='worker')
+        # the frozen snapshot is a STALE non-zero (5) — grouped guard must override it.
+        self.assertEqual(AddaStageRoleRate.objects.get(stage_record=sr, role=worker_role).rate, Decimal('5'))
+        w = _worker('f2g-w@test')
+        set_stage_workers(sr, [w.pk])
+        t = WorkerStageTask.objects.get(stage_record=sr, worker=w)
+        report_contributions(t, [{'reported_quantity': '10'}], actor=w)
+        complete_worker_task(t, actor=w)
+        c = t.contributions.get()
+        self.assertEqual(c.expected_rate, Decimal('0'))        # grouped wins over stale 5
+        self.assertEqual(c.expected_earning, Decimal('0.00'))
+
+    def test_rerate_on_grouped_stage_pays_zero(self):
+        sr, ws = self._ungrouped_then_grouped(code='f2r')
+        w = _worker('f2r-w@test')
+        set_stage_workers(sr, [w.pk])
+        t = WorkerStageTask.objects.get(stage_record=sr, worker=w)
+        report_contributions(t, [{'reported_quantity': '10'}], actor=w)
+        complete_worker_task(t, actor=w)
+        admin = _worker('f2r-adm@test', code='super_admin')
+        stage_rate_service.rerate_stage_role(sr, Role.objects.get(code='worker'),
+                                             Decimal('8'), actor=admin, reason='attempt re-rate')
+        c = t.contributions.get(); c.refresh_from_db()
+        self.assertEqual(c.expected_rate, Decimal('0'))        # grouped wins over rerate 8
+        self.assertEqual(c.expected_earning, Decimal('0.00'))
+
+    def test_effective_pay_rate_helper(self):
+        sr, ws = self._ungrouped_then_grouped(code='f2h')
+        self.assertEqual(cost_service.effective_pay_rate(ws, Decimal('5')), Decimal('0'))   # grouped
+        ungrouped_sr, ungrouped_ws = _stage_record(cost_rate='5', code='f2hu')
+        self.assertEqual(cost_service.effective_pay_rate(ungrouped_ws, Decimal('5')), Decimal('5'))

@@ -34,7 +34,15 @@ claim is wrong for rerate-vs-finalize (S1-LOCK-ORDER-001, same root).
   the lock-order docstring: rerate **joins** the settlement serialization domain (it is a
   settlement-boundary operation). Closes F1 + S1-LOCK-ORDER-001.
 
-### F2 🟠 HIGH — grouped-member stale non-zero rate → double-pay (S1-GROUPED-001)
+### F2 🟠 HIGH — grouped-member stale non-zero rate → double-pay (S1-GROUPED-001) — ✅ FIXED 2026-06-14
+**Fixed:** new structural guard `cost_service.effective_pay_rate(ws, candidate) → 0 if
+ws.cost_billed_at_id else candidate`, applied at **all three** sites where expected_rate/
+earning is (re)computed — `complete_worker_task` (freeze), `rerate_stage_role` (recalc), and
+the **finalize money boundary** (`adda_settlement_service`, per-contribution earning). A
+grouped member now pays 0 even if a stale non-zero snapshot was frozen before grouping — and
+even for pre-existing stale frozen contributions (the finalize guard catches them at the money
+boundary). Tests: stale-snapshot→complete→0, rerate-grouped→0, helper. Golden ₹225 byte-
+identical (existing grouped stages were already 0 → no-op); full suite green.
 `AddaStageRoleRate` freezes the resolved rate at stage-start. If a stage's `cost_billed_at`
 is set NULL→payer **after** the snapshot (a mid-Adda regrouping), the frozen rate stays
 **non-zero**; `complete`/`rerate` pay it from the snapshot while the payer also covers the

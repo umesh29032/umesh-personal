@@ -175,6 +175,11 @@ def rerate_stage_role(stage_record, role, new_rate, *, actor, reason):
     row.rate = new_rate
     row.save(update_fields=['rate', 'updated_at'])
 
+    # F2: grouped→0 STRUCTURAL guard — if this stage is a grouped member, the effective
+    # pay is 0 regardless of new_rate (a grouped member never pays; grouped wins).
+    from production.services import cost_service
+    effective = cost_service.effective_pay_rate(stage_record.workflow_stage, new_rate)
+
     # Recalc completed/verified-but-unsettled contributions (voided lines re-open,
     # so they ARE included). Lock the WSC rows (of=self: nullable settlement_line join).
     recalc = (WorkerStageContribution.objects.select_for_update(of=('self',))
@@ -183,9 +188,9 @@ def rerate_stage_role(stage_record, role, new_rate, *, actor, reason):
                                         WorkerStageTask.Status.VERIFIED)))
     n = 0
     for c in recalc:
-        c.expected_rate = new_rate
+        c.expected_rate = effective
         # S3: recalc on the PAYABLE good (mirror of complete's freeze).
-        c.expected_earning = (c.good_quantity * new_rate).quantize(
+        c.expected_earning = (c.good_quantity * effective).quantize(
             Decimal('0.01'), rounding=ROUND_HALF_UP)
         c.save(update_fields=['expected_rate', 'expected_earning', 'updated_at'])
         n += 1

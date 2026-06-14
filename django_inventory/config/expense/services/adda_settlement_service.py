@@ -321,9 +321,14 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         worker_expected = _ZERO
         first_swa = None
 
+        from production.services import cost_service
         for c in wlines:
             qty = settlement_quantity(c)               # resolver (S1) — default = verified ?? reported
-            rate = c.expected_rate or _ZERO            # frozen at complete (Option B)
+            # F2: grouped→0 STRUCTURAL guard at the MONEY boundary — a grouped member never
+            # pays, even if the frozen expected_rate is a stale non-zero (snapshot frozen
+            # before the stage was grouped). Grouped status wins over the frozen value.
+            rate = cost_service.effective_pay_rate(
+                c.task.stage_record.workflow_stage, c.expected_rate or _ZERO)
             amount = _q(qty * rate)
             # D-S grain (locked): ONE SWA per contribution line — dimension-true.
             swa = StageWorkAssignment.objects.create(

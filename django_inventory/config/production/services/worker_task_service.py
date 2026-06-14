@@ -255,6 +255,9 @@ def complete_worker_task(task, *, actor):
             "stage_rate.live_fallback sr=%s role=%s task=%s — no frozen rate; using "
             "live resolution (legit only for pre-S2 / off-roster role)",
             task.stage_record_id, getattr(role, 'pk', None), task.pk)
+    # F2: grouped→0 STRUCTURAL guard — a grouped member never pays, even if the frozen
+    # snapshot is a stale non-zero (set before the stage was grouped). Grouped wins.
+    rate = cost_service.effective_pay_rate(ws, rate)
     for c in task.contributions.all():
         c.expected_rate = rate
         # S3: visibility earning is on the PAYABLE good (good == reported in the thin

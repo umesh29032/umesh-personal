@@ -188,6 +188,20 @@ def resolved_payable_rate(workflow_stage, role):
     return role_rate_for(workflow_stage, role) or workflow_stage.cost_rate or Decimal('0')
 
 
+def effective_pay_rate(workflow_stage, candidate_rate):
+    """F2 (hostile-review fix 2026-06-14) — the STRUCTURAL grouped→0 guard, applied
+    ANYWHERE a contribution's expected_rate / expected_earning is (re)computed: complete,
+    rerate, and the settlement money-boundary. A grouped MEMBER stage (cost_billed_at set)
+    must NEVER pay (C-1 / ADR-0009 double-pay prevention), so grouped status WINS over any
+    candidate rate — including a STALE non-zero AddaStageRoleRate snapshot frozen before the
+    stage was grouped. This is a hard structural invariant, not a business preference.
+    Returns 0 for a grouped member; otherwise the candidate unchanged (rate-freezing intact
+    for non-structural edits — M-5)."""
+    if workflow_stage.cost_billed_at_id is not None:
+        return Decimal('0')
+    return candidate_rate
+
+
 def adda_cost_summary(adda) -> dict:
     """Per-Adda manufacturing-cost rollup (Q3/Q4/Q8). Honest-NULL: surfaces how
     many stages are unpriced rather than coercing NULL→0 (which would silently
