@@ -305,7 +305,16 @@ class UserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
     success_url = reverse_lazy("accounts:user_list")
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        from django.db import IntegrityError
+        try:
+            response = super().form_valid(form)
+        except IntegrityError:
+            # PA-05A-5: clean_email validates with iexact but the DB unique is
+            # case-sensitive; a concurrent double-submit can pass validation then
+            # collide at INSERT. Surface a field error instead of a 500 (mirrors
+            # SignupVerifyView's IntegrityError handling).
+            form.add_error("email", "A user with this email already exists.")
+            return self.form_invalid(form)
         # Skills saved by ModelForm.save_m2m → retro-tag onto active layerings
         # (explicit; replaces the removed m2m_changed signal).
         user_service.sync_user_skills(self.object)
@@ -694,6 +703,23 @@ class SkillDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     success_url = reverse_lazy("accounts:skill_list")
 
     def form_valid(self, form):
+        # PA-05A-1: Skill→User and Skill→SidebarItemRule are M2M (no FK PROTECT),
+        # so a bare delete silently strips the skill from every worker that holds
+        # it (losing stage access) and empties any sidebar rule that references it
+        # — no warning, no audit. Mirror UserTypeDeleteView: refuse while in use.
+        skill = self.get_object()
+        blockers = []
+        if skill.users.exists():
+            blockers.append(f"{skill.users.count()} user(s)")
+        if skill.visible_sidebar_items.exists():
+            blockers.append(f"{skill.visible_sidebar_items.count()} sidebar rule(s)")
+        if blockers:
+            messages.error(
+                self.request,
+                f"Cannot delete '{skill.get_name_display()}' — still used by "
+                f"{', '.join(blockers)}. Reassign / update those first.",
+            )
+            return redirect("accounts:skill_list")
         messages.success(self.request, "Skill deleted.")
         return super().form_valid(form)
 

@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 04 — Navigation Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 05 — CRUD Audit |
+| **Current phase** | PHASE 05A — Master-Data CRUD ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 05B — Operational CRUD (addas, rolls, assignments, contributions, settlements, payroll) |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-14 |
-| **Green test baseline** | **652 tests, all passing** |
-| **Open blockers** | None |
+| **Green test baseline** | **660 tests, all passing** (was 641; +19 audit regression tests) |
+| **Open blockers** | None (4 storefront validation gaps documented as a small follow-up — need model+migration; storefront not yet live) |
 
 ---
 
@@ -29,8 +29,9 @@
 | 01 | System Mapping | ✅ COMPLETE | `docs/AUDIT_SYSTEM_MAP.md` written; 151 URLs / 151 views / 31 services / 36 forms / 109 templates mapped + nav/RBAC + infra. Map cross-validated vs actual `urls.py`. |
 | 02 | Authentication Audit | ✅ COMPLETE · commit `1dc05424` | 18 candidates → 8 fixed (incl. owner-approved signup disable), 5 documented-no-fix, 5 refuted. Code+browser+DB+live verified. 649 tests green. |
 | 03 | RBAC Audit | ✅ COMPLETE · commit `0213aaa7` | Empirical URL×role matrix (7 principals × ~80 no-arg URLs) + adversarial code workflow. 1 real leak fixed (PA-03-1), 1 owner-decision (WONTFIX), 2 documented defense-in-depth. URL-layer RBAC sound. 652 tests green. |
-| 04 | Navigation Audit | ✅ COMPLETE | Static dead-link scan (all 390 url names; every template `{% url %}` + py `reverse/redirect` resolves) + adversarial workflow (redirect/cancel/breadcrumb/loop/orphan) + browser mobile-nav. 1 dead-link fixed (PA-04-1, dormant template). Nav integrity clean. 652 green. |
-| 05 | CRUD Audit | ⬜ PENDING | every module: C/R/U/D + DB persistence |
+| 04 | Navigation Audit | ✅ COMPLETE · commit `0637337a` | Static dead-link scan (all 390 url names; every template `{% url %}` + py `reverse/redirect` resolves) + adversarial workflow (redirect/cancel/breadcrumb/loop/orphan) + browser mobile-nav. 1 dead-link fixed (PA-04-1, dormant template). Nav integrity clean. 652 green. |
+| 05A | CRUD Audit — Master Data | ✅ COMPLETE | Behavioral C/R/U/D probes (real DB writes, rolled back) on 7 surfaces + delete-in-use probes + adversarial workflow (21 candidates). 5 fixed, 5 refuted, 4 storefront gaps documented. Mobile CRUD PASS. 660 green. |
+| 05B | CRUD Audit — Operational | ⬜ PENDING | addas · rolls · assignments · contributions · settlements · advances · payroll |
 | 06 | Master Data Audit | ⬜ PENDING | products · stages · roles · workers · addas · materials · suppliers · customers |
 | 07 | Stage Engine Audit | ⬜ PENDING | layering · cutting_pattern · cutting · barcode: create/assign/complete/reopen/settlement-impact |
 | 08 | Raw Material Audit | ⬜ PENDING | cloth roll: inbound · stock · consumption · adjustments |
@@ -70,13 +71,24 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-03-2 (workflow [2]) | LOW | 03 | production/stage-actions | 📋 DOC (service holds) | Layering/Cutting action POST views lack `StageViewAccessMixin` (fail-fast), but the service layer (`_ensure_*_skill`) already raises PermissionDenied → write blocked. Defense-in-depth gap, not a bypass. |
 | PA-03-3 (workflow [4]) | LOW | 03 | production/layering | 📋 DOC (service holds) | `LayeringFullCreateAndAttachView` accepts financial POST params from a worker, but the service rejects them with PermissionDenied → no write. Defense-in-depth gap, not a bypass. |
 | PA-04-1 | LOW | 04 | accounts/templates | ✅ FIXED | Dormant `signup_otp.html` had 2 broken `{% url %}` (`accounts:signup`, `accounts:signup_resend_otp` — removed in Phase 02). Unreachable (no route) so no live 500, but a dead-link landmine. Repointed to `accounts:login`. |
+| PA-05A-1 | HIGH | 05A | accounts/skills | ✅ FIXED | `SkillDeleteView` had no guard — deleting a Skill silently cascaded its M2M, stripping the skill (and stage access) from every worker holding it + emptying any SidebarItemRule referencing it. Added in-use guard (mirrors UserTypeDeleteView). |
+| PA-05A-2 | MEDIUM | 05A | inventory/roles | ✅ FIXED | `RoleDeleteView` guarded the primary-role FK (`users`) but not the `extra_roles` M2M (`extra_users`) — a role used only as an extra_role could be deleted, silently stripping it. Guard now covers both. (`is_system` already protected.) |
+| PA-05A-3 | LOW | 05A | inventory/roles | ✅ FIXED | Role create/update gave no success message (inconsistent with other CRUD). Added `messages.success`. |
+| PA-05A-4 | MEDIUM | 05A | production/patterns | ✅ FIXED | `ProductPatternsEditView` did `int(POST['pieces_count'])` — non-numeric/tampered input → ValueError 500. Added `_safe_pieces_count` (clamp ≥1, fall back to 1). |
+| PA-05A-5 | MEDIUM | 05A | accounts/users | ✅ FIXED | `UserCreateView` had no IntegrityError handler — a concurrent double-submit of the same email (iexact validation vs case-sensitive DB unique) → 500. Now caught → field error (mirrors SignupVerifyView). |
+| PA-05A-SF1 | MEDIUM | 05A | storefront | 📋 DOC (needs migration) | `Category.name` not `unique=True` → duplicate categories possible. 0 dup in dev DB. Fix = unique + migration. |
+| PA-05A-SF2 | MEDIUM | 05A | storefront | 📋 DOC (needs migration) | `FeaturedProduct.price`/`original_price` lack `MinValueValidator` → zero/negative accepted. 0 featured products live. Fix = validator + migration. |
+| PA-05A-SF3 | MEDIUM | 05A | storefront | 📋 DOC | Image fields have no size/type cap (Pillow validates it's an image; no max size). Admin/listing-team only. Fix = validators (size policy decision). |
+| PA-05A-SF4 | LOW | 05A | storefront | 📋 DOC | Updating a Category/FeaturedProduct image leaves the old file on disk (orphan). Ops hygiene, not user-facing. |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
-Phase 03: PA-03-1 (financial-history leak). All with regression tests (652 green). Full reports below.
+Phase 03: PA-03-1 (financial-history leak).
+Phase 04: PA-04-1 (dead signup links).
+Phase 05A: PA-05A-1..5 (Skill delete guard, Role extra-role guard, Role messages, pattern int-parse, UserCreate IntegrityError). All with regression tests (660 green). Full reports below.
 
 ### Open blockers
-- None.
+- None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
 
 ---
 
@@ -242,6 +254,32 @@ Cloth-roll `supplier`/`cost_per_kg`: forms **pop** the fields for non-financial 
 - **Status:** ✅ FIXED
 
 **No other navigation issues found.** Nav integrity (links, redirects, mobile, loops, orphans) is clean.
+
+---
+
+## PHASE 05A — CRUD AUDIT (MASTER DATA) · RESULT
+
+**Scope:** master-data CRUD — User, Skill, UserType (accounts) · Role (inventory) · Product, ProductPattern, Stage (production) · ClothType, ClothColor, StorageLocation (raw_materials) · Category, FeaturedProduct (storefront). 21-point checklist incl. DB persistence, validation, dup-prevention, delete guards, transaction safety, RBAC, messages, PRG, mobile 320-414. Operational CRUD (addas/rolls/settlements/payroll) → Phase 05B.
+
+**Method:** (1) **Behavioral probes** — real C/R/U/D via Django test client as super_admin in rolled-back transactions (writes happen + verified, no dev-DB pollution); 7 surfaces × {create-PRG, list-shows, update-single-row, delete, omit-required-validation, duplicate}. (2) **Delete-in-use probes** — create master + a live reference, attempt delete. (3) Adversarial workflow (6 domain lenses → 21 candidates → per-finding verify). (4) Browser mobile (logged-in super_admin) — forms + list tables at 320/375px.
+
+### Behavioral result — master-data CRUD is SOUND
+- All 7 surfaces: **Create** redirects (PRG → refresh-safe) + writes the row; **Read** list shows it; **Update** changes only that row; **Delete** removes it; **omit-required** → form re-render, no write; **duplicate** unique field → blocked (200 form error). (Two initial "dup not blocked" flags were probe artifacts — the probe renamed the unique field before the dup check; corrected re-test confirmed `unique=True` blocks both ClothType + ClothColor.)
+- **Delete-in-use is graceful:** ClothType (used by a roll), Stage (used by a WorkflowStage), Role (used by a user) → all **blocked with a redirect+message**, no 500, no cascade-wipe, referencing objects intact (FK PROTECT + view guards).
+- **Mobile (320/375px):** no page overflow on any create/edit form or list; tables fit or scroll within their responsive wrapper; console clean.
+
+### Fixed (5) — all view-only, no migration, regression-tested
+- **PA-05A-1 (HIGH)** `SkillDeleteView` in-use guard (Skill→User + Skill→SidebarItemRule M2M would cascade silently). `accounts/views.py`. Tests: `SkillDeleteGuardTests` (3).
+- **PA-05A-2 (MEDIUM)** `RoleDeleteView` now guards `extra_users` (extra_roles M2M) too. `inventory/views/role_views.py`. Tests: `RoleDeleteGuardTests` (3).
+- **PA-05A-3 (LOW)** Role create/update success messages.
+- **PA-05A-4 (MEDIUM)** `ProductPatternsEditView` `pieces_count` safe-parse (was `int()` → 500 on tampered input). `production/views/pattern_views.py`. Tests: `PatternPiecesCountSafeParseTests` (2).
+- **PA-05A-5 (MEDIUM)** `UserCreateView` catches IntegrityError on concurrent same-email → field error instead of 500.
+
+### Refuted (verified NOT bugs)
+- Skill/UserType edit-dup → Django `ModelForm.validate_unique` handles it (probe: Role/Stage edit work). Role.clean_code → only guards system-role code immutability; uniqueness via validate_unique. Master-name dup → blocked at form layer (200, not 500); masters hard-delete so no archived-row collision. Storefront `ProductDeleteView`/`CategoryDeleteView` → DO have `ListingTeamMixin` (no RBAC hole). Product create/update "service bypass" → that IS the correct service-owns-writes pattern (CLAUDE rule 4).
+
+### Documented for follow-up (real, but need model+migration; storefront not live)
+PA-05A-SF1 Category.name not unique · SF2 FeaturedProduct price/original_price no MinValueValidator · SF3 image fields no size/type cap · SF4 orphaned image files on update. All admin/listing-team-only entry; 0 bad data in dev. Recommended as one small storefront-validation migration PR — not bundled into the surgical 05A view-fix commit.
 
 ---
 

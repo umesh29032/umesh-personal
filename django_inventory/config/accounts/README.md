@@ -326,6 +326,21 @@ out of the system.
 - Cannot delete another Super Admin if they are the only remaining active one
   (would leave the platform with zero admins — shell access required to recover)
 
+### Master-data delete guards (Production Audit PA-05A, 2026-06-14)
+
+Master objects referenced by an M2M (no FK PROTECT) must be guarded at the view,
+or a delete silently cascades the join rows:
+- **`SkillDeleteView`** — refuse while the Skill is assigned to any user
+  (`skill.users`) or referenced by a sidebar rule (`skill.visible_sidebar_items`);
+  otherwise workers silently lose the skill (and its stage access). Mirrors
+  `UserTypeDeleteView` (blocks if `users.exists()`).
+- **`RoleDeleteView`** (inventory) — refuse if the role is a user's primary role
+  (`role.users`) **or** stacked via `extra_roles` (`role.extra_users`); plus
+  `is_system` roles are never deletable.
+
+**`UserCreateView`** catches `IntegrityError` (case-insensitive email validation
+vs case-sensitive DB unique under a concurrent double-submit) → field error, not a 500.
+
 ---
 
 ## Security decisions log

@@ -162,3 +162,33 @@ class SidebarSingleSourceTest(TestCase):
             f"SidebarItemRule rows reference menu items absent from the code SIDEBAR "
             f"registry (drift from a rename/removal): {orphans}",
         )
+
+
+class RoleDeleteGuardTests(TestCase):
+    """PA-05A-2: deleting a Role must be refused while it is assigned to ANY user
+    — primary role (`users`) OR stacked via extra_roles (`extra_users`). The
+    extra_roles M2M would otherwise cascade and silently strip the role."""
+
+    def setUp(self):
+        self.admin = _make_user('rdg-admin@t.com', role_code='super_admin', is_super=True)
+        self.client.force_login(self.admin)
+
+    def _delete(self, role):
+        return self.client.post(reverse('inventory:role_delete', args=[role.pk]))
+
+    def test_blocked_when_used_as_extra_role(self):
+        role = Role.objects.create(name='Extra Only', code='extra_only')
+        u = _make_user('rdg-u@t.com', role_code='worker')
+        u.extra_roles.add(role)
+        self._delete(role)
+        self.assertTrue(Role.objects.filter(pk=role.pk).exists())  # not deleted
+
+    def test_blocked_when_system_role(self):
+        sysrole = Role.objects.get(code='manager')  # seeded, is_system
+        self._delete(sysrole)
+        self.assertTrue(Role.objects.filter(pk=sysrole.pk).exists())
+
+    def test_deletes_when_unused_and_not_system(self):
+        role = Role.objects.create(name='Disposable', code='disposable')
+        self._delete(role)
+        self.assertFalse(Role.objects.filter(pk=role.pk).exists())

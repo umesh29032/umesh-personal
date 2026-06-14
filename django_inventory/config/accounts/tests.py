@@ -305,6 +305,43 @@ class AuthPageCacheControlTests(BaseSecurityTest):
 
 # ─── Native self-signup disabled (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ─
 
+class SkillDeleteGuardTests(BaseSecurityTest):
+    """PA-05A-1: a Skill in use (by a worker or a sidebar rule) must NOT be
+    silently deletable — the M2M would cascade and strip stage access / break
+    the sidebar rule with no warning."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import Skill
+        self.admin = User.objects.create_user(
+            email='sg-admin@t.com', password='Str0ngP@ssw0rd!', is_superuser=True)
+        self.skill = Skill.objects.create(name='guard_skill', label='Guard Skill')
+        self.client.force_login(self.admin)
+
+    def _delete(self):
+        return self.client.post(reverse('accounts:skill_delete', args=[self.skill.pk]))
+
+    def test_blocked_when_assigned_to_user(self):
+        from .models import Skill
+        w = User.objects.create_user(email='sg-w@t.com', password='Str0ngP@ssw0rd!')
+        w.skills.add(self.skill)
+        self._delete()
+        self.assertTrue(Skill.objects.filter(pk=self.skill.pk).exists())
+
+    def test_blocked_when_referenced_by_sidebar_rule(self):
+        from .models import Skill, SidebarItemRule
+        rule = SidebarItemRule.objects.first()
+        self.assertIsNotNone(rule)
+        rule.allowed_skills.add(self.skill)
+        self._delete()
+        self.assertTrue(Skill.objects.filter(pk=self.skill.pk).exists())
+
+    def test_deletes_when_unused(self):
+        from .models import Skill
+        self._delete()
+        self.assertFalse(Skill.objects.filter(pk=self.skill.pk).exists())
+
+
 class SignupDisabledTests(BaseSecurityTest):
     """Internal ERP = pre-provisioned users only. The public signup routes were
     removed; accounts come from a Super Admin or a pre-provisioned Google link."""

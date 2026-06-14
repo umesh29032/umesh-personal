@@ -41,6 +41,16 @@ from accounts.services import user_has_perm
 from production.models import Product, ProductPattern, ProductPatternAssignment
 
 
+def _safe_pieces_count(raw) -> int:
+    """PA-05A-4: parse the posted pieces_count without crashing on tampered/
+    non-numeric input. `int('abc')` would raise ValueError → 500; clamp to ≥1
+    and fall back to 1 for blank/garbage."""
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 1
+
+
 class _PatternPermissionRequired(UserPassesTestMixin):
     """ProductPattern admin pages ko gate karne wala mixin.
 
@@ -192,7 +202,7 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
         if action == 'add':
             pattern_id = request.POST.get('pattern')
             # max(1, count) = safety — never less than 1 piece per assignment.
-            count = int(request.POST.get('pieces_count') or 1)
+            count = _safe_pieces_count(request.POST.get('pieces_count'))
             if not pattern_id:
                 messages.error(request, "Pick a pattern.")
                 return redirect('production:product-patterns', pk=pk)
@@ -211,9 +221,9 @@ class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, Te
 
         elif action == 'update_count':
             assign_id = request.POST.get('assignment')
-            count = int(request.POST.get('pieces_count') or 1)
+            count = _safe_pieces_count(request.POST.get('pieces_count'))
             ProductPatternAssignment.objects.filter(pk=assign_id, product=product).update(
-                pieces_count=max(1, count),
+                pieces_count=count,
             )
             messages.success(request, "Count updated.")
 
