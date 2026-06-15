@@ -96,6 +96,21 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 
 **⚠ Never ship a bare `<table>` (PA-14-1).** Page content sits inside `main.content { overflow-x: hidden }`, so a table wider than the viewport is **clipped with no scroll** — the rightmost columns (often money: "Final payable ₹", "Recovered ₹") become invisible and unreachable on a phone. Wrap EVERY `<table>` in `.table-responsive` AND put `data-label` on every `<td>`. The wrapper gives desktop horizontal-scroll and, at ≤600px, switches to stacked label:value cards. This includes detail/snapshot tables (e.g. settlement detail), not just DataTables lists.
 
+**⚠ `data-label` is INERT without a `.table-responsive` ancestor (PA-15).** The stacking media query (`base.html` ≤600px) keys EVERY rule on `.table-responsive` (`thead { display:none }`, `td[data-label]::before`). A `<td data-label="…">` inside a table that is NOT wrapped in `.table-responsive` (or an equivalent page-scoped `<scope> table` stacking block) does **nothing** — the column header stays, no label prefix renders, and a wide table still clips. Phase 15 found several templates with `data-label` attrs that were dead because the wrapper was missing. If you add `data-label`, you MUST also provide the stacking host (wrap in `.table-responsive`, or a page-scoped `@media (max-width:…) { .scope thead{display:none} .scope td::before{content:attr(data-label)} }`).
+
+**Inline-edit tables clip worse than text tables (PA-15-1/2).** A cell holding a `<form>` with fixed-width inputs (`input[name=label]{width:140px}`, number inputs, a Save button) **cannot shrink** — it forces the table past the viewport and clips the Actions column with no scroll. A text-only table (e.g. an advance list: Date · Amount · Recovered · Remaining) wraps its cells and fits, so it is **safe to leave bare** (document why). For inline-edit tables: `.table-responsive` + `data-label` + mark the form cell `class="cell-edit"` and the action cell `class="td-actions"`, then add a mobile rule so the edit form goes full-width and mini buttons reach 44px:
+
+```css
+@media (max-width: 600px) {
+    .<scope> .table-responsive td.cell-edit { flex-direction: column; align-items: stretch; text-align: left; gap: 6px; }
+    .<scope> .table-responsive td.cell-edit form { width: 100%; }
+    .<scope> .table-responsive td.cell-edit input { width: 100%; min-width: 0; }
+    .<scope> .btn-mini { min-height: 44px; }   /* mini row-actions were 28px → sub-44 touch */
+}
+```
+
+**Shared table partials must own their responsive CSS (PA-15-3).** A partial included by more than one host (e.g. `_stage_panel_cutting_pattern.html` → both `stage_panel_embedded.html` AND the standalone `pattern_workspace.html`) must not rely on stacking CSS that only one host loads. `_form_styles.html` scopes `.form-shell .breakup-table` stacking; the standalone workspace had no `.form-shell` wrapper, so its `.breakup-table` `data-label`s were dead. Scope shared-table stacking to the **bare element** (`.breakup-table`, as `stage_panel_embedded.html` does) so every host gets it, or ensure every host applies the same wrapper class.
+
 ## DataTables — list pages
 
 Use the helper, NOT manual init. CSS overrides are global.

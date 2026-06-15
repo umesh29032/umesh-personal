@@ -4,6 +4,21 @@
 
 {% block extra_head %}
     {% include "production/_form_styles.html" %}
+    <style>
+    /* PA-15-3: this standalone workspace does NOT wrap content in .form-shell, so the
+       _form_styles breakup-table mobile stacking (scoped to .form-shell .breakup-table)
+       never applied — the panel's data-label attrs were dead and tables rendered
+       cramped/unstacked on phones. Mirror the embedded path (bare .breakup-table,
+       stage_panel_embedded.html) so the same panel stacks identically here. */
+    @media (max-width: 600px) {
+        .breakup-table { min-width: 0; }
+        .breakup-table thead { display: none; }
+        .breakup-table tr { display: block; margin-bottom: 12px; border: 1px solid var(--border-card); border-radius: 10px; overflow: hidden; }
+        .breakup-table td { display: flex; justify-content: space-between; padding: 8px 12px; border-top: none; border-bottom: 1px solid var(--border-subtle); }
+        .breakup-table td:last-child { border-bottom: none; }
+        .breakup-table td::before { content: attr(data-label); font-size: 10px; text-transform: uppercase; color: var(--stone); margin-right: 8px; align-self: center; }
+    }
+    </style>
 {% endblock %}
 
 {% block content %}

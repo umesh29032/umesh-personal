@@ -26,6 +26,15 @@
     .pp-edit .btn-mini { padding: 6px 10px; font-size: 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-subtle); }
     .pp-edit .btn-mini.danger { color: #b91c1c; border-color: rgba(185,28,28,0.35); background: #fff; }
     .pp-edit .empty-state { padding: 24px; text-align: center; color: var(--stone); font-style: italic; }
+    /* PA-15-2: same inline-edit bare-table pattern as product_sizes_edit (PA-15-1).
+       Canonical .table-responsive + data-label stacking so the Remove action stays
+       reachable on phones; mini actions reach 44px touch target. */
+    @media (max-width: 600px) {
+        .pp-edit .table-responsive td.cell-edit { flex-direction: column; align-items: stretch; text-align: left; gap: 6px; }
+        .pp-edit .table-responsive td.cell-edit form { width: 100%; }
+        .pp-edit .table-responsive td.cell-edit input[type=number] { width: 100%; }
+        .pp-edit .btn-mini { min-height: 44px; }
+    }
 </style>
 {% endblock %}
 
@@ -43,15 +52,16 @@
     <div class="panel">
         <div class="panel-title">Current Assignments</div>
         {% if assignments %}
+        <div class="table-responsive">
         <table>
             <thead>
-                <tr><th>Pattern</th><th>Pieces / Adda</th><th></th></tr>
+                <tr><th>Pattern</th><th>Pieces / Adda</th><th>Actions</th></tr>
             </thead>
             <tbody>
             {% for a in assignments %}
                 <tr>
-                    <td>{{ a.pattern.name }} <small style="color:var(--stone);font-family:monospace;">{{ a.pattern.code }}</small></td>
-                    <td>
+                    <td data-label="Pattern">{{ a.pattern.name }} <small style="color:var(--stone);font-family:monospace;">{{ a.pattern.code }}</small></td>
+                    <td data-label="Pieces / Adda" class="cell-edit">
                         <form method="post" style="display:flex;gap:6px;align-items:center;">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update_count">
@@ -60,7 +70,7 @@
                             <button type="submit" class="btn-mini">Save</button>
                         </form>
                     </td>
-                    <td>
+                    <td data-label="Actions" class="td-actions">
                         <form method="post" onsubmit="return confirm('Remove {{ a.pattern.name }} from this product?');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="remove">
@@ -72,6 +82,7 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
             <div class="empty-state">No patterns assigned yet.</div>
         {% endif %}

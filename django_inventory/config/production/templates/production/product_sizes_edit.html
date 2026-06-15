@@ -33,6 +33,17 @@
     .ps-edit .btn-mini.danger { color: #b91c1c; border-color: rgba(185,28,28,0.35); background: #fff; }
     .ps-edit .empty-state { padding: 24px; text-align: center; color: var(--stone); font-style: italic; }
     .ps-edit .size-code { display: inline-block; padding: 2px 8px; background: var(--copper); color: #fff; border-radius: 6px; font-weight: 700; font-family: monospace; }
+    /* PA-15-1: fixed-width inputs (label 140 + order 80) forced the table to ~351px,
+       clipping the Archive action off-screen at ≤340px (main.content overflow-x:hidden,
+       no scroll). Tables now use the canonical .table-responsive + data-label stacking. */
+    @media (max-width: 600px) {
+        /* Inline-edit cell: label on top, form full-width below (inputs can't overflow the card) */
+        .ps-edit .table-responsive td.cell-edit { flex-direction: column; align-items: stretch; text-align: left; gap: 6px; }
+        .ps-edit .table-responsive td.cell-edit form { width: 100%; }
+        .ps-edit .table-responsive td.cell-edit input[name=label] { flex: 1; width: auto; min-width: 0; }
+        /* Touch target: mini actions reach 44px on phones (were 28px) */
+        .ps-edit .btn-mini { min-height: 44px; }
+    }
 </style>
 {% endblock %}
 
@@ -50,6 +61,7 @@
     <div class="panel">
         <div class="panel-title">Active Sizes</div>
         {% if active_sizes %}
+        <div class="table-responsive">
         <table>
             <thead>
                 <tr><th>Code</th><th>Label</th><th>Order</th><th>Actions</th></tr>
@@ -57,8 +69,8 @@
             <tbody>
             {% for s in active_sizes %}
                 <tr>
-                    <td><span class="size-code">{{ s.code|upper }}</span></td>
-                    <td>
+                    <td data-label="Code"><span class="size-code">{{ s.code|upper }}</span></td>
+                    <td data-label="Label" class="cell-edit">
                         <form method="post" style="display:flex;gap:6px;align-items:center;">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update">
@@ -68,8 +80,8 @@
                             <button type="submit" class="btn-mini">Save</button>
                         </form>
                     </td>
-                    <td>{{ s.display_order }}</td>
-                    <td>
+                    <td data-label="Order">{{ s.display_order }}</td>
+                    <td data-label="Actions" class="td-actions">
                         <form method="post" onsubmit="return confirm('Archive size {{ s.code|upper }}? It will hide from Cutting Pattern + Cutting selectors.');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="archive">
@@ -81,6 +93,7 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
             <div class="empty-state">No active sizes yet. Add one below.</div>
         {% endif %}
@@ -110,14 +123,15 @@
     {% if archived_sizes %}
     <div class="panel">
         <div class="panel-title" style="color: var(--stone);">Archived Sizes</div>
+        <div class="table-responsive">
         <table>
-            <thead><tr><th>Code</th><th>Label</th><th></th></tr></thead>
+            <thead><tr><th>Code</th><th>Label</th><th>Actions</th></tr></thead>
             <tbody>
             {% for s in archived_sizes %}
                 <tr>
-                    <td><span class="size-code" style="background:var(--stone);opacity:0.65;">{{ s.code|upper }}</span></td>
-                    <td style="color:var(--stone);">{{ s.label }}</td>
-                    <td>
+                    <td data-label="Code"><span class="size-code" style="background:var(--stone);opacity:0.65;">{{ s.code|upper }}</span></td>
+                    <td data-label="Label" style="color:var(--stone);">{{ s.label }}</td>
+                    <td data-label="Actions" class="td-actions">
                         <form method="post">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="reactivate">
@@ -129,6 +143,7 @@
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
     {% endif %}
 
