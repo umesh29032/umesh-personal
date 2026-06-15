@@ -155,3 +155,48 @@ class UpdateRollDetailsTests(TestCase):
         self.roll.save(update_fields=['status'])
         with self.assertRaises(ValidationError):
             update_roll_details(user=self.admin, roll=self.roll, width_inch=40)
+
+
+class RollFormNonNegativeTests(TestCase):
+    """PA-08: negative weight/cost must be a graceful FORM error, not a DB
+    CheckConstraint IntegrityError → 500. BulkRollForm + AssignRollForm are plain
+    forms.Form (no model-constraint validation), so they need an explicit
+    min_value — verified here. (RollEditForm is a ModelForm; Django validates the
+    CheckConstraint in full_clean, so it is already graceful.)"""
+
+    def setUp(self):
+        self.admin = _superuser()
+        self.red = ClothColor.objects.get(name='Red')
+
+    def test_bulk_form_rejects_negative_cost(self):
+        from raw_materials.forms import BulkRollForm
+        form = BulkRollForm(
+            data={'cost_per_kg': '-2'}, user=self.admin,
+            raw_breakup=[{'color': str(self.red.pk), 'qty': '1'}])
+        self.assertFalse(form.is_valid())
+        self.assertIn('cost_per_kg', form.errors)   # field error, not __all__/IntegrityError
+
+    def test_bulk_form_accepts_zero_and_positive_cost(self):
+        from raw_materials.forms import BulkRollForm
+        for good in ('0', '120.50'):
+            form = BulkRollForm(
+                data={'cost_per_kg': good}, user=self.admin,
+                raw_breakup=[{'color': str(self.red.pk), 'qty': '1'}])
+            form.is_valid()
+            self.assertNotIn('cost_per_kg', form.errors)
+
+    def test_assign_form_rejects_negative_weight(self):
+        from raw_materials.forms import AssignRollForm
+        form = AssignRollForm(
+            data={'weight_kg': '-5', 'width_inch': '40', 'adda_code': 'X'},
+            adda_choices=[('X', 'X')])
+        self.assertFalse(form.is_valid())
+        self.assertIn('weight_kg', form.errors)
+
+    def test_assign_form_accepts_positive_weight(self):
+        from raw_materials.forms import AssignRollForm
+        form = AssignRollForm(
+            data={'weight_kg': '5', 'width_inch': '40', 'adda_code': 'X'},
+            adda_choices=[('X', 'X')])
+        form.is_valid()
+        self.assertNotIn('weight_kg', form.errors)

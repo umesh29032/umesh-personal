@@ -72,6 +72,12 @@ bulk intake form (price fields visible to financial roles only), roll detail.
 - **Role-gated form fields**: the intake form POPS `cost_per_kg` for
   non-financial users (`fields.pop`) — gating belongs in the form layer,
   display mein nahi.
+- **Non-negative form guard (PA-08)**: `BulkRollForm.cost_per_kg` +
+  `AssignRollForm.weight_kg` carry `min_value=0`. These are plain `forms.Form`
+  (no model-constraint validation), so without it a negative slips past
+  validation and only trips the DB CheckConstraint at INSERT → `IntegrityError`
+  → 500. (`RollEditForm` is a ModelForm → Django validates the CheckConstraint in
+  `full_clean`, so it is already graceful.)
 - **Honest-NULL**: nullable Decimal + dashboard surfacing instead of
   default-0 — "pata nahi" aur "zero" alag cheez hai.
 

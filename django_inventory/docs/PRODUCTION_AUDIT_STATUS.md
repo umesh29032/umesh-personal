@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 07 — Stage Engine Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 08 — Raw Material Audit |
+| **Current phase** | PHASE 08 — Raw Material Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 09 — Inventory Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **673 tests, all passing** (was 641; +32 audit regression tests) |
+| **Green test baseline** | **677 tests, all passing** (was 641; +36 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -34,7 +34,7 @@
 | 05B | CRUD Audit — Operational | ✅ COMPLETE · commit `15371a08` | Adversarial workflow (38 candidates, 6 money/qty/inventory flows) + code-level verification + live mobile worker-report test. 2 fixed (finalize crash, breakup atomic); rest refuted/documented (money writes are service-locked+atomic+tested). 663 green. |
 | 06 | Master Data — Integrity / Config / Seed / **Drift** | ✅ COMPLETE · commit `d75e606f` | Refined scope (a–e incl. owner-added Configuration Drift Audit). Adversarial workflow (16 candidates: DB-integrity/seed/flow-config/WorkerProfile/config-drift) + live DB drift probes + constraint-enforcement probes. 2 fixed (WorkerProfile validation); rest documented/refuted. Constraints enforced; reconcile_denorm clean; no drift on real products. 671 green. |
 | 07 | Stage Engine Audit | ✅ COMPLETE · commit `bc008685` | Full lifecycle audit of layering · cutting_pattern · cutting · barcode (create/assign/start/report/draft/complete/reopen/review/settlement/quantity/allocation/transition/race). 7-finder adversarial workflow died on session limit → continued main-thread (full stage engine read). 2 fixed (PA-07-1/2, one root cause: raw-string→`Decimal` 500), 2 refuted (Adda.started_at None; breakup count<consumed). Money/transition/reopen logic = foundation-locked + tested, verified sound. 673 green. |
-| 08 | Raw Material Audit | ⬜ PENDING | cloth roll: inbound · stock · consumption · adjustments |
+| 08 | Raw Material Audit | ✅ COMPLETE · commit `PENDING` | Cloth roll lifecycle: inbound (bulk intake) · stock-edit · Adda assignment · leftover consumption. Main-thread audit (subagents still session-limited; not re-run — no added coverage vs manual read of a 5-file app). 2 fixed (PA-08-1/2: negative weight/cost on plain forms.Form → DB CheckConstraint IntegrityError → 500). Refuted: RollEditForm (ModelForm full_clean validates constraint → graceful), dashboard filter parse (guarded), assign-roll race (PA-05B-RACE class), RollBulkCreateView `except PermissionError` mismatch (latent, super-admin-only → unreachable). 677 green. |
 | 09 | Inventory Audit | ⬜ PENDING | |
 | 10 | Production Audit | ⬜ PENDING | |
 | 11 | Settlement Audit | ⬜ PENDING | |
@@ -96,6 +96,10 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-07-2 | MEDIUM | 07 | production/adda-report-review | ✅ FIXED | Management quantity review: a tampered/non-numeric `verified_<pk>` reached `set_verified_quantity` as a raw string → same `Decimal()` `InvalidOperation` → 500 (`AddaReportReviewView` catches only `(ValidationError, PermissionDenied)`). Same root cause + fix as PA-07-1. |
 | PA-07-STARTED-AT | — | 07 | production/layering | 📋 REFUTED | "Layering auto-duration `now − adda.started_at` 500s if `started_at` is None." `Adda.started_at = DateTimeField(auto_now_add=True)` (models/adda.py:45) → never None. Not a bug. |
 | PA-07-BREAKUP-COUNT | — | 07 | production/cutting | 📋 REFUTED (benign) | "`upsert_breakup_row` can set a breakup `count` below its `consumed_count` → negative `available`." Breakup is the INFORMATIONAL plan (docstring: bundles drive completion/settlement, not breakup). Negative `available` only blocks further takes in `add_pieces_to_bundle` (`take > available` always rejects) — no crash, no money/qty error. Not fixed (no-speculative rule). |
+| PA-08-1 | MEDIUM | 08 | raw_materials/intake | ✅ FIXED | Bulk roll intake: a negative `cost_per_kg` passed `BulkRollForm` (a plain `forms.Form`, no model-constraint validation) → `bulk_create_rolls` → `ClothRoll` INSERT → DB CheckConstraint `rawmat_clothroll_costperkg_nonneg` → **IntegrityError** (RollBulkCreateView catches only `(ValidationError, PermissionError)`) → 500. Reproduced at service level. Fix: `min_value=0` on the form field → graceful field error. (Same class as PA-06-1.) |
+| PA-08-2 | MEDIUM | 08 | raw_materials/assign | ✅ FIXED | Roll→Adda assign: a negative `weight_kg` passed `AssignRollForm` (`is_valid()=True`, plain forms.Form) → `assign_roll_to_adda` → roll save → CheckConstraint `rawmat_clothroll_weight_nonneg` → IntegrityError (RollAssignView catches only `(Adda.DoesNotExist, ValidationError)`) → 500. Fix: `min_value=0` on the form field. Mobile-relevant (roll assign is a floor data-entry surface; the number input had no `min`). |
+| PA-08-EDITFORM | — | 08 | raw_materials/roll-edit | 📋 REFUTED | "RollEditForm accepts negative weight/cost → 500." It is a **ModelForm**; Django 5 validates the model CheckConstraint in `full_clean()`, so `is_valid()` is False (`__all__` error) → no service call, no 500. Already graceful (message leaks the constraint name — cosmetic, not fixed per no-speculative). |
+| PA-08-PERM | LOW | 08 | raw_materials/intake | 📋 DOC (latent, unreachable) | `RollBulkCreateView.form_valid` catches `PermissionError` (Python builtin) but the service raises `django.core.exceptions.PermissionDenied` — wrong type. Latent only: the view is `SuperAdminOnlyMixin`, super-admin always passes `user_can_edit_financials`, so `bulk_create_rolls`' financial gate never fires here → PermissionDenied is unreachable from this view (would 403 anyway, not 500). Not fixed (not reproducible). |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
@@ -105,6 +109,7 @@ Phase 05A: PA-05A-1..5 (Skill delete guard, Role extra-role guard, Role messages
 Phase 05B: PA-05B-1 (settlement finalize int-parse crash), PA-05B-2 (cutting breakup atomic).
 Phase 06: PA-06-1 (WorkerProfile opening_advance ≥ 0), PA-06-2 (WorkerProfile bank-detail validation). All with regression tests (671 green). Full reports below.
 Phase 07: PA-07-1 (worker-report non-numeric quantity → 500), PA-07-2 (review verified-qty non-numeric → 500) — one root cause, fixed at the `worker_task_service` writer boundary. +2 regression tests (673 green).
+Phase 08: PA-08-1 (bulk-intake negative cost → 500), PA-08-2 (roll-assign negative weight → 500) — `min_value=0` on the two plain-form DecimalFields (DB CheckConstraint mirrored at the form layer). +4 regression tests (677 green).
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -410,6 +415,44 @@ Both fixes are **backend-only** (`worker_task_service`) — **no template / CSS 
 
 ### UI_COMPONENTS.md
 No change — both fixes are backend input validation in the writer service; no reusable UI rule emerged.
+
+---
+
+## PHASE 08 — RAW MATERIAL AUDIT · RESULT
+
+**Scope:** the cloth-roll lifecycle in the `raw_materials` app — **inbound** (bulk intake), **stock** edit, Adda **assignment**, leftover **consumption** ("adjustments" = the width/weight/location stock edits; there is no separate stock-count surface). Models: ClothType / ClothColor / StorageLocation (master, audited in 05A — not re-audited) + ClothRoll. Files: `services/roll_service.py`, `views/{roll,assign,dashboard,master}_views.py`, `forms/roll_forms.py`, `models.py`.
+
+**Method:** main-thread deep read of the whole app (5 core files) + a live shell repro of the suspected 500s (negative numeric → DB CheckConstraint `IntegrityError`) + tmp-row cleanup verified. **Sub-agents were NOT re-run** — still session-limited, and a 5-file app gains no coverage over a complete manual read (per the Phase-07 finder-honesty rule). RBAC + master-data CRUD already covered in Phases 03/05A — not re-audited.
+
+### What's robust (verified)
+- **Money/measure write paths are service-owned + atomic.** `bulk_create_rolls` (financial gate + per-row qty `int()` guarded in `BulkRollForm.clean`), `update_roll_details` (field-level diff + history + `refresh_from_db` to survive ModelForm instance mutation + USED-roll block), `consume_leftover` (`select_for_update` + re-check + same-Adda guard, C-1/ADR-0009). Roll FKs PROTECT; CheckConstraints (`cost_per_kg/weight/remaining_* >= 0`) enforced at the DB.
+- **Filter parsing is guarded** — `RollListView` chip lookups `try/except (DoesNotExist, ValueError)`; dashboard `color_id` gated by `.isdigit()`; `_parse_date` `try/except ValueError → None`. No GET-param 500s.
+- **`assign_roll_to_adda`** guards roll status + Adda in-progress + Layering-stage; the missing `select_for_update` is the already-documented single-actor race (PA-05B-RACE), not re-flagged.
+
+### BUG PA-08-1 — bulk intake: negative cost_per_kg → 500
+- **Severity:** MEDIUM · **Module:** raw_materials/intake · **URL:** `raw_materials:roll-bulk-create` POST · **Role:** super_admin (financial) · **Device:** both
+- **Reproduction:** submit a valid color/qty breakup with `cost_per_kg = -2`. `BulkRollForm` is a plain `forms.Form` (NOT a ModelForm) so it runs no model-constraint validation — the negative passes `is_valid()`. `bulk_create_rolls` builds `ClothRoll(cost_per_kg=-2)` → `bulk_create` → DB CheckConstraint `rawmat_clothroll_costperkg_nonneg` → **IntegrityError**, which `RollBulkCreateView.form_valid` does not catch (`except (ValidationError, PermissionError)`) → 500.
+- **Verification of repro:** shell — `bulk_create_rolls(..., cost_per_kg=Decimal('-2'))` raised `IntegrityError: ... violates check constraint "rawmat_clothroll_costperkg_nonneg"`. (tmp master rows cleaned up.)
+- **Root cause:** the non-negative rule lived only at the DB; the plain form had no `min_value`. `raw_materials/forms/roll_forms.py` `BulkRollForm.cost_per_kg`.
+- **Fix:** `min_value=0` on the field (+ `min='0'` on the widget) → graceful field error before any INSERT. Mirrors PA-06-1.
+- **Status:** ✅ FIXED · test `RollFormNonNegativeTests.test_bulk_form_rejects_negative_cost` (+ positive control).
+
+### BUG PA-08-2 — roll→Adda assign: negative weight_kg → 500
+- **Severity:** MEDIUM · **Module:** raw_materials/assign · **URL:** `raw_materials:roll-assign` POST · **Role:** production (worker/manager) · **Device:** both (mobile floor surface — the number input had no `min`)
+- **Reproduction:** on the assign form, enter `weight_kg = -5`. `AssignRollForm` (plain forms.Form) returns `is_valid()=True` (shell-verified). `assign_roll_to_adda` saves `weight_kg=-5` → CheckConstraint `rawmat_clothroll_weight_nonneg` → IntegrityError, not caught by `RollAssignView.form_valid` (`except (Adda.DoesNotExist, ValidationError)`) → 500.
+- **Root cause + fix:** same as PA-08-1 — `min_value=0` on `AssignRollForm.weight_kg`.
+- **Status:** ✅ FIXED · test `RollFormNonNegativeTests.test_assign_form_rejects_negative_weight` (+ positive control).
+
+### Refuted / documented
+- **PA-08-EDITFORM (refuted):** `RollEditForm` is a **ModelForm** → Django 5 validates the CheckConstraint in `full_clean()`, so a negative weight/cost makes `is_valid()` False (graceful `__all__` error, no service call, no 500). Shell-confirmed. (The message leaks the constraint name — cosmetic, not fixed.)
+- **PA-08-PERM (doc, latent):** `RollBulkCreateView` catches `PermissionError` (builtin) not `PermissionDenied` (Django) — but the view is super-admin-only so the service's financial gate never raises here. Unreachable → not fixed.
+- **Sequence gaps on validation failure:** `_next_roll_id()` advances the Postgres sequence before the late `is_active` checks; a rejected intake leaves CR-ID gaps. Inherent to Postgres sequences (rollback never reclaims `nextval`) — cosmetic, not a bug.
+
+### Mobile (highest priority)
+Both fixes are **form-validation-only** (one kwarg + a widget `min` attr) — no template/layout change. The assign surface (PA-08-2) is a floor data-entry form; adding `min='0'` to its number input is a small mobile-correctness improvement (prevents an invalid negative at the keyboard). No layout/overflow impact.
+
+### UI_COMPONENTS.md
+No change — backend form-field validation; no reusable visual/layout rule emerged. (The `min='0'` on numeric inputs is a sensible convention but does not rise to a documented component rule.)
 
 ---
 
