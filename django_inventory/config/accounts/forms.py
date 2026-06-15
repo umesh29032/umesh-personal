@@ -25,7 +25,7 @@ class UserTypeForm(forms.ModelForm):
         widgets = {
             'code': forms.TextInput(attrs={
                 'placeholder': 'slug-key, e.g. franchise_owner',
-                'pattern': r'[-a-z0-9_]+',
+                'pattern': r'[a-z0-9_\-]+',
             }),
             'label': forms.TextInput(attrs={'placeholder': 'Display name, e.g. Franchise Owner'}),
             'description': forms.Textarea(attrs={'rows': 2}),
@@ -40,7 +40,7 @@ class SkillForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={
                 'placeholder': 'slug-key, e.g. stitching_master',
-                'pattern': r'[-a-z0-9_]+',
+                'pattern': r'[a-z0-9_\-]+',
                 'title': 'Lowercase letters, numbers, hyphens, underscores only',
             }),
             'label': forms.TextInput(attrs={'placeholder': 'Display name, e.g. Stitching Master'}),
