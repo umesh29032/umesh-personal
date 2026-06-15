@@ -32,9 +32,9 @@ from production.constants import (
     STAGE_CUTTING, STAGE_LAYERING,
 )
 from production.models import (
-    AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation, CuttingPieceBreakup,
-    CuttingRecord, LayeringRecord, Product, ProductPattern, ProductPatternAssignment,
-    ProductSize, Stage, WorkflowStage,
+    AddaStageRecord, CuttingBundleItem, CuttingPatternRecord, CuttingPatternSizeAllocation,
+    CuttingPieceBreakup, CuttingRecord, LayeringRecord, Product, ProductPattern,
+    ProductPatternAssignment, ProductSize, Stage, WorkflowStage,
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle, complete_cutting,
@@ -202,6 +202,22 @@ class StartCuttingTests(CuttingWorkflowFixture):
         sr1 = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         sr2 = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         self.assertEqual(sr1.pk, sr2.pk)
+
+    def test_legacy_complete_after_start_refused_gracefully(self):
+        """PA-09-1: complete_cutting_legacy CREATEs the AddaStageRecord; if start_cutting
+        (or any bundle op / a prior complete+reopen) already made it, the unconditional
+        create would hit unique_together(adda, workflow_stage) → IntegrityError → 500.
+        Must surface as a graceful ValidationError instead."""
+        from production.stages.cutting.service import complete_cutting_legacy
+        start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
+        with self.assertRaises(ValidationError):
+            complete_cutting_legacy(
+                adda=self.adda, pieces_cut=5, worker_ids=[self.admin.pk],
+                notes='', user=self.admin)
+        # No partial state: still exactly one SR, still not completed.
+        srs = AddaStageRecord.objects.filter(adda=self.adda, workflow_stage=self.cutting_wf)
+        self.assertEqual(srs.count(), 1)
+        self.assertIsNone(srs.get().completed_at)
 
 
 class UpsertBreakupRowTests(CuttingWorkflowFixture):
@@ -553,6 +569,27 @@ class AddPiecesToBundleTests(CuttingWorkflowFixture):
         self.assertEqual(self.brk_front.available_count, 10)
         self.assertEqual(self.brk_back.consumed_count, 5)
         self.assertEqual(self.bundle.total_pieces, 15)
+
+    def test_manual_item_then_breakup_consume_refused_gracefully(self):
+        """PA-09-2: CuttingBundleItem is unique on (bundle, pattern, color), but
+        add_pieces_to_bundle keys get_or_create on (...,source_breakup). A manual
+        add_item_to_bundle line (source_breakup=NULL) for the same (pattern, color)
+        then a breakup-consume → unique collision → IntegrityError → 500. Must be a
+        graceful ValidationError instead, and consume nothing."""
+        add_item_to_bundle(
+            adda=self.adda, bundle_id=self.bundle.id,
+            pattern_id=self.front.id, color_id=self.red.id, count=5, user=self.admin)
+        with self.assertRaises(ValidationError):
+            add_pieces_to_bundle(
+                adda=self.adda, bundle_id=self.bundle.id,
+                selections=[{'breakup_id': self.brk_front.id, 'take_count': 3}],
+                user=self.admin)
+        # Refused before any consumption — breakup untouched, manual line intact.
+        self.brk_front.refresh_from_db()
+        self.assertEqual(self.brk_front.consumed_count, 0)
+        self.assertEqual(
+            CuttingBundleItem.objects.filter(
+                bundle=self.bundle, pattern=self.front, color=self.red).count(), 1)
 
     def test_consume_full_zeros_available(self):
         add_pieces_to_bundle(

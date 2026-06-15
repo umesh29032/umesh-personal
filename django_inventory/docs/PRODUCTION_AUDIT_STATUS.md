@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 08 — Raw Material Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 09 — Inventory Audit |
+| **Current phase** | PHASE 09 — Inventory Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 10 — Production Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **677 tests, all passing** (was 641; +36 audit regression tests) |
+| **Green test baseline** | **679 tests, all passing** (was 641; +38 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -35,7 +35,7 @@
 | 06 | Master Data — Integrity / Config / Seed / **Drift** | ✅ COMPLETE · commit `d75e606f` | Refined scope (a–e incl. owner-added Configuration Drift Audit). Adversarial workflow (16 candidates: DB-integrity/seed/flow-config/WorkerProfile/config-drift) + live DB drift probes + constraint-enforcement probes. 2 fixed (WorkerProfile validation); rest documented/refuted. Constraints enforced; reconcile_denorm clean; no drift on real products. 671 green. |
 | 07 | Stage Engine Audit | ✅ COMPLETE · commit `bc008685` | Full lifecycle audit of layering · cutting_pattern · cutting · barcode (create/assign/start/report/draft/complete/reopen/review/settlement/quantity/allocation/transition/race). 7-finder adversarial workflow died on session limit → continued main-thread (full stage engine read). 2 fixed (PA-07-1/2, one root cause: raw-string→`Decimal` 500), 2 refuted (Adda.started_at None; breakup count<consumed). Money/transition/reopen logic = foundation-locked + tested, verified sound. 673 green. |
 | 08 | Raw Material Audit | ✅ COMPLETE · commit `666d7274` | Cloth roll lifecycle: inbound (bulk intake) · stock-edit · Adda assignment · leftover consumption. Main-thread audit (subagents still session-limited; not re-run — no added coverage vs manual read of a 5-file app). 2 fixed (PA-08-1/2: negative weight/cost on plain forms.Form → DB CheckConstraint IntegrityError → 500). Refuted: RollEditForm (ModelForm full_clean validates constraint → graceful), dashboard filter parse (guarded), assign-roll race (PA-05B-RACE class), RollBulkCreateView `except PermissionError` mismatch (latent, super-admin-only → unreachable). 677 green. |
-| 09 | Inventory Audit | ⬜ PENDING | |
+| 09 | Inventory Audit | ✅ COMPLETE · commit `PENDING` | Inventory as a QUANTITY-TRUTH system (the `inventory` Django app is RBAC-only): roll/leftover · breakup↔bundle↔item · breakdown↔barcode · S4 pool · reopen effects · denorm counters · concurrency · reconcile. 6-finder conservation Workflow ran; **9/10 verifiers died on session limit → main-thread-verified every finder candidate (honesty rule — NOT marked clean on dead verifiers).** 2 fixed (PA-09-1 legacy-cutting double-create SR 500; PA-09-2 mixed manual+breakup add unique-collision 500). Refuted/documented: consume_leftover stale read-cache (benign), reconcile pieces_cut-vs-breakup (by-design, tested contract), reconcile 2-of-5 coverage (enhancement, counters self-heal), manual-no-bound (PA-07-BREAKUP class), total_pieces lost-update (display-only/PA-05B-RACE). 679 green. |
 | 10 | Production Audit | ⬜ PENDING | |
 | 11 | Settlement Audit | ⬜ PENDING | |
 | 12 | Payroll Audit | ⬜ PENDING | |
@@ -100,6 +100,12 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-08-2 | MEDIUM | 08 | raw_materials/assign | ✅ FIXED | Roll→Adda assign: a negative `weight_kg` passed `AssignRollForm` (`is_valid()=True`, plain forms.Form) → `assign_roll_to_adda` → roll save → CheckConstraint `rawmat_clothroll_weight_nonneg` → IntegrityError (RollAssignView catches only `(Adda.DoesNotExist, ValidationError)`) → 500. Fix: `min_value=0` on the form field. Mobile-relevant (roll assign is a floor data-entry surface; the number input had no `min`). |
 | PA-08-EDITFORM | — | 08 | raw_materials/roll-edit | 📋 REFUTED | "RollEditForm accepts negative weight/cost → 500." It is a **ModelForm**; Django 5 validates the model CheckConstraint in `full_clean()`, so `is_valid()` is False (`__all__` error) → no service call, no 500. Already graceful (message leaks the constraint name — cosmetic, not fixed per no-speculative). |
 | PA-08-PERM | LOW | 08 | raw_materials/intake | 📋 DOC (latent, unreachable) | `RollBulkCreateView.form_valid` catches `PermissionError` (Python builtin) but the service raises `django.core.exceptions.PermissionDenied` — wrong type. Latent only: the view is `SuperAdminOnlyMixin`, super-admin always passes `user_can_edit_financials`, so `bulk_create_rolls`' financial gate never fires here → PermissionDenied is unreachable from this view (would 403 anyway, not 500). Not fixed (not reproducible). |
+| PA-09-1 | HIGH | 09 | production/cutting (legacy complete) | ✅ FIXED | `complete_cutting_legacy` CREATEs the `AddaStageRecord` unconditionally, but `(adda, workflow_stage)` is `unique_together` and the SR may already exist — `start_cutting`, any bundle/breakup op (`_get_or_create_cutting_stage_record`), or a prior complete+`reopen_cutting` (keeps the SR) all leave one. Second create → **IntegrityError**, uncaught by `CuttingCompleteView` (`except (ValidationError, PermissionDenied)`) → 500. Cleanest repro: legacy-complete → reopen → legacy-complete again. Fix: refuse gracefully if an SR exists (point at the workspace). |
+| PA-09-2 | MEDIUM | 09 | production/cutting (bundles) | ✅ FIXED | `CuttingBundleItem` is `unique_together (bundle,pattern,color)` but `add_pieces_to_bundle`'s `get_or_create` keys on `(...,source_breakup)`. A manually-added line (`add_item_to_bundle`, `source_breakup=NULL`) for the same (pattern,color) then a breakup-consume → `get_or_create` can't match it → tries CREATE → unique violation → **IntegrityError** (uncaught by `CuttingBundleAddPiecesView`) → 500. Fix: detect the conflicting line before create → graceful ValidationError. |
+| PA-09-CONSUME-LEFTOVER | — | 09 | production/leftover | 📋 REFUTED (benign) | `consume_leftover` sets `is_consumed=True` but never re-syncs the source `ClothRoll.remaining_*` denorm (no `_sync_roll_leftover` call), so a per-roll display column on 3 pages shows a stale leftover. Verified benign: `ClothRoll.remaining_*` is a pure read-cache — NO costing/settlement/barcode/pieces/pool code reads it; double-consume is governed by `is_consumed` (correct, `select_for_update`+recheck); leftover-availability dashboards Sum the PRIMARY `RemainingClothOfClothRoll` rows, not the roll denorm. Display drift only → not fixed. |
+| PA-09-RECONCILE-SRC | — | 09 | production/reconcile | 📋 REFUTED (by-design) | `reconcile_denorm` checks `pieces_cut == Σ CuttingPieceBreakup.count`, while the modern workspace path sets `pieces_cut = Σ CuttingBundleItem.count` — so it can report plan≠actual as "drift". This is the DOCUMENTED + TESTED contract (model docstring "pieces_cut = SUM(breakup.count)"; `test_reconcile_denorm` codifies breakup-as-source). In correct usage Σ breakup == Σ items (Phase-06 verified clean on real data); a divergence is a legitimate plan/actual flag, not a false positive. Changing the source = redesign → not changed (no-redesign rule). |
+| PA-09-RECONCILE-COV | LOW | 09 | production/reconcile | 📋 DOC (enhancement) | `reconcile_denorm` covers only `pieces_cut` + `total_barcodes`; it does NOT verify `CuttingPieceBreakup.consumed_count`, `CuttingBundle.total_pieces`, or `ClothRoll.remaining_*`. Drift in those would go undetected by the tool. Mitigated: all three are recomputed-from-truth on every write (`_recompute_*` / `_sync_roll_leftover`) so they self-heal; none feeds barcode/settlement truth. Adding checks = enhancement (no-feature rule) → documented, not built. |
+| PA-09-TOTALPIECES-RACE | LOW | 09 | production/cutting (bundles) | 📋 DOC (display, race) | `_recompute_bundle_total`/`_recompute_breakup_consumed` re-sum without locking the bundle/items, so two managers concurrently adding items to the SAME bundle could persist a stale `total_pieces`/`consumed_count` (lost update). Display-only impact: `total_pieces` is NOT in the truth path (barcode/breakdown/`pieces_cut` read `Σ items` directly); recomputed correct on the next item op. Single-bundle two-actor concurrency = PA-05B-RACE class (not touching locked services for a theoretical race). |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
@@ -110,6 +116,7 @@ Phase 05B: PA-05B-1 (settlement finalize int-parse crash), PA-05B-2 (cutting bre
 Phase 06: PA-06-1 (WorkerProfile opening_advance ≥ 0), PA-06-2 (WorkerProfile bank-detail validation). All with regression tests (671 green). Full reports below.
 Phase 07: PA-07-1 (worker-report non-numeric quantity → 500), PA-07-2 (review verified-qty non-numeric → 500) — one root cause, fixed at the `worker_task_service` writer boundary. +2 regression tests (673 green).
 Phase 08: PA-08-1 (bulk-intake negative cost → 500), PA-08-2 (roll-assign negative weight → 500) — `min_value=0` on the two plain-form DecimalFields (DB CheckConstraint mirrored at the form layer). +4 regression tests (677 green).
+Phase 09: PA-09-1 (legacy-cutting unconditional SR create → IntegrityError 500), PA-09-2 (mixed manual+breakup bundle add → unique-collision IntegrityError 500) — both converted to graceful ValidationError. +2 regression tests (679 green).
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -453,6 +460,50 @@ Both fixes are **form-validation-only** (one kwarg + a widget `min` attr) — no
 
 ### UI_COMPONENTS.md
 No change — backend form-field validation; no reusable visual/layout rule emerged. (The `min='0'` on numeric inputs is a sensible convention but does not rise to a documented component rule.)
+
+---
+
+## PHASE 09 — INVENTORY AUDIT · RESULT
+
+**Scope (quantity-truth, not CRUD):** the `inventory` Django app is RBAC-only (no stock model), so "inventory" = the STOCK QUANTITY-TRUTH subsystem across raw_materials + production + tracking. Audited stock conservation, movement correctness, negative-stock prevention, quantity drift, denormalized counters, reconciliation, orphaned records, concurrency (double-consume / double-assign / lost-update / lock coverage), and reopen/reversal effects — with DB-truth ⟷ service-truth ⟷ UI-truth consistency as the bar.
+
+**Method:** a 6-finder quantity-conservation Workflow (roll-leftover · breakup-bundle · breakdown-barcode · S4 pool · reopen-reversal · concurrency-reconcile) + adversarial per-finding verify. **The finders ran and surfaced 10 candidates, but 9 of 10 VERIFIERS died on a session/API limit** (only the `consume_leftover` verifier completed). Per the honesty rule, "0 confirmed" was NOT treated as clean — **every finder candidate was main-thread-verified against the actual code + tests.** Two were also independently found main-thread before the workflow returned.
+
+### What's robust (verified)
+- **Conservation chain holds:** breakup(plan) → bundle items(actual) → `_materialize_breakdown` (Σ items by size,color) → `pieces_cut`(=Σ items) → BarcodeBatch; `complete_barcode_generation` enforces `batch_total == breakdown_total == total_barcodes`. Barcode count == pieces actually bundled.
+- **Negative/over:** all counts are `PositiveIntegerField` (DB rejects negative); `available_count = max(count−consumed,0)` clamps; `add_pieces_to_bundle` locks the breakup + refuses over-take; CheckConstraints on roll cost/weight/remaining + BarcodeBatch `total_pieces>0` / `total_pieces == end−start+1`.
+- **Double-consume guarded:** leftover `consume_leftover` = `select_for_update` + `is_consumed` recheck + same-Adda guard; allocated bundle items / settled lines PROTECT against delete.
+- **Denorm self-heals:** `_recompute_bundle_total` / `_recompute_breakup_consumed` / `_sync_roll_leftover` recompute-from-truth on every write.
+- **Reopen resets stock:** cutting reopen deletes breakdown + BarcodeBatch (incl. inline) + clears pool; barcode reopen deletes batches + resets `total_barcodes`/`generated_at`; the transitive downstream-consumer guard blocks reopening a stage whose output is consumed.
+
+### BUG PA-09-1 — legacy cutting completion double-creates the stage record → 500
+- **Severity:** HIGH · **Module:** production/cutting · **URL:** `production:cutting-complete` POST · **Role:** management · **Device:** both
+- **Reproduction:** (1) start cutting (or add any bundle/breakup, or complete-then-reopen) so an `AddaStageRecord(adda, cutting)` exists. (2) POST the legacy cutting form (`/production/addas/<code>/cutting/`). `complete_cutting_legacy` runs `AddaStageRecord.objects.create(adda=, workflow_stage=)` **unconditionally**, but `(adda, workflow_stage)` is `unique_together` → **IntegrityError**, which `CuttingCompleteView` (`except (ValidationError, PermissionDenied)`) doesn't catch → 500. Cleanest path: legacy-complete → `reopen_cutting` (keeps the SR) → legacy-complete again.
+- **Root cause:** the single-form path assumes a fresh stage; it never checks for an existing SR. `config/production/stages/cutting/service.py` `complete_cutting_legacy`.
+- **Fix:** refuse gracefully (`ValidationError`) if an SR already exists, directing to the cutting workspace (which handles an existing SR). Pure-legacy first-completion (no SR) is unchanged.
+- **Verification:** `StartCuttingTests.test_legacy_complete_after_start_refused_gracefully` (asserts `ValidationError`, exactly one SR, not completed). 679 green.
+- **Status:** ✅ FIXED
+
+### BUG PA-09-2 — mixed manual + breakup bundle-add collides → 500
+- **Severity:** MEDIUM · **Module:** production/cutting · **URL:** `production:cutting-bundle-add-pieces` POST · **Role:** cutting/management · **Device:** both
+- **Reproduction:** in a bundle, add a line manually for Front/Red (`add_item_to_bundle` → `source_breakup=NULL`), then consume the Front/Red breakup into the same bundle (`add_pieces_to_bundle`). Its `get_or_create(bundle,pattern,color,source_breakup=breakup)` can't match the manual row (different `source_breakup`), tries to CREATE, and trips `unique_together (bundle,pattern,color)` → **IntegrityError** (uncaught by `CuttingBundleAddPiecesView`) → 500.
+- **Root cause:** the unique key and the get_or_create key differ. `config/production/stages/cutting/service.py` `add_pieces_to_bundle`.
+- **Fix:** before create, detect a conflicting line for `(bundle,pattern,color)` not sourced from this breakup → graceful `ValidationError` ("edit that line instead"). Consumes nothing on refusal (atomic).
+- **Verification:** `AddPiecesToBundleTests.test_manual_item_then_breakup_consume_refused_gracefully`. 679 green.
+- **Status:** ✅ FIXED
+
+### Refuted / documented (main-thread verified — verifiers had died)
+- **PA-09-CONSUME-LEFTOVER (refuted, benign):** `consume_leftover` leaves `ClothRoll.remaining_*` denorm stale, but that field is a pure read-cache (no costing/settlement/barcode/pool reader); `is_consumed` (correct, locked) governs double-consume; availability dashboards Sum the primary leftover rows. Display drift only.
+- **PA-09-RECONCILE-SRC (refuted, by-design):** `reconcile_denorm` checks `pieces_cut` against `Σ breakup.count` — the documented + `test_reconcile_denorm`-codified contract (breakup is the source-of-truth for pieces_cut). Changing it to Σ items = redesign (forbidden). In correct usage they're equal (Phase-06 clean on real data).
+- **PA-09-RECONCILE-COV (doc, enhancement):** reconcile covers only 2 of the denorm counters; the other three self-heal on write and don't feed barcode/settlement truth. Adding checks = feature (not built).
+- **manual-no-bound (refuted):** `add_item_to_bundle` overwriting a breakup-sourced count can push `consumed_count>count`, but breakup is the informational plan (PA-07-BREAKUP) and the manual count IS the actual barcoded truth — no downstream corruption.
+- **PA-09-TOTALPIECES-RACE (doc):** `_recompute_*` re-sum without locking the bundle → a two-manager concurrent add to the same bundle could persist a stale `total_pieces`; display-only (not in the barcode/breakdown/pieces_cut truth path), self-heals next op. PA-05B-RACE class.
+
+### Mobile (highest priority)
+Both fixes are **backend service guards** (turn an `IntegrityError` 500 into a graceful `ValidationError` the existing views already surface as a message) — no template/markup/CSS change, so no mobile-render delta. The cutting workspace + legacy form render unchanged.
+
+### UI_COMPONENTS.md
+No change — backend quantity-truth guards; no reusable visual/layout rule emerged.
 
 ---
 

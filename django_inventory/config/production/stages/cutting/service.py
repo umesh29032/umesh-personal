@@ -610,6 +610,20 @@ def add_pieces_to_bundle(
                 f"{breakup.pattern.name}/{breakup.color.name}: only {available} "
                 f"available, cannot take {take_count}.",
             )
+        # PA-09-2: CuttingBundleItem is unique on (bundle, pattern, color), but this
+        # get_or_create keys on (...,source_breakup). If a DIFFERENT row already holds
+        # (bundle, pattern, color) — a manually-added line (source_breakup=NULL via
+        # add_item_to_bundle) — get_or_create can't match it, tries to CREATE, and trips
+        # the unique constraint → IntegrityError (uncaught by the view → 500). Detect it
+        # and refuse gracefully. (Re-consuming THIS breakup matches + increments below.)
+        conflict = (CuttingBundleItem.objects
+                    .filter(bundle=bundle, pattern=breakup.pattern, color=breakup.color)
+                    .exclude(source_breakup=breakup).exists())
+        if conflict:
+            raise ValidationError(
+                f"{breakup.pattern.name}/{breakup.color.name} already has a line in this "
+                "bundle (added manually or from another source). Edit that line instead "
+                "of consuming this row into the same bundle.")
         item, item_created = CuttingBundleItem.objects.get_or_create(
             bundle=bundle, pattern=breakup.pattern, color=breakup.color,
             source_breakup=breakup,
@@ -975,6 +989,18 @@ def complete_cutting_legacy(
         raise ValidationError(f"Adda {adda.code} is not in-progress")
     if pieces_cut < 1:
         raise ValidationError("pieces_cut must be >= 1")
+
+    # PA-09-1: this single-form path CREATEs the AddaStageRecord unconditionally.
+    # But (adda, workflow_stage) is unique_together, and the SR may ALREADY exist —
+    # start_cutting / any bundle-or-breakup op lazy-creates it, and reopen_cutting
+    # keeps it. A second create → IntegrityError, which CuttingCompleteView's
+    # `except (ValidationError, PermissionDenied)` does not catch → 500. Refuse
+    # gracefully and point at the workspace (the path that handles an existing SR).
+    if AddaStageRecord.objects.filter(adda=adda, workflow_stage=stage).exists():
+        raise ValidationError(
+            "Cutting has already been started for this Adda — complete it from the "
+            "cutting workspace (or reopen and re-complete there). The single-form "
+            "completion is only for a fresh cutting stage.")
 
     sr = AddaStageRecord.objects.create(
         adda=adda, workflow_stage=stage,
