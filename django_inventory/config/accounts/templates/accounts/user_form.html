@@ -41,8 +41,8 @@
         </div>
     </div>
 
-    {# Show ALL validation errors (field + non-field). Without this, a rejected
-       password / email silently re-renders with no feedback (looks "broken"). #}
+    {% comment %}Show ALL validation errors (field + non-field). Without this, a rejected
+       password / email silently re-renders with no feedback (looks "broken").{% endcomment %}
     {% if form.errors %}
         <div class="form-alert form-alert-error">
             <strong>Could not save — please fix:</strong>
