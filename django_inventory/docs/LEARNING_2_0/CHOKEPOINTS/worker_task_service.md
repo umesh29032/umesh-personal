@@ -57,6 +57,13 @@ final money boundary (a settled stage can't reopen).
 concurrent stage-complete cancel, P0-5**) · `set_verified_quantity` (settled lines
 REFUSE → reverse first) · `resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
 
+**Input guard (PA-07):** both quantity entry points take a RAW string from their view
+(`report_contributions` ← worker report form; `set_verified_quantity` ← review form). A
+non-numeric value (tampered POST, or a locale-comma `1,5` on a phone) makes `Decimal()`
+raise `decimal.InvalidOperation` — NOT a `ValidationError` — which the views' `except
+ValidationError` would miss → 500. Both now catch `InvalidOperation` and re-raise a graceful
+`ValidationError` so the view shows a message.
+
 **Invariants protected:** reported_quantity IMMUTABLE (owner §6) · roster =
 who actually participated (cancel, never delete) · ≤1 ACTIVE task per
 (stage_record, worker) (partial-unique constraint) · **C-TM: every capture

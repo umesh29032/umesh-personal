@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 06 — Master Data Integrity/Config/Seed/Drift ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 07 — Stage Engine Audit |
+| **Current phase** | PHASE 07 — Stage Engine Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 08 — Raw Material Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **671 tests, all passing** (was 641; +30 audit regression tests) |
+| **Green test baseline** | **673 tests, all passing** (was 641; +32 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -33,7 +33,7 @@
 | 05A | CRUD Audit — Master Data | ✅ COMPLETE · commit `9be49e17` | Behavioral C/R/U/D probes (real DB writes, rolled back) on 7 surfaces + delete-in-use probes + adversarial workflow (21 candidates). 5 fixed, 5 refuted, 4 storefront gaps documented. Mobile CRUD PASS. 660 green. |
 | 05B | CRUD Audit — Operational | ✅ COMPLETE · commit `15371a08` | Adversarial workflow (38 candidates, 6 money/qty/inventory flows) + code-level verification + live mobile worker-report test. 2 fixed (finalize crash, breakup atomic); rest refuted/documented (money writes are service-locked+atomic+tested). 663 green. |
 | 06 | Master Data — Integrity / Config / Seed / **Drift** | ✅ COMPLETE · commit `d75e606f` | Refined scope (a–e incl. owner-added Configuration Drift Audit). Adversarial workflow (16 candidates: DB-integrity/seed/flow-config/WorkerProfile/config-drift) + live DB drift probes + constraint-enforcement probes. 2 fixed (WorkerProfile validation); rest documented/refuted. Constraints enforced; reconcile_denorm clean; no drift on real products. 671 green. |
-| 07 | Stage Engine Audit | ⬜ PENDING | layering · cutting_pattern · cutting · barcode: create/assign/complete/reopen/settlement-impact |
+| 07 | Stage Engine Audit | ✅ COMPLETE · commit `PENDING` | Full lifecycle audit of layering · cutting_pattern · cutting · barcode (create/assign/start/report/draft/complete/reopen/review/settlement/quantity/allocation/transition/race). 7-finder adversarial workflow died on session limit → continued main-thread (full stage engine read). 2 fixed (PA-07-1/2, one root cause: raw-string→`Decimal` 500), 2 refuted (Adda.started_at None; breakup count<consumed). Money/transition/reopen logic = foundation-locked + tested, verified sound. 673 green. |
 | 08 | Raw Material Audit | ⬜ PENDING | cloth roll: inbound · stock · consumption · adjustments |
 | 09 | Inventory Audit | ⬜ PENDING | |
 | 10 | Production Audit | ⬜ PENDING | |
@@ -92,6 +92,10 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-06-TESTDATA | LOW | 06 | dev DB | 📋 DOC (dev-data) | Stray test products (CROSS-TEST, TEST-VERIFY, TEST-86f27f0a) with handler-less stages (cross_cutting, verify, verify-86f27f0a) — leaked test fixtures in the dev DB. No production-code impact (real products all have handlers). Recommend dev-DB cleanup. |
 | PA-06-FLOW | LOW | 06 | production/flow_service | 📋 DOC (propose, defer) | `add_stage_to_product_flow` doesn't verify the stage has a registered handler → a handler-less stage can be configured (a flow dead-end). Mitigated: worker-report fails **gracefully** (403 "No handler registered", no crash). Smallest fix = `registry.has(stage.code)` guard — DEFERRED (documented-future TM-1 manual stages may legitimately lack a handler; owner call). |
 | PA-06-WP-UPI | LOW | 06 | expense/WorkerProfile | 📋 DOC | `upi_id` has no format validation. Left unvalidated (UPI handle format varies; strict regex risks false-positives) — documented as data-quality. |
+| PA-07-1 | MEDIUM | 07 | production/worker-report | ✅ FIXED | Worker report: a non-numeric quantity (tampered POST, or a locale-comma `1,5` on a phone) reached `report_contributions` as a raw string → `Decimal()` `InvalidOperation` (not a `ValidationError`) → `WorkerReportView`'s `except ValidationError` missed it → **500**. Service now catches `InvalidOperation` → graceful `ValidationError`. (Same class as PA-05B-1/PA-05A-4.) |
+| PA-07-2 | MEDIUM | 07 | production/adda-report-review | ✅ FIXED | Management quantity review: a tampered/non-numeric `verified_<pk>` reached `set_verified_quantity` as a raw string → same `Decimal()` `InvalidOperation` → 500 (`AddaReportReviewView` catches only `(ValidationError, PermissionDenied)`). Same root cause + fix as PA-07-1. |
+| PA-07-STARTED-AT | — | 07 | production/layering | 📋 REFUTED | "Layering auto-duration `now − adda.started_at` 500s if `started_at` is None." `Adda.started_at = DateTimeField(auto_now_add=True)` (models/adda.py:45) → never None. Not a bug. |
+| PA-07-BREAKUP-COUNT | — | 07 | production/cutting | 📋 REFUTED (benign) | "`upsert_breakup_row` can set a breakup `count` below its `consumed_count` → negative `available`." Breakup is the INFORMATIONAL plan (docstring: bundles drive completion/settlement, not breakup). Negative `available` only blocks further takes in `add_pieces_to_bundle` (`take > available` always rejects) — no crash, no money/qty error. Not fixed (no-speculative rule). |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
@@ -100,6 +104,7 @@ Phase 04: PA-04-1 (dead signup links).
 Phase 05A: PA-05A-1..5 (Skill delete guard, Role extra-role guard, Role messages, pattern int-parse, UserCreate IntegrityError).
 Phase 05B: PA-05B-1 (settlement finalize int-parse crash), PA-05B-2 (cutting breakup atomic).
 Phase 06: PA-06-1 (WorkerProfile opening_advance ≥ 0), PA-06-2 (WorkerProfile bank-detail validation). All with regression tests (671 green). Full reports below.
+Phase 07: PA-07-1 (worker-report non-numeric quantity → 500), PA-07-2 (review verified-qty non-numeric → 500) — one root cause, fixed at the `worker_task_service` writer boundary. +2 regression tests (673 green).
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -360,6 +365,51 @@ Logged in as the assigned worker, opened `production:worker-report` (live task o
 
 ### UI_COMPONENTS.md
 No change — both fixes are backend form validation; no reusable UI rule emerged.
+
+---
+
+## PHASE 07 — STAGE ENGINE AUDIT · RESULT
+
+**Scope:** the 4-stage production workflow end-to-end — **layering · cutting_pattern · cutting · barcode_generation** — across the full lifecycle (create · assign · start · report · draft-save · complete · reopen · review · settlement-impact) and the cross-cutting concerns (quantity integrity · allocation interaction · stage transitions / `advance_to_next_stage` · rollback / reopen guards · race conditions · tampered input · production-truth good/alter/missing + `AddaStageRoleRate` + rate-freeze behavior).
+
+**Method:** (1) deep read of the whole stage engine — `stages/{layering,cutting_pattern,cutting,barcode_generation}/{handler,service}.py`, `stages/base/{handler,registry}.py`, `services/{_shared,worker_task_service,pool_service,cost_service,stage_rate_service,adda_service}.py`, and every stage view (`stage_views.py`, `pattern_stage_views.py`, `barcode_gen_views.py`, `worker_report_views.py`) + forms. (2) A 7-finder adversarial workflow (per-stage + cross-cutting lenses → per-finding adversarial verify) was launched but **all 7 finders died on a session/API limit** (0 findings returned — not a clean result), so the audit was completed **in the main thread** against the already-loaded code. (3) Every candidate verified against the actual code + the existing `production/tests/` suite (≈400 production tests) before flag/refute.
+
+### What's robust (verified, not re-derived)
+- **Money / transitions / reopen are foundation-locked + tested.** `reopen_stage_record` (the shared Template Method) enforces, in order: settled-stage refuse → `_downstream_consumer_guard` (transitive, names the furthest blocker) → stage `guard` → `teardown` → clear frozen cost → re-float rate snapshot → void era-A allocations → clear pool → reset Adda → log `STAGE_REOPENED`. All four stages wire it consistently. `advance_to_next_stage` freezes cost before advancing, handles last-stage (`current_stage=None`, COMPLETED), and runs the PAY-2 worker-credit gate before mutating.
+- **Stage completes are race-safe** — each `complete_*` does `select_for_update` on the `AddaStageRecord` + re-checks `completed_at` (WF-4). `complete_worker_task` locks the task row + re-reads DB status (P0-5).
+- **Piece-count integrity holds** — `add_pieces_to_bundle` locks the breakup row + refuses over-take; delete/void recompute `consumed_count`; allocated bundle items are PROTECT-guarded against delete (graceful `ValidationError`, no `ProtectedError` 500). Barcode generate is one-shot (guarded), and complete validates `batch_total == breakdown_total == denorm`.
+- **View input parsing is hardened** — every `int()` on POST in the stage views (`pattern_stage_views`, cutting bundle/breakup/allocate views, layering layer-save) is wrapped → graceful message (prior-phase discipline). Attach/edit-roll paths use Django Forms (`cleaned_data` = typed). `record_remaining_cloth` / `save_layering_breakup` have no raw-POST caller.
+
+### BUG PA-07-1 — worker-report non-numeric quantity → 500
+- **Severity:** MEDIUM · **Module:** production/worker-report · **URL:** `production:worker-report` POST · **Role:** assigned worker · **Device:** both (mobile-relevant)
+- **Reproduction:** as the assigned worker, POST a contribution line with `line-0-reported_quantity=abc` (or a locale-comma `1,5`, or `1.2.3`). `WorkerReportView._parse_lines` int-guards `choice` fields but stores the **quantity field as a raw string** (no numeric check). `save_draft_contributions → report_contributions` does `Decimal(str(line['reported_quantity']))` → `decimal.InvalidOperation`. The view's `except ValidationError` does NOT catch it (`InvalidOperation` ⊄ `ValidationError`) → **500**.
+- **Why mobile-real (not pure tamper):** the input is `type=number inputmode=decimal`, but a phone keyboard / locale that emits a comma decimal (`1,5`) submits a value `Decimal()` rejects.
+- **Root cause:** untrusted string reaches `Decimal()` in the single-writer service, whose only numeric guard was `qty <= 0`. `worker_task_service.report_contributions`.
+- **Fix:** wrap the `Decimal(...)` in `try/except InvalidOperation → raise ValidationError("Quantity must be a number.")`. Imported `InvalidOperation`. `config/production/services/worker_task_service.py`.
+- **Verification:** `test_report_non_numeric_qty_rejected_gracefully` (`'abc'`,`'1,5'`,`'1.2.3'` → `ValidationError`). Note transactional safety: `save_draft_contributions` is `@transaction.atomic`, so the delete-then-recreate rolls back on the bad line (no draft loss). 673 green.
+- **Status:** ✅ FIXED
+
+### BUG PA-07-2 — review verified-quantity non-numeric → 500
+- **Severity:** MEDIUM · **Module:** production/adda-report-review · **URL:** `production:adda-report-review` POST · **Role:** management · **Device:** both
+- **Reproduction:** on the pre-settlement quantity review, POST a tampered `verified_<pk>=abc`. `AddaReportReviewView` passes the raw string to `set_verified_quantity`, which does `Decimal(str(quantity))` → `InvalidOperation`. The view catches only `(ValidationError, PermissionDenied)` → **500**.
+- **Root cause:** identical to PA-07-1 (untrusted string → `Decimal()` in the writer). `worker_task_service.set_verified_quantity`.
+- **Fix:** same `try/except InvalidOperation → ValidationError("Verified quantity must be a number.")`. `config/production/services/worker_task_service.py`.
+- **Verification:** `test_verify_non_numeric_rejected_gracefully` (`test_c1_hardening.PreDeploySafetyTests`). 673 green.
+- **Status:** ✅ FIXED
+
+### Refuted on re-verification
+- **PA-07-STARTED-AT:** Layering auto-duration `now − adda.started_at` — `Adda.started_at` is `auto_now_add=True` (never None). No crash.
+- **PA-07-BREAKUP-COUNT:** `upsert_breakup_row` can drop a breakup `count` below its `consumed_count` → negative `available`, but the breakup is the *informational plan* (bundles drive completion/settlement) and negative `available` only blocks further takes — no crash, no money/qty error. Not fixed (no-speculative rule).
+- **Foundation behaviors verified, not re-flagged:** over-allocation refused always-on (S4 `pool_service`); `LEDGER_CREDIT_AT_ALLOCATION=False` (no money at allocation); single-actor `select_for_update` races (documented PA-05B-RACE); handler-less stage = graceful 403 (PA-06-FLOW); assignment-not-skill report gating (PA-03-WORKER-SKILL); good/alter/missing dual-write + `AddaStageRoleRate` rate-freeze (S1/S3).
+
+### Production-truth verification (good/alter/missing · rate freeze · reopen · allocation · settlement)
+- `report_contributions` dual-writes `good_quantity = reported_quantity` (alter/missing default 0); `complete_worker_task` freezes `expected_earning = good × frozen rate` from the `AddaStageRoleRate` snapshot (live fallback only for pre-S2 records, warned); grouped-member→0 structural guard holds. Reopen voids era-A allocations + re-floats the rate; settled stages refuse reopen. All consistent with the locked foundation — verified, not redesigned.
+
+### Mobile (highest priority)
+Both fixes are **backend-only** (`worker_task_service`) — **no template / CSS / markup change**, so the rendered stage surfaces are byte-identical and carry no new mobile risk. The touched surface (worker-report) was browser-verified PASS at 320/375/414px in Phase 05B (phone-first hero + numbered panels + cream quantity input + sticky submit; screenshot on file). No fresh mobile regression introduced.
+
+### UI_COMPONENTS.md
+No change — both fixes are backend input validation in the writer service; no reusable UI rule emerged.
 
 ---
 

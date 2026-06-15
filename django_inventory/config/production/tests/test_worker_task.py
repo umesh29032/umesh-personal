@@ -242,6 +242,16 @@ class LifecycleServiceTest(TestCase):
         with self.assertRaises(ValidationError):
             report_contributions(self.task, [{'reported_quantity': '0'}], actor=self.worker)
 
+    def test_report_non_numeric_qty_rejected_gracefully(self):
+        # PA-07-1: a non-numeric quantity (tampered POST, or a locale comma "1,5" on a
+        # phone) must surface as a ValidationError (the view shows a message), NOT a
+        # bare decimal.InvalidOperation that the view's `except ValidationError` misses
+        # → 500. Cover both an alpha string and a comma-decimal.
+        for bad in ('abc', '1,5', '1.2.3'):
+            with self.assertRaises(ValidationError):
+                report_contributions(
+                    self.task, [{'reported_quantity': bad}], actor=self.worker)
+
     def test_complete_freezes_expected_no_ledger(self):
         report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
         complete_worker_task(self.task, actor=self.worker)

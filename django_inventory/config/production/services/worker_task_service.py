@@ -25,7 +25,7 @@ lock ke bina do managers ki save ek doosre ke cancel/create ko khaa jaati). `add
 lock-free (the skill-sync retro-tag path is not atomic).
 """
 import logging
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -153,7 +153,15 @@ def report_contributions(task, lines, *, actor):
         raise ValidationError("Cannot report on a completed or cancelled task.")
     created = []
     for line in lines:
-        qty = Decimal(str(line['reported_quantity']))
+        # PA-07-1: the worker view passes reported_quantity as a RAW string. A
+        # non-numeric value (tampered POST, or a locale comma like "1,5" on mobile)
+        # makes Decimal() raise decimal.InvalidOperation — NOT a ValidationError — so
+        # the view's `except ValidationError` misses it and the request 500s. Convert
+        # it to a graceful ValidationError (the view then shows a message).
+        try:
+            qty = Decimal(str(line['reported_quantity']))
+        except InvalidOperation:
+            raise ValidationError("Quantity must be a number.")
         if qty <= 0:
             raise ValidationError("reported_quantity must be greater than 0.")
         # Foundation S3 (RC-3 dual-write): the worker UI submits ONE quantity = the
@@ -312,7 +320,14 @@ def set_verified_quantity(contribution, quantity, *, actor):
             f"({c.settlement_line.adda_settlement.reference}) — reverse that "
             "settlement first, then correct the quantity.")
     if quantity is not None:
-        quantity = Decimal(str(quantity))
+        # PA-07-2: same guard as report_contributions — AddaReportReviewView passes the
+        # verified value as a raw string; a non-numeric one (tampered/locale comma) would
+        # make Decimal() raise InvalidOperation, which the review view's
+        # `except (ValidationError, PermissionDenied)` misses → 500.
+        try:
+            quantity = Decimal(str(quantity))
+        except InvalidOperation:
+            raise ValidationError("Verified quantity must be a number.")
         if quantity < 0:
             raise ValidationError("Verified quantity cannot be negative.")
     c.verified_quantity = quantity
