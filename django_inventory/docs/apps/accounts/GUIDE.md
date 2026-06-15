@@ -10,7 +10,7 @@
 | `services/user_service.py` | user-provisioning invariants (no signals) |
 | `views.py` | FILE MAP at top: OTP login/verify · user CRUD · rate-limited password login · signup(pre-provisioned) · reset |
 | `urls.py` | mounted at /app/ |
-| templates/accounts/ | base.html ★ (THE design system: tokens, components, money-family canonicals) + auth pages |
+| templates/accounts/ | base.html ★ (THE design system: tokens + shared JS components incl. `fancy-select` & `fancy-date` calendar — vocab in [UI_COMPONENTS.md](../../../UI_COMPONENTS.md) — + money-family canonicals) + auth pages (`user_form.html` = edit user) |
 
 Foundation-purity: core+accounts import NO domain app (CI gate 1/4).
 Dots: har request → middleware(sidebar rules) → permission_service → view.

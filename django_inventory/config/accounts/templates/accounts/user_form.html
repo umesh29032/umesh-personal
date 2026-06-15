@@ -116,7 +116,8 @@
                         <div class="field-grid-2">
                             <div class="field">
                                 <label for="id_birth_date">Birth Date</label>
-                                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date">
+                                {# data-fancy-date → custom body-anchored calendar (native date popup mispositions under transformed ancestors + only its icon is clickable on desktop). placeholder shows on the trigger when empty. #}
+                                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date" data-fancy-date placeholder="Select birth date">
                             </div>
                             <div class="field">
                                 <label for="id_new_password">Reset Password</label>

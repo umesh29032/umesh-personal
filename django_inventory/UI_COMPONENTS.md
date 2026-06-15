@@ -246,6 +246,29 @@ CSS that targets the select **by a class** (`select.form-control` / `.sf-input` 
 
 **⚠ Mobile gotcha (PA-14-3):** the trigger is a `<button>`, NOT a `<select>` — so page CSS that styles selects **by tag name** (`.my-form select { … }`) does NOT reach it. A class-less `<select>` would otherwise render as a bare ~20px UA-styled line (sub-44px touch target, visually inconsistent with sibling inputs). base.html now auto-adds `.fancy-select-trigger--bare` to class-less triggers so they always get a default input box. **Best practice when styling form selects: put a styling class on the `<select>` (`class="sf-input"`), or target `.fancy-select-trigger` alongside `select` in your page CSS — never rely on a tag-only `select{}` rule.**
 
+## Date picker — fancy-date (opt-in)
+
+Write `<input type="date" data-fancy-date>`. base.html JS (`fancifyDate`) upgrades it to a custom calendar — same reason as fancy-select: native date popups **misposition** under transformed / `backdrop-filter` / `@view-transition` ancestors, and on desktop Chromium **only the tiny calendar icon is clickable** (not the text). The custom panel is a `.fancy-select-panel` appended to `<body>` (`position:fixed`), so it anchors to the field on mobile + desktop, flips above when space below is short, and every day cell is a full tap target.
+
+**Opt-in by design** — without `data-fancy-date` the input stays native. (Date-range filters on dashboards intentionally keep the native input; only convert single-value fields like Birth Date.)
+
+| Attr / Class | Purpose |
+|---|---|
+| `<input type=date data-fancy-date>` | Trigger the upgrade |
+| `data-min-year` / `data-max-year` | Optional year bounds (default `currentYear-100` … `currentYear`) |
+| `placeholder="…"` | Shown on the trigger when empty |
+| `.fancy-date` | Wrap div (also carries `.fancy-select` for the shared outside-click/Escape close) |
+| `.fancy-date-trigger` | Button replacing the input (gets `.fancy-select-trigger--bare` when class-less) |
+| `.fancy-date-panel` | Calendar panel (a `.fancy-select-panel`, auto-rendered in `<body>` when open) |
+| `.fancy-date-head` / `-nav` / `-title` | Month/year header: prev-next arrows + title (click title → year/month pane) |
+| `.fancy-date-grid` / `-dow` / `-cell` | Day grid; `.selected` (copper) + `.today` (copper ring) |
+| `.fancy-date-months` / `-mo`, `.fancy-date-years` / `-yr` | Year/month pane (DOB-friendly fast year jump) |
+| `.fancy-date-clear` | Footer action — clears the value (the field stays optional) |
+
+The real `<input type=date>` stays in the DOM (`display:none`, `name` intact) so the form submits the `YYYY-MM-DD` value normally; each pick dispatches native `change`/`input` so existing handlers still fire. JS-off → native date input still works (progressive enhancement).
+
+**Known limitations (accepted — same class as `fancy-select`).** Keyboard users can Tab to day cells (`<button>`s) and Enter to pick, but there is no arrow-key grid navigation, focus-trap, or focus-return, and typing a date is no longer possible (the native input is `aria-hidden`). Day cells are 38px (<44px) at 320px — the 7-column grid floor (cf. the OTP 6-box residual). A native form-reset restores the hidden input value without firing `change`, so the trigger label won't re-sync on reset (no form here has a reset). None block use; keyboard-nav parity is a future **shared** enhancement for `fancy-select` + `fancy-date`.
+
 ## Buttons
 
 | Class | Purpose |
