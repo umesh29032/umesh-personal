@@ -91,3 +91,59 @@ class StageCreditTest(TestCase):
         advance_to_next_stage(self.adda, self.mgr, enforce_worker_credit=False)   # no raise
         self.adda.refresh_from_db()
         self.assertEqual(self.adda.status, self.adda.Status.COMPLETED)
+
+
+# PA-10-1: the SETTLEMENT-FIRST default (flag OFF). No StageWorkAssignment exists
+# pre-settlement (allocate refuses; settlement SWA is created at finalize, AFTER
+# completion), so reading SWA blocked EVERY payable-stage completion in the default
+# config. The guard now reads the production truth settlement pays: a COMPLETED/
+# VERIFIED WorkerStageContribution. (No @override_settings → real default False.)
+class StageCreditSettlementFirstTest(TestCase):
+    def setUp(self):
+        cut = Stage.objects.get_or_create(code='cutting', defaults={'name': 'Cutting'})[0]
+        self.product = Product.objects.create(code='SF-CREDIT', name='SF Credit Test')
+        self.ws = WorkflowStage.objects.create(
+            product=self.product, stage=cut, order=1,
+            cost_rate=Decimal('10'), credits_workers=True)
+        skill = Skill.objects.get_or_create(
+            name='cutting_master', defaults={'label': 'Cutting Master'})[0]
+        self.mgr = User.objects.create_user(
+            email='sf-credit-mgr@test', password='x', is_superuser=True, is_staff=True)
+        self.mgr.skills.add(skill)
+        self.worker = User.objects.create_user(email='sf-credit-worker@test', password='x')
+        self.adda = create_adda(self.mgr, product=self.product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
+
+    def _complete_contribution(self):
+        from production.models import WorkerStageContribution, WorkerStageTask
+        task = WorkerStageTask.objects.create(
+            stage_record=self.sr, worker=self.worker,
+            status=WorkerStageTask.Status.COMPLETED, completed_at=timezone.now())
+        WorkerStageContribution.objects.create(
+            task=task, reported_quantity=Decimal('5'), good_quantity=Decimal('5'))
+
+    def test_guard_blocks_payable_without_completed_contribution(self):
+        # No allocation possible (flag off) AND no completed contribution → blocked.
+        with self.assertRaisesMessage(ValidationError, 'complete their reported work'):
+            ensure_worker_credit(self.sr)
+
+    def test_guard_passes_with_completed_contribution(self):
+        self._complete_contribution()
+        ensure_worker_credit(self.sr)   # no raise — settlement will pay this line
+
+    def test_advance_blocks_without_contribution_in_default_mode(self):
+        from production.services import advance_to_next_stage
+        self.adda.current_stage = self.ws
+        self.adda.save(update_fields=['current_stage'])
+        with self.assertRaisesMessage(ValidationError, 'complete their reported work'):
+            advance_to_next_stage(self.adda, self.mgr)
+
+    def test_advance_passes_with_contribution_in_default_mode(self):
+        from production.services import advance_to_next_stage
+        self._complete_contribution()
+        self.adda.current_stage = self.ws
+        self.adda.save(update_fields=['current_stage'])
+        advance_to_next_stage(self.adda, self.mgr)   # no raise — the real default-mode path
+        self.adda.refresh_from_db()
+        self.assertEqual(self.adda.status, self.adda.Status.COMPLETED)

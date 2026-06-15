@@ -120,6 +120,14 @@ def _get_or_create_cutting_stage_record(adda: Adda) -> AddaStageRecord:
     if created and not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    if created:
+        # PA-10-3 (Contract 2): snapshot the frozen payable-rate AT creation, like
+        # every other SR site (create_adda/start_layering/barcode). Idempotent. Without
+        # it, the cutting rate snapshot was late-created at first worker completion with
+        # a spurious "snapshot_missing_at_complete" WARNING (the codebase treats that as
+        # a bug signal) + no pre-completion rate row existed. Caller is @transaction.atomic.
+        from production.services.stage_rate_service import ensure_stage_role_rates
+        ensure_stage_role_rates(sr)
     return sr
 
 

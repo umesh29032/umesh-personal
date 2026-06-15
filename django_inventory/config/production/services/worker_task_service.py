@@ -73,6 +73,19 @@ def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
                 stage_record=stage_record, worker_id=wid, **_new_task_kwargs(stage_record))
     for wid, task in active.items():
         if wid not in target:                        # removed → cancel (never delete)
+            # PA-10-2: NEVER cancel a task that already carries frozen production truth
+            # (COMPLETED/VERIFIED). complete_worker_task does NOT stamp
+            # stage_record.completed_at, so a COMPLETED task routinely exists on an
+            # OPEN stage; a manager roster edit (re-running start_* with a reduced
+            # roster) reaches here and would otherwise cancel that task — orphaning its
+            # WorkerStageContribution rows from settlement (_settleable_lines filters
+            # completed/verified) and the review screen, silently unpaying the worker.
+            # resolve_stage_tasks_on_complete already passes completed/verified in
+            # `target`, so this guard does not change its behaviour — it only closes
+            # the direct-reassign hole.
+            if task.status in (WorkerStageTask.Status.COMPLETED,
+                               WorkerStageTask.Status.VERIFIED):
+                continue
             task.status = WorkerStageTask.Status.CANCELLED
             if cancel_note:
                 task.notes = (f"{task.notes} | {cancel_note}" if task.notes else cancel_note)[:200]

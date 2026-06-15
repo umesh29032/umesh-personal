@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 09 — Inventory Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 10 — Production Audit |
+| **Current phase** | PHASE 10 — Production Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 11 — Settlement Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **679 tests, all passing** (was 641; +38 audit regression tests) |
+| **Green test baseline** | **685 tests, all passing** (was 641; +44 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -36,7 +36,7 @@
 | 07 | Stage Engine Audit | ✅ COMPLETE · commit `bc008685` | Full lifecycle audit of layering · cutting_pattern · cutting · barcode (create/assign/start/report/draft/complete/reopen/review/settlement/quantity/allocation/transition/race). 7-finder adversarial workflow died on session limit → continued main-thread (full stage engine read). 2 fixed (PA-07-1/2, one root cause: raw-string→`Decimal` 500), 2 refuted (Adda.started_at None; breakup count<consumed). Money/transition/reopen logic = foundation-locked + tested, verified sound. 673 green. |
 | 08 | Raw Material Audit | ✅ COMPLETE · commit `666d7274` | Cloth roll lifecycle: inbound (bulk intake) · stock-edit · Adda assignment · leftover consumption. Main-thread audit (subagents still session-limited; not re-run — no added coverage vs manual read of a 5-file app). 2 fixed (PA-08-1/2: negative weight/cost on plain forms.Form → DB CheckConstraint IntegrityError → 500). Refuted: RollEditForm (ModelForm full_clean validates constraint → graceful), dashboard filter parse (guarded), assign-roll race (PA-05B-RACE class), RollBulkCreateView `except PermissionError` mismatch (latent, super-admin-only → unreachable). 677 green. |
 | 09 | Inventory Audit | ✅ COMPLETE · commit `63f58fb5` | Inventory as a QUANTITY-TRUTH system (the `inventory` Django app is RBAC-only): roll/leftover · breakup↔bundle↔item · breakdown↔barcode · S4 pool · reopen effects · denorm counters · concurrency · reconcile. 6-finder conservation Workflow ran; **9/10 verifiers died on session limit → main-thread-verified every finder candidate (honesty rule — NOT marked clean on dead verifiers).** 2 fixed (PA-09-1 legacy-cutting double-create SR 500; PA-09-2 mixed manual+breakup add unique-collision 500). Refuted/documented: consume_leftover stale read-cache (benign), reconcile pieces_cut-vs-breakup (by-design, tested contract), reconcile 2-of-5 coverage (enhancement, counters self-heal), manual-no-bound (PA-07-BREAKUP class), total_pieces lost-update (display-only/PA-05B-RACE). 679 green. |
-| 10 | Production Audit | ⬜ PENDING | |
+| 10 | Production Audit | ✅ COMPLETE · commit `PENDING` | Production-truth system: Adda/assignment/contribution lifecycle · draft→complete · reopen→re-complete · rate-freeze · expected_earning · good/alter/missing · settlement-qty derivation · AddaStageRoleRate · locks/atomicity/audit. Finder-only Workflow (all 6 finders survived → 12 candidates; verify stage omitted to dodge the verifier-death pattern) + main-thread-verified EACH. 3 fixed: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked ALL cutting completion in the default flag-off config), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). 5 documented-not-fixed (reopen-restale=by-design/use rerate; verified-qty no-audit=by-design; grouped→0 settlement-preview + finalize-vs-verified race = Phase 11; role=None→base rate = benign). Golden ₹225 settlement byte-identical. 685 green. |
 | 11 | Settlement Audit | ⬜ PENDING | |
 | 12 | Payroll Audit | ⬜ PENDING | |
 | 13 | Reporting Audit | ⬜ PENDING | |
@@ -106,6 +106,14 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-09-RECONCILE-SRC | — | 09 | production/reconcile | 📋 REFUTED (by-design) | `reconcile_denorm` checks `pieces_cut == Σ CuttingPieceBreakup.count`, while the modern workspace path sets `pieces_cut = Σ CuttingBundleItem.count` — so it can report plan≠actual as "drift". This is the DOCUMENTED + TESTED contract (model docstring "pieces_cut = SUM(breakup.count)"; `test_reconcile_denorm` codifies breakup-as-source). In correct usage Σ breakup == Σ items (Phase-06 verified clean on real data); a divergence is a legitimate plan/actual flag, not a false positive. Changing the source = redesign → not changed (no-redesign rule). |
 | PA-09-RECONCILE-COV | LOW | 09 | production/reconcile | 📋 DOC (enhancement) | `reconcile_denorm` covers only `pieces_cut` + `total_barcodes`; it does NOT verify `CuttingPieceBreakup.consumed_count`, `CuttingBundle.total_pieces`, or `ClothRoll.remaining_*`. Drift in those would go undetected by the tool. Mitigated: all three are recomputed-from-truth on every write (`_recompute_*` / `_sync_roll_leftover`) so they self-heal; none feeds barcode/settlement truth. Adding checks = enhancement (no-feature rule) → documented, not built. |
 | PA-09-TOTALPIECES-RACE | LOW | 09 | production/cutting (bundles) | 📋 DOC (display, race) | `_recompute_bundle_total`/`_recompute_breakup_consumed` re-sum without locking the bundle/items, so two managers concurrently adding items to the SAME bundle could persist a stale `total_pieces`/`consumed_count` (lost update). Display-only impact: `total_pieces` is NOT in the truth path (barcode/breakdown/`pieces_cut` read `Σ items` directly); recomputed correct on the next item op. Single-bundle two-actor concurrency = PA-05B-RACE class (not touching locked services for a theoretical race). |
+| PA-10-1 | CRITICAL | 10 | production/credit (PAY-2) | ✅ FIXED | `ensure_worker_credit` (PAY-2) required a non-voided `StageWorkAssignment`, but in the documented-default config (`LEDGER_CREDIT_AT_ALLOCATION=False`) `allocate_stage_work` refuses and the settlement SWA is created at finalize (AFTER completion) → `complete_cutting_from_bundles`→`advance_to_next_stage(enforce=True)`→`ensure_worker_credit` raised → **NO Adda could complete cutting** (all 5 real cutting stages are `credits_workers=True`/self-paid; 0 cutting completions since the V2-3 flip). The code (credit.py:33) had flagged this SWA-read as needing the cutover. Fix: flag-aware — era-A (flag on) keeps the SWA check verbatim; settlement-first (default) requires a COMPLETED/VERIFIED `WorkerStageContribution` (the exact `_settleable_lines` predicate settlement pays). Verified cutting credits via worker self-report (3-PATTI-001 has 3 contributions). |
+| PA-10-2 | HIGH | 10 | production/worker_task_service | ✅ FIXED | `set_stage_workers` cancelled a COMPLETED/VERIFIED task when a manager re-edits the roster mid-stage. `complete_worker_task` never stamps `stage_record.completed_at`, so a COMPLETED task sits on an OPEN stage; re-running `start_layering`/`start_cutting` with a reduced roster → the cancel-loop (excludes only CANCELLED) cancels it → its frozen `WorkerStageContribution` vanishes from settlement (`_settleable_lines` filters completed/verified) + the review screen → worker silently unpaid. Fix: never cancel COMPLETED/VERIFIED in the cancel loop (`resolve_stage_tasks_on_complete` already keeps them via `target`, so unaffected). |
+| PA-10-3 | LOW | 10 | production/cutting + cutting_pattern | ✅ FIXED | `_get_or_create_cutting_stage_record` + `get_or_create_pattern_stage_record` skipped `ensure_stage_role_rates` (every other SR site calls it — Contract 2). The cutting rate snapshot was late-created at first worker completion with a spurious `snapshot_missing_at_complete` WARNING (the codebase treats that as a bug signal) — which PA-10-1 makes universal for cutting. Fix: snapshot at SR creation (idempotent, callers atomic). |
+| PA-10-REOPEN-RATE | — | 10 | production/reopen | 📋 REFUTED (by-design) | "reopen refloats `AddaStageRoleRate` but settlement pays the contribution's stale frozen `expected_rate`." By-design: settlement (`adda_settlement_service:331`) pays each contribution at ITS frozen `expected_rate` = price-at-time-of-completion; the dedicated re-pricing tool is `rerate_stage_role` (recalcs completed-unsettled contributions + writes `RateCorrectionAudit`). `refloat_rates_on_reopen` targets RE-COMPLETIONS; the common reopen (no rate change) is correct. reopen+config-rate-change+re-settle is a footgun → use `rerate`. Not changing reopen (locked foundation, no-redesign). |
+| PA-10-VERIFY-AUDIT | LOW | 10 | production/worker_task_service | 📋 DOC (by-design) | `set_verified_quantity` overwrites `verified_quantity` (only the latest survives) with no append-only audit / `AddaHistory` (unlike `rerate_stage_role`'s `RateCorrectionAudit`). By-design (owner model: `reported_quantity` immutable, `verified_quantity` = latest management correction). An audit trail for verified corrections = a future enhancement (no-feature rule). |
+| PA-10-GROUPED-PREVIEW | MEDIUM | 10→11 | expense/settlement preview | 📋 DOC (Phase 11) | The grouped→₹0 structural guard (`effective_pay_rate`) is applied at finalize (`adda_settlement_service:331`) but NOT at the settlement PREVIEW/queue surfaces (`settlement_queue:195`, `expense/views.py` `_line_dict`/totals), which use raw `c.expected_rate`. A stage grouped AFTER its workers completed shows ₹(qty×stale_rate) in the approval gate while finalize correctly books ₹0. VISIBILITY divergence only (booked money correct). Defer to Phase 11 (Settlement) — settlement-preview surface + unusual group-after-complete scenario. |
+| PA-10-VERIFY-RACE | LOW | 10→11 | expense/settlement | 📋 DOC (Phase 11) | `finalize_adda_settlement` locks `AddaStageRecord` ("freeze quantity inputs") but `verified_quantity` lives on `WorkerStageContribution`, which finalize does NOT lock; `set_verified_quantity` takes neither 5374 nor the AddaStageRecord lock → a verified edit racing an in-flight finalize can be booked on the stale quantity. Two-actor, recoverable via reverse/supersede. Defer to Phase 11 (settlement finalize locking) — PA-05B-RACE-adjacent. |
+| PA-10-ROLE-NONE | — | 10 | production/contribution-rate | 📋 REFUTED (benign) | A skilled worker with `User.role=None` completing freezes at the base rate (skips per-role override) + `role_snapshot=None`. Benign: role=None → base rate is the sensible fallback (no role = no override to apply); assignment is skill-gated by design (PA-03-WORKER-SKILL WONTFIX). Not a defect. |
 
 ### Issues fixed
 Phase 02: PA-02-1, PA-02-2, PA-02-3, PA-02-4, PA-02-OPEN-SIGNUP.
@@ -117,6 +125,7 @@ Phase 06: PA-06-1 (WorkerProfile opening_advance ≥ 0), PA-06-2 (WorkerProfile 
 Phase 07: PA-07-1 (worker-report non-numeric quantity → 500), PA-07-2 (review verified-qty non-numeric → 500) — one root cause, fixed at the `worker_task_service` writer boundary. +2 regression tests (673 green).
 Phase 08: PA-08-1 (bulk-intake negative cost → 500), PA-08-2 (roll-assign negative weight → 500) — `min_value=0` on the two plain-form DecimalFields (DB CheckConstraint mirrored at the form layer). +4 regression tests (677 green).
 Phase 09: PA-09-1 (legacy-cutting unconditional SR create → IntegrityError 500), PA-09-2 (mixed manual+breakup bundle add → unique-collision IntegrityError 500) — both converted to graceful ValidationError. +2 regression tests (679 green).
+Phase 10: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked all cutting completion in the default flag-off config; made flag-aware → production-truth credit), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). +6 regression tests (685 green); golden ₹225 settlement byte-identical.
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -504,6 +513,48 @@ Both fixes are **backend service guards** (turn an `IntegrityError` 500 into a g
 
 ### UI_COMPONENTS.md
 No change — backend quantity-truth guards; no reusable visual/layout rule emerged.
+
+---
+
+## PHASE 10 — PRODUCTION AUDIT · RESULT
+
+**Scope (production-truth, not CRUD):** Adda lifecycle · worker assignment · `WorkerStageTask`/`WorkerStageContribution` lifecycle · draft→complete · reopen→re-complete · quantity truth · good/alter/missing · settlement_quantity derivation · `AddaStageRoleRate` · `expected_rate` freeze · `expected_earning` · replay/refresh · stale-after-reopen · duplicate completion · locks/atomicity · audit/history. DB-truth ⟷ service-truth ⟷ UI-truth consistency as the bar.
+
+**Method:** I deep-read the full production-truth core (worker_task_service, stage_rate_service, cost_service, adda_service, _shared reopen, credit.py, the settlement resolver + finalize) then ran a **FINDER-ONLY** Workflow (6 finders, verify stage deliberately omitted — the prior two phases' verifiers died on the session limit and burned ~1M tokens; finders survive). **All 6 finders survived → 12 candidates**, and **every candidate was main-thread-verified** against the code + the dev DB (honesty rule: no candidate accepted or dismissed on agent say-so).
+
+### BUG PA-10-1 — payable-stage completion blocked in the documented-default config (CRITICAL)
+- **Module:** production/credit (PAY-2) · **Trigger:** any Adda, cutting stage, default `LEDGER_CREDIT_AT_ALLOCATION=False` · **Role:** management · **Device:** both
+- **Reproduction:** all 5 real cutting `WorkflowStage`s are `credits_workers=True` + self-paid (migration 0030). Start cutting + report work + build bundles, then `CuttingWorkspaceCompleteView` → `complete_cutting_from_bundles` → `advance_to_next_stage(enforce_worker_credit=True)` → `ensure_worker_credit`. With the flag off, `allocate_stage_work` refuses (so no era-A SWA) and the settlement SWA is only created at finalize (AFTER completion) → `ensure_worker_credit` finds zero non-voided SWA → `ValidationError` → **the Adda can never advance past cutting via the workspace path in the default config.** Dev-DB evidence: 0 cutting completions since the 2026-06-11 V2-3 flip (only 3-PATTI-001, completed pre-flip when allocation worked).
+- **Root cause:** `ensure_worker_credit` read the transitional `StageWorkAssignment`; V2-3 moved crediting to settlement but never re-pointed this guard (its own comment, credit.py:33, flagged the SWA-read as needing the cutover).
+- **Fix:** flag-aware credit source — flag ON (era-A rollback lever) keeps the SWA check + message verbatim; flag OFF (default) requires a COMPLETED/VERIFIED `WorkerStageContribution` (the exact `_settleable_lines` predicate settlement pays). Same gate intent; truth-source moved from the transitional SWA to production truth. Verified cutting credits via worker self-report (3-PATTI-001 has 3 contributions; resolver is stage-agnostic).
+- **Verification:** new `StageCreditSettlementFirstTest` (4 tests, default flag): blocked without a completed contribution, passes with one, advance both ways. `test_stage_credit` (flag-on) unchanged + green. **Golden ₹225 settlement chain byte-identical.** 685 green.
+- **Status:** ✅ FIXED
+
+### BUG PA-10-2 — roster edit cancels a COMPLETED worker task, orphaning payable truth (HIGH)
+- **Module:** production/worker_task_service · **URL:** `production:layering-start` / `cutting` start POST · **Role:** management · **Device:** both
+- **Reproduction:** assign [A,B]; B reports + completes (B's `WorkerStageTask`=COMPLETED, contribution frozen) — `complete_worker_task` never stamps `stage_record.completed_at`, so the STAGE stays OPEN. Manager re-submits the roster as [A] (drop B). `set_stage_workers` builds `active` excluding only CANCELLED (so B's COMPLETED task is in it) and cancels it. B's frozen `WorkerStageContribution` is now on a CANCELLED task → excluded from settlement (`_settleable_lines` filters completed/verified) + the review screen → B silently unpaid, production truth stranded.
+- **Root cause:** the cancel loop had no guard for COMPLETED/VERIFIED tasks (only `resolve_stage_tasks_on_complete` protected them, via `target`).
+- **Fix:** the cancel loop now skips COMPLETED/VERIFIED tasks (never cancel frozen truth). `resolve_stage_tasks_on_complete` already passes them in `target` → behaviour there unchanged.
+- **Verification:** `test_set_never_cancels_a_completed_task_on_roster_edit` (completed task survives a roster drop + contribution intact; an ASSIGNED worker dropped in the same call is still cancelled). 685 green.
+- **Status:** ✅ FIXED
+
+### BUG PA-10-3 — two SR-creation sites skipped the rate-snapshot contract (LOW)
+- **Module:** production/cutting + cutting_pattern · **Reproduction:** `_get_or_create_cutting_stage_record` / `get_or_create_pattern_stage_record` created an `AddaStageRecord` without `ensure_stage_role_rates` (every other site calls it — Contract 2). The cutting `AddaStageRoleRate` was then late-created at first worker completion with a spurious `snapshot_missing_at_complete` WARNING (codebase: "on a fresh DB any warning = a bug") — which PA-10-1 makes universal for cutting.
+- **Fix:** snapshot at SR creation (idempotent; callers atomic). **Verification:** `test_start_snapshots_stage_role_rates`. 685 green.
+- **Status:** ✅ FIXED
+
+### Verified-but-not-fixed (main-thread verified — verify stage was omitted by design)
+- **PA-10-REOPEN-RATE (refuted, by-design):** 3 finders flagged "reopen refloats the rate but settlement pays the stale `c.expected_rate`." Settlement pays each contribution at ITS frozen rate (price-at-time-of-completion); the dedicated re-pricing tool is `rerate_stage_role` (recalcs completed-unsettled + audits). `refloat` targets re-completions; the common reopen (no rate change) is correct. reopen+config-rate-change+re-settle is a footgun → use `rerate`. Not changing reopen (locked foundation).
+- **PA-10-VERIFY-AUDIT (doc, by-design):** `set_verified_quantity` has no append-only audit (unlike `rerate`). Owner model: `reported` immutable, `verified` = latest correction. Audit trail = future enhancement.
+- **PA-10-GROUPED-PREVIEW (Phase 11):** grouped→₹0 applied at finalize but not at the settlement preview/queue → preview overstates a grouped-after-complete member (money correct). Settlement-preview surface → Phase 11.
+- **PA-10-VERIFY-RACE (Phase 11):** finalize locks `AddaStageRecord` but not the `WorkerStageContribution` rows where `verified_quantity` lives → a two-actor verified-edit-vs-finalize window. Recoverable; settlement-finalize locking → Phase 11.
+- **PA-10-ROLE-NONE (refuted, benign):** a role=None skilled worker freezes at the base rate — sensible (no role = no override); assignment is skill-gated by design.
+
+### Mobile (highest priority)
+All three fixes are **backend service guards** (turn a blocked/orphaning/warning path into correct behaviour) — no template/markup/CSS change, no mobile-render delta.
+
+### UI_COMPONENTS.md
+No change — backend production-truth guards; no reusable visual/layout rule emerged.
 
 ---
 

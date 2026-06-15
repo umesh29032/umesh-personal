@@ -57,6 +57,19 @@ final money boundary (a settled stage can't reopen).
 concurrent stage-complete cancel, P0-5**) · `set_verified_quantity` (settled lines
 REFUSE → reverse first) · `resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
 
+**PA-10-2 (completed-task protection):** `set_stage_workers`' cancel loop NEVER cancels a
+COMPLETED/VERIFIED task. `complete_worker_task` does not stamp `stage_record.completed_at`,
+so a COMPLETED task routinely sits on an OPEN stage; a manager re-running `start_*` with a
+reduced roster would otherwise cancel it and orphan its frozen `WorkerStageContribution`
+from settlement (`_settleable_lines` filters completed/verified). `resolve_stage_tasks_on_complete`
+passes completed/verified in `target`, so it is unaffected.
+
+**PA-10-1 (credit-guard cutover):** the payable-stage completion guard `ensure_worker_credit`
+(stages/base/credit.py) is now flag-aware: era-A (`LEDGER_CREDIT_AT_ALLOCATION=True`) keeps the
+`StageWorkAssignment` check; the settlement-first DEFAULT requires a COMPLETED/VERIFIED
+`WorkerStageContribution` (the `_settleable_lines` predicate) — because no SWA exists until
+settlement, the SWA-read previously blocked ALL cutting completion in the default config.
+
 **Input guard (PA-07):** both quantity entry points take a RAW string from their view
 (`report_contributions` ← worker report form; `set_verified_quantity` ← review form). A
 non-numeric value (tampered POST, or a locale-comma `1,5` on a phone) makes `Decimal()`

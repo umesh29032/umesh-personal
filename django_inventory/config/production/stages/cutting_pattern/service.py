@@ -160,6 +160,11 @@ def get_or_create_pattern_stage_record(adda: Adda, user) -> AddaStageRecord:
     if created and not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    if created:
+        # PA-10-3 (Contract 2): snapshot the payable-rate at creation, like every other
+        # SR site. Idempotent; caller is @transaction.atomic.
+        from production.services.stage_rate_service import ensure_stage_role_rates
+        ensure_stage_role_rates(sr)
     return sr
 
 

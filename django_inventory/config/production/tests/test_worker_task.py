@@ -127,6 +127,31 @@ class TaskChokepointTest(TestCase):
         t = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w1)
         self.assertEqual(t.status, WorkerStageTask.Status.COMPLETED)
 
+    def test_set_never_cancels_a_completed_task_on_roster_edit(self):
+        """PA-10-2: a worker who already COMPLETED their task (frozen contributions)
+        must NOT be cancelled when a manager re-edits the roster mid-stage. The stage
+        is still OPEN (complete_worker_task never stamps sr.completed_at), so the
+        manager dropping that worker reaches set_stage_workers' cancel path — which
+        would otherwise orphan the worker's payable contribution from settlement."""
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        # w2 completes their task + has a frozen contribution; STAGE stays open.
+        w2_task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w2)
+        w2_task.status = WorkerStageTask.Status.COMPLETED
+        w2_task.completed_at = timezone.now()
+        w2_task.save(update_fields=['status', 'completed_at'])
+        WorkerStageContribution.objects.create(
+            task=w2_task, reported_quantity=Decimal('7'), good_quantity=Decimal('7'))
+        # Manager re-edits roster to drop w2.
+        set_stage_workers(self.sr, [self.w1.pk])
+        w2_task.refresh_from_db()
+        self.assertEqual(w2_task.status, WorkerStageTask.Status.COMPLETED)  # NOT cancelled
+        self.assertEqual(w2_task.contributions.count(), 1)                  # truth intact
+        # An ASSIGNED worker dropped in the same call IS still cancelled (regression).
+        set_stage_workers(self.sr, [self.w1.pk, self.w3.pk])
+        set_stage_workers(self.sr, [self.w1.pk])
+        w3_task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w3)
+        self.assertEqual(w3_task.status, WorkerStageTask.Status.CANCELLED)
+
     # (V2-1d Step 0) the WORKER_TASK_DUAL_WRITE kill-switch test retired with the
     # mechanism it characterized: task writes are unconditional now.
 

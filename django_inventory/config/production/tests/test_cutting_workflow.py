@@ -203,6 +203,16 @@ class StartCuttingTests(CuttingWorkflowFixture):
         sr2 = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         self.assertEqual(sr1.pk, sr2.pk)
 
+    def test_start_snapshots_stage_role_rates(self):
+        """PA-10-3 (Contract 2): the cutting SR-creation helper now snapshots the
+        AddaStageRoleRate at creation (like every other SR site), so no late-create +
+        spurious 'snapshot_missing_at_complete' WARNING at first worker completion."""
+        from production.models import AddaStageRoleRate
+        sr = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
+        self.assertTrue(
+            AddaStageRoleRate.objects.filter(stage_record=sr).exists(),
+            "start_cutting must snapshot AddaStageRoleRate at SR creation")
+
     def test_legacy_complete_after_start_refused_gracefully(self):
         """PA-09-1: complete_cutting_legacy CREATEs the AddaStageRecord; if start_cutting
         (or any bundle op / a prior complete+reopen) already made it, the unconditional
