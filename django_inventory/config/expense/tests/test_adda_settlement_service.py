@@ -397,3 +397,50 @@ class ReversalLifecycleTests(_Base):
             create_settlement(user=self.mgmt, worker=self.w1,
                               amount_paid=Decimal('50'),
                               recoveries=[{'advance': adv.id, 'amount': 10}])
+
+
+class Phase11SettlementAuditTests(_Base):
+    """PA-11: settlement-audit fixes."""
+
+    def test_outstanding_advances_excludes_reversed_recovery(self):
+        """PA-11-1: a reversed recovery must NOT count as recovered in
+        outstanding_advances (it already doesn't in advance_remaining/outstanding).
+        After reversing a settlement that fully recovered an advance, the advance
+        must reappear as outstanding so the owner can re-recover it."""
+        from expense.services.payroll_service import outstanding_advances
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        self._contribute(self.w1, self.sr_pay, 50)            # ₹150 earning
+        adv = WorkerAdvance.objects.create(
+            worker=self.w1, amount=Decimal('100'),
+            advance_date=timezone.now().date(), entered_by=self.mgmt)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt,
+                                 recoveries={adv.pk: Decimal('100')})
+        # fully recovered → drops out of the outstanding list
+        self.assertEqual(outstanding_advances(self.w1), [])
+        # reverse → advance restored everywhere, incl. the recovery UI source
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        out = outstanding_advances(self.w1)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['advance'].pk, adv.pk)
+        self.assertEqual(out[0]['remaining'], Decimal('100'))
+
+    def test_grouped_after_complete_preview_matches_finalize_zero(self):
+        """PA-11-2: a stage grouped AFTER its workers completed has a stale non-zero
+        frozen expected_rate. The settlement preview/queue must apply the grouped→0
+        effective_pay_rate guard (mirror finalize), not the raw frozen rate."""
+        from expense.services.adda_settlement_service import settlement_queue
+        self._contribute(self.w1, self.sr_pay, 50)            # expected_rate frozen = 3
+        self._close_stages()
+        # Group the payable stage after completion (billed at the other stage).
+        self.ws_pay.cost_billed_at = self.ws_free
+        self.ws_pay.save(update_fields=['cost_billed_at'])
+        # Queue preview must show 0 (grouped member pays at the payer), matching finalize.
+        q = settlement_queue()
+        row = next(r for r in q['ready'] if r['adda'].pk == self.adda.pk)
+        self.assertEqual(row['expected'], Decimal('0.00'))
+        # And finalize books 0 — preview now agrees with the money write.
+        s = create_draft(adda=self.adda, user=self.mgmt)
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        s.refresh_from_db()
+        self.assertEqual(s.expected_total, Decimal('0.00'))

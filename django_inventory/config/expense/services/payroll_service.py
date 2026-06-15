@@ -74,7 +74,13 @@ def outstanding_advances(worker):
     advs = WorkerAdvance.objects.filter(worker=worker).order_by('advance_date', 'id')
     recovered_map = {
         r['advance']: r['s'] for r in
-        PayrollSettlementItem.objects.filter(advance__worker=worker)
+        # PA-11-1: exclude REVERSED recoveries (reversed_at set) — exactly like
+        # advance_remaining / advance_outstanding. Without this filter a reversed
+        # recovery still counts as recovered here, so after a settlement reversal the
+        # restored advance is under-reported (or, if fully recovered-then-reversed,
+        # drops out at the remaining>0 gate below) and the owner can't re-recover it.
+        PayrollSettlementItem.objects.filter(advance__worker=worker,
+                                             reversed_at__isnull=True)
         .values('advance').annotate(s=Sum('amount_recovered'))
     }
     out = []

@@ -191,8 +191,14 @@ def settlement_queue():
         lines, skip_a, skip_b = _settleable_lines(payable)
         if not lines:
             continue                       # fully credited — nothing pending
+        # PA-11-2: mirror the finalize money-boundary — apply the grouped→0 structural
+        # guard (effective_pay_rate) here too, else a stage grouped AFTER completion shows
+        # an overstated "expected" in the queue while finalize correctly books 0 (F2: the
+        # guard must apply ANYWHERE expected_* is recomputed).
+        from production.services import cost_service
         expected = sum(
-            _q(settlement_quantity(c) * (c.expected_rate or _ZERO))
+            _q(settlement_quantity(c) * cost_service.effective_pay_rate(
+                c.task.stage_record.workflow_stage, c.expected_rate or _ZERO))
             for c in lines)
         ready.append({
             'adda': adda,
@@ -266,10 +272,19 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
 
     adda = settlement.adda
     stage_records = _payable_stage_records(adda)
-    from production.models import AddaStageRecord
-    # Freeze quantity inputs (verified_quantity edits race) — row locks.
+    from production.models import AddaStageRecord, WorkerStageContribution
+    # Freeze the stage records (row locks).
     list(AddaStageRecord.objects.select_for_update()
          .filter(pk__in=[sr.pk for sr in stage_records]))
+    # PA-11-3: the settled quantity is resolved from WorkerStageContribution.verified_quantity
+    # (settlement_resolver) — which lives on WSC, NOT AddaStageRecord — so the SR lock above
+    # does NOT freeze it. Lock the WSC rows too (of=('self',), the SAME target
+    # set_verified_quantity locks) so a verified-quantity edit racing this finalize blocks
+    # until commit, then sees settlement_line stamped and refuses. Without this, a correction
+    # issued during the finalize window is a lost update and money books on the stale quantity.
+    # No deadlock: every settlement op takes 5374 first; set_verified takes only the WSC row.
+    list(WorkerStageContribution.objects.select_for_update(of=('self',))
+         .filter(task__stage_record__in=stage_records))
 
     lines, skip_a, skip_b = _settleable_lines(stage_records)
     if not lines:

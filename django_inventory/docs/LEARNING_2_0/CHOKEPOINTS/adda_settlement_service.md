@@ -24,8 +24,10 @@ debits; stamps `WSC.settlement_line` (provenance). CI gates **[4b/4]** (ADST)
 
 **Invariants protected:** a contribution line is paid AT MOST ONCE (era-A +
 era-B skip guards, both directions) · full provenance loop item↔SWA↔ledger↔WSC
-· **lock ORDER** advisory 5374 → ADST → stage records → profiles → advances
-(deadlock-safe) · recovery ≤ remaining · frozen snapshots never recomputed.
+· **lock ORDER** advisory 5374 → ADST → stage records → **WSC rows (PA-11-3: `verified_quantity` lives here, not on AddaStageRecord — locked `of=self` so a racing `set_verified_quantity` can't lost-update the settled qty)** → profiles → advances
+(deadlock-safe) · recovery ≤ remaining · frozen snapshots never recomputed ·
+**PA-11-2: the grouped→0 `effective_pay_rate` guard is applied at the preview surfaces
+(`settlement_queue` + `_line_dict`) too, not just at finalize — preview == money-write.**
 
 **What breaks if bypassed:** double-pay, deadlocks, unauditable money, and the
 V2-3 holes (reopen/void touching settled lines — now guarded).
@@ -48,7 +50,7 @@ Traced from `config/expense/services/adda_settlement_service.py:finalize_adda_se
 
 **Transaction boundary + lock order (verified,:**
 ```
-@transaction.atomic pg_advisory_xact_lock(5374) # global settlement lock AddaSettlement.select_for_update # this ADST row AddaStageRecord.select_for_update # freeze quantities (race guard) WorkerProfile.select_for_update # per settled worker WorkerAdvance.select_for_update # advances
+@transaction.atomic pg_advisory_xact_lock(5374) # global settlement lock AddaSettlement.select_for_update # this ADST row AddaStageRecord.select_for_update # freeze stage records WorkerStageContribution.select_for_update(of=self) # PA-11-3: freeze verified_quantity (the settled qty lives HERE) WorkerProfile.select_for_update # per settled worker WorkerAdvance.select_for_update # advances
 ```
 
 **Models touched, in order (verified:**

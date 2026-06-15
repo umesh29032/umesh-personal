@@ -343,8 +343,13 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
 
     @staticmethod
     def _line_dict(c):
+        from production.services import cost_service
         qty = settlement_quantity(c)               # resolver (S1) — default = verified ?? reported
-        rate = c.expected_rate or _ZERO
+        # PA-11-2: grouped→0 structural guard, mirroring the finalize money-write — a stage
+        # grouped after completion has a stale non-zero frozen expected_rate; the preview
+        # must show the 0 that finalize will actually book, not the raw frozen rate.
+        rate = cost_service.effective_pay_rate(
+            c.task.stage_record.workflow_stage, c.expected_rate or _ZERO)
         return {
             'contribution': c,
             'stage': c.task.stage_record.workflow_stage.stage.name,
