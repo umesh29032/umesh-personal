@@ -17,7 +17,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from accounts.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 
 from .mixins import ProductionRoleMixin
@@ -71,11 +71,17 @@ class RawMaterialDashboardView(LoginRequiredMixin, ProductionRoleMixin, Template
         ctx['can_add_rolls'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
         # Time logs — saari cloth-roll movements ka top-level overview (accordion)
         from tracking.models import ClothRollHistory
-        ctx['roll_events'] = (
+        roll_events = (
             ClothRollHistory.objects
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
-            .order_by('-created_at')[:30]
+            .order_by('-created_at')
         )
+        # PA-13-3 (PA-03-1 class, on the dashboard time-log): the accordion renders
+        # field_name/old/new, so a non-financial viewer would see cost_per_kg/supplier
+        # CHANGE VALUES that the roll table/detail hide. Filter server-side.
+        if not user_can_view_financials(self.request.user):
+            roll_events = roll_events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['roll_events'] = roll_events[:30]
         return ctx
 
 
@@ -164,11 +170,15 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         )
         # Time logs — ClothRollHistory latest 30 events (accordion mein render hota hai)
         from tracking.models import ClothRollHistory
-        ctx['roll_events'] = (
+        roll_events = (
             ClothRollHistory.objects
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
-            .order_by('-created_at')[:30]
+            .order_by('-created_at')
         )
+        # PA-13-3: hide cost_per_kg/supplier change values from non-financial viewers.
+        if not user_can_view_financials(self.request.user):
+            roll_events = roll_events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['roll_events'] = roll_events[:30]
         ctx['active_colors'] = ClothColor.active.order_by('name')
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')

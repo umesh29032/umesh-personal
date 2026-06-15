@@ -278,7 +278,13 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
                 Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q)
             )
         if skills:
-            qs = qs.filter(skills__id__in=skills).distinct()
+            # PA-13-4: skills come from the querystring; a non-numeric value
+            # (?skills=abc, tampered/stale link) made the integer FK lookup raise
+            # ValueError → 500. Keep only numeric ids (mirrors the int()-guard the
+            # context builder already applies to selected_skills below).
+            skill_ids = [s for s in skills if s.isdigit()]
+            if skill_ids:
+                qs = qs.filter(skills__id__in=skill_ids).distinct()
         return qs
 
     def get_context_data(self, **kwargs):

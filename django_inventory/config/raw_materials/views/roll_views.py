@@ -40,11 +40,15 @@ class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         color_id = self.request.GET.get('color')
         if status in {ClothRoll.Status.NOT_USED, ClothRoll.Status.USED}:
             qs = qs.filter(status=status)
-        if type_id:
+        # PA-13-2: these are integer FK lookups — a non-numeric GET value
+        # (?cloth_type=abc, stale/tampered link) made Django raise ValueError →
+        # 500, making the whole roll list unreachable. Apply only when numeric
+        # (a non-numeric filter is ignored, same as the dashboard's .isdigit() guard).
+        if type_id and type_id.isdigit():
             qs = qs.filter(cloth_type_id=type_id)
-        if loc_id:
+        if loc_id and loc_id.isdigit():
             qs = qs.filter(storage_location_id=loc_id)
-        if color_id:
+        if color_id and color_id.isdigit():
             qs = qs.filter(cloth_color_id=color_id)
         return qs
 
@@ -57,6 +61,11 @@ class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         ctx['can_add_rolls'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
 
         status = self.request.GET.get('status', '')
+        # PA-13-5: ignore an invalid status here too, so the active-filter chip +
+        # filtered_count match what get_queryset actually applied (a garbage status
+        # otherwise rendered a misleading 'Status: garbage' chip over the FULL list).
+        if status not in {ClothRoll.Status.NOT_USED, ClothRoll.Status.USED}:
+            status = ''
         type_id = self.request.GET.get('cloth_type', '')
         loc_id = self.request.GET.get('location', '')
         color_id = self.request.GET.get('color', '')
@@ -108,11 +117,17 @@ class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         # Time log: latest cloth-roll movement events across all rolls.
         # Lazy-import — tracking depends on raw_materials, not the other way.
         from tracking.models import ClothRollHistory
-        ctx['roll_events'] = (
+        roll_events = (
             ClothRollHistory.objects
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
-            .order_by('-created_at')[:50]
+            .order_by('-created_at')
         )
+        # PA-13-3 (PA-03-1 class): the time-log accordion renders field_name/old/new,
+        # so hide cost_per_kg/supplier change values from non-financial viewers (the
+        # roll table + detail already hide them; this is the third surface that didn't).
+        if not user_can_view_financials(self.request.user):
+            roll_events = roll_events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['roll_events'] = roll_events[:50]
         return ctx
 
     def _build_remove_url(self, key_to_remove):

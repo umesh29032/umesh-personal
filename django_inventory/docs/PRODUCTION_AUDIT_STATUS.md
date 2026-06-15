@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 12 — Payroll Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 13 — Reporting Audit |
+| **Current phase** | PHASE 13 — Reporting + Search + Filter + Export Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 14 — Mobile Responsiveness Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **688 tests, all passing** (was 641; +47 audit regression tests) |
+| **Green test baseline** | **696 tests, all passing** (was 641; +55 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -39,12 +39,13 @@
 | 10 | Production Audit | ✅ COMPLETE · commit `70a7afca` | Production-truth system: Adda/assignment/contribution lifecycle · draft→complete · reopen→re-complete · rate-freeze · expected_earning · good/alter/missing · settlement-qty derivation · AddaStageRoleRate · locks/atomicity/audit. Finder-only Workflow (all 6 finders survived → 12 candidates; verify stage omitted to dodge the verifier-death pattern) + main-thread-verified EACH. 3 fixed: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked ALL cutting completion in the default flag-off config), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). 5 documented-not-fixed (reopen-restale=by-design/use rerate; verified-qty no-audit=by-design; grouped→0 settlement-preview + finalize-vs-verified race = Phase 11; role=None→base rate = benign). Golden ₹225 settlement byte-identical. 685 green. |
 | 11 | Settlement Audit | ✅ COMPLETE · commit `111a8a33` | finalize / reverse / supersede chains / AddaSettlement / SWA / ledger / reconciliation evidence / rerate / override / locks / settlement_quantity / double-pay / replay / S5. Finder-only Workflow (all 6 finders survived → 10 candidates) + main-thread-verified each. Money-write/reverse/supersede/ledger-idempotency verified SOUND (5374 serializes; era-A/B guards; reverse fully restores; double-finalize/reverse blocked). 3 fixed: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance from the recovery UI), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue [carried PA-10-GROUPED-PREVIEW]), PA-11-3 (MEDIUM — finalize locked AddaStageRecord but not the WSC rows where `verified_quantity` lives [carried PA-10-VERIFY-RACE]; comment falsely claimed protection). Golden ₹225 byte-identical. 687 green. |
 | 12 | Payroll Audit | ✅ COMPLETE · commit `c7c50c79` | Money-consumption (read/aggregate/display): generation/aggregation/display/filtering/history/visibility · grouped-worker · settlement integration · reverse/supersede effects · stale values · permissions · advances. Finder-only Workflow (all 4 finders survived → 14 candidates) + main-thread-verified each. 3 fixed (all reversal-netting amount-mismatches; ledger payable was always correct): PA-12-A (`payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (`PayrollOverviewView` advance_outstanding ignored `reversed_at`), PA-12-C (`PayrollOverviewView` `total_earnings`/`total_settled` didn't net reversals by category → counted CREDIT/REVERSAL as earnings; now mirrors `worker_summary`). Permissions sound (MyEarnings self-scoped; worker-detail `can_view_worker`-gated; overview management-only). No payroll export surface. 688 green. |
-| 13 | Reporting Audit | ⬜ PENDING | |
-| 14 | Search/Filter/Export Audit | ⬜ PENDING | |
-| 15 | Mobile Responsiveness Audit | ⬜ PENDING | **HIGHEST PRIORITY** — 320/375/390/414px |
-| 16 | UI Consistency Audit | ⬜ PENDING | spacing · alignment · typography · buttons · dropdowns · date inputs |
-| 17 | Performance Audit | ⬜ PENDING | |
-| 18 | Regression Audit | ⬜ PENDING | full-system retest |
+| 13 | Reporting + Search + Filter + Export Audit | ✅ COMPLETE · commit `PENDING` | MERGED (reporting+search+filter+sort+pagination+exports+aggregations+visibility). Finder-only Workflow (all 4 finders survived → 8 candidates) + main-thread-verified each. 6 fixed: PA-13-1 (HIGH barcode-dashboard cartesian-JOIN inflation), PA-13-2 (HIGH RollListView non-numeric id filter → 500), PA-13-3 (HIGH cost/supplier leak via 3 time-log accordions — PA-03-1 class), PA-13-4 (MEDIUM UserListView non-numeric `?skills` → 500), PA-13-5 (LOW garbage-status chip), PA-13-6 (LOW CSV/XLSX formula-injection). +8 regression tests. Verified sound: all paginated lists ordered, operations_digest single-source, payroll netting (P12). 696 green. |
+| 14 | Mobile Responsiveness Audit | ⬜ PENDING | **HIGHEST PRIORITY** — 320/375/390/414px. Every UI fix → evaluate for UI_COMPONENTS.md (owner rule 2026-06-15) |
+| 15 | UI Consistency Audit | ⬜ PENDING | spacing · alignment · typography · buttons · dropdowns · date inputs. Every UI fix → evaluate for UI_COMPONENTS.md (owner rule 2026-06-15) |
+| 16 | Performance Audit | ⬜ PENDING | |
+| 17 | Final Regression Audit | ⬜ PENDING | full-system retest |
+
+> **Phase-plan revision (owner 2026-06-15):** Phase 13 = merged Reporting+Search+Filter+Export (one user-facing reporting surface, avoids duplicate verification). Mobile moved to 14 (right after Reporting). **Mandatory for Phases 14+15:** every UI-related fix MUST be evaluated for inclusion in `UI_COMPONENTS.md` — if it establishes a reusable rule (responsive/layout/form/table/modal/dropdown/date-input/validation-display/spacing/accessibility), document the standard + reference the component so future pages follow it. No reusable UI knowledge stays trapped in one template.
 
 Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 
@@ -122,6 +123,12 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-12-C | MEDIUM | 12 | expense/PayrollOverviewView | ✅ FIXED | The overview computed `total_earnings = credits − reversals` (all-credits − all-debit-reversals) and `total_settled = settled` (gross). A settlement reversal writes a CREDIT/REVERSAL (undoing the advance-recovery debit), which inflated "Earned"; a reversed payment would inflate "Settled". Both disagreed with `worker_summary`. Fix: the grouped aggregate now nets BY CATEGORY exactly like `worker_summary` — `earned` (EARNING-category credits) − `earned_reversed` (reversals of earnings); `settled` − `settled_reversed`. Overview now matches each worker's own page. Payable (credits−debits) was always correct. |
 | PA-12-BREAKDOWN | — | 12 | expense/payroll_service | 📋 DOC (dead code) | `worker_balance_breakdown()` is unwired (no view/template caller); its `debits_by_category` would show gross recovery debits after a reversal. No user-visible figure is wrong. Flagged so a future wiring nets REVERSAL rows. |
 | PA-12-GROUPED-BOARD | LOW | 12 | expense/PayrollOverviewView | 📋 DOC (by-design) | A worker who did ONLY grouped/zero-cost stage work (earning 0 → no ledger credit booked) + has no advance is absent from the payroll overview board (`worker_ids = ledger | given | recovered`, not `pieces_map`), so their pieces don't show. By-design: the board scopes to payroll activity (who's owed); a ₹0-payable worker is out of scope and productivity has its own views. Not changed (board-scope is a product decision, no-feature). |
+| PA-13-1 | HIGH | 13 | inventory/barcode-dashboard | ✅ FIXED | `BarcodeDashboardView` per-Adda counts used ONE `.annotate()` mixing `Sum('barcode_batches__total_pieces')` (relation A) + `Count('barcodes', …)` (relation B) → cartesian JOIN: `total` inflated ×#barcodes, packed/dispatched/missing inflated ×#batches, the moment a multi-batch Adda had ≥1 scanned piece (repro: 2 batches + 3 scanned → total 300 not 100, packed 4 not 2). The page's KPI cards (separate queries) were correct → page self-contradicted. `.distinct()` doesn't fix join-multiplied aggregates. Fix: compute `total` (BarcodeBatch grouped) + scanned-by-status (BatchBarcode grouped) from SEPARATE per-Adda queries (same approach as the KPIs), attach in Python. `inventory/views/tracking_dashboard.py`. |
+| PA-13-2 | HIGH | 13 | raw_materials/roll-list | ✅ FIXED | `RollListView.get_queryset` applied `qs.filter(cloth_type_id=type_id)` (also color/location) from the raw GET string → a non-numeric value (`?cloth_type=abc`, stale/tampered link) raised `ValueError` → **500**, making the whole roll list unreachable. (The chip block caught it; the queryset filter didn't — PA-08 guarded the dashboards, not these list filters.) Fix: `.isdigit()` guard on the three id filters (ignore a non-numeric filter). |
+| PA-13-3 | HIGH | 13 | raw_materials reporting | ✅ FIXED | The PA-03-1 financial-leak REOPENED on 3 reporting surfaces: the cloth-roll Time-Logs accordion (`_roll_events_accordion.html` renders `field_name: old → new`) on the **roll list**, the **cloth dashboard**, and the **raw-material dashboard** rendered `ClothRollHistory` `cost_per_kg`/`supplier` CHANGE VALUES to worker/manager (non-financial) — the exact figures the roll table/detail hide. (PA-03-1 only fixed the dedicated roll-history timeline.) Fix: server-side `exclude(field_name__in=('supplier','cost_per_kg'))` for non-financial viewers on all 3 querysets (same as PA-03-1). |
+| PA-13-4 | MEDIUM | 13 | accounts/user-list | ✅ FIXED | `UserListView.get_queryset` did `qs.filter(skills__id__in=skills)` from `GET.getlist('skills')` → a non-numeric value (`?skills=abc`) → `ValueError` → 500. Super-admin-only surface (low blast radius). Fix: keep only numeric ids (mirrors the `int()`-guard the context builder already applies to `selected_skills`). |
+| PA-13-5 | LOW | 13 | raw_materials/roll-list | ✅ FIXED | `?status=garbage` returned 200 but rendered a misleading "Status: garbage" active-filter chip + a `filtered_count` equal to the FULL list (the filter only applies for valid choices, but the chip showed for any non-empty status). Fix: ignore an invalid status in the context so chip + filtered_count match `get_queryset`. |
+| PA-13-6 | LOW | 13 | barcode export | ✅ FIXED | The CSV/XLSX barcode manifest wrote free-text `color`/`size` labels (ClothColor.name/ProductSize.label — no char validator) verbatim → a label starting with `= + - @ tab CR` executes as a formula when a production-role user opens the manifest in Excel/LibreOffice (CSV-injection). No wrong count/total; not financial. Fix: `_csv_safe` prefixes a formula-leading cell with `'` in both CSV + XLSX renderers (`export_service.py`). |
 | PA-12-PIECES-SEMANTICS | — | 12 | expense/payroll | 📋 REFUTED (labeling) | The overview "Pieces" (Σ SWA.allocated_quantity = settled qty) and `worker_production_stats.pieces` (Σ good_quantity = production output) measure different things and can differ. No money impact; a labeling/semantics nuance, not a defect. |
 | PA-11-SOUND | — | 11 | expense/settlement | 📋 VERIFIED SOUND | Finder-verified (main-thread re-checked) with NO defect: finalize money-write (qty=verified-else-good × grouped-guarded rate, ROUND_HALF_UP; era-A/B exclusion; recovery ≤ remaining under lock; tie-out; S5 block rolls back atomically); reverse/supersede (compensating ledger + PSI `reversed_at` + SWA soft-void re-arm; FINALIZED-only guard; multi-level chain isolation); ledger idempotency (double-finalize/double-reverse blocked under 5374; `uniq_one_reversal_per_entry` DB constraint; balance nets reversals to 0); `verified_quantity=0` pays 0; alter/missing never enter the payable; recovery>earning negative balance is by-design (advance pool independent of this Adda's earning). The 5374 advisory lock serializes all finalize/reverse/rerate; lock orders are deadlock-free. |
 
@@ -138,6 +145,7 @@ Phase 09: PA-09-1 (legacy-cutting unconditional SR create → IntegrityError 500
 Phase 10: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked all cutting completion in the default flag-off config; made flag-aware → production-truth credit), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). +6 regression tests (685 green); golden ₹225 settlement byte-identical.
 Phase 11: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue), PA-11-3 (MEDIUM — finalize didn't lock the WSC rows holding `verified_quantity`). +2 regression tests (PA-11-3 = structural lock, covered by existing finalize/verify tests). 687 green; golden ₹225 byte-identical.
 Phase 12: PA-12-A (MEDIUM — `payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (MEDIUM — overview advance_outstanding ignored `reversed_at`), PA-12-C (MEDIUM — overview earnings/settled didn't net reversals by category). +1 regression test (asserts overview == worker_summary == ledger after a reverse). 688 green.
+Phase 13: PA-13-1 (HIGH barcode-dashboard cartesian-JOIN), PA-13-2 (HIGH roll-list non-numeric filter 500), PA-13-3 (HIGH cost/supplier leak via 3 time-log accordions), PA-13-4 (MEDIUM user-list `?skills` 500), PA-13-5 (LOW garbage-status chip), PA-13-6 (LOW CSV/XLSX formula-injection). +8 regression tests. 696 green.
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -633,6 +641,41 @@ All three fixes are backend aggregate-query filters — no template/markup/CSS c
 
 ### UI_COMPONENTS.md
 No change — backend aggregation-netting fixes; no reusable visual/layout rule emerged.
+
+---
+
+## PHASE 13 — REPORTING + SEARCH + FILTER + EXPORT AUDIT · RESULT
+
+**Scope (merged 13+14):** the user-facing reporting surface — dashboard totals/aggregations · list filters · search · sort · pagination · CSV/XLSX/PDF exports · date-range filters · stale data · reporting visibility/RBAC.
+
+**Method:** mapped the surface (exports = barcode manifests; dashboards = production/raw_materials/inventory/expense; lists = Adda/Roll/User/Settlement/Export) + a FINDER-ONLY Workflow (4 finders, verify omitted). **All 4 finders survived → 8 candidates** (deduped to 6 distinct bugs), each main-thread-verified. Three HIGH.
+
+### What's verified SOUND
+- **Pagination:** every paginated ListView has a stable `order_by` (the "vanishing records on pagination" class is closed — incl. the documented `UserListView` `-date_joined,email` fix).
+- **Digest/aggregation reconciliation:** `operations_digest` is single-source for stalled/pending (drill-downs reconcile) + reuses the (P12-fixed) `payroll_totals`. `adda_cost_summary` honest-NULL + cost-duality respected.
+- Filter parse-guards on the audited dashboards (PA-08 `.isdigit()`/`_parse_date`) hold.
+
+### BUG PA-13-1 — barcode dashboard cross-join inflation (HIGH)
+- **Module:** inventory/barcode-dashboard (`/tracking/`) · **Reproduction:** a multi-batch Adda with ≥1 scanned piece → the single `.annotate()` joining `Sum(barcode_batches.total_pieces)` × `Count(barcodes)` cross-joins: per-Adda `total` ×#barcodes, `packed`/`dispatched`/`missing` ×#batches (verified: 2 batches + 3 scanned → total 300 vs 100, packed 4 vs 2, pending 294 vs 97). KPI cards (separate queries) stayed correct → the page contradicted itself.
+- **Fix:** compute total + scanned-by-status from SEPARATE per-Adda grouped queries (the KPI approach), attach in Python — no cross-join. **Test:** `BarcodeDashboardCountTests` (asserts per-row == real == KPI). **Status:** ✅ FIXED
+
+### BUG PA-13-2 — roll-list 500 on non-numeric id filter (HIGH)
+- **Module:** raw_materials/roll-list · **Reproduction:** `GET /raw-materials/rolls/?cloth_type=abc` (or color/location) → integer FK lookup `ValueError` → 500 → list unreachable. **Fix:** `.isdigit()` guard. **Test:** `RollListReportingTests.test_non_numeric_id_filters_do_not_500`. **Status:** ✅ FIXED
+
+### BUG PA-13-3 — cost/supplier leak via Time-Logs accordions (HIGH)
+- **Module:** raw_materials reporting (roll list + cloth dashboard + raw-material dashboard) · **Reproduction:** edit a roll's cost/supplier (writes `ClothRollHistory`), then view any of the 3 surfaces as a worker/manager — the accordion renders `cost_per_kg`/`supplier` change values that the roll table/detail hide. The PA-03-1 class, on 3 surfaces its fix didn't cover.
+- **Fix:** server-side `exclude(field_name__in=('supplier','cost_per_kg'))` for non-financial viewers on all 3. **Test:** `RollListReportingTests` (worker hidden, financial shown). **Status:** ✅ FIXED
+
+### Lower-severity (fixed)
+- **PA-13-4 (MEDIUM):** `UserListView` 500 on non-numeric `?skills` → keep-numeric guard. Super-admin-only. Test: `UserListFilterParamTests`.
+- **PA-13-5 (LOW):** roll-list rendered a misleading "Status: garbage" chip + full `filtered_count` for an invalid status → ignore invalid status in context. Test: `test_garbage_status_shows_no_status_chip`.
+- **PA-13-6 (LOW):** CSV/XLSX barcode manifest didn't neutralize spreadsheet formula injection in free-text color/size labels → `_csv_safe` prefixes formula-leading cells with `'`. Tests: `FormulaInjectionTests`.
+
+### Mobile (highest priority)
+All six fixes are backend (aggregate queries, filter guards, a server-side exclude, an export cell-sanitizer) — no template/markup/CSS change, no mobile-render delta. (PA-13-1/PA-13-3 make the rendered numbers correct + close a leak — data-truth/security fixes, not layout.)
+
+### UI_COMPONENTS.md
+No change — all fixes are backend (query/visibility/export). No reusable visual/layout/component rule emerged. (Mobile + UI-consistency rule-harvesting begins in Phases 14–15 per the owner rule.)
 
 ---
 

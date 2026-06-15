@@ -510,3 +510,17 @@ class UserServiceTests(TestCase):
         # No skills + no active layering rosters → no retro-tag, returns 0 (no crash
         # across the lazy accounts->production edge).
         self.assertEqual(sync_user_skills(self.worker), 0)
+
+
+class UserListFilterParamTests(TestCase):
+    """PA-13-4: a non-numeric ?skills= filter must not 500 the user-management list."""
+
+    def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            email='ul-admin@t.test', password='x', is_superuser=True, is_staff=True)
+
+    def test_non_numeric_skills_param_does_not_500(self):
+        self.client.force_login(self.admin)
+        for qs in ('skills=abc', 'skills=1&skills=xyz', 'skills=%20'):
+            resp = self.client.get(reverse('accounts:user_list') + '?' + qs)
+            self.assertEqual(resp.status_code, 200, f"500 on ?{qs}")

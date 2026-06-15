@@ -12,7 +12,7 @@ from datetime import datetime, time
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -62,24 +62,34 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
         if to_dt:
             addas_qs = addas_qs.filter(created_at__lt=to_dt)
 
-        # Total per-Adda = SUM(BarcodeBatch.total_pieces). Scanned counts
-        # come from BatchBarcode (lazy). Pending = total - scanned.
-        addas = (
-            addas_qs.annotate(
-                total=Sum('barcode_batches__total_pieces'),
-                packed=Count('barcodes', filter=Q(barcodes__status='packed')),
-                dispatched=Count('barcodes', filter=Q(barcodes__status='dispatched')),
-                missing=Count('barcodes', filter=Q(barcodes__status='missing')),
-            )
-            .select_related('product')
-            .order_by('-started_at')
-            .distinct()
-        )
-        # Pending = total - (packed + dispatched + missing). Computed in Python
-        # to avoid double-counted M2M JOIN explosion.
+        # PA-13-1: per-Adda totals + scanned counts come from TWO different multi-valued
+        # relations (BarcodeBatch.total_pieces vs BatchBarcode rows). Annotating both in
+        # ONE .annotate() cross-joins them — Sum(total_pieces) gets multiplied by the
+        # #barcodes and each Count(barcodes) by the #batches, so every per-row figure was
+        # inflated the moment a multi-batch Adda had any scanned piece (and contradicted
+        # the KPI cards). Compute each from a SEPARATE grouped query (same approach as the
+        # KPI cards below) and attach in Python — no cross-join.
+        addas = list(
+            addas_qs.select_related('product').order_by('-started_at').distinct())
+        adda_ids = [a.pk for a in addas]
+        total_by_adda = {
+            r['adda']: r['t'] for r in
+            BarcodeBatch.objects.filter(adda_id__in=adda_ids)
+            .values('adda').annotate(t=Sum('total_pieces'))
+        }
+        scanned_by_adda = {}
+        for r in (BatchBarcode.objects
+                  .filter(adda_id__in=adda_ids,
+                          status__in=('packed', 'dispatched', 'missing'))
+                  .values('adda', 'status').annotate(n=Count('id'))):
+            scanned_by_adda.setdefault(r['adda'], {})[r['status']] = r['n']
         for a in addas:
-            scanned = (a.packed or 0) + (a.dispatched or 0) + (a.missing or 0)
-            a.pending = max((a.total or 0) - scanned, 0)
+            sc = scanned_by_adda.get(a.pk, {})
+            a.total = total_by_adda.get(a.pk, 0) or 0
+            a.packed = sc.get('packed', 0)
+            a.dispatched = sc.get('dispatched', 0)
+            a.missing = sc.get('missing', 0)
+            a.pending = max(a.total - (a.packed + a.dispatched + a.missing), 0)
 
         # KPIs across all filtered Addas.
         total_pieces = (

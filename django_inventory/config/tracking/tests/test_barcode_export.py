@@ -313,3 +313,31 @@ class ViewIntegrationTests(_PostCompleteFixture):
             reverse('tracking:export-csv', args=[self.adda.code]),
         )
         self.assertEqual(resp.status_code, 400)
+
+
+class FormulaInjectionTests(_PostCompleteFixture):
+    """PA-13-6: free-text color/size labels must not become live spreadsheet
+    formulas when the CSV/XLSX manifest is opened in Excel/LibreOffice."""
+
+    def test_csv_safe_neutralizes_formula_triggers(self):
+        from production.stages.barcode_generation.export_service import _csv_safe
+        for bad in ('=HYPERLINK("http://evil","x")', '+1+1', '-2', '@SUM(A1)',
+                    '\tred', '\rred'):
+            self.assertEqual(_csv_safe(bad), "'" + bad)
+        # Safe values untouched.
+        self.assertEqual(_csv_safe('Red'), 'Red')
+        self.assertEqual(_csv_safe('CR-000001'), 'CR-000001')
+        self.assertEqual(_csv_safe(42), 42)
+
+    def test_csv_export_neutralizes_malicious_color_name(self):
+        from raw_materials.models import ClothColor
+        from production.stages.barcode_generation.export_service import _render_csv_bytes
+        # Rename a color used by this Adda's barcodes to a formula payload.
+        c = ClothColor.objects.filter(rolls__adda=self.adda).first() or ClothColor.objects.first()
+        c.name = '=cmd|calc'
+        c.save(update_fields=['name'])
+        text = _render_csv_bytes(self.adda).decode('utf-8')
+        # The raw formula must NOT appear as a cell start; the neutralized form does.
+        self.assertNotIn(',=cmd|calc', text)
+        if 'cmd|calc' in text:
+            self.assertIn("'=cmd|calc", text)

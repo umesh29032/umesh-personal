@@ -146,6 +146,19 @@ _HEADERS = [
     'bundle', 'size', 'color', 'piece_seq',
 ]
 
+# PA-13-6: CSV/XLSX formula-injection neutralization. A cell whose text starts with
+# a formula trigger (=,+,-,@,tab,CR) is executed when the manifest is opened in
+# Excel/LibreOffice. `size`/`color` are free user text (ClothColor.name / ProductSize
+# .label have no char validator), so prefix any such cell with a single quote → shown
+# literally, never evaluated. System-generated cells (barcode/adda/…) are unaffected.
+_FORMULA_TRIGGERS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(value):
+    if isinstance(value, str) and value and value[0] in _FORMULA_TRIGGERS:
+        return "'" + value
+    return value
+
 
 def _render_csv_bytes(adda: Adda) -> bytes:
     """Render export as CSV bytes."""
@@ -153,7 +166,7 @@ def _render_csv_bytes(adda: Adda) -> bytes:
     writer = csv.writer(buf)
     writer.writerow(_HEADERS)
     for row in _iter_export_rows(adda):
-        writer.writerow([row[k] for k in _HEADERS])
+        writer.writerow([_csv_safe(row[k]) for k in _HEADERS])
     return buf.getvalue().encode('utf-8')
 
 
@@ -165,7 +178,7 @@ def _render_xlsx_bytes(adda: Adda) -> bytes:
     ws.title = adda.code[:31]  # XLSX sheet name max 31 chars
     ws.append(_HEADERS)
     for row in _iter_export_rows(adda):
-        ws.append([row[k] for k in _HEADERS])
+        ws.append([_csv_safe(row[k]) for k in _HEADERS])
     # Auto-size columns roughly (header length + small pad)
     for i, h in enumerate(_HEADERS, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, len(h) + 2)
