@@ -37,6 +37,10 @@
 
     @media (max-width: 600px) {
         .bc-dash .table-responsive .td-actions { display: flex; flex-direction: column; gap: 6px; }
+        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+        .bc-dash .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+        .bc-dash .filter-card .field { width: 100%; }
+        .bc-dash .filter-card input, .bc-dash .filter-card select { width: 100%; min-width: 0; }
     }
 </style>
 {# Shared accordion + time-log styles #}

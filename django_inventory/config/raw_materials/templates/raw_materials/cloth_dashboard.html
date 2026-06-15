@@ -72,7 +72,10 @@
     .cloth-dash .color-chip .chip-avail { color: var(--success); font-weight: 600; font-size: 11px; }
 
     @media (max-width: 600px) {
-        .cloth-dash .filter-card { padding: 12px 14px; }
+        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+        .cloth-dash .filter-card { padding: 12px 14px; flex-direction: column; align-items: stretch; overflow-x: visible; }
+        .cloth-dash .filter-card .field { width: 100%; }
+        .cloth-dash .filter-card input, .cloth-dash .filter-card select { width: 100%; min-width: 0; }
         .cloth-dash .type-name { font-size: 16px; }
         .cloth-dash .type-row { padding: 14px; }
     }

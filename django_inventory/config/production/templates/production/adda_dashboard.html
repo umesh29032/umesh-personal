@@ -60,6 +60,12 @@
     .adda-dash .digest-sub { font-size: 11px; color: var(--stone); }
     .adda-dash .digest-tile.alert .digest-value { color: var(--danger); }
     .adda-dash .digest-tile.warn  .digest-value { color: var(--warning); }
+    @media (max-width: 600px) {
+        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+        .adda-dash .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+        .adda-dash .filter-card .field { width: 100%; }
+        .adda-dash .filter-card input, .adda-dash .filter-card select { width: 100%; min-width: 0; }
+    }
 </style>
 {# Shared accordion + time-log styles #}
 {% include 'inventory/_time_log_styles.html' %}

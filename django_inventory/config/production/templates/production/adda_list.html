@@ -23,6 +23,12 @@
         background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
         font-size: 13px;
     }
+    @media (max-width: 600px) {
+        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+        .adda-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+        .adda-list .filter-card .field { width: 100%; }
+        .adda-list .filter-card select { width: 100%; min-width: 0; }
+    }
 </style>
 {% endblock %}
 

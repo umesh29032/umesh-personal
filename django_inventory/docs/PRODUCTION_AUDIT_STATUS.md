@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 13 — Reporting + Search + Filter + Export Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 14 — Mobile Responsiveness Audit |
+| **Current phase** | PHASE 14 — Mobile Responsiveness Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 15 — UI Consistency Audit (do NOT start without review) |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **696 tests, all passing** (was 641; +55 audit regression tests) |
+| **Green test baseline** | **696 tests, all passing** (Phase 14 = UI/CSS/template fixes, browser-verified; no unit-test delta) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -40,7 +40,7 @@
 | 11 | Settlement Audit | ✅ COMPLETE · commit `111a8a33` | finalize / reverse / supersede chains / AddaSettlement / SWA / ledger / reconciliation evidence / rerate / override / locks / settlement_quantity / double-pay / replay / S5. Finder-only Workflow (all 6 finders survived → 10 candidates) + main-thread-verified each. Money-write/reverse/supersede/ledger-idempotency verified SOUND (5374 serializes; era-A/B guards; reverse fully restores; double-finalize/reverse blocked). 3 fixed: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance from the recovery UI), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue [carried PA-10-GROUPED-PREVIEW]), PA-11-3 (MEDIUM — finalize locked AddaStageRecord but not the WSC rows where `verified_quantity` lives [carried PA-10-VERIFY-RACE]; comment falsely claimed protection). Golden ₹225 byte-identical. 687 green. |
 | 12 | Payroll Audit | ✅ COMPLETE · commit `c7c50c79` | Money-consumption (read/aggregate/display): generation/aggregation/display/filtering/history/visibility · grouped-worker · settlement integration · reverse/supersede effects · stale values · permissions · advances. Finder-only Workflow (all 4 finders survived → 14 candidates) + main-thread-verified each. 3 fixed (all reversal-netting amount-mismatches; ledger payable was always correct): PA-12-A (`payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (`PayrollOverviewView` advance_outstanding ignored `reversed_at`), PA-12-C (`PayrollOverviewView` `total_earnings`/`total_settled` didn't net reversals by category → counted CREDIT/REVERSAL as earnings; now mirrors `worker_summary`). Permissions sound (MyEarnings self-scoped; worker-detail `can_view_worker`-gated; overview management-only). No payroll export surface. 688 green. |
 | 13 | Reporting + Search + Filter + Export Audit | ✅ COMPLETE · commit `0f0d178a` | MERGED (reporting+search+filter+sort+pagination+exports+aggregations+visibility). Finder-only Workflow (all 4 finders survived → 8 candidates) + main-thread-verified each. 6 fixed: PA-13-1 (HIGH barcode-dashboard cartesian-JOIN inflation), PA-13-2 (HIGH RollListView non-numeric id filter → 500), PA-13-3 (HIGH cost/supplier leak via 3 time-log accordions — PA-03-1 class), PA-13-4 (MEDIUM UserListView non-numeric `?skills` → 500), PA-13-5 (LOW garbage-status chip), PA-13-6 (LOW CSV/XLSX formula-injection). +8 regression tests. Verified sound: all paginated lists ordered, operations_digest single-source, payroll netting (P12). 696 green. |
-| 14 | Mobile Responsiveness Audit | ⬜ PENDING | **HIGHEST PRIORITY** — 320/375/390/414px. Every UI fix → evaluate for UI_COMPONENTS.md (owner rule 2026-06-15) |
+| 14 | Mobile Responsiveness Audit | ✅ COMPLETE | Real-browser (headless Chromium) scan at 320/375/390/414px across all priority surfaces (dashboards, lists, workspaces, Adda detail, settlement, payroll, stage-rates, review, forms, worker-report). Automated overflow/clip/touch-target/scroll diagnostics + visual screenshots. **3 fixed:** PA-14-1 (HIGH — settlement-detail money tables clipped off-screen, no scroll), PA-14-2 (MEDIUM — `.filter-card` horizontal-scroll hides filters on 5 dash/list pages), PA-14-3 (MEDIUM — class-less fancy-select triggers = bare 20px line, sub-44px touch target). **UI_COMPONENTS.md updated** (3 reusable rules: bare-table clip, filter-card mobile stacking, fancy-select tag-CSS gotcha + `--bare` fallback). 696 green (UI-only, browser-verified). |
 | 15 | UI Consistency Audit | ⬜ PENDING | spacing · alignment · typography · buttons · dropdowns · date inputs. Every UI fix → evaluate for UI_COMPONENTS.md (owner rule 2026-06-15) |
 | 16 | Performance Audit | ⬜ PENDING | |
 | 17 | Final Regression Audit | ⬜ PENDING | full-system retest |
@@ -130,6 +130,11 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-13-5 | LOW | 13 | raw_materials/roll-list | ✅ FIXED | `?status=garbage` returned 200 but rendered a misleading "Status: garbage" active-filter chip + a `filtered_count` equal to the FULL list (the filter only applies for valid choices, but the chip showed for any non-empty status). Fix: ignore an invalid status in the context so chip + filtered_count match `get_queryset`. |
 | PA-13-6 | LOW | 13 | barcode export | ✅ FIXED | The CSV/XLSX barcode manifest wrote free-text `color`/`size` labels (ClothColor.name/ProductSize.label — no char validator) verbatim → a label starting with `= + - @ tab CR` executes as a formula when a production-role user opens the manifest in Excel/LibreOffice (CSV-injection). No wrong count/total; not financial. Fix: `_csv_safe` prefixes a formula-leading cell with `'` in both CSV + XLSX renderers (`export_service.py`). |
 | PA-12-PIECES-SEMANTICS | — | 12 | expense/payroll | 📋 REFUTED (labeling) | The overview "Pieces" (Σ SWA.allocated_quantity = settled qty) and `worker_production_stats.pieces` (Σ good_quantity = production output) measure different things and can differ. No money impact; a labeling/semantics nuance, not a defect. |
+| PA-14-1 | HIGH | 14 | expense/settlement-detail | ✅ FIXED | Settlement-detail per-worker tables (incl. **Final payable ₹ / Recovered ₹** money columns) were bare `<table>`s with no `.table-responsive` wrapper. Page content lives in `main.content { overflow-x: hidden }`, so the ~448px table was **clipped with NO horizontal scroll** at 320–414px — the rightmost money columns were invisible + unreachable on a phone. Fix: wrapped all 6 tables in `.table-responsive` + `data-label` on every `<td>` (the documented stacked-card standard) → on mobile each row becomes a label:value card with every column visible. Verified at 320px (Final payable ₹ 225.00 now shown). |
+| PA-14-2 | MEDIUM | 14 | filter-card (5 pages) | ✅ FIXED | `.filter-card` (roll-list, adda-list, adda-dashboard, cloth-dashboard, tracking/barcode-dashboard) is `flex-wrap:nowrap; overflow-x:auto` with `min-width:150px` fields → on a phone the filter row scrolled sideways (e.g. roll-list: 6 fields = ~864px on a 320px screen), fields cut mid-field, later filters hidden with no scroll affordance. No page had a mobile-stacking media rule. Fix: added `@media (max-width:600px) { flex-direction:column; align-items:stretch; overflow-x:visible; fields/inputs width:100% }` to all 5 page-scoped definitions → filters stack full-width, all discoverable. |
+| PA-14-3 | MEDIUM | 14 | base.html / fancy-select | ✅ FIXED | fancy-select JS swaps `<select>`→`<button class="fancy-select-trigger [copied select classes]">`. A `<select>` styled only by **tag name** (`.expense-form select{}`) loses all box styling because the trigger is a button, not a select → rendered as a bare ~20px UA-grey line (sub-44px touch target, inconsistent with sibling cream inputs). Hit advance-add, settle-create, layering-workspace roll filters (a worker phone surface). Fix: JS now tags a class-less trigger with `.fancy-select-trigger--bare`, defined in base.html as a default cream input box + `min-height:44px`. **Zero regression to classed triggers** (`.sf-input` etc. never receive `--bare`). Verified: triggers now 44px cream boxes; dropdown still opens (7 opts). |
+| PA-14-TOPBAR-TITLE | — | 14 | base.html / topbar | 📋 REFUTED (intended) | Mobile topbar page-title (`.topbar-title`) reports scrollWidth>clientWidth on long titles. By design: `white-space:nowrap; overflow:hidden; text-overflow:ellipsis` — intended ellipsis truncation; the full title is also shown in the page hero/H1. Not a clip bug. |
+| PA-14-HERO-FLEX | — | 14 | shared `.hero` | 📋 REFUTED (false positive) | The overflow detector flagged `.hero` (scrollWidth ≈ clientWidth+100) as clipped on many pages. Visually clean at 320px (full hero content fits + visible); the excess scrollWidth is a flex min-content artifact, no child rect exceeds the viewport, nothing is cut. Not a bug. |
 | PA-11-SOUND | — | 11 | expense/settlement | 📋 VERIFIED SOUND | Finder-verified (main-thread re-checked) with NO defect: finalize money-write (qty=verified-else-good × grouped-guarded rate, ROUND_HALF_UP; era-A/B exclusion; recovery ≤ remaining under lock; tie-out; S5 block rolls back atomically); reverse/supersede (compensating ledger + PSI `reversed_at` + SWA soft-void re-arm; FINALIZED-only guard; multi-level chain isolation); ledger idempotency (double-finalize/double-reverse blocked under 5374; `uniq_one_reversal_per_entry` DB constraint; balance nets reversals to 0); `verified_quantity=0` pays 0; alter/missing never enter the payable; recovery>earning negative balance is by-design (advance pool independent of this Adda's earning). The 5374 advisory lock serializes all finalize/reverse/rerate; lock orders are deadlock-free. |
 
 ### Issues fixed
@@ -146,6 +151,7 @@ Phase 10: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked all cutting compl
 Phase 11: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue), PA-11-3 (MEDIUM — finalize didn't lock the WSC rows holding `verified_quantity`). +2 regression tests (PA-11-3 = structural lock, covered by existing finalize/verify tests). 687 green; golden ₹225 byte-identical.
 Phase 12: PA-12-A (MEDIUM — `payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (MEDIUM — overview advance_outstanding ignored `reversed_at`), PA-12-C (MEDIUM — overview earnings/settled didn't net reversals by category). +1 regression test (asserts overview == worker_summary == ledger after a reverse). 688 green.
 Phase 13: PA-13-1 (HIGH barcode-dashboard cartesian-JOIN), PA-13-2 (HIGH roll-list non-numeric filter 500), PA-13-3 (HIGH cost/supplier leak via 3 time-log accordions), PA-13-4 (MEDIUM user-list `?skills` 500), PA-13-5 (LOW garbage-status chip), PA-13-6 (LOW CSV/XLSX formula-injection). +8 regression tests. 696 green.
+Phase 14: PA-14-1 (HIGH settlement-detail money tables clipped off-screen → `.table-responsive`+data-label on 6 tables), PA-14-2 (MEDIUM `.filter-card` horizontal-scroll hides filters on 5 dash/list pages → mobile-stack media rule), PA-14-3 (MEDIUM class-less fancy-select trigger = bare 20px line → `.fancy-select-trigger--bare` default box, 44px touch target). UI-only (CSS/template/JS), browser-verified at 320/375/390/414px; 696 green (no unit-test delta). **UI_COMPONENTS.md updated** with 3 reusable rules. 2 refuted (topbar-title ellipsis = intended; `.hero` flex scrollWidth = false positive).
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -676,6 +682,50 @@ All six fixes are backend (aggregate queries, filter guards, a server-side exclu
 
 ### UI_COMPONENTS.md
 No change — all fixes are backend (query/visibility/export). No reusable visual/layout/component rule emerged. (Mobile + UI-consistency rule-harvesting begins in Phases 14–15 per the owner rule.)
+
+---
+
+## PHASE 14 — MOBILE RESPONSIVENESS AUDIT · RESULT
+
+**Scope:** every priority user-facing surface at **320 / 375 / 390 / 414px** — worker reporting, layering/cutting/pattern/barcode workspaces, Adda detail + list, settlement (list/detail/create), payroll (overview/worker-detail), roll management, dashboards (production/raw-material/cloth/tracking/barcode), stage-rate correction, report-review, and all major CRUD forms (user/role/adda/roll-bulk/advance/worker-profile).
+
+**Method:** real headless-Chromium (gstack browse), logged in as super-admin. For each surface, at each width: an injected diagnostic measured (a) true horizontal overflow accounting for `body{overflow-x:hidden}` masking — flagging elements whose content is **clipped by an `overflow-x:hidden` ancestor** (the masking trap that hides real overflow from a naive `scrollWidth==innerWidth` check), (b) overflow-x:auto scroll containers, (c) sub-36px touch targets on buttons/links/inputs. Visual screenshots confirmed every candidate (the detector's clip heuristic produces flex false-positives — each was screenshot-verified before accepting or refuting). **Note (process):** the dev `runserver` caches templates in-process — server MUST be restarted after each template edit for changes to render (caught a stale-verify early; re-verified post-restart).
+
+**Result:** 3 real defects fixed, 2 refuted. No console errors on any surface. Forms (user-create, roll-bulk, worker-report, worker-profile, barcode-dashboard) verified genuinely clean (`overflow-x:visible`, no clip). The worker-report phone surface remains exemplary (Phase 05B).
+
+### BUG PA-14-1 — Settlement-detail money tables clipped off-screen on mobile
+- **Severity:** HIGH · **Module:** expense/settlement-detail · **Page:** `expense:adda-settlement-detail` · **Device:** mobile (320/375/390/414) · **Role:** management
+- **Reproduction:** open a finalized settlement (`/expense/settlements/ADST-0003/`) at 320px → the per-worker snapshot table shows only Worker / Expected ₹ / Advance before ₹ + a sliver of "Rec…"; **Recovered ₹ and Final payable ₹ are off the right edge with no way to scroll to them.**
+- **Root cause:** 6 bare `<table>`s (no `.table-responsive` wrapper). Content sits in `main.content { overflow-x: hidden }` (and `.main`/`.shell` likewise), so a 448px table on a 320px viewport is clipped, not scrollable. `width:100%` can't shrink a table below the sum of its column min-widths.
+- **Files:** `config/expense/templates/expense/adda_settlement_detail.html` (6 tables).
+- **Fix:** wrapped each table in `<div class="table-responsive">` + added `data-label` to every `<td>`. The global `.table-responsive` rule gives desktop h-scroll and, at ≤600px, switches each row to a stacked label:value card — every column (incl. money) visible.
+- **Verification:** 320px screenshot — per-worker card shows Expected/Advance before/Recovered/**Final payable ₹ 225.00**; diagnostic clip count 0; last `<td>` right=292 < vw 320. 696 tests green.
+- **Status:** ✅ FIXED
+
+### BUG PA-14-2 — `.filter-card` filters scroll off-screen on mobile (no stacking)
+- **Severity:** MEDIUM · **Module:** filter-card (roll-list, adda-list, adda-dashboard, cloth-dashboard, tracking/barcode-dashboard) · **Device:** mobile · **Role:** all
+- **Reproduction:** `/raw-materials/rolls/` at 320px → the filter bar (6 fields ≈ 864px) scrolls horizontally; "Cloth Type" is cut mid-field and Location/Color/Apply/Reset are hidden with no visible scroll affordance.
+- **Root cause:** page-scoped `.filter-card` is `display:flex; flex-wrap:nowrap; overflow-x:auto` with `flex-shrink:0` + `min-width:150px` fields; no page had a mobile media rule to stack them.
+- **Files:** roll_list.html, adda_list.html, adda_dashboard.html, cloth_dashboard.html, barcode_dashboard.html.
+- **Fix:** `@media (max-width:600px) { .filter-card { flex-direction:column; align-items:stretch; overflow-x:visible } .field{width:100%} input,select{width:100%; min-width:0} }` on all 5.
+- **Verification:** all 5 at 320px → `overflow-x:visible`, scrollWidth==clientWidth, fields full-width (262–270px); roll-list screenshot shows all filters stacked + visible.
+- **Status:** ✅ FIXED
+
+### BUG PA-14-3 — Class-less fancy-select renders as a bare ~20px line (touch target + consistency)
+- **Severity:** MEDIUM · **Module:** base.html fancy-select · **Page:** advance-add, settle-create, layering-workspace roll filters · **Device:** mobile (also desktop) · **Role:** worker + management
+- **Reproduction:** `/expense/advances/add/` at 375px → the "Worker" dropdown is a thin ~20px underlined grey line, visually unlike the cream Amount/Date/Notes inputs and too short to tap; same on the settlement payment-method select and the layering "Colour/Type/Width" roll filters (a worker phone surface).
+- **Root cause:** fancy-select JS replaces `<select>` with `<button class="fancy-select-trigger " + select.className>`. Pages that style selects **by tag** (`.expense-form select{}`) can't reach the button → a class-less select yields an unstyled UA button (h=20, padding 0, grey). Pages that put a class on the select (`sf-input`) render correctly (the class is copied to the trigger).
+- **Files:** `config/accounts/templates/accounts/base.html` (fancy-select JS class assignment + new `.fancy-select-trigger--bare` CSS).
+- **Fix:** when `select.className` is empty, the JS tags the trigger `.fancy-select-trigger--bare`, styled as a default cream input box (`padding:11px 13px; min-height:44px; border; border-radius; cream bg`). Classed triggers never get `--bare` → zero regression. Touch target now ≥44px.
+- **Verification:** advance/settle/layering triggers now 44px cream boxes (was 20px); dropdown still opens (7 options); screenshot confirms visual parity with sibling inputs. 696 green.
+- **Status:** ✅ FIXED
+
+### Refuted
+- **PA-14-TOPBAR-TITLE:** mobile topbar title clip = intended `text-overflow:ellipsis` (full title in hero). Not a bug.
+- **PA-14-HERO-FLEX:** `.hero` scrollWidth≈clientWidth+100 = flex min-content artifact; screenshot-verified fully visible at 320px, no child exceeds viewport. False positive.
+
+### UI_COMPONENTS.md
+**UI_COMPONENTS.md updated** — 3 reusable rules captured: (1) Tables — never ship a bare `<table>`; wrap in `.table-responsive` + `data-label` (the `main.content{overflow-x:hidden}` clip applies to detail/money tables, not just DataTables lists). (2) New `.filter-card` mobile-stacking standard (media rule). (3) Selects — corrected the stale "tag CSS auto-applies" claim; documented that tag-only `select{}` rules don't reach the `<button>` trigger + the new `.fancy-select-trigger--bare` fallback.
 
 ---
 

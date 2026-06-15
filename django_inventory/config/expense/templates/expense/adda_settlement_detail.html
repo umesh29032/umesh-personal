@@ -78,21 +78,24 @@
         <div class="panel">
             <h2>{{ w.worker.get_full_name|default:w.worker.email }}
                 <span class="muted">— expected ₹{{ w.expected|floatformat:2 }}</span></h2>
+            {# .table-responsive = horizontal-scroll on desktop, stacked label:value cards ≤600px (mobile) #}
+            <div class="table-responsive">
             <table>
                 <thead><tr><th>Stage</th><th>Color</th><th>Size</th><th class="num">Qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th></tr></thead>
                 <tbody>
                 {% for l in w.lines %}
                     <tr>
-                        <td>{{ l.stage }}</td>
-                        <td>{{ l.color|default:"—" }}</td>
-                        <td>{{ l.size|default:"—" }}</td>
-                        <td class="num">{{ l.qty }}{% if l.verified %} <span class="muted" title="verified quantity used">✓</span>{% endif %}</td>
-                        <td class="num">{{ l.rate|floatformat:2 }}</td>
-                        <td class="num">{{ l.amount|floatformat:2 }}</td>
+                        <td data-label="Stage">{{ l.stage }}</td>
+                        <td data-label="Color">{{ l.color|default:"—" }}</td>
+                        <td data-label="Size">{{ l.size|default:"—" }}</td>
+                        <td class="num" data-label="Qty">{{ l.qty }}{% if l.verified %} <span class="muted" title="verified quantity used">✓</span>{% endif %}</td>
+                        <td class="num" data-label="Rate ₹">{{ l.rate|floatformat:2 }}</td>
+                        <td class="num" data-label="Amount ₹">{{ l.amount|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
 
             <h3>Variance (counts only — factory absorbs; pay is not reduced)</h3>
             <div style="display:flex; gap:14px; flex-wrap:wrap;">
@@ -103,18 +106,20 @@
 
             {% if w.advances %}
             <h3>Recover advances <span class="muted">— optional, ≤ remaining; you decide per advance</span></h3>
+            <div class="table-responsive">
             <table>
                 <thead><tr><th>Date</th><th class="num">Remaining ₹</th><th class="num">Recover now ₹</th></tr></thead>
                 <tbody>
                 {% for a in w.advances %}
                     <tr>
-                        <td>{{ a.advance.advance_date }}{% if a.advance.notes %} · <span class="muted">{{ a.advance.notes }}</span>{% endif %}</td>
-                        <td class="num">{{ a.remaining|floatformat:2 }}</td>
-                        <td class="num"><input type="number" inputmode="decimal" step="0.01" min="0" max="{{ a.remaining|floatformat:2 }}" name="recover_{{ a.advance.id }}" placeholder="0.00"></td>
+                        <td data-label="Date">{{ a.advance.advance_date }}{% if a.advance.notes %} · <span class="muted">{{ a.advance.notes }}</span>{% endif %}</td>
+                        <td class="num" data-label="Remaining ₹">{{ a.remaining|floatformat:2 }}</td>
+                        <td class="num" data-label="Recover now ₹"><input type="number" inputmode="decimal" step="0.01" min="0" max="{{ a.remaining|floatformat:2 }}" name="recover_{{ a.advance.id }}" placeholder="0.00"></td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% endif %}
         </div>
         {% endfor %}
@@ -128,19 +133,21 @@
             <h2>Excluded — already credited at allocation (legacy)</h2>
             <div class="skip">
                 <div class="why">Why excluded: these earnings were booked the old way, at work allocation, before Adda settlements existed. Settling them again would pay the worker twice. They stay on the old ledger entries.</div>
+                <div class="table-responsive">
                 <table>
                     <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th class="num">Would-be ₹</th></tr></thead>
                     <tbody>
                     {% for l in skip_a %}
                         <tr>
-                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
-                            <td>{{ l.stage }}</td>
-                            <td class="num">{{ l.qty }}</td>
-                            <td class="num">{{ l.amount|floatformat:2 }}</td>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                            <td class="num" data-label="Would-be ₹">{{ l.amount|floatformat:2 }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -150,19 +157,21 @@
             <h2>Excluded — settled by an earlier Adda settlement</h2>
             <div class="skip">
                 <div class="why">Why excluded: an earlier settlement already booked these lines. To re-settle them, reverse that settlement first.</div>
+                <div class="table-responsive">
                 <table>
                     <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th>Settled by</th></tr></thead>
                     <tbody>
                     {% for l in skip_b %}
                         <tr>
-                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
-                            <td>{{ l.stage }}</td>
-                            <td class="num">{{ l.qty }}</td>
-                            <td>{{ l.contribution.settlement_line.adda_settlement.reference|default:"—" }}</td>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                            <td data-label="Settled by">{{ l.contribution.settlement_line.adda_settlement.reference|default:"—" }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -205,38 +214,42 @@
 
     <div class="panel">
         <h2>Per-worker snapshot <span class="muted">— frozen at finalize; the ledger stays the live truth</span></h2>
+        <div class="table-responsive">
         <table>
             <thead><tr><th>Worker</th><th class="num">Expected ₹</th><th class="num">Advance before ₹</th><th class="num">Recovered ₹</th><th class="num">Final payable ₹</th></tr></thead>
             <tbody>
             {% for i in items %}
                 <tr>
-                    <td>{{ i.worker.get_full_name|default:i.worker.email }}</td>
-                    <td class="num">{{ i.expected_earning|floatformat:2 }}</td>
-                    <td class="num">{{ i.advance_outstanding_before|floatformat:2 }}</td>
-                    <td class="num">{{ i.advance_recovered|floatformat:2 }}</td>
-                    <td class="num">{{ i.final_payable|floatformat:2 }}</td>
+                    <td data-label="Worker">{{ i.worker.get_full_name|default:i.worker.email }}</td>
+                    <td class="num" data-label="Expected ₹">{{ i.expected_earning|floatformat:2 }}</td>
+                    <td class="num" data-label="Advance before ₹">{{ i.advance_outstanding_before|floatformat:2 }}</td>
+                    <td class="num" data-label="Recovered ₹">{{ i.advance_recovered|floatformat:2 }}</td>
+                    <td class="num" data-label="Final payable ₹">{{ i.final_payable|floatformat:2 }}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     {% if recoveries %}
     <div class="panel">
         <h2>Advance recoveries</h2>
+        <div class="table-responsive">
         <table>
             <thead><tr><th>Worker</th><th>Advance</th><th class="num">Recovered ₹</th><th>State</th></tr></thead>
             <tbody>
             {% for r in recoveries %}
                 <tr>
-                    <td>{{ r.advance.worker.get_full_name|default:r.advance.worker.email }}</td>
-                    <td>#{{ r.advance_id }} · {{ r.advance.advance_date }}</td>
-                    <td class="num">{{ r.amount_recovered|floatformat:2 }}</td>
-                    <td>{% if r.reversed_at %}<span class="muted">reversed {{ r.reversed_at|date:"d M Y H:i" }}</span>{% else %}active{% endif %}</td>
+                    <td data-label="Worker">{{ r.advance.worker.get_full_name|default:r.advance.worker.email }}</td>
+                    <td data-label="Advance">#{{ r.advance_id }} · {{ r.advance.advance_date }}</td>
+                    <td class="num" data-label="Recovered ₹">{{ r.amount_recovered|floatformat:2 }}</td>
+                    <td data-label="State">{% if r.reversed_at %}<span class="muted">reversed {{ r.reversed_at|date:"d M Y H:i" }}</span>{% else %}active{% endif %}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
     {% endif %}
 

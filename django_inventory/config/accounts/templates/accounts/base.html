@@ -1920,6 +1920,21 @@
             font-family: inherit;
             background-image: none !important;
         }
+        /* Class-less <select> → trigger inherits no input box. Give it a default
+           cream box + 44px touch target so it matches sibling inputs on phones.
+           (Triggers that DID inherit a class — .sf-input etc. — never get --bare.) */
+        .fancy-select-trigger--bare {
+            width: 100%;
+            min-height: 44px;
+            padding: 11px 13px;
+            font-size: 14px;
+            color: var(--text-primary);
+            background: var(--cream);
+            border: 1.5px solid var(--border-subtle);
+            border-radius: 10px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+        }
+        .fancy-select.open .fancy-select-trigger--bare { border-color: var(--copper); }
         .fancy-select-label {
             flex: 1;
             overflow: hidden;
@@ -2274,8 +2289,12 @@
 
             var trigger = document.createElement('button');
             trigger.type = 'button';
-            // Inherit select's classes so existing CSS (.form-control, .sf-input, .filter-select, etc) applies
-            trigger.className = 'fancy-select-trigger ' + (select.className || '');
+            // Inherit select's classes so existing CSS (.form-control, .sf-input, .filter-select, etc) applies.
+            // When the <select> carries NO styling class, page CSS that targets `select` by tag
+            // can't reach the trigger (it's a <button>) — fall back to a default input box so the
+            // control isn't a bare ~20px UA-styled line (mobile touch-target + visual-consistency fix).
+            var inheritedCls = (select.className || '').trim();
+            trigger.className = 'fancy-select-trigger ' + (inheritedCls || 'fancy-select-trigger--bare');
             trigger.setAttribute('aria-haspopup', 'listbox');
             trigger.setAttribute('aria-expanded', 'false');
             if (select.disabled) trigger.disabled = true;

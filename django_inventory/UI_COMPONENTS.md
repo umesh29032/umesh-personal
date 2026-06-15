@@ -94,6 +94,8 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `td[data-label="X"]` | Required on EVERY `<td>` — turns into stacked card row at ≤600px |
 | `.td-actions` | Add to actions `<td>` — full-width button row on mobile |
 
+**⚠ Never ship a bare `<table>` (PA-14-1).** Page content sits inside `main.content { overflow-x: hidden }`, so a table wider than the viewport is **clipped with no scroll** — the rightmost columns (often money: "Final payable ₹", "Recovered ₹") become invisible and unreachable on a phone. Wrap EVERY `<table>` in `.table-responsive` AND put `data-label` on every `<td>`. The wrapper gives desktop horizontal-scroll and, at ≤600px, switches to stacked label:value cards. This includes detail/snapshot tables (e.g. settlement detail), not just DataTables lists.
+
 ## DataTables — list pages
 
 Use the helper, NOT manual init. CSS overrides are global.
@@ -143,6 +145,21 @@ $(document).ready(function () {
 | `.skill-filter-chip` | Pill-shaped toggle chip — copper when `.active` |
 | `.filter-select` | Native-style select with custom arrow (legacy, fancy-select replaces these globally) |
 | `.ke-toolbar` | Standalone filter strip ABOVE card (avoid — prefer `.dt-filter-row` INSIDE card) |
+
+### `.filter-card` — horizontal filter bar (MUST stack on mobile, PA-14-2)
+
+The page-scoped `.filter-card` pattern (`display:flex; flex-wrap:nowrap; overflow-x:auto` with `min-width` fields) lays filters out in a horizontal row on desktop. On a phone that row **scrolls sideways** — fields get cut mid-field and later filters are hidden with no scroll affordance. **Every `.filter-card` MUST add a `@media (max-width: 600px)` rule that stacks it vertically:**
+
+```css
+@media (max-width: 600px) {
+    .<page-scope> .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+    .<page-scope> .filter-card .field { width: 100%; }
+    .<page-scope> .filter-card input,
+    .<page-scope> .filter-card select { width: 100%; min-width: 0; }
+}
+```
+
+Applied to roll-list, adda-list, adda-dashboard, cloth-dashboard, barcode/tracking-dashboard. Mirror it on any new filter bar.
 
 ## Forms
 
@@ -205,11 +222,14 @@ Just write `<select>`. base.html JS auto-upgrades to custom dropdown that escape
 |---|---|
 | `<select data-no-fancy>` | Opt out of upgrade (keeps native dropdown) |
 | `.fancy-select` | Wrap div (auto-generated) |
-| `.fancy-select-trigger` | Button replacing visual `<select>` (inherits select's classes) |
+| `.fancy-select-trigger` | Button replacing visual `<select>` (copies the select's **classes**) |
+| `.fancy-select-trigger--bare` | Auto-added fallback box when the select had **no class** (cream box + 44px touch target) |
 | `.fancy-select-panel` | Dropdown options panel (auto-rendered in `<body>` when open) |
 | `.fancy-select-option` | Each option in panel |
 
-Existing CSS that targets `select.form-control` / `.field select` / `.sf-input` etc. is automatically applied to `.fancy-select-trigger` because the trigger inherits the select's classes. No special handling needed.
+CSS that targets the select **by a class** (`select.form-control` / `.sf-input` / `.filter-select`) is applied to `.fancy-select-trigger` because the JS copies the select's `className` onto the trigger.
+
+**⚠ Mobile gotcha (PA-14-3):** the trigger is a `<button>`, NOT a `<select>` — so page CSS that styles selects **by tag name** (`.my-form select { … }`) does NOT reach it. A class-less `<select>` would otherwise render as a bare ~20px UA-styled line (sub-44px touch target, visually inconsistent with sibling inputs). base.html now auto-adds `.fancy-select-trigger--bare` to class-less triggers so they always get a default input box. **Best practice when styling form selects: put a styling class on the `<select>` (`class="sf-input"`), or target `.fancy-select-trigger` alongside `select` in your page CSS — never rely on a tag-only `select{}` rule.**
 
 ## Buttons
 

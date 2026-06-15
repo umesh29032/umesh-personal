@@ -67,6 +67,10 @@
     @media (max-width: 600px) {
         .roll-list .filter-info { padding: 10px 12px; }
         .roll-list .filter-info .clear-all { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
+        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+        .roll-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+        .roll-list .filter-card .field { width: 100%; }
+        .roll-list .filter-card select { width: 100%; min-width: 0; }
     }
 
     /* Time-log styling shared partial mein move ho gayi (inventory/_time_log_styles.html) */
