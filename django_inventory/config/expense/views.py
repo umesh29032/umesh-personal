@@ -116,14 +116,23 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        # Grouped ledger aggregate (payable / earnings / settled), keyed by worker.
+        # Grouped ledger aggregate keyed by worker. PA-12-C: mirror worker_summary's
+        # netting EXACTLY so the overview agrees with each worker's own page — earnings
+        # = EARNING-category credits net of earning reversals (NOT all-credits − all-
+        # reversals, which wrongly counted a CREDIT/REVERSAL from a reversed recovery/
+        # payment as earnings); settled = SETTLEMENT_PAYMENT debits net of their reversals.
+        _EARN = (_CAT.STAGE_EARNING, _CAT.PRODUCTION_EARNING)
         ledger = {
             r['worker']: r for r in
             WorkerLedgerEntry.objects.values('worker').annotate(
                 credits=Sum('amount', filter=Q(entry_type=_ET.CREDIT)),
                 debits=Sum('amount', filter=Q(entry_type=_ET.DEBIT)),
-                reversals=Sum('amount', filter=Q(entry_type=_ET.DEBIT, category=_CAT.REVERSAL)),
+                earned=Sum('amount', filter=Q(entry_type=_ET.CREDIT, category__in=_EARN)),
+                earned_reversed=Sum('amount', filter=Q(
+                    category=_CAT.REVERSAL, reverses__category__in=_EARN)),
                 settled=Sum('amount', filter=Q(entry_type=_ET.DEBIT, category=_CAT.SETTLEMENT_PAYMENT)),
+                settled_reversed=Sum('amount', filter=Q(
+                    category=_CAT.REVERSAL, reverses__category=_CAT.SETTLEMENT_PAYMENT)),
             )
         }
         # Advance outstanding = Σ given − Σ recovered (separate loan pool).
@@ -133,7 +142,9 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         }
         recovered_map = {
             r['advance__worker']: r['s'] for r in
-            payroll_service.PayrollSettlementItem.objects
+            # PA-12-B: exclude REVERSED recoveries (reversed_at set), like advance_outstanding
+            # — else a reversed settlement's recovery understates advance_outstanding here.
+            payroll_service.PayrollSettlementItem.objects.filter(reversed_at__isnull=True)
             .values('advance__worker').annotate(s=Sum('amount_recovered'))
         }
         pieces_map = {
@@ -153,7 +164,6 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             lr = ledger.get(wid, {})
             credits = lr.get('credits') or _ZERO
             debits = lr.get('debits') or _ZERO
-            reversals = lr.get('reversals') or _ZERO
             payable = credits - debits
             adv_out = (given_map.get(wid) or _ZERO) - (recovered_map.get(wid) or _ZERO)
             total_payable += payable
@@ -163,9 +173,11 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
                 'worker': u,
                 'role': u.role if u else None,
                 'pieces': pieces_map.get(wid, 0),
-                'total_earnings': credits - reversals,
+                # PA-12-C: net of earning reversals only (matches worker_summary), not
+                # all-credits − all-reversals.
+                'total_earnings': (lr.get('earned') or _ZERO) - (lr.get('earned_reversed') or _ZERO),
                 'advance_outstanding': adv_out,
-                'total_settled': lr.get('settled') or _ZERO,
+                'total_settled': (lr.get('settled') or _ZERO) - (lr.get('settled_reversed') or _ZERO),
                 'payable': payable,
             })
         workers.sort(key=lambda w: w['payable'], reverse=True)

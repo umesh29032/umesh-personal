@@ -13,11 +13,11 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 11 — Settlement Audit ✅ COMPLETE (awaiting review) |
-| **Next phase** | PHASE 12 — Payroll Audit |
+| **Current phase** | PHASE 12 — Payroll Audit ✅ COMPLETE (awaiting review) |
+| **Next phase** | PHASE 13 — Reporting Audit |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **687 tests, all passing** (was 641; +46 audit regression tests) |
+| **Green test baseline** | **688 tests, all passing** (was 641; +47 audit regression tests) |
 | **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup). |
 
 ---
@@ -38,7 +38,7 @@
 | 09 | Inventory Audit | ✅ COMPLETE · commit `63f58fb5` | Inventory as a QUANTITY-TRUTH system (the `inventory` Django app is RBAC-only): roll/leftover · breakup↔bundle↔item · breakdown↔barcode · S4 pool · reopen effects · denorm counters · concurrency · reconcile. 6-finder conservation Workflow ran; **9/10 verifiers died on session limit → main-thread-verified every finder candidate (honesty rule — NOT marked clean on dead verifiers).** 2 fixed (PA-09-1 legacy-cutting double-create SR 500; PA-09-2 mixed manual+breakup add unique-collision 500). Refuted/documented: consume_leftover stale read-cache (benign), reconcile pieces_cut-vs-breakup (by-design, tested contract), reconcile 2-of-5 coverage (enhancement, counters self-heal), manual-no-bound (PA-07-BREAKUP class), total_pieces lost-update (display-only/PA-05B-RACE). 679 green. |
 | 10 | Production Audit | ✅ COMPLETE · commit `70a7afca` | Production-truth system: Adda/assignment/contribution lifecycle · draft→complete · reopen→re-complete · rate-freeze · expected_earning · good/alter/missing · settlement-qty derivation · AddaStageRoleRate · locks/atomicity/audit. Finder-only Workflow (all 6 finders survived → 12 candidates; verify stage omitted to dodge the verifier-death pattern) + main-thread-verified EACH. 3 fixed: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked ALL cutting completion in the default flag-off config), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). 5 documented-not-fixed (reopen-restale=by-design/use rerate; verified-qty no-audit=by-design; grouped→0 settlement-preview + finalize-vs-verified race = Phase 11; role=None→base rate = benign). Golden ₹225 settlement byte-identical. 685 green. |
 | 11 | Settlement Audit | ✅ COMPLETE · commit `111a8a33` | finalize / reverse / supersede chains / AddaSettlement / SWA / ledger / reconciliation evidence / rerate / override / locks / settlement_quantity / double-pay / replay / S5. Finder-only Workflow (all 6 finders survived → 10 candidates) + main-thread-verified each. Money-write/reverse/supersede/ledger-idempotency verified SOUND (5374 serializes; era-A/B guards; reverse fully restores; double-finalize/reverse blocked). 3 fixed: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance from the recovery UI), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue [carried PA-10-GROUPED-PREVIEW]), PA-11-3 (MEDIUM — finalize locked AddaStageRecord but not the WSC rows where `verified_quantity` lives [carried PA-10-VERIFY-RACE]; comment falsely claimed protection). Golden ₹225 byte-identical. 687 green. |
-| 12 | Payroll Audit | ⬜ PENDING | |
+| 12 | Payroll Audit | ✅ COMPLETE · commit `PENDING` | Money-consumption (read/aggregate/display): generation/aggregation/display/filtering/history/visibility · grouped-worker · settlement integration · reverse/supersede effects · stale values · permissions · advances. Finder-only Workflow (all 4 finders survived → 14 candidates) + main-thread-verified each. 3 fixed (all reversal-netting amount-mismatches; ledger payable was always correct): PA-12-A (`payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (`PayrollOverviewView` advance_outstanding ignored `reversed_at`), PA-12-C (`PayrollOverviewView` `total_earnings`/`total_settled` didn't net reversals by category → counted CREDIT/REVERSAL as earnings; now mirrors `worker_summary`). Permissions sound (MyEarnings self-scoped; worker-detail `can_view_worker`-gated; overview management-only). No payroll export surface. 688 green. |
 | 13 | Reporting Audit | ⬜ PENDING | |
 | 14 | Search/Filter/Export Audit | ⬜ PENDING | |
 | 15 | Mobile Responsiveness Audit | ⬜ PENDING | **HIGHEST PRIORITY** — 320/375/390/414px |
@@ -117,6 +117,12 @@ Legend: ✅ complete · 🔄 in progress · ⬜ pending · ⛔ blocked
 | PA-11-1 | MEDIUM | 11 | expense/payroll_service | ✅ FIXED | `outstanding_advances()` summed `PayrollSettlementItem.amount_recovered` WITHOUT `reversed_at__isnull=True` — unlike its siblings `advance_remaining`/`advance_outstanding`. So after a settlement-with-recovery is REVERSED, the reversed PSI still counted as recovered → the restored advance showed understated remaining (or, if fully-recovered-then-reversed, dropped out at the `remaining>0` gate) → vanished from the settlement recovery UI (`expense/views.py:386`) → owner couldn't re-recover it. Money truth was correct (finalize uses `advance_remaining`); this was a visibility/re-recovery gap. Fix: add `reversed_at__isnull=True` (one line, consistent with siblings). |
 | PA-11-2 | MEDIUM | 11 | expense/settlement preview | ✅ FIXED | (carried PA-10-GROUPED-PREVIEW) the grouped→0 structural guard (`effective_pay_rate`) was applied at finalize but NOT at the two settlement-preview surfaces — `settlement_queue` (`adda_settlement_service:195`) + `AddaSettlementDetailView._line_dict` (`expense/views.py:347`, feeding per-worker + `grand_expected`). A stage grouped AFTER completion has a stale non-zero frozen `expected_rate`, so the approval gate showed ₹(qty×stale) while finalize correctly books ₹0. Visibility-only (money correct), but the approver saw a number finalize won't pay. Fix: apply `effective_pay_rate` at both preview sites (mirror finalize; completes the F2 invariant). |
 | PA-11-3 | MEDIUM | 11 | expense/adda_settlement_service | ✅ FIXED | (carried PA-10-VERIFY-RACE) `finalize_adda_settlement` locked `AddaStageRecord` ("freeze quantity inputs") but `verified_quantity` lives on `WorkerStageContribution`, which finalize never locked — and `set_verified_quantity` takes neither the 5374 advisory lock nor the SR lock. A verified-quantity correction committing during the finalize window was a lost update → money booked on the stale quantity (the in-code comment falsely claimed the SR lock froze verified edits). Two-actor, recoverable. Fix: finalize now `select_for_update(of=('self',))` the WSC rows of the payable stages (the SAME target `set_verified_quantity` locks) → a racing verify blocks, then sees `settlement_line` stamped and refuses; corrected the comment. No deadlock (every settlement op takes 5374 first; set_verified takes only the WSC row). |
+| PA-12-A | MEDIUM | 12 | expense/payroll_service | ✅ FIXED | `payroll_totals()` (operations digest) summed `PayrollSettlementItem.amount_recovered` WITHOUT `reversed_at__isnull=True` → after a settlement reversal the reversed recovery still counted as recovered → factory-wide `advance_exposure` understated. Fix: add the `reversed_at` filter (consistent with `advance_remaining`/`advance_outstanding`/`outstanding_advances`). Ledger payable always correct. |
+| PA-12-B | MEDIUM | 12 | expense/PayrollOverviewView | ✅ FIXED | The management payroll overview's `recovered_map` summed recoveries WITHOUT `reversed_at__isnull=True` → the "Advance Out" column + `total_advance_out` understated a worker's outstanding advance after a settlement reversal (disagreed with worker-detail). Fix: add the `reversed_at` filter. |
+| PA-12-C | MEDIUM | 12 | expense/PayrollOverviewView | ✅ FIXED | The overview computed `total_earnings = credits − reversals` (all-credits − all-debit-reversals) and `total_settled = settled` (gross). A settlement reversal writes a CREDIT/REVERSAL (undoing the advance-recovery debit), which inflated "Earned"; a reversed payment would inflate "Settled". Both disagreed with `worker_summary`. Fix: the grouped aggregate now nets BY CATEGORY exactly like `worker_summary` — `earned` (EARNING-category credits) − `earned_reversed` (reversals of earnings); `settled` − `settled_reversed`. Overview now matches each worker's own page. Payable (credits−debits) was always correct. |
+| PA-12-BREAKDOWN | — | 12 | expense/payroll_service | 📋 DOC (dead code) | `worker_balance_breakdown()` is unwired (no view/template caller); its `debits_by_category` would show gross recovery debits after a reversal. No user-visible figure is wrong. Flagged so a future wiring nets REVERSAL rows. |
+| PA-12-GROUPED-BOARD | LOW | 12 | expense/PayrollOverviewView | 📋 DOC (by-design) | A worker who did ONLY grouped/zero-cost stage work (earning 0 → no ledger credit booked) + has no advance is absent from the payroll overview board (`worker_ids = ledger | given | recovered`, not `pieces_map`), so their pieces don't show. By-design: the board scopes to payroll activity (who's owed); a ₹0-payable worker is out of scope and productivity has its own views. Not changed (board-scope is a product decision, no-feature). |
+| PA-12-PIECES-SEMANTICS | — | 12 | expense/payroll | 📋 REFUTED (labeling) | The overview "Pieces" (Σ SWA.allocated_quantity = settled qty) and `worker_production_stats.pieces` (Σ good_quantity = production output) measure different things and can differ. No money impact; a labeling/semantics nuance, not a defect. |
 | PA-11-SOUND | — | 11 | expense/settlement | 📋 VERIFIED SOUND | Finder-verified (main-thread re-checked) with NO defect: finalize money-write (qty=verified-else-good × grouped-guarded rate, ROUND_HALF_UP; era-A/B exclusion; recovery ≤ remaining under lock; tie-out; S5 block rolls back atomically); reverse/supersede (compensating ledger + PSI `reversed_at` + SWA soft-void re-arm; FINALIZED-only guard; multi-level chain isolation); ledger idempotency (double-finalize/double-reverse blocked under 5374; `uniq_one_reversal_per_entry` DB constraint; balance nets reversals to 0); `verified_quantity=0` pays 0; alter/missing never enter the payable; recovery>earning negative balance is by-design (advance pool independent of this Adda's earning). The 5374 advisory lock serializes all finalize/reverse/rerate; lock orders are deadlock-free. |
 
 ### Issues fixed
@@ -131,6 +137,7 @@ Phase 08: PA-08-1 (bulk-intake negative cost → 500), PA-08-2 (roll-assign nega
 Phase 09: PA-09-1 (legacy-cutting unconditional SR create → IntegrityError 500), PA-09-2 (mixed manual+breakup bundle add → unique-collision IntegrityError 500) — both converted to graceful ValidationError. +2 regression tests (679 green).
 Phase 10: PA-10-1 (CRITICAL — `ensure_worker_credit` blocked all cutting completion in the default flag-off config; made flag-aware → production-truth credit), PA-10-2 (HIGH — `set_stage_workers` cancelled COMPLETED tasks → orphaned pay), PA-10-3 (LOW — `ensure_stage_role_rates` SR-site coverage). +6 regression tests (685 green); golden ₹225 settlement byte-identical.
 Phase 11: PA-11-1 (MEDIUM — `outstanding_advances` ignored `reversed_at` → reversed recovery hid the restored advance), PA-11-2 (MEDIUM — grouped→0 not applied at settlement preview/queue), PA-11-3 (MEDIUM — finalize didn't lock the WSC rows holding `verified_quantity`). +2 regression tests (PA-11-3 = structural lock, covered by existing finalize/verify tests). 687 green; golden ₹225 byte-identical.
+Phase 12: PA-12-A (MEDIUM — `payroll_totals` advance_exposure ignored `reversed_at`), PA-12-B (MEDIUM — overview advance_outstanding ignored `reversed_at`), PA-12-C (MEDIUM — overview earnings/settled didn't net reversals by category). +1 regression test (asserts overview == worker_summary == ledger after a reverse). 688 green.
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -595,6 +602,37 @@ All three fixes are backend (a query filter, a rate-guard mirror on read-only pr
 
 ### UI_COMPONENTS.md
 No change — backend settlement-truth + preview-parity guards; no reusable visual/layout rule emerged.
+
+---
+
+## PHASE 12 — PAYROLL AUDIT · RESULT
+
+**Scope:** payroll as a money-consumption (read/aggregate/display) system — generation/aggregation/display/filtering/history/visibility · grouped-worker · settlement integration · reverse/supersede effects · stale values · duplicate records · permissions · audit trail. Verified DB ⟷ service ⟷ UI consistency. Looked specifically for amount mismatches, stale cached values, missing reversals, double counting, hidden records, permission leaks, export inconsistencies.
+
+**Method:** deep-read `payroll_service.py` + the three payroll views + a FINDER-ONLY Workflow (4 finders, verify omitted). **All 4 finders survived → 14 candidates**, each main-thread-verified. Three real reversal-netting mismatches fixed (found main-thread before the finders returned; the finders — running against the working tree — confirmed them fixed + tests passing, and surfaced no new fixable defect).
+
+### Theme: payroll figures must net reversals consistently
+Balances are derived live from the ledger (never stored) and `pending_payable = Σcredits − Σdebits` was always correct (a reversal writes one opposite entry, so it nets). The bugs were in the DERIVED display figures that aggregate by category and must exclude reversed rows — three sites had drifted from the canonical `worker_summary`/advance helpers.
+
+- **PA-12-A (MEDIUM):** `payroll_totals().advance_exposure` summed recoveries without `reversed_at__isnull=True` → factory-wide exposure understated after a reversal. Fix: add the filter.
+- **PA-12-B (MEDIUM):** `PayrollOverviewView` `recovered_map` likewise → the "Advance Out" column + factory total understated after a reversal (disagreed with worker-detail). Fix: add the filter.
+- **PA-12-C (MEDIUM):** `PayrollOverviewView` computed `total_earnings = credits − reversals` and `total_settled = settled` (gross). A settlement reversal writes a CREDIT/REVERSAL (undoing the advance-recovery debit) that inflated "Earned"; a payment reversal would inflate "Settled". Fix: the grouped aggregate now nets by category exactly like `worker_summary` (`earned − earned_reversed`, `settled − settled_reversed`). Overview == each worker's own page == ledger.
+
+**Verification:** `Phase12PayrollAuditTests.test_advance_exposure_and_earnings_correct_after_reverse` — finalize-with-recovery → reverse, then assert `payroll_totals`, `worker_summary`, AND the live `PayrollOverviewView` context all agree (advance restored to ₹100, earnings netted to ₹0). Full suite 687 → 688, OK.
+
+### Verified SOUND / documented-not-fixed
+- **Permissions:** `MyEarningsView` self-scoped (no worker_id param); `WorkerPayrollDetailView` gated by `can_view_worker` (worker → self only, tested via URL-tamper in `test_views`); `PayrollOverviewView` `_ManagementOnly`. No leak.
+- **No payroll export surface** exists (no CSV/HttpResponse view) → the "exports" lens is N/A (recorded, not assumed clean).
+- **Reverse/supersede self-heal:** `worker_stage_earnings`/`worker_adda_earnings`/`unsettled_expected` read non-voided SWA + re-arm correctly after a reversal; era-A/era-B can't double-count (the `_settleable_lines` skip).
+- **PA-12-BREAKDOWN:** `worker_balance_breakdown` is unwired dead code (no caller) — its post-reversal `debits_by_category` would read oddly but is never displayed.
+- **PA-12-GROUPED-BOARD (LOW, by-design):** a worker who did ONLY grouped/zero-cost work (₹0 payable, no ledger credit) is absent from the payroll board — by design (the board scopes to payroll activity; productivity has its own views).
+- **PA-12-PIECES-SEMANTICS (refuted):** overview "Pieces" (settled qty) vs `worker_production_stats` (production output) measure different things — labeling nuance, no money impact.
+
+### Mobile (highest priority)
+All three fixes are backend aggregate-query filters — no template/markup/CSS change, no mobile-render delta. (The displayed numbers are now correct, a data-truth fix to the management overview, not a layout change.)
+
+### UI_COMPONENTS.md
+No change — backend aggregation-netting fixes; no reusable visual/layout rule emerged.
 
 ---
 

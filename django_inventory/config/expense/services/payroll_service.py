@@ -34,7 +34,11 @@ def payroll_totals() -> dict:
     )
     pending_payable = (led['credits'] or _ZERO) - (led['debits'] or _ZERO)
     given = WorkerAdvance.objects.aggregate(s=Sum('amount'))['s'] or _ZERO
-    recovered = (PayrollSettlementItem.objects
+    # PA-12-A: exclude REVERSED recoveries (reversed_at set), exactly like
+    # advance_remaining/advance_outstanding/outstanding_advances. Without it, a
+    # reversed settlement's recovery still counts as recovered → factory-wide
+    # advance_exposure is understated after any settlement reversal.
+    recovered = (PayrollSettlementItem.objects.filter(reversed_at__isnull=True)
                  .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO)
     return {'pending_payable': pending_payable,
             'advance_exposure': given - recovered}
