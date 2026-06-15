@@ -13,12 +13,12 @@
 
 | | |
 |---|---|
-| **Current phase** | PHASE 16 — Performance Audit ✅ COMPLETE · commit `17edeafa` |
-| **Next phase** | PHASE 17 — Final Regression Audit (do NOT start without review) |
+| **Current phase** | PHASE 17 — Final Regression Audit ✅ COMPLETE · commit `<PHASE17_HASH>` — **AUDIT CLOSED** |
+| **Next phase** | None — 18-phase Production Readiness Audit COMPLETE. No further audit phases. |
 | **Branch** | `new_flask_app` |
 | **Last updated** | 2026-06-15 |
-| **Green test baseline** | **700 tests, all passing** (Phase 16 = +4 query-count regression tests; run from `config/`: `../env/bin/python manage.py test --settings=config.settings.local --parallel 4`) |
-| **Open blockers** | None. Documented follow-ups: storefront PA-05A-SF1..4 (migration); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup); **PA-16-QUEUE** settlement-queue residual ~4 queries/Adda (structural, bounded by pending-unsettled queue; batching = settlement-logic redesign, out of stabilization scope). |
+| **Green test baseline** | **700 tests, all passing** (no count change in Phase 17 — verification-only; run from `config/`: `../env/bin/python manage.py test --settings=config.settings.local --parallel 4`) |
+| **Open blockers** | None. Documented follow-ups (none block production): storefront PA-05A-SF1..4 (migration; storefront not live); over-allocation 3-PATTI-001 (pre-foundation dev data, foundation flags off pending soak); stray test-product data (dev-DB cleanup); **PA-16-QUEUE** settlement-queue residual ~4 queries/Adda (structural, bounded by pending-unsettled queue; batching = settlement-logic redesign, out of stabilization scope). |
 
 ---
 
@@ -43,7 +43,7 @@
 | 14 | Mobile Responsiveness Audit | ✅ COMPLETE · commit `2b8d1c5e` | Real-browser (headless Chromium) scan at 320/375/390/414px across all priority surfaces (dashboards, lists, workspaces, Adda detail, settlement, payroll, stage-rates, review, forms, worker-report). Automated overflow/clip/touch-target/scroll diagnostics + visual screenshots. **3 fixed:** PA-14-1 (HIGH — settlement-detail money tables clipped off-screen, no scroll), PA-14-2 (MEDIUM — `.filter-card` horizontal-scroll hides filters on 5 dash/list pages), PA-14-3 (MEDIUM — class-less fancy-select triggers = bare 20px line, sub-44px touch target). **UI_COMPONENTS.md updated** (3 reusable rules: bare-table clip, filter-card mobile stacking, fancy-select tag-CSS gotcha + `--bare` fallback). 696 green (UI-only, browser-verified). |
 | 15 | UI Consistency Audit | ✅ COMPLETE · commit `bf7dab93` | Real-browser (headless Chromium) audit at 320/375/390/414/desktop. Carry-forward bare-table sweep of all 9 named surfaces + broad list sweep + touch-target + fancy-select + date-input dimensions. **3 fixed:** PA-15-1 (MEDIUM — product_sizes_edit inline-edit table clipped Archive off-screen at ≤340px + 28px mini buttons), PA-15-2 (LOW — product_patterns_edit identical pattern), PA-15-3 (LOW — standalone pattern_workspace breakup-tables had dead `data-label` / no stacking host). **Documented SAFE (verified):** worker_detail/settlement_form `.adv` (text-only, wraps, money cols visible at 320); cutting-panel/costing/adda_settlement_list/payroll_overview (own scoped stacking, browser-confirmed). **CLEAN dimensions:** fancy-select (all class-less selects covered by Phase-14 `--bare` fallback, 44–45px), date inputs (native `type=date` full-width, no clip), touch targets (only sub-44 actionable = page-scoped `.btn-mini`, folded into PA-15-1/2; `.hamburger`/`.btn` = pre-existing app baseline). **UI_COMPONENTS.md updated** (3 reusable rules: data-label-needs-wrapper gotcha · inline-edit vs text table clip · shared-partial responsive ownership). 696 green (UI-only). |
 | 16 | Performance Audit | ✅ COMPLETE · commit `17edeafa` | **Measured** (django.db CaptureQueriesContext + assertNumQueries scale tests — no code-reading-only verdicts). Built a 2-scale query-count harness over the heavy read paths: settlement detail/queue/preview, payroll overview/my-earnings/worker-detail, adda detail, cutting snapshot. **2 fixed:** PA-16-1 (HIGH — settlement-detail draft + queue per-line N+1 on `workflow_stage.stage`, missing `select_related` → +4q/line; settlement-detail draft was O(lines)), PA-16-2 (MEDIUM — same page called `outstanding_advances` per worker → +2q/worker). Combined: **settlement-detail draft now O(1) in contribution lines** (a 30-line cutting Adda ≈137q → 15q, measured flat). **1 refuted by measurement** (PA-16-DUP: adda-detail "duplicate stage_records prefetch" — `worker_tasks` prefetch ran ×1, no dup). **Measured-clean (flat, not assumed):** my-earnings, worker-detail, payroll-overview, get_cutting_snapshot. Dashboards/lists/costing/exports already optimized (prior phases). +4 regression tests (assertNumQueries scale-invariance). 700 green. |
-| 17 | Final Regression Audit | ⬜ PENDING | full-system retest |
+| 17 | Final Regression Audit | ✅ COMPLETE · commit `<PHASE17_HASH>` | Full-system regression + audit-closure verification (NOT bug-hunting). **700 tests green** (no drift). Spot-checked a representative FIXED fix from every phase 02→16 (fix code still present, grep-confirmed). Cross-phase interaction tests run individually & green: PA-16 perf + PA-11 settlement + PA-10 credit (40 tests), PA-13 reporting + PA-12 payroll-netting + PA-11 reversal/reopen (40 tests). Golden ₹225 settlement chain byte-identical (encoded as exact-Decimal assertions in `test_golden_path`/`test_adda_settlement_service`/`test_s3`/`test_s5` — all green). Feature flags confirmed default-OFF (`LEDGER_CREDIT_AT_ALLOCATION`/`ENFORCE_ALLOCATION_BOUND`/`ENFORCE_SETTLEMENT_RECONCILIATION`=False, tolerance 0; no local/production override). **Real-browser smoke** (headless Chromium, super-admin + cutting-master) at 320/375/390/414 + 1280: 7 surfaces (settlement-detail, settlement-queue, payroll-overview, worker-detail, production-dash, barcode-dash, roll-list) all 200, **0 console errors, 0px horizontal overflow at every breakpoint**; PA-14-1 money-table data-labels render at 320, PA-14-2 filter-card stacks (column), worker-report form renders for assigned worker + graceful 403 for unauthorized. Documented backlog re-verified intact (SF1 still non-unique, 3-PATTI-001 unmutated). **0 regressions found. No code changes (verification-record commit).** |
 
 > **Phase-plan revision (owner 2026-06-15):** Phase 13 = merged Reporting+Search+Filter+Export (one user-facing reporting surface, avoids duplicate verification). Mobile moved to 14 (right after Reporting). **Mandatory for Phases 14+15:** every UI-related fix MUST be evaluated for inclusion in `UI_COMPONENTS.md` — if it establishes a reusable rule (responsive/layout/form/table/modal/dropdown/date-input/validation-display/spacing/accessibility), document the standard + reference the component so future pages follow it. No reusable UI knowledge stays trapped in one template.
 
@@ -167,6 +167,7 @@ Phase 13: PA-13-1 (HIGH barcode-dashboard cartesian-JOIN), PA-13-2 (HIGH roll-li
 Phase 14: PA-14-1 (HIGH settlement-detail money tables clipped off-screen → `.table-responsive`+data-label on 6 tables), PA-14-2 (MEDIUM `.filter-card` horizontal-scroll hides filters on 5 dash/list pages → mobile-stack media rule), PA-14-3 (MEDIUM class-less fancy-select trigger = bare 20px line → `.fancy-select-trigger--bare` default box, 44px touch target). UI-only (CSS/template/JS), browser-verified at 320/375/390/414px; 696 green (no unit-test delta). **UI_COMPONENTS.md updated** with 3 reusable rules. 2 refuted (topbar-title ellipsis = intended; `.hero` flex scrollWidth = false positive).
 Phase 15: PA-15-1 (MEDIUM product_sizes_edit inline-edit table clipped Archive off-screen + 28px mini buttons), PA-15-2 (LOW product_patterns_edit identical pattern), PA-15-3 (LOW standalone pattern_workspace breakup-tables had dead data-label / no stacking host). UI-only (3 templates: product_sizes_edit, product_patterns_edit, pattern_workspace), browser-verified at 320/375/390/414/1280px; 696 green (no unit-test delta). **UI_COMPONENTS.md updated** with 3 reusable rules (data-label-needs-wrapper · inline-edit-vs-text clip · shared-partial responsive ownership). 5 documented SAFE/CLEAN (worker_detail/settle `.adv` text-wrap; 4 own-stacking surfaces; fancy-select `--bare` fallback; native date inputs; touch targets).
 Phase 16: PA-16-1 (HIGH — settlement-detail draft + queue + preview per-line N+1 on `workflow_stage.stage`; `select_related` fix), PA-16-2 (MEDIUM — settlement-detail draft `outstanding_advances` per-worker N+1; new `outstanding_advances_bulk` = 2 queries). **Settlement-detail draft now O(1) in contribution lines** (measured flat 15q at 1 & 5 lines; ~137q→15q on a 30-line Adda). 1 refuted by measurement (PA-16-DUP adda-detail), 1 documented-deferred (PA-16-QUEUE structural per-Adda cost), measured-clean money + cutting read paths (PA-16-CLEAN). Files: `expense/services/adda_settlement_service.py`, `expense/services/payroll_service.py`, `expense/views.py`, `config/expense/README.md`. +4 regression tests (assertNumQueries scale-invariance + bulk equivalence). 700 green.
+Phase 17: **no fixes (verification-only).** Full-system regression + audit closure: 700 green (no drift); representative fix from every phase re-confirmed present; cross-phase interaction modules green individually (perf+settlement+credit, reporting+payroll+reversal); golden ₹225 byte-identical; flags default-OFF; real-browser smoke (7 surfaces × 320/375/390/414/1280) 0-overflow/0-console-error; documented backlog intact. **0 regressions.** Verification-record commit (no code change).
 
 ### Open blockers
 - None. (PA-05A-SF1..4 storefront validation gaps documented for a small follow-up — need model+migration; storefront not yet live.)
@@ -831,6 +832,92 @@ No change — all fixes are backend (query/visibility/export). No reusable visua
 
 ### Docs-sync
 `config/expense/README.md` — added a PA-16 perf note under `payroll_service` (settlement-detail read path is O(1) in lines; `outstanding_advances_bulk` is the batched sibling of `outstanding_advances`, same filter).
+
+---
+
+## PHASE 17 — FINAL REGRESSION AUDIT · RESULT
+
+**Goal:** full-system regression + audit-closure verification. **NOT primarily bug-hunting** — verify all prior fixes still hold, no cross-phase regressions, no fix conflicts, baseline stable. **0 regressions found.**
+
+**Method (real verification, audit-honesty rule — nothing marked clean on assumption):**
+
+1. **Full suite — 700 green, no drift.** `cd config && ../env/bin/python manage.py test --settings=config.settings.local --parallel 4` → `Ran 700 tests … OK`. Count unchanged from Phase 16 (Phase 17 added no tests; verification-only).
+
+2. **Spot-check every phase's fix (code still present).** Grep-confirmed a representative FIXED fix from each phase: PA-02-1 decoy-OTP + signup routes removed (urls.py = comments only); PA-03-1/PA-13-3 `exclude(field_name__in=('supplier','cost_per_kg'))` (4 sites); PA-05A-1 SkillDeleteView in-use guard; PA-06-1 `opening_advance` min_value; PA-07-1/2 `InvalidOperation` catch (2 sites); PA-08-1/2 `min_value=0` on roll forms; PA-09-1 legacy-complete SR guard (service.py:1001) + PA-09-2 bundle-conflict guard; PA-10-1 flag-aware credit (era-A SWA vs settlement-first COMPLETED/VERIFIED WSC); PA-11-1 `reversed_at` in `outstanding_advances` + PA-11-3 `select_for_update(of=('self',))` on WSC; PA-12-A `reversed_at` filter; PA-13-1 separate per-Adda queries + PA-13-2 `.isdigit()` guard; PA-14-1 `.table-responsive` on settlement-detail; PA-15-1 `cell-edit`/`td-actions`; PA-16-1 `task__stage_record__workflow_stage__stage` select_related + PA-16-2 `outstanding_advances_bulk`.
+
+3. **Cross-phase interaction tests (run individually, all green — no later phase weakened an earlier one):**
+   - PA-16 perf + PA-11 settlement-locking + PA-10 credit: `test_perf_settlement` + `test_adda_settlement_service` + `test_stage_credit` = **40 tests OK** (the PA-16 select_related change did not weaken the PA-11 finalize-lock or PA-10 credit gate).
+   - PA-13 reporting-aggregations + PA-12 payroll-netting + PA-11 reversal/reopen handling: `test_reporting_audit` + `test_views` + `test_expense` + `test_reconciliation` + `test_reopen_voids_pay` = **40 tests OK** (PA-12 reversal-netting still holds with PA-11 reversal semantics).
+
+4. **Golden ₹225 settlement oracle — byte-identical.** The oracle is encoded as exact-`Decimal` settlement-money assertions (`expected_total`=240.00, `expected_earning`/`final_payable`=150.00, `earning_amount_snapshot`=135.00, recovery=500.00, …) in `production/tests/test_golden_path.py` + `expense/tests/test_adda_settlement_service.py`, with the good=reported byte-identical gate + non-zero alter/missing gate in `production/tests/test_s3_good_alter_missing.py` and the S5 recon gate in `expense/tests/test_s5_recon_block.py`. All ran green (13 tests in the targeted run) → money truth unchanged, no drift.
+
+5. **Feature flags — defaults confirmed OFF.** `config/config/settings/base.py`: `LEDGER_CREDIT_AT_ALLOCATION` default `False` (line 182), `ENFORCE_ALLOCATION_BOUND` default `False` (189), `ENFORCE_SETTLEMENT_RECONCILIATION` default `False` (196), `SETTLEMENT_RECONCILIATION_TOLERANCE` default `'0'` (199). **No override** in `local.py` / `production.py`. Settlement remains the only money boundary; enforcement still soak-gated.
+
+6. **Real-browser smoke (headless Chromium via gstack `browse`).** Dev runserver on `:8000`; logged in as super-admin (`umesh29mar`) and cutting-master (`utest`). At **320 / 375 / 390 / 414 (mobile) + 1280 (desktop)**:
+   - 7 key surfaces — settlement-detail (`/expense/settlements/ADST-0003/`), settlement-queue (`/expense/settlements/`), payroll-overview (`/expense/payroll/`), worker-detail (`/expense/workers/1/`), production-dashboard (`/production/`), barcode-dashboard (`/tracking/`), roll-list (`/raw-materials/rolls/`) — **all load 200 (no login bounce), 0 console errors, 0px horizontal overflow at every breakpoint.**
+   - **PA-14-1 confirmed live:** settlement-detail money table renders stacked-card `data-label`s at 320 — `Worker · Expected ₹ · Advance before ₹ · Recovered ₹ · Final payable ₹` all reachable (the off-screen-clip regression stays fixed).
+   - **PA-14-2 confirmed live:** roll-list `.filter-card` computes `flex-direction: column` at 320 (filters stack full-width).
+   - **Worker-report** (`/production/addas/3-PATTI-002/report/layering/`): renders the report form for the assigned worker (utest) at 320 (hero "Layering", 9 form controls, 0 overflow, no live console errors); returns a graceful "You don't have access" 403 page (no 500) for an unauthorized user (super-admin) — RBAC + PA-03-WORKER-SKILL by-design both hold.
+
+7. **Documented backlog re-verified intact (no scope creep, nothing fixed this phase):** PA-05A-SF1 `Category.name` still not `unique` (storefront migration still pending); PA-06-DRIFT-OVERALLOC 3-PATTI-001 still exists and **unmutated** (over-allocation evidence preserved per cleanup rule); PA-06-TESTDATA stray products still present (dev-DB cleanup); PA-16-QUEUE still documented-deferred. All 30 `📋 DOC` items remain documented; **0 backlog items were fixed during Phase 17.**
+
+**Automation note (honesty rule):** all finders/verifiers were the **main thread** (no sub-agent/Workflow used in Phase 17 — verification, not fan-out discovery). Browser automation (gstack `browse`) succeeded on every surface; no automation failure to record. Every "clean" verdict above rests on an actual run (test output / grep hit / live browser measurement), not assumption.
+
+### Regressions found
+**None.** No code changed. Working tree clean except the two pre-existing, unrelated docs (`docs/PENDING_BACKLOG.md` modified, `docs/DOCUMENTATION_DEBT_2026_06_14.md` untracked) — left untouched.
+
+---
+
+## FINAL AUDIT SUMMARY
+
+| Metric | Value |
+|---|---|
+| **Phases completed** | **18 / 18** (01 System Mapping → 17 Final Regression; 05 split A/B) |
+| **Total findings investigated** | **92** |
+| **Findings FIXED** | **45** (each verified + regression-checked) |
+| **Findings documented (no-fix)** | **30** (`📋 DOC` — intentional / deploy-config / theoretical-race / needs-migration / enhancement) |
+| **Findings REFUTED** | **11** (`📋 REFUTED` — disproven on verification/measurement) |
+| **Findings VERIFIED SOUND** | **5** (`📋 VERIFIED SOUND` — examined, no defect) |
+| **Findings WONTFIX (by-design)** | **1** (PA-03-WORKER-SKILL, owner decision) |
+| **Final test count** | **700, all green** (baseline at audit start: 641 → +59 regression tests across phases) |
+| **New regressions introduced** | **0** |
+| **Net commits** | 16 fix commits + per-phase hash-record commits (02→17) |
+
+**Severity profile of the 45 fixes:** 1 CRITICAL (PA-10-1 — cutting-completion blocker in the default config), ~9 HIGH (auth enumeration, financial-leak reopens ×2, query N+1, roll-list/user-list 500s, barcode cartesian-JOIN, settlement-table mobile clip, skill-delete cascade), ~22 MEDIUM (input-parse 500s, validation gaps, reversal-netting visibility, filter-card/fancy-select mobile), ~13 LOW.
+
+**Remaining documented backlog (none block production):**
+- **Storefront (not live):** PA-05A-SF1..SF4 — `Category.name` unique, `FeaturedProduct` price validators, image size/type cap, orphan-image cleanup (each needs a model + migration).
+- **Foundation soak:** PA-06-DRIFT-OVERALLOC (3-PATTI-001 pre-foundation over-allocation) — remediate by enabling `ENFORCE_*` flags after staging soak, or void the 15-pc delta.
+- **Dev hygiene:** PA-06-TESTDATA (stray test products), PA-06-SEED (4 optional sidebar rule rows).
+- **Deploy config:** PA-02-XFF (`TRUSTED_PROXIES` for IP-throttle behind a proxy).
+- **Perf (structural, bounded):** PA-16-QUEUE (~4 queries/Adda on the pending-settlement queue).
+- **By-design / theoretical (left as-is per no-redesign rule):** PA-05B-RACE / PA-09-TOTALPIECES-RACE (single-actor theoretical races), PA-10-VERIFY-AUDIT (verified-qty audit trail = future enhancement), PA-12-BREAKDOWN (unwired dead code), PA-06-FLOW (handler-guard, deferred for future TM-1 manual stages).
+
+**Production-readiness assessment:** **READY (stabilization goals met).** All money-truth paths (settlement / ledger / payroll netting / reversal-supersede) are service-locked, atomic, single-writer, and tested; the ₹225 golden oracle is byte-identical; every reproducible 500 found across CRUD / stage-engine / raw-material / inventory / reporting input paths is converted to a graceful `ValidationError`; RBAC + financial-field visibility hold at all layers; mobile surfaces are clip-free at 320–414. Both enforcement flags ship **OFF** by deliberate design (deploy-OFF → soak → resolve over-allocation → enable) — settlement is the sole money boundary. No blocker remains; the open backlog is non-blocking (storefront not live, dev-data hygiene, deploy-config, a bounded structural query cost, and by-design items).
+
+---
+
+## FINAL SYSTEM HEALTH SUMMARY
+
+| Subsystem | Health | Justification |
+|---|---|---|
+| **Authentication** | 🟢 GREEN | Enumeration oracle closed (PA-02-1), native signup disabled to match the internal-ERP invariant, OTP/password/Google paths + lockout throttle tested, auth pages `never_cache`, role=None contained. Residual = deploy-only `TRUSTED_PROXIES` (PA-02-XFF). |
+| **RBAC** | 🟢 GREEN | Empirical URL×role matrix clean (no anon/role=None bypass; admin surface super-only; payroll/settlement management-only); financial-field leak closed at every render surface (PA-03-1/PA-13-3); super-admin dual-bypass intact. Defense-in-depth view-mixin gaps (PA-03-2/3) provably blocked at the service layer. |
+| **Production** | 🟢 GREEN | Stage-engine lifecycle (layering/cutting_pattern/cutting/barcode) sound; the CRITICAL cutting-completion blocker (PA-10-1) fixed flag-aware; completed-task cancellation orphan-pay (PA-10-2) fixed; input-parse 500s graceful; reopen/transition/credit foundation-locked + tested. |
+| **Inventory** | 🟢 GREEN | Quantity-truth conservation holds; two IntegrityError→500 paths (legacy-complete SR collision, mixed manual+breakup bundle) made graceful (PA-09-1/2); denorm counters self-heal from truth on every write; reconcile contract by-design. |
+| **Settlement** | 🟢 GREEN | finalize/reverse/supersede/ledger idempotency VERIFIED SOUND (5374 serializes; era-A/B guards; reverse fully restores; double-finalize/reverse blocked); verified-quantity finalize race closed (PA-11-3 WSC lock); grouped→0 visibility aligned (PA-11-2); golden ₹225 byte-identical. Money is the sole boundary; enforcement flags OFF by design. |
+| **Payroll** | 🟢 GREEN | Ledger payable always correct; all reversal-netting display mismatches fixed (PA-12-A/B/C — exposure/outstanding/earnings-settled now net reversals by category; overview == worker_summary == ledger). Permissions self-scoped/management-gated. |
+| **Reporting** | 🟢 GREEN | Barcode-dashboard cartesian-JOIN inflation fixed (PA-13-1); list-filter 500s guarded (PA-13-2/4); financial-history leak closed on all 3 reporting surfaces (PA-13-3); CSV/XLSX formula-injection neutralized (PA-13-6); paginated lists ordered; aggregations single-source. |
+| **Mobile** | 🟢 GREEN | Real-browser-verified clip-free at 320/375/390/414: settlement-detail money tables (PA-14-1), filter-cards stack (PA-14-2), fancy-select 44px touch target (PA-14-3), inline-edit config tables (PA-15-1/2/3). Phase-17 re-smoke: 0px overflow on all 7 key surfaces at all breakpoints. UI_COMPONENTS.md captured 6 reusable responsive rules. |
+| **Performance** | 🟢 GREEN | Settlement money-approval page made O(1) in contribution lines (PA-16-1/2; ≈137q → 15q on a 30-line Adda), proven by `assertNumQueries` scale-invariance tests; money + cutting read paths measured-clean (flat); dashboards/lists/costing/exports already optimized + locked. One bounded structural residual documented (PA-16-QUEUE, YELLOW-adjacent but bounded by the pending queue, not all-time growth). |
+
+**Overall: 🟢 GREEN — audit COMPLETE.** No RED, no YELLOW subsystem. The single bounded query-cost note (PA-16-QUEUE) is documented and scoped out by the no-redesign rule; it does not degrade with all-time data growth.
+
+---
+
+## ✅ AUDIT COMPLETE
+
+The 18-phase Production Readiness Audit (stabilization & hardening) is **CLOSED** as of 2026-06-15 on branch `new_flask_app`. 45 verified bugs fixed across authentication, RBAC, navigation, CRUD, integrity, stage-engine, raw-materials, inventory, production-truth, settlement, payroll, reporting, mobile, UI, and performance — with 0 new regressions, a byte-identical settlement money oracle, and 700 green tests. No further audit phases. STOP — await review.
 
 ---
 
