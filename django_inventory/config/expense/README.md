@@ -148,6 +148,13 @@ block diagnostics; super-admin override field on the settlement screen. Both thi
 ### `payroll_service` — the READ layer
 - All dashboards/My Earnings read through here. Knows the era rules so
   templates never do.
+- **Perf (Production Audit PA-16):** the settlement-detail DRAFT screen is O(1)
+  in contribution lines — `outstanding_advances_bulk(workers)` is the batched
+  sibling of `outstanding_advances` (same row shape + same `reversed_at` filter,
+  2 queries for any worker count), and `_settleable_lines` select_relates
+  `task__stage_record__workflow_stage__stage` so the per-line `.stage.name` reads
+  don't fan out. Query-count regressions are locked in
+  `expense/tests/test_perf_settlement.py`.
 
 ## Views (what enters)
 

@@ -106,7 +106,13 @@ def _settleable_lines(stage_records):
         .filter(task__stage_record_id__in=sr_ids,
                 task__status__in=(WorkerStageTask.Status.COMPLETED,
                                   WorkerStageTask.Status.VERIFIED))
+        # PA-16-1: include workflow_stage→stage on the join. The preview/queue
+        # consumers (_line_dict, settlement_queue, effective_pay_rate) read
+        # c.task.stage_record.workflow_stage.stage.name PER LINE — without this
+        # that was 2 extra queries (workflow_stage + stage) for every contribution
+        # line (a measured N+1 on the settlement-detail draft + the queue).
         .select_related('task', 'task__worker', 'task__stage_record',
+                        'task__stage_record__workflow_stage__stage',
                         'color', 'size', 'settlement_line')
     )
     # era-A coarse map: (worker_id, stage_record_id) pairs already credited by a

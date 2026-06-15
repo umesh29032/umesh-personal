@@ -399,8 +399,12 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
                 d = self._line_dict(c)
                 w['lines'].append(d)
                 w['expected'] += d['amount']
-            for w in by_worker.values():
-                w['advances'] = outstanding_advances(w['worker'])
+            # PA-16-2: batch outstanding advances for ALL draft workers in 2
+            # queries (was outstanding_advances() per worker = an N+1 over workers).
+            adv_by_worker = payroll_service.outstanding_advances_bulk(
+                [w['worker'] for w in by_worker.values()])
+            for wid, w in by_worker.items():
+                w['advances'] = adv_by_worker.get(wid, [])
             ctx['workers'] = sorted(by_worker.values(),
                                     key=lambda w: w['worker'].pk)
             ctx['grand_expected'] = sum(

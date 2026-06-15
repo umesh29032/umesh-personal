@@ -97,6 +97,38 @@ def outstanding_advances(worker):
     return out
 
 
+def outstanding_advances_bulk(workers):
+    """PA-16-2: batched `outstanding_advances` for MANY workers in 2 queries.
+
+    The settlement-draft screen showed one worker's outstanding advances each
+    (per-advance recovery inputs), calling outstanding_advances() in a loop →
+    2 queries PER worker (a measured N+1 on a money-approval page). This returns
+    {worker_id: [{advance, amount, recovered, remaining}]} with the SAME row shape
+    and the SAME reversed_at filter, computed in 2 queries total regardless of the
+    worker count. Workers with no positive-remaining advance are absent from the map.
+    """
+    ids = [getattr(w, 'pk', w) for w in workers]
+    if not ids:
+        return {}
+    advs = (WorkerAdvance.objects.filter(worker_id__in=ids)
+            .order_by('advance_date', 'id'))
+    recovered_map = {
+        r['advance']: r['s'] for r in
+        PayrollSettlementItem.objects.filter(advance__worker_id__in=ids,
+                                             reversed_at__isnull=True)
+        .values('advance').annotate(s=Sum('amount_recovered'))
+    }
+    out: dict = {}
+    for a in advs:
+        rec = recovered_map.get(a.id, _ZERO)
+        remaining = a.amount - rec
+        if remaining > _ZERO:
+            out.setdefault(a.worker_id, []).append(
+                {'advance': a, 'amount': a.amount,
+                 'recovered': rec, 'remaining': remaining})
+    return out
+
+
 def worker_advances(worker, *, limit=None):
     """All advances for a worker (newest first)."""
     qs = WorkerAdvance.objects.filter(worker=worker).order_by('-advance_date', '-id')
