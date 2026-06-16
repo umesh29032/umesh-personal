@@ -182,11 +182,11 @@
         </div>
 
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
-            <button type="submit" name="action" value="discard" class="btn-ghost"
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="discard" class="btn btn-ghost btn-lg"
                     onclick="return confirm('Discard draft {{ s.reference }}? Nothing was booked; this just removes the scratchpad.');">Discard draft</button>
             {% if workers %}
-            <button type="submit" name="action" value="finalize" class="btn-copper"
+            <button type="submit" name="action" value="finalize" class="btn btn-copper btn-lg"
                     onclick="return confirm('Finalize {{ s.reference }}? This books earnings and recoveries to the ledger.');">Finalize settlement</button>
             {% endif %}
         </div>
@@ -267,16 +267,16 @@
             <textarea name="notes" placeholder="Reason for reversal (kept on the ledger entries)"></textarea>
         </div>
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
-            <button type="submit" name="action" value="reverse" class="btn-danger"
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="reverse" class="btn btn-danger btn-lg"
                     onclick="return confirm('Reverse {{ s.reference }}? Earnings and recoveries are undone with compensating ledger entries.');">Reverse</button>
-            <button type="submit" name="action" value="supersede" class="btn-copper"
+            <button type="submit" name="action" value="supersede" class="btn btn-copper btn-lg"
                     onclick="return confirm('Reverse {{ s.reference }} and open a fresh draft to settle again?');">Reverse &amp; settle again</button>
         </div>
     </form>
     {% else %}
     <div class="sticky-bar">
-        <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+        <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
     </div>
     {% endif %}
     {% endif %}

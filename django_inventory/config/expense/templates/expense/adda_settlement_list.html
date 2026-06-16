@@ -59,7 +59,7 @@
                         {% else %}
                             <form method="post" action="{% url 'expense:adda-settlement-start' r.adda.pk %}" style="display:inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn-copper">Start settlement</button>
+                                <button type="submit" class="btn btn-copper btn-lg">Start settlement</button>
                             </form>
                         {% endif %}
                     </td>
