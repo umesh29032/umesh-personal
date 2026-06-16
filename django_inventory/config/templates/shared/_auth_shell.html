@@ -36,8 +36,16 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
             --auth-input-focus-bg-warm: #fffdf9;
             --auth-otp-mb: 20px;
             --auth-field-mb: 16px;            /* .auth-field margin-bottom */
-            --auth-title-size: 36px;          /* heading/title size */
+            --auth-title-size: 36px;          /* heading/title size (desktop) */
+            --auth-title-size-sm: var(--auth-title-size);  /* heading/title size @≤480 (defaults to desktop = no shrink) */
             --auth-btn-hover: var(--ink-2);
+            /* per-page field knobs (defaults = the common case → unset pages unchanged) */
+            --auth-field-label-mb: 8px;       /* .auth-field label margin-bottom */
+            --auth-input-pad: 14px 18px;      /* .auth-field input padding */
+            --auth-input-size: 14px;          /* .auth-field input font-size */
+            --auth-sub-size: 12px;            /* .auth-sub font-size */
+            --auth-sub-color: var(--stone);   /* .auth-sub color */
+            --auth-sub-ls: normal;            /* .auth-sub letter-spacing */
         }
         html, body { min-height: 100%; font-family: 'Syne', sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
@@ -81,8 +89,8 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-alert-info    { background: #eff6ff; color: #1e3a5f; border-left: 3px solid #3b82f6; }
 
         .auth-field { margin-bottom: var(--auth-field-mb); }
-        .auth-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: 8px; }
-        .auth-field input { width: 100%; padding: 14px 18px; background: var(--white); border: 1.5px solid var(--auth-input-border); border-radius: 6px; font-family: var(--auth-input-font); font-size: 14px; font-weight: 400; color: var(--ink); outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; box-shadow: var(--auth-input-shadow); }
+        .auth-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: var(--auth-field-label-mb); }
+        .auth-field input { width: 100%; padding: var(--auth-input-pad); background: var(--white); border: 1.5px solid var(--auth-input-border); border-radius: 6px; font-family: var(--auth-input-font); font-size: var(--auth-input-size); font-weight: 400; color: var(--ink); outline: none; transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none; box-shadow: var(--auth-input-shadow); }
         .auth-field input::placeholder { color: var(--smoke); }
         .auth-field input:focus { border-color: var(--copper); background: var(--auth-input-focus-bg); box-shadow: var(--auth-input-shadow-focus); }
         .auth-field-hint { font-size: 11px; color: var(--smoke); margin-top: 5px; }
@@ -101,7 +109,7 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-back svg { width: 14px; height: 14px; }
         .auth-heading { font-family: 'Cormorant Garamond', serif; font-size: var(--auth-title-size); font-weight: 300; font-style: italic; color: var(--ink); line-height: 1.1; margin-bottom: 6px; }
         .auth-heading em { font-style: normal; font-weight: 600; }
-        .auth-sub { font-size: 12px; font-weight: 500; color: var(--stone); margin-bottom: var(--auth-sub-mb, 32px); line-height: 1.6; }
+        .auth-sub { font-size: var(--auth-sub-size); font-weight: 500; color: var(--auth-sub-color); letter-spacing: var(--auth-sub-ls); margin-bottom: var(--auth-sub-mb, 32px); line-height: 1.6; }
         .auth-link { display: block; text-align: center; margin-top: var(--auth-link-mt, 20px); font-size: 12px; font-weight: 500; color: var(--stone); text-decoration: none; transition: color 0.2s; }
         .auth-link:hover { color: var(--copper); }
 
@@ -150,7 +158,7 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         @keyframes authFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
         @media (max-width: 860px) { body.auth-layout-split .auth-brand { display: none; } body.auth-layout-split .auth-right { padding: 40px 28px; } }
-        @media (max-width: 480px) { body.auth-layout-card .auth-card-body { padding: 32px 24px 28px; } .auth-otp-digit { height: 52px; font-size: 24px; } }
+        @media (max-width: 480px) { body.auth-layout-card .auth-card-body { padding: 32px 24px 28px; } .auth-otp-digit { height: 52px; font-size: 24px; } .auth-heading, .auth-title { font-size: var(--auth-title-size-sm); } }
         @media (max-width: 360px) { body.auth-layout-card .auth-card-body { padding: 28px 16px 24px; } .auth-otp-row { gap: 4px; } .auth-otp-sep { display: none; } }
         {% block auth_extra_head %}{% endblock %}
     </style>
