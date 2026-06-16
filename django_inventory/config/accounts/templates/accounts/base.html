@@ -1301,38 +1301,12 @@
             text-transform: uppercase;
             color: var(--stone);
         }
-        .form-control {
-            padding: 11px 14px;
-            border: 1.5px solid var(--cream-3);
-            border-radius: 6px;
-            background: var(--cream);
-            font-family: inherit;
-            font-size: 13px;
-            color: var(--ink);
-            outline: none;
-            width: 100%;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.15s;
-            font-weight: 500;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-        /* Select-specific: add chevron arrow — appearance:none removes native one */
-        select.form-control {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 36px;
-            cursor: pointer;
-        }
-        html[data-theme="dark"] select.form-control {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a89274' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-        }
-        .form-control::placeholder { color: var(--smoke); font-weight: 400; }
-        .form-control:focus { border-color: var(--copper); background: var(--white); box-shadow: 0 0 0 3px rgba(184,115,51,0.1); }
+        /* .form-control input system REMOVED (Forms F-2, 2026-06-16): 0 consumers — dead since
+           form-shell (shared/_form_styles.html) + .sf-input superseded it. .form-group/.form-label
+           above are kept (still used by the form-card container pages). */
 
         /* ── Storefront form classes (sf-*) — alternate form style with rounder corners
-           Used by storefront product/category forms. Parallel to .form-control but
-           bigger border-radius (9-10px) for the storefront's softer look. */
+           Used by storefront product/category forms; bigger border-radius (9-10px). */
         .sf-input {
             width: 100%;
             padding: 10px 14px;
