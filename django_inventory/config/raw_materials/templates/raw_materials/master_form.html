@@ -2,7 +2,7 @@
 
 {% block page_title %}{% if is_edit %}Edit{% else %}New{% endif %} {{ title }}{% endblock %}
 
-{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+{% block extra_head %}{% include 'shared/_form_styles.html' %}{% endblock %}
 
 {% block content %}
 {# Shared form for ClothType/ClothColor/StorageLocation — `form` ModelForm view se inject hua #}

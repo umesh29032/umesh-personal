@@ -2,7 +2,7 @@
 
 {% block page_title %}{% if object.is_active %}Archive{% else %}Restore{% endif %} {{ title }}{% endblock %}
 
-{% block extra_head %}{% include 'production/_form_styles.html' %}{% endblock %}
+{% block extra_head %}{% include 'shared/_form_styles.html' %}{% endblock %}
 
 {% block content %}
 {# Archive/restore — service ne is_active flip kiya. CSRF token mandatory for POST #}
