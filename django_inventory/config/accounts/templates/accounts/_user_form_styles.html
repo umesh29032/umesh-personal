@@ -112,17 +112,9 @@
 .panel-head p { font-size: 13px; color: var(--gray-500); margin: 0; }
 .panel-body { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
 
-/* ─── FIELDS ──────────────────────────────────────── */
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: flex; gap: 16px; }
-.field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 560px) { .field-grid-2 { grid-template-columns: 1fr; } }
-
-.field label {
-    font-size: 12px; font-weight: 700;
-    color: var(--ink-2); text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* ─── FIELDS ── F-4c (2026-06-16): .field / .field-row / .field-grid-2 / .field label converged
+   to the Forms owner (shared/_form_styles.html). Accounts keeps only its .field INPUT styling
+   (below) + label.avatar-btn (explicit exception). No .field layout/label def here. ─── */
 .field input, .field select, .field textarea,
 .field .fancy-select-trigger {
     width: 100%;
@@ -359,7 +351,6 @@ html[data-theme="dark"] .field input:focus,
 html[data-theme="dark"] .field select:focus,
 html[data-theme="dark"] .field textarea:focus,
 html[data-theme="dark"] .field .fancy-select.open .fancy-select-trigger { background: var(--cream-2); box-shadow: 0 0 0 3px rgba(184,115,51,0.18); }
-html[data-theme="dark"] .field label { color: var(--ink-2); }
 html[data-theme="dark"] .field small { color: var(--stone); }
 html[data-theme="dark"] .avatar-upload { background: var(--cream); border-color: var(--cream-3); }
 html[data-theme="dark"] .avatar-preview { background: var(--card-bg); border-color: var(--cream-3); }
