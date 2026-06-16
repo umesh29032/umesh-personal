@@ -48,9 +48,14 @@
 
     .form-shell .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
     .form-shell .form-grid.cols-1 { grid-template-columns: 1fr; }
-    .form-shell .field { display: flex; flex-direction: column; gap: 6px; }
-    .form-shell .field.full { grid-column: 1/-1; }
-    .form-shell .field label {
+    /* ── GLOBAL FORM FIELD (Forms owner; works WITHOUT .form-shell) — the ONLY .field owner.
+       .field (column) · .field-grid-2 / .field-row (layouts) · .inline-form .field (row modifier). */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1/-1; }
+    .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .field-row { display: flex; gap: var(--space-4); }
+    .inline-form .field { flex: 1 1 140px; min-width: 120px; }
+    .field label {
         font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.06em; color: var(--stone);
     }
@@ -141,7 +146,7 @@
         .form-shell .breakup-table td::before { content: attr(data-label); font-size: var(--fs-2xs); text-transform: uppercase; color: var(--stone); margin-right: 8px; align-self: center; }
     }
 
-    @media (max-width: 768px) { .form-shell .form-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) { .form-shell .form-grid, .field-grid-2 { grid-template-columns: 1fr; } }
     @media (max-width: 600px) {
         .form-shell .hero { padding: 22px 20px; border-radius: var(--radius-lg); }
         .form-shell .hero h1 { font-size: 24px; }

@@ -81,12 +81,7 @@ to fit iframe height. Implemented in script at bottom.
 
     /* Forms */
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    .field.full { grid-column: 1/-1; }
-    .field label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--stone);
-    }
+    /* .field / .field label → shared/_form_styles.html (F-4a) */
     input, select, textarea, .sf-input {
         width: 100%; padding: 9px 12px;
         background: var(--cream); border: 1.5px solid var(--border-card); border-radius: 8px;
@@ -123,7 +118,6 @@ to fit iframe height. Implemented in script at bottom.
     .roll-row details { margin-top: 6px; }
     .roll-row summary { cursor: pointer; font-size: 11px; color: var(--copper); font-weight: 600; }
     .inline-form { margin-top: 8px; display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; }
-    .inline-form .field { flex: 1 1 100px; min-width: 100px; }
     .row-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top: 8px; }
 
     .roll-id-chip {
