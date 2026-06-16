@@ -3,6 +3,7 @@
 {% block page_title %}{{ action }} Category{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 <style>
 /* ──────────────────────────────────────────────────────────────────
    Category form mobile responsive styles
@@ -62,7 +63,7 @@ section header {
 
     <!-- Form-level validation errors -->
     {% if form.non_field_errors %}
-        <div class="form-errors" style="margin-bottom: 24px;">
+        <div class="form-error" style="margin-bottom: 24px;">
             <p>Please fix the following errors:</p>
             <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
         </div>
@@ -88,7 +89,7 @@ section header {
                     <input type="text" name="name" value="{{ form.name.value|default:'' }}" required
                         class="sf-input" placeholder="e.g. T-Shirts">
                     {% if form.name.errors %}
-                        <span class="sf-error">{{ form.name.errors|join:" " }}</span>
+                        <span class="field-error">{{ form.name.errors|join:" " }}</span>
                     {% endif %}
                 </div>
 

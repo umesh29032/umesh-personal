@@ -44,7 +44,7 @@
     {% comment %}Show ALL validation errors (field + non-field). Without this, a rejected
        password / email silently re-renders with no feedback (looks "broken").{% endcomment %}
     {% if form.errors %}
-        <div class="form-alert form-alert-error">
+        <div class="form-error">
             <strong>Could not save — please fix:</strong>
             <ul style="margin:6px 0 0; padding-left:18px;">
                 {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
@@ -122,7 +122,7 @@
                             <div class="field">
                                 <label for="id_new_password">Reset Password</label>
                                 <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
-                                {% if form.new_password.errors %}<small class="form-alert form-alert-error" style="display:block;margin-top:6px;">{{ form.new_password.errors|join:" " }}</small>{% endif %}
+                                {% if form.new_password.errors %}<small class="field-error" style="display:block;margin-top:6px;">{{ form.new_password.errors|join:" " }}</small>{% endif %}
                                 <small>Only fill to issue a new password.</small>
                             </div>
                         </div>
@@ -279,5 +279,6 @@ document.querySelectorAll('.chip-pick input').forEach(cb => {
 
 <style>
 {% include 'accounts/_user_form_styles.html' %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 </style>
 {% endblock %}

@@ -2,6 +2,8 @@
 
 {% block page_title %}{% if object %}Edit{% else %}New{% endif %} Pattern{% endblock %}
 
+{% block extra_head %}{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}{% endblock %}
+
 {% block content %}
 <div style="max-width: 720px; margin: 0 auto;">
     <div class="page-header">
@@ -14,7 +16,7 @@
     <form method="post" enctype="multipart/form-data" class="form-card" novalidate>
         {% csrf_token %}
         {% if form.non_field_errors %}
-            <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+            <div class="form-error">{{ form.non_field_errors }}</div>
         {% endif %}
 
         <div class="form-section">

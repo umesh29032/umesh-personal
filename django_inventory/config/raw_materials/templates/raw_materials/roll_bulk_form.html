@@ -3,6 +3,7 @@
 {% block page_title %}Add Cloth Rolls{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 {# form-shell CSS .bulk-roll-create ke andar scoped — dusre pages pe leak nahi hoga #}
 <style>
     .bulk-roll-create { max-width: 1100px; margin: 0 auto; padding-bottom: 120px; }
@@ -72,9 +73,6 @@
         letter-spacing: 0.06em; color: var(--stone);
     }
     .bulk-roll-create .field .muted { color: var(--stone); font-weight: 400; }
-    .bulk-roll-create .field-error {
-        color: var(--danger); font-size: 12px; margin-top: 2px;
-    }
     .bulk-roll-create input,
     .bulk-roll-create select {
         width: 100%; padding: 11px 14px;
@@ -136,11 +134,6 @@
     }
     html[data-theme="dark"] .bulk-roll-create .sticky-actions {
         background: rgba(28,28,30,0.85);
-    }
-
-    .bulk-roll-create .form-error {
-        padding: 12px 16px; background: var(--danger-bg); color: var(--danger);
-        border-radius: 10px; margin-bottom: 18px; font-size: 13px;
     }
 
     /* Mobile */

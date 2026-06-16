@@ -3,6 +3,7 @@
 {% block page_title %}{{ action }} Product{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 <style>
 /* ──────────────────────────────────────────────────────────────────
    Product form mobile responsive — 2-column grid mobile pe collapse
@@ -72,7 +73,7 @@ section header {
 
     <!-- Form-level errors (field errors neeche dikhte hain) -->
     {% if form.non_field_errors %}
-        <div class="form-errors" style="margin-bottom: 24px;">
+        <div class="form-error" style="margin-bottom: 24px;">
             <p>Please fix the following errors:</p>
             <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
         </div>
@@ -106,7 +107,7 @@ section header {
                             <input type="text" name="name" value="{{ form.name.value|default:'' }}" required
                                 class="sf-input" placeholder="e.g. Cotton Round Neck Tee — Multicolor">
                             {% if form.name.errors %}
-                                <span class="sf-error">{{ form.name.errors|join:" " }}</span>
+                                <span class="field-error">{{ form.name.errors|join:" " }}</span>
                             {% endif %}
                         </div>
 
@@ -163,7 +164,7 @@ section header {
                                     value="{{ form.price.value|default:'' }}"
                                     class="sf-input" placeholder="149.00">
                                 {% if form.price.errors %}
-                                    <span class="sf-error">{{ form.price.errors|join:" " }}</span>
+                                    <span class="field-error">{{ form.price.errors|join:" " }}</span>
                                 {% endif %}
                             </div>
                             <div class="sf-field">

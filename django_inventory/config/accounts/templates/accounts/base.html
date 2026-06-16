@@ -1346,7 +1346,6 @@
             letter-spacing: 0.05em;
         }
         .sf-field { display: flex; flex-direction: column; }
-        .sf-error { font-size: 12px; color: var(--danger); margin-top: 4px; font-weight: 500; }
         .sf-hint  { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
         .sf-footer {
             position: sticky; bottom: 0;
@@ -1366,7 +1365,6 @@
             box-shadow: 0 0 0 3px rgba(184,115,51,0.18);
         }
         .form-hint { font-size: 11px; color: var(--smoke); font-weight: 400; }
-        .form-error { font-size: 11px; color: #dc2626; font-weight: 500; }
 
         .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
         .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -1392,19 +1390,9 @@
             border-color: var(--cream-3);
         }
 
-        /* Form errors block */
-        .form-errors {
-            background: #fef1ee;
-            border: 1px solid #fecaca;
-            border-left: 3px solid #dc4533;
-            border-radius: 8px;
-            padding: 14px 16px;
-            margin-bottom: 20px;
-        }
-        .form-errors p { font-size: 13px; font-weight: 600; color: #7c2d12; margin-bottom: 6px; }
-        .form-errors ul { list-style: none; }
-        .form-errors li { font-size: 12px; color: #991b1b; padding: 2px 0; }
-        .form-errors li::before { content: '— '; color: #dc4533; }
+        /* Form VALIDATION CSS removed (Forms F-3, 2026-06-16): sole owner is
+           shared/_form_styles.html (.field-error inline · .form-error box). base.html holds
+           ZERO validation CSS — no new validation styles may be added here (ds_lint guards). */
 
         /* ── Status badges ──────────────────────────────────────────── */
         .badge {
@@ -1885,11 +1873,6 @@
         html[data-theme="dark"] [style*="background: #fef2f2"],
         html[data-theme="dark"] [style*="background: #fee2e2"],
         html[data-theme="dark"] [style*="background: #fef1ee"] { background: rgba(239,68,68,0.15) !important; color: #fca5a5 !important; border-color: rgba(239,68,68,0.3) !important; }
-
-        /* Form error block */
-        html[data-theme="dark"] .form-errors { background: rgba(220,69,51,0.12); border-color: rgba(220,69,51,0.35); border-left-color: rgba(220,69,51,0.7); }
-        html[data-theme="dark"] .form-errors p  { color: #fca5a5; }
-        html[data-theme="dark"] .form-errors li { color: #fca5a5; }
 
         /* Btn-danger in dark mode */
         html[data-theme="dark"] .btn-danger { background: rgba(239,68,68,0.18); color: #fca5a5; }
