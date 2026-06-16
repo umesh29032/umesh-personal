@@ -21,13 +21,16 @@ EXEMPT='styleguide.html'
 VIOLATION='style="[^"]*(#[0-9a-fA-F]{3,6}|font-size:[[:space:]]*[0-9]+px|border-radius:[[:space:]]*[0-9]+px)'
 
 if [ "${1:-}" = "--changed" ]; then
-    # RATCHET: only added lines (+) in staged html, excluding the exempt demo page.
-    files=$(git diff --cached --name-only --diff-filter=ACM -- '*.html' | grep -v "$EXEMPT" || true)
+    # RATCHET — run from the git toplevel (monorepo root): git reports paths repo-root-relative,
+    # so we cd there and keep them consistent. Scope to this project's config/ templates only.
+    cd "$(git rev-parse --show-toplevel)"
+    files=$(git diff --cached --name-only --diff-filter=ACM -- '*.html' | grep -E '/config/.*\.html$' | grep -v "$EXEMPT" || true)
     [ -z "$files" ] && exit 0
     hits=0
     for f in $files; do
-        # added lines only (strip the leading +), skip the +++ header
-        added=$(git diff --cached --unified=0 -- "$f" | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//')
+        # added lines only (strip the leading +), skip the +++ header; empty-safe under set -e
+        added=$(git diff --cached --unified=0 -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' | sed 's/^+//' || true)
+        [ -z "$added" ] && continue
         bad=$(printf '%s\n' "$added" | grep -nE "$VIOLATION" || true)
         if [ -n "$bad" ]; then
             echo "❌ DS-LINT: new inline raw value in $f (use a token/class):"
