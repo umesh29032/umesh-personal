@@ -46,6 +46,7 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
             --auth-sub-size: 12px;            /* .auth-sub font-size */
             --auth-sub-color: var(--stone);   /* .auth-sub color */
             --auth-sub-ls: normal;            /* .auth-sub letter-spacing */
+            --auth-text-dim: #4a3f36;         /* AA-readable dark-warm text (otp sub + timer) */
         }
         html, body { min-height: 100%; font-family: 'Syne', sans-serif; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 
@@ -87,6 +88,7 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-alert-error   { background: #fef1ee; color: #7c2d12; border-left: 3px solid #dc4533; }
         .auth-alert-success { background: #f0fdf4; color: #14532d; border-left: 3px solid #22c55e; }
         .auth-alert-info    { background: #eff6ff; color: #1e3a5f; border-left: 3px solid #3b82f6; }
+        .auth-alert-warning { background: #fffbeb; color: #78350f; border-left: 3px solid var(--copper); }
 
         .auth-field { margin-bottom: var(--auth-field-mb); }
         .auth-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--stone); margin-bottom: var(--auth-field-label-mb); }
@@ -98,10 +100,12 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-field-row a { font-size: 11px; font-weight: 600; color: var(--copper); text-decoration: none; letter-spacing: 0.05em; }
         .auth-field-row a:hover { opacity: 0.75; }
 
-        .auth-btn { width: 100%; padding: 15px 24px; background: var(--ink); color: var(--cream); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; position: relative; overflow: hidden; transition: background 0.2s, transform 0.15s; margin-top: var(--auth-btn-mt, 0); }
+        .auth-btn { width: 100%; padding: 15px 24px; background: var(--ink); color: var(--cream); border: none; border-radius: 6px; font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; position: relative; overflow: hidden; transition: var(--auth-btn-transition, background 0.2s, transform 0.15s); margin-top: var(--auth-btn-mt, 0); }
         .auth-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 40%, rgba(184,115,51,0.15) 100%); }
-        .auth-btn:hover { background: var(--auth-btn-hover); transform: translateY(-1px); }
-        .auth-btn:active { transform: translateY(0); }
+        .auth-btn:hover:not(:disabled) { background: var(--auth-btn-hover); transform: translateY(-1px); }
+        .auth-btn:active:not(:disabled) { transform: translateY(0); }
+        .auth-btn:disabled { opacity: 0.4; cursor: not-allowed; }   /* otp: disabled until 6 digits */
+        .auth-btn.ready { background: var(--copper); }              /* otp: all 6 entered */
 
         /* title / nav / link family (vars carry per-page sizes) */
         .auth-back { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--stone); text-decoration: none; margin-bottom: var(--auth-back-mb, 28px); transition: color 0.2s; }
@@ -110,6 +114,7 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-heading { font-family: 'Cormorant Garamond', serif; font-size: var(--auth-title-size); font-weight: 300; font-style: italic; color: var(--ink); line-height: 1.1; margin-bottom: 6px; }
         .auth-heading em { font-style: normal; font-weight: 600; }
         .auth-sub { font-size: var(--auth-sub-size); font-weight: 500; color: var(--auth-sub-color); letter-spacing: var(--auth-sub-ls); margin-bottom: var(--auth-sub-mb, 32px); line-height: 1.6; }
+        .auth-sub strong { color: var(--ink); font-weight: 700; }
         .auth-link { display: block; text-align: center; margin-top: var(--auth-link-mt, 20px); font-size: 12px; font-weight: 500; color: var(--stone); text-decoration: none; transition: color 0.2s; }
         .auth-link:hover { color: var(--copper); }
 
@@ -125,6 +130,12 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-otp-digit:focus { border-color: var(--copper); background: #fffdf9; box-shadow: 0 0 0 3px rgba(184,115,51,0.18), 0 1px 3px rgba(0,0,0,0.04) inset; }
         .auth-otp-digit.filled { border-color: var(--copper); background: #fffdf9; }
         .auth-otp-sep { width: 12px; height: 2px; background: #7a6252; border-radius: 1px; flex-shrink: 0; }
+        /* resend / countdown (otp) */
+        .auth-resend-area { margin-top: 20px; text-align: center; }
+        .auth-timer-text { font-size: 13px; font-weight: 500; color: var(--auth-text-dim); }
+        .auth-timer-text strong { color: var(--copper); font-weight: 700; font-variant-numeric: tabular-nums; }
+        .auth-resend-link { display: none; font-size: 13px; font-weight: 700; color: var(--copper); letter-spacing: 0.06em; text-decoration: none; transition: opacity 0.2s; }
+        .auth-resend-link:hover { opacity: 0.7; }
 
         /* ── SPLIT-only primitives (brand panel internals + split form chrome) ── */
         body.auth-layout-split .auth-monogram { opacity: 0; animation: authFadeUp 0.7s 0.1s cubic-bezier(0.22,1,0.36,1) forwards; }
