@@ -6,7 +6,10 @@ Route groups / workflows:
   access-control/…     the Super-Admin hub: roles, skills, per-user access
   sidebar-access/…     menu+URL gating rules (SidebarItemRule editor)
 The /tracking/ section lives in inventory/tracking_urls.py (P4.2 ownership)."""
+from django.contrib.auth.decorators import login_required
 from django.urls import path
+from django.views.generic import TemplateView
+
 from . import views
 
 app_name = 'inventory'
@@ -15,6 +18,11 @@ urlpatterns = [
     # Dashboards
     path('dashboard/', views.dashboard, name='inventory_dashboard'),
     path('my-dashboard/', views.user_dashboard, name='user_dashboard'),
+
+    # Design-system styleguide — living component gallery (login-only; no business logic).
+    # TemplateView (Django generic) renders a static template; no SidebarItemRule = open to any authed user.
+    path('styleguide/', login_required(
+        TemplateView.as_view(template_name='inventory/styleguide.html')), name='styleguide'),
 
     # Roles & Permissions (Super Admin only)
     path('roles/', views.RoleListView.as_view(), name='role_list'),
