@@ -12,7 +12,7 @@
         overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
     .roll-list .filter-card > * { flex-shrink: 0; }
-    .roll-list .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .roll-list .filter-card .filter-field { display: flex; flex-direction: column; gap: 4px; }
     .roll-list .filter-card label {
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
@@ -69,7 +69,7 @@
         .roll-list .filter-info .clear-all { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
         /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
         .roll-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
-        .roll-list .filter-card .field { width: 100%; }
+        .roll-list .filter-card .filter-field { width: 100%; }
         .roll-list .filter-card select { width: 100%; min-width: 0; }
     }
 
@@ -97,7 +97,7 @@
 
     {# GET form — status/cloth_type/location querystring mein bhejta hai, view filter karta hai #}
     <form method="get" class="filter-card">
-        <div class="field">
+        <div class="filter-field">
             <label>Status</label>
             <select name="status" data-no-fancy>
                 <option value="">All</option>
@@ -105,29 +105,29 @@
                 <option value="used" {% if filters.status == 'used' %}selected{% endif %}>Used</option>
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Cloth Type</label>
             <select name="cloth_type" data-no-fancy>
                 <option value="">All</option>
                 {% for t in cloth_types %}<option value="{{ t.pk }}" {% if filters.cloth_type == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Location</label>
             <select name="location" data-no-fancy>
                 <option value="">All</option>
                 {% for l in locations %}<option value="{{ l.pk }}" {% if filters.location == l.pk|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Color</label>
             <select name="color" data-no-fancy>
                 <option value="">All</option>
                 {% for c in colors %}<option value="{{ c.pk }}" {% if filters.color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
-        <div class="field"><label>&nbsp;</label><a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Reset</a></div>
+        <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="filter-field"><label>&nbsp;</label><a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Reset</a></div>
     </form>
 
     {# `active_filter_chips` context var — har chip mein `remove_url` already built hai (view side) #}

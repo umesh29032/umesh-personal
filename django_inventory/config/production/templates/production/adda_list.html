@@ -12,7 +12,7 @@
         overflow-x: auto; -webkit-overflow-scrolling: touch;
     }
     .adda-list .filter-card > * { flex-shrink: 0; }
-    .adda-list .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
+    .adda-list .filter-card .filter-field { display: flex; flex-direction: column; gap: 4px; }
     .adda-list .filter-card label {
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
@@ -26,7 +26,7 @@
     @media (max-width: 600px) {
         /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
         .adda-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
-        .adda-list .filter-card .field { width: 100%; }
+        .adda-list .filter-card .filter-field { width: 100%; }
         .adda-list .filter-card select { width: 100%; min-width: 0; }
     }
 </style>
@@ -46,22 +46,22 @@
     {% if messages %}{% for m in messages %}<div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>{% endfor %}{% endif %}
 
     <form method="get" class="filter-card">
-        <div class="field">
+        <div class="filter-field">
             <label>Status</label>
             <select name="status" data-no-fancy>
                 <option value="">All</option>
                 {% for val, label in status_choices %}<option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Current Stage</label>
             <select name="stage" data-no-fancy>
                 <option value="">All</option>
                 {% for val, label in stage_types %}<option value="{{ val }}" {% if filters.stage == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
-        <div class="field"><label>&nbsp;</label><a href="{% url 'production:adda-list' %}" class="btn btn-ghost">Reset</a></div>
+        <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="filter-field"><label>&nbsp;</label><a href="{% url 'production:adda-list' %}" class="btn btn-ghost">Reset</a></div>
     </form>
 
     <div class="card card-clip">
