@@ -18,3 +18,12 @@ repos:
         types: [python]
         files: ^django_inventory/.*\.py$
         exclude: ^django_inventory/(.*/migrations/|env/|staticfiles/)
+      # Design-system governance (ratchet): block NEW inline raw values (#hex / font-size:Npx /
+      # border-radius:Npx) in CHANGED templates. Existing code untouched → safe mid-migration.
+      # Adoption score (manual): bash django_inventory/scripts/ds_lint.sh
+      - id: ds-lint
+        name: design-system lint (ratchet · new inline raw values)
+        entry: bash django_inventory/scripts/ds_lint.sh --changed
+        language: system
+        pass_filenames: false
+        files: ^django_inventory/config/.*\.html$
