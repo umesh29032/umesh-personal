@@ -1234,6 +1234,26 @@
         }
         .btn-clear:hover { border-color: var(--smoke); color: var(--ink); }
 
+        /* ── Button size: .btn-lg — Foundation 2 / B-2 (additive; ZERO consumers until B-3) ──
+           Reproduces Geometry-B byte-for-byte (comfortable / "money" buttons) so the B-3 markup
+           repoint is pixel-identical. See docs/B2_GEOMETRY_B_PROOF_PLAN.md.
+           NOTE: .btn-sm is DEFERRED to B-4 — it has a pre-existing consumer (stage_rate_list:56
+           uses class="btn btn-sm"), so defining it here would NOT be inert. B-4 introduces
+           .btn-sm together with inline-mini cleanup + browser before/after proof. */
+        .btn-lg {
+            padding: 10px 18px;               /* off-grid → literal */
+            border-radius: var(--radius-md);  /* 10px */
+            font-size: var(--fs-base);        /* 13px */
+            min-height: 40px;                 /* no 40px token → literal */
+            text-transform: none;             /* override .btn uppercase */
+            letter-spacing: normal;           /* override .btn 0.1em */
+            gap: 6px;                         /* override .btn 7px (off-grid) */
+        }
+        /* per-variant overrides so .btn .btn-X .btn-lg == bare Geometry-B exactly */
+        .btn-ghost.btn-lg { font-weight: var(--fw-semibold); color: var(--ink); border: 1px solid var(--border-card); }
+        .btn-danger.btn-lg { background: #b03434; color: #fff; } /* solid danger (raw hex = identical to :not(.btn)) */
+        /* .btn-copper.btn-lg: no rule needed — copper/white from .btn-copper; only .btn-lg layout applies */
+
         /* ── Form elements ──────────────────────────────────────────── */
         .form-card {
             background: var(--white);
