@@ -38,6 +38,7 @@ from accounts.skills import (
 )
 from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_BARCODE_GENERATION
+from production.forms._shared import _WorkerCheckboxes  # F-5: worker chip widget (presentation)
 from production.models import Adda, AddaStageRecord, WorkflowStage
 from production.services import (
     complete_barcode_generation, generate_barcodes, get_barcode_snapshot,
@@ -69,7 +70,7 @@ class BarcodeGenStartForm(forms.Form):
 
     workers = forms.ModelMultipleChoiceField(
         queryset=None, required=True,
-        widget=forms.CheckboxSelectMultiple,
+        widget=_WorkerCheckboxes(),  # F-5: chip UI (was CheckboxSelectMultiple); payload identical
     )
 
     def __init__(self, *args, **kwargs):

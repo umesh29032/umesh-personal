@@ -51,6 +51,7 @@ from accounts.skills import (
 from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.constants import STAGE_CUTTING_PATTERN
 from production.forms import PatternVerifyForm
+from production.forms._shared import _WorkerCheckboxes  # F-5: worker chip widget (presentation)
 from production.models import (
     Adda, AddaStageRecord, CuttingPatternPhoto, ProductPatternAssignment,
     WorkflowStage,
@@ -91,7 +92,7 @@ class PatternStartForm(forms.Form):
     workers = forms.ModelMultipleChoiceField(
         queryset=None,  # __init__ mein set
         required=True,
-        widget=forms.CheckboxSelectMultiple,
+        widget=_WorkerCheckboxes(),  # F-5: chip UI (was CheckboxSelectMultiple); payload identical
     )
 
     def __init__(self, *args, **kwargs):
