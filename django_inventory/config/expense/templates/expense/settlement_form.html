@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Settle · {{ viewed_worker.get_full_name|default:viewed_worker.email }}{% endblock %}
 
@@ -35,8 +36,8 @@
     </div>
 
     <div class="stat-grid">
-        <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value" id="payableVal" data-payable="{{ payable|floatformat:2 }}">₹{{ payable|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">₹{{ advance_outstanding|floatformat:2 }}</div></div>
+        <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value" id="payableVal" data-payable="{{ payable|floatformat:2 }}">{% money payable %}</div></div>
+        <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">{% money advance_outstanding %}</div></div>
         <div class="stat-card"><div class="label">Date</div><div class="value" style="font-size:15px;">{{ today }}</div></div>
     </div>
 
@@ -57,7 +58,7 @@
                 {% for o in outstanding_advances %}
                     <tr>
                         <td>{{ o.advance.advance_date }}{% if o.advance.notes %} · <span style="color:var(--stone)">{{ o.advance.notes }}</span>{% endif %}</td>
-                        <td class="num">₹{{ o.remaining|floatformat:2 }}</td>
+                        <td class="num">{% money o.remaining %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -89,7 +90,7 @@
 
         <div class="preview">
             <div class="row total"><span>Cash paid</span><span>₹<span id="pvPaid">0.00</span></span></div>
-            <div class="row"><span>Payable after</span><span id="pvAfter">₹{{ payable|floatformat:2 }}</span></div>
+            <div class="row"><span>Payable after</span><span id="pvAfter">{% money payable %}</span></div>
             <div class="row" id="pvWarnRow" style="display:none;"><span class="warn">⚠ Paid exceeds pending payable</span><span></span></div>
         </div>
 

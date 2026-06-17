@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Manufacturing Costing{% endblock %}
 
@@ -44,7 +45,7 @@
             <p style="font-size:11px;opacity:.85;margin-top:4px;">⚠ Cost (standard) and Worker Earnings (actual) are two views of the SAME labor — never add them together (ADR-0009).</p>
         </div>
         <div class="total">
-            <div class="v">₹{{ grand_cost|floatformat:2 }}</div>
+            <div class="v">{% money grand_cost %}</div>
             <div class="l">Total (shown Addas)</div>
         </div>
     </div>
@@ -81,11 +82,11 @@
                         <td data-label="Status">{{ r.adda.get_status_display }}</td>
                         <td class="num" data-label="Pieces">{{ r.pieces }}</td>
                         <td class="num" data-label="Mfg Cost">
-                            <span class="cost">₹{{ r.total_cost|floatformat:2 }}</span>
+                            <span class="cost">{% money r.total_cost %}</span>
                             {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced stage{{ r.unpriced|pluralize }}</div>{% endif %}
                             {% if r.unpriced_rolls %}<div class="unpriced">{{ r.unpriced_rolls }} unpriced roll{{ r.unpriced_rolls|pluralize }} — material cost incomplete</div>{% endif %}
                         </td>
-                        <td class="num" data-label="Worker Earnings">₹{{ r.worker_earnings|floatformat:2 }}</td>
+                        <td class="num" data-label="Worker Earnings">{% money r.worker_earnings %}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="7" class="empty">No Addas yet.</td></tr>

@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Payroll Overview{% endblock %}
 
@@ -35,7 +36,7 @@
     <div class="hero-strip copper">
         <h1>Payroll Overview</h1>
         <div class="total">
-            <div class="v">₹{{ total_payable|floatformat:2 }}</div>
+            <div class="v">{% money total_payable %}</div>
             <div class="l">Total Pending Payable</div>
         </div>
     </div>
@@ -68,10 +69,10 @@
                         </td>
                         <td data-label="Role">{{ w.role.name|default:"—" }}</td>
                         <td class="num" data-label="Pieces">{{ w.pieces|floatformat:0 }}</td>
-                        <td class="num" data-label="Earned">₹{{ w.total_earnings|floatformat:2 }}</td>
-                        <td class="num" data-label="Advance Out">₹{{ w.advance_outstanding|floatformat:2 }}</td>
-                        <td class="num" data-label="Settled">₹{{ w.total_settled|floatformat:2 }}</td>
-                        <td class="num payable" data-label="Payable">₹{{ w.payable|floatformat:2 }}</td>
+                        <td class="num" data-label="Earned">{% money w.total_earnings %}</td>
+                        <td class="num" data-label="Advance Out">{% money w.advance_outstanding %}</td>
+                        <td class="num" data-label="Settled">{% money w.total_settled %}</td>
+                        <td class="num payable" data-label="Payable">{% money w.payable %}</td>
                         <td class="num" data-label="">
                             <a class="worker" href="{% url 'expense:settlement-create' w.worker.pk %}">Settle</a>
                         </td>

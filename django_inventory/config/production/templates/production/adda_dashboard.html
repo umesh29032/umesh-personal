@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Operations{% endblock %}
 
@@ -106,12 +107,12 @@
         </div>
         <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
             <span class="digest-label">Pending Payable</span>
-            <span class="digest-value">₹{{ digest.pending_payable|floatformat:2 }}</span>
+            <span class="digest-value">{% money digest.pending_payable %}</span>
             <span class="digest-sub">owed to workers</span>
         </a>
         <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
             <span class="digest-label">Advance Exposure</span>
-            <span class="digest-value">₹{{ digest.advance_exposure|floatformat:2 }}</span>
+            <span class="digest-value">{% money digest.advance_exposure %}</span>
             <span class="digest-sub">outstanding advances</span>
         </a>
     </div>

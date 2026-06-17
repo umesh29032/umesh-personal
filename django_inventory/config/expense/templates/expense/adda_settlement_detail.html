@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}{{ s.reference }}{% endblock %}
 
@@ -77,7 +78,7 @@
         {% for w in workers %}
         <div class="panel">
             <h2>{{ w.worker.get_full_name|default:w.worker.email }}
-                <span class="muted">— expected ₹{{ w.expected|floatformat:2 }}</span></h2>
+                <span class="muted">— expected {% money w.expected %}</span></h2>
             {# .table-responsive = horizontal-scroll on desktop, stacked label:value cards ≤600px (mobile) #}
             <div class="table-responsive">
             <table>
@@ -177,7 +178,7 @@
         {% endif %}
 
         <div class="panel totals">
-            <div class="t"><div class="v">₹{{ grand_expected|floatformat:2 }}</div><div class="l">Total expected earning</div></div>
+            <div class="t"><div class="v">{% money grand_expected %}</div><div class="l">Total expected earning</div></div>
             <div class="t"><div class="v">{{ workers|length }}</div><div class="l">Workers</div></div>
         </div>
 
@@ -205,11 +206,11 @@
     {% else %}
     {# ── FINALIZED / REVERSED / SUPERSEDED: frozen snapshot ── #}
     <div class="panel totals">
-        <div class="t"><div class="v">₹{{ s.expected_total|floatformat:2 }}</div><div class="l">Expected total</div></div>
+        <div class="t"><div class="v">{% money s.expected_total %}</div><div class="l">Expected total</div></div>
         <div class="t"><div class="v">{{ s.packed_total }}</div><div class="l">Packed</div></div>
         <div class="t"><div class="v">{{ s.missing_total }}</div><div class="l">Missing</div></div>
         <div class="t"><div class="v">{{ s.rejected_total }}</div><div class="l">Rejected</div></div>
-        <div class="t"><div class="v">₹{{ s.variance_total|floatformat:2 }}</div><div class="l">Variance ₹ (absorbed)</div></div>
+        <div class="t"><div class="v">{% money s.variance_total %}</div><div class="l">Variance ₹ (absorbed)</div></div>
     </div>
 
     <div class="panel">

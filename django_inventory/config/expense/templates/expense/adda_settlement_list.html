@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Adda Settlements{% endblock %}
 
@@ -52,7 +53,7 @@
                     <td data-label="Product">{{ r.adda.product.name }}</td>
                     <td class="num" data-label="Workers">{{ r.workers }}</td>
                     <td class="num" data-label="Lines">{{ r.lines }}</td>
-                    <td class="num" data-label="Expected">₹{{ r.expected|floatformat:2 }}</td>
+                    <td class="num" data-label="Expected">{% money r.expected %}</td>
                     <td data-label="Action">
                         {% if r.draft %}
                             <a class="ref" href="{% url 'expense:adda-settlement-detail' r.draft.reference %}">Open draft {{ r.draft.reference }}</a>
@@ -101,7 +102,7 @@
                     <td data-label="Reference"><a class="ref" href="{% url 'expense:adda-settlement-detail' s.reference %}">{{ s.reference }}</a></td>
                     <td data-label="Adda">{{ s.adda.code }}</td>
                     <td data-label="Status"><span class="pill {{ s.status }}">{{ s.get_status_display }}</span></td>
-                    <td class="num" data-label="Expected">{% if s.status == 'draft' %}—{% else %}₹{{ s.expected_total|floatformat:2 }}{% endif %}</td>
+                    <td class="num" data-label="Expected">{% if s.status == 'draft' %}—{% else %}{% money s.expected_total %}{% endif %}</td>
                     <td data-label="Settled">{{ s.settled_at|date:"d M Y H:i"|default:"—" }}</td>
                     <td data-label="Chain">{% if s.supersedes %}replaces {{ s.supersedes.reference }}{% else %}—{% endif %}</td>
                 </tr>
