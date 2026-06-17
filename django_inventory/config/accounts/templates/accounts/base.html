@@ -1581,6 +1581,11 @@
         .stat-card .label { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .04em; }
         .stat-card .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
         .stat-card.payable .value { color: var(--copper); }
+        /* Serif-value variant (opt-in): Cormorant value + larger pad. Dashboard/production stat tiles. */
+        .stat-card--serif { padding: 16px 18px; }
+        .stat-card--serif .label { font-weight: 700; letter-spacing: .06em; }
+        .stat-card--serif .value { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--ink); margin-top: 4px; }
+        .stat-card--serif .unit { font-size: 14px; color: var(--stone); }
         @media (max-width: 560px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
 
         .sticky-bar {

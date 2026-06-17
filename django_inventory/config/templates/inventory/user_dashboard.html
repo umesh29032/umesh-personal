@@ -121,20 +121,7 @@
         display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 14px; margin-bottom: 18px;
     }
-    .user-dash .stat-tile {
-        padding: 16px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card);
-    }
-    .user-dash .stat-tile .stat-label {
-        font-size: 11px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--stone);
-    }
-    .user-dash .stat-tile .stat-value {
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 28px; font-weight: 600; color: var(--ink); margin-top: 4px;
-    }
-    .user-dash .stat-tile .stat-unit { font-size: 14px; color: var(--stone); }
+    /* D-2a: stat tiles now use canonical .stat-card.stat-card--serif (base.html); local chrome removed */
 
     .user-dash .helper-tag {
         display: inline-block; padding: 3px 10px; margin-top: 8px;
@@ -276,21 +263,21 @@
     {% comment %}Helper section — only rendered for users with cutting_master_helper skill. Spec: helpers see every active Layering across the factory, plus their stats.{% endcomment %}
     {% if helper_data %}
     <div class="stats-grid">
-        <div class="stat-tile">
-            <div class="stat-label">Layerings Completed</div>
-            <div class="stat-value">{{ helper_data.completed_count }}</div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Layerings Completed</div>
+            <div class="value">{{ helper_data.completed_count }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">My Active Tasks</div>
-            <div class="stat-value">{{ helper_data.active_assigned_count }}</div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">My Active Tasks</div>
+            <div class="value">{{ helper_data.active_assigned_count }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">Total Layers Recorded</div>
-            <div class="stat-value">{{ helper_data.total_layers }}</div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Total Layers Recorded</div>
+            <div class="value">{{ helper_data.total_layers }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">Total Time</div>
-            <div class="stat-value">{{ helper_data.total_minutes }} <span class="stat-unit">min</span></div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Total Time</div>
+            <div class="value">{{ helper_data.total_minutes }} <span class="unit">min</span></div>
         </div>
     </div>
 
