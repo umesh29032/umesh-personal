@@ -139,6 +139,13 @@
             --input-padding:      11px 14px;
             --input-focus-ring:   rgba(184,115,51,.15);     /* focus glow */
 
+            /* Native-select arrow (F-2c) — one chevron source + per-context geometry skins.
+               Dark theme swaps the chevron tint; ke-toolbar/filter override offset+padding. */
+            --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            --select-arrow-size:         12px;
+            --select-arrow-offset-right: 14px;   /* default = field/sf; ke-toolbar/filter set 12px */
+            --select-padding-right:      38px;   /* default = field/sf; ke-toolbar 36px, filter 32px */
+
             /* Semantic status tokens (dark-mode override below) */
             --status-success-bg:  #ecfdf5; --status-success-text: #15803d;
             --status-warning-bg:  #fffbeb; --status-warning-text: #b45309;
@@ -1127,16 +1134,18 @@
         .ke-toolbar .fancy-select.open .fancy-select-trigger { border-color: var(--copper); }
         /* ke-toolbar select: consistent arrow across all browsers (only used for data-no-fancy selects) */
         .ke-toolbar select {
+            --select-arrow-offset-right: 12px; --select-padding-right: 36px;
             -webkit-appearance: none;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-image: var(--select-arrow);
+            background-size: var(--select-arrow-size);
             background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 36px;
+            background-position: right var(--select-arrow-offset-right) center;
+            padding-right: var(--select-padding-right);
             cursor: pointer;
         }
         html[data-theme="dark"] .ke-toolbar select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a89274' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a89274' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
         }
         @media (max-width: 600px) {
             .ke-toolbar { padding: 10px 14px; }
@@ -1174,6 +1183,7 @@
         .search-input:focus { border-color: var(--copper); }
 
         .filter-select {
+            --select-arrow-offset-right: 12px; --select-padding-right: 32px;
             padding: 9px 14px;
             border: 1.5px solid var(--cream-3);
             border-radius: 6px;
@@ -1184,10 +1194,11 @@
             outline: none;
             cursor: pointer;
             -webkit-appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-image: var(--select-arrow);
+            background-size: var(--select-arrow-size);
             background-repeat: no-repeat;
-            background-position: right 12px center;
-            padding-right: 32px;
+            background-position: right var(--select-arrow-offset-right) center;
+            padding-right: var(--select-padding-right);
             min-width: 130px;
         }
         .filter-select:focus { border-color: var(--copper); }
@@ -1338,10 +1349,11 @@
             appearance: none;
         }
         select.sf-input {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-image: var(--select-arrow);
+            background-size: var(--select-arrow-size);
             background-repeat: no-repeat;
-            background-position: right 14px center;
-            padding-right: 38px;
+            background-position: right var(--select-arrow-offset-right) center;
+            padding-right: var(--select-padding-right);
             cursor: pointer;
         }
         .sf-input:focus {
