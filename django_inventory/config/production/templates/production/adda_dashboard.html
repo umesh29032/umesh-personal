@@ -119,8 +119,8 @@
     {% endif %}
 
     <form method="get" class="filter-card">
-        <div class="filter-field"><label>From (created)</label><input type="date" name="from" value="{{ filter_from }}"></div>
-        <div class="filter-field"><label>To (created)</label><input type="date" name="to" value="{{ filter_to }}"></div>
+        <div class="filter-field"><label>From (created)</label><input type="date" data-fancy-date name="from" value="{{ filter_from }}"></div>
+        <div class="filter-field"><label>To (created)</label><input type="date" data-fancy-date name="to" value="{{ filter_to }}"></div>
         <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
         <div class="filter-field"><label>&nbsp;</label><a href="{% url 'production:dashboard' %}" class="btn btn-ghost">Reset</a></div>
     </form>
