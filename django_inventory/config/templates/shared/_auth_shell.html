@@ -165,6 +165,45 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         .auth-links a:hover { color: var(--copper); }
         .auth-links a span { color: var(--copper); font-weight: 600; }
 
+        /* ════ LOGIN skin — body.auth-login (login.html ONLY; gated, zero effect on other auth pages) ════ */
+        body.auth-login {
+            --auth-card-max: 360px; --auth-title-size: 42px; --auth-title-size-sm: 34px;
+            --auth-monogram: 54px; --auth-monogram-mb: 40px; --auth-input-size: 15px;
+            --auth-btn-mt: 4px; --auth-btn-hover: var(--ink-3);
+            --auth-input-border: var(--auth-input-border-warm); --auth-input-shadow: var(--auth-input-shadow-warm);
+            --auth-input-focus-bg: var(--auth-input-focus-bg-warm);
+            --auth-input-shadow-focus: 0 0 0 3px rgba(184,115,51,0.15), 0 1px 3px rgba(0,0,0,0.04) inset;
+        }
+        body.auth-login .auth-right { background: #fdfaf6; }
+        body.auth-login .auth-right::before { z-index: 1; }   /* accent above noise */
+        body.auth-login .auth-right::after { content: ''; position: absolute; inset: 0; z-index: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E"); opacity: 0.5; pointer-events: none; }
+        body.auth-login .auth-thread { opacity: 0.75; background: linear-gradient(to bottom, transparent 0%, var(--copper) 25%, var(--copper-l) 50%, var(--copper) 75%, transparent 100%); }
+        body.auth-login .auth-deco { color: rgba(255,255,255,0.028); }
+        body.auth-login .auth-glow { position: absolute; bottom: -80px; left: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(79,46,180,0.3) 0%, transparent 65%); pointer-events: none; }
+        body.auth-login .auth-monogram::before { border-color: rgba(184,115,51,0.3); }
+        body.auth-login .auth-monogram span { font-size: 22px; letter-spacing: 0.02em; }
+        body.auth-login .auth-feature-marker { margin-top: 5px; }
+        body.auth-login .auth-feature-text { color: rgba(255,255,255,0.55); }
+        body.auth-login .auth-footer span { color: rgba(255,255,255,0.2); }
+        body.auth-login .auth-heading { letter-spacing: -0.02em; }
+        body.auth-login .auth-form-sub { margin-top: 10px; margin-bottom: 36px; font-weight: 600; letter-spacing: 0.1em; color: var(--auth-text-dim); text-transform: uppercase; }
+        body.auth-login .auth-alert { padding: 12px 16px; display: flex; gap: 10px; align-items: flex-start; }
+        body.auth-login .auth-field label { font-size: 11px; letter-spacing: 0.18em; color: #2e2620; }
+        body.auth-login .auth-field input { transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+        body.auth-login .auth-field input::placeholder { color: #8a7060; }
+        body.auth-login .auth-field input:not(:placeholder-shown) { border-color: rgba(184,115,51,0.5); background: #fffdf9; }
+        body.auth-login .auth-field input:-webkit-autofill,
+        body.auth-login .auth-field input:-webkit-autofill:hover,
+        body.auth-login .auth-field input:-webkit-autofill:focus { -webkit-text-fill-color: #0e0b09; -webkit-box-shadow: 0 0 0 100px #fffdf9 inset; box-shadow: 0 0 0 100px #fffdf9 inset; border-color: rgba(184,115,51,0.5); transition: background-color 5000s ease-in-out 0s; }
+        body.auth-login .auth-sep::before, body.auth-login .auth-sep::after { background: #c8b8a4; }
+        body.auth-login .auth-sep span { font-weight: 700; letter-spacing: 0.2em; color: #6a5a4e; }
+        body.auth-login .auth-links { margin-top: 28px; }
+        body.auth-login .auth-links a { font-weight: 600; color: var(--auth-text-dim); }
+        body.auth-login .auth-btn-google { width: 100%; padding: 13px 20px; background: #ffffff; border: 1.5px solid var(--auth-input-border-warm); border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 12px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        body.auth-login .auth-btn-google:hover { border-color: var(--copper); background: var(--cream-2); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        @media (max-width: 860px) { body.auth-login .auth-card { max-width: 420px; } body.auth-login .auth-right { min-height: 100dvh; } body.auth-login .auth-right::before { height: 4px; } }
+        @media (max-width: 480px) { body.auth-login .auth-right { padding: 32px 18px; } }
+
         @keyframes authRiseIn { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes authFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
