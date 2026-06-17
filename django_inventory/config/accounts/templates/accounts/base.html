@@ -128,6 +128,17 @@
             --shadow-card:        0 2px 12px rgba(14,11,9,0.10); /* card shadow */
             --shadow-card-hover:  0 6px 20px -2px rgba(14,11,9,0.14);
 
+            /* ── Input foundation tokens (F-1) — canonical owner; defaults = the .field/forms skin.
+               Per-context skins set only what differs (.sf-input storefront r9; filter/DataTables r8).
+               Auth (_auth_shell.html) is a standalone document with its own --auth-input-* — not served here. */
+            --input-bg:           var(--cream);             /* resting fill */
+            --input-bg-focus:     var(--white);             /* focus fill */
+            --input-border:       var(--border-card);       /* resting border (#cfc0aa) */
+            --input-border-focus: var(--copper);            /* focus border */
+            --input-radius:       10px;
+            --input-padding:      11px 14px;
+            --input-focus-ring:   rgba(184,115,51,.15);     /* focus glow */
+
             /* Semantic status tokens (dark-mode override below) */
             --status-success-bg:  #ecfdf5; --status-success-text: #15803d;
             --status-warning-bg:  #fffbeb; --status-warning-text: #b45309;
@@ -1308,16 +1319,19 @@
         /* ── Storefront form classes (sf-*) — alternate form style with rounder corners
            Used by storefront product/category forms; bigger border-radius (9-10px). */
         .sf-input {
+            /* storefront skin — overrides only what differs from the default (forms) input tokens */
+            --input-radius: 9px; --input-padding: 10px 14px; --input-focus-ring: rgba(184,115,51,0.1);
+            --input-bg: var(--surface-input);
             width: 100%;
-            padding: 10px 14px;
-            border-radius: 9px;
+            padding: var(--input-padding);
+            border-radius: var(--input-radius);
             font-size: 14px;
             color: var(--text-primary);
-            background: var(--surface-input);
+            background: var(--input-bg);
             box-sizing: border-box;
             font-family: inherit;
             outline: none;
-            border: 1.5px solid #cfc0aa;
+            border: 1.5px solid var(--input-border);
             box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
             transition: border-color 0.2s, box-shadow 0.2s, background 0.15s;
             -webkit-appearance: none;
@@ -1331,9 +1345,9 @@
             cursor: pointer;
         }
         .sf-input:focus {
-            border-color: var(--copper);
-            box-shadow: 0 0 0 3px rgba(184,115,51,0.1);
-            background: var(--white);
+            border-color: var(--input-border-focus);
+            box-shadow: 0 0 0 3px var(--input-focus-ring);
+            background: var(--input-bg-focus);
         }
         .sf-input::placeholder { color: var(--text-tertiary); }
         .sf-label {
