@@ -10,7 +10,8 @@
     .payroll-overview .hero-strip .total .l { font-size: 11px; opacity: .9; text-transform: uppercase; }
     .payroll-overview .actions { display: flex; gap: 8px; margin-bottom: 16px; }
     .payroll-overview .actions a { background: var(--copper); color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; }
-    .payroll-overview .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    /* D-1: chrome inherited from canonical .card (base.html); page keeps only the table-bleed padding */
+    .payroll-overview .card { padding: 4px 0; }
     .payroll-overview table { width: 100%; border-collapse: collapse; }
     .payroll-overview th, .payroll-overview td { text-align: left; padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
     .payroll-overview th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }

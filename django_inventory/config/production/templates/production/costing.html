@@ -13,7 +13,8 @@
     .costing .hero-strip p { margin: 4px 0 0; font-size: 12px; opacity: .8; }
     .costing .hero-strip .total .v { font-size: 24px; font-weight: 800; }
     .costing .hero-strip .total .l { font-size: 11px; opacity: .85; text-transform: uppercase; }
-    .costing .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    /* D-1: chrome inherited from canonical .card (base.html); page keeps only the table-bleed padding */
+    .costing .card { padding: 4px 0; }
     .costing table { width: 100%; border-collapse: collapse; }
     .costing th, .costing td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
     .costing th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
