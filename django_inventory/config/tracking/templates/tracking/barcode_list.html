@@ -2,6 +2,9 @@
 
 {% block page_title %}Barcodes · {{ adda.code }}{% endblock %}
 
+{# A2→TC-1: adopt the canonical DataTable engine (search/sort/paginate). Vendor is per-page (not global). Export forms live in .card-header, OUTSIDE the table — unaffected. #}
+{% block extra_head %}{% include 'shared/_datatables_vendor_css.html' %}{% endblock %}
+
 {% block content %}
 {# Batches-level view (PR6 2026-05-28). Per-piece BatchBarcode rows lazy-created on scan; #}
 {# range info lives on BarcodeBatch. #}
@@ -26,7 +29,7 @@
             </div>
         </div>
         <div class="table-responsive">
-            <table class="tbl">
+            <table id="barcodes-dt" class="tbl">
                 <thead><tr><th>Size</th><th>Color</th><th>Start</th><th>End</th><th>Pieces</th></tr></thead>
                 <tbody>
                 {% for batch in batches %}
@@ -54,4 +57,18 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{# A2→TC-1: all 5 columns are data (no Actions) → default sortable. `<tfoot>` Total row preserved (verify no DataTables column-mismatch). #}
+{% block extra_scripts %}
+{% include 'shared/_datatables_vendor_js.html' %}
+<script>
+$(function () {
+    initFancyDataTable('#barcodes-dt', {
+        pageLength: 25,
+        itemName: 'batches',
+        searchPlaceholder: 'Filter batches…'
+    });
+});
+</script>
 {% endblock %}

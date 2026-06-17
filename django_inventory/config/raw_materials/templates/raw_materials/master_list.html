@@ -3,6 +3,9 @@
 
 {% block page_title %}{{ title }}{% endblock %}
 
+{# A2→TC-1: adopt the canonical DataTable engine (search/sort/paginate). Vendor is per-page (not global). #}
+{% block extra_head %}{% include 'shared/_datatables_vendor_css.html' %}{% endblock %}
+
 {% block content %}
 {# `rows` queryset + dynamic `extra_columns` tuples — generic CBV teen master models ko handle karta hai #}
 <div class="master-list">
@@ -18,7 +21,7 @@
 
     <div class="card card-clip">
         <div class="table-responsive">
-            <table class="tbl">
+            <table id="masters-dt" class="tbl">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -66,4 +69,18 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{# A2→TC-1: Actions column stays non-sortable via its `data-orderable="false"` th (dynamic-column-safe — no fixed columnDefs index). #}
+{% block extra_scripts %}
+{% include 'shared/_datatables_vendor_js.html' %}
+<script>
+$(function () {
+    initFancyDataTable('#masters-dt', {
+        pageLength: 25,
+        itemName: '{{ title|lower }}',
+        searchPlaceholder: 'Filter {{ title|lower }}…'
+    });
+});
+</script>
 {% endblock %}
