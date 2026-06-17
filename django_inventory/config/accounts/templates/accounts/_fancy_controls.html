@@ -408,8 +408,9 @@ upgrades dynamically-added controls. Do NOT duplicate this CSS/JS elsewhere; inc
        calendar icon is clickable — not the text. This builds a panel that
        is appended to <body> with position:fixed so it always anchors to
        the field on mobile AND desktop, with full-size clickable day cells.
-       Opt-in: only inputs carrying [data-fancy-date] are upgraded, so the
-       date-range filters on dashboards keep native behaviour. */
+       Opt-OUT model (2026-06-17): EVERY <input type=date> is upgraded —
+       including Django-widget-rendered ones (DateInput) that never carried
+       [data-fancy-date]. Add data-no-fancy to keep native on a specific field. */
     (function () {
         var MO_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         var MO_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -422,6 +423,7 @@ upgrades dynamically-added controls. Do NOT duplicate this CSS/JS elsewhere; inc
 
         function fancifyDate(input) {
             if (input.dataset.fancied) return;
+            if (input.hasAttribute('data-no-fancy')) return;   // opt-out escape hatch
             input.dataset.fancied = '1';
 
             var NOW = new Date();
@@ -622,7 +624,7 @@ upgrades dynamically-added controls. Do NOT duplicate this CSS/JS elsewhere; inc
         }
 
         function initAllDates(root) {
-            (root || document).querySelectorAll('input[type="date"][data-fancy-date]').forEach(fancifyDate);
+            (root || document).querySelectorAll('input[type="date"]:not([data-no-fancy])').forEach(fancifyDate);
         }
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function () { initAllDates(); });
@@ -651,7 +653,7 @@ upgrades dynamically-added controls. Do NOT duplicate this CSS/JS elsewhere; inc
             // was inserted directly, scan its parent so the node itself is seen.
             var root = node;
             if (node.matches && (node.matches('select') ||
-                node.matches('input[type="date"][data-fancy-date]'))) {
+                node.matches('input[type="date"]:not([data-no-fancy])'))) {
                 root = node.parentNode || node;
             }
             if (window.fancifySelects) window.fancifySelects(root);
