@@ -17,11 +17,9 @@
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
     }
+    /* F-Select A: chrome from canonical .select-field--form; only pad/font deviate from token defaults. */
     .adda-list .filter-card select {
-        padding: 9px 12px; min-width: 150px;
-        border: 1.5px solid #cfc0aa; border-radius: 10px;
-        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
-        font-size: 13px;
+        --select-field-padding: 9px 12px; --select-field-font: 13px; min-width: 150px;
     }
     @media (max-width: 600px) {
         /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
@@ -45,17 +43,18 @@
 
     {% if messages %}{% for m in messages %}<div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>{% endfor %}{% endif %}
 
+    {# Filter selects use FancySelect (no data-no-fancy): native <select> popup mispositions on mobile/DevTools emulation; custom dropdown positions correctly. #}
     <form method="get" class="filter-card">
         <div class="filter-field">
             <label>Status</label>
-            <select name="status" data-no-fancy>
+            <select name="status" class="select-field--form">
                 <option value="">All</option>
                 {% for val, label in status_choices %}<option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
         <div class="filter-field">
             <label>Current Stage</label>
-            <select name="stage" data-no-fancy>
+            <select name="stage" class="select-field--form">
                 <option value="">All</option>
                 {% for val, label in stage_types %}<option value="{{ val }}" {% if filters.stage == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>

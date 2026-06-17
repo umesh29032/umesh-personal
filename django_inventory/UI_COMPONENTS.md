@@ -231,11 +231,15 @@ decorative `.otp-sep`), the boxes must stay touch-usable on the smallest phones:
 
 ## Selects — fancy-select (automatic)
 
-Just write `<select>`. base.html JS auto-upgrades to custom dropdown that escapes iframe/transform/overflow clipping bugs.
+Just write `<select>`. base.html JS auto-upgrades to a custom dropdown that escapes iframe/transform/overflow clipping bugs **and positions the panel correctly on mobile** (native `<select>`/`<input type=date>` OS popups misposition — detach off-screen — under DevTools device-emulation / transformed-overflow parents; the custom panel is portaled to `<body>` at `position:fixed`, anchored to the trigger).
+
+**🔒 RULE — never ship a native dropdown for a visible control.** Every `<select>` (filter OR form) and every `<input type=date>` (add `data-fancy-date`) MUST be a FancySelect/FancyDate. Do NOT add `data-no-fancy` to anything the user sees. A `MutationObserver` (base.html, after the init IIFEs) auto-upgrades **dynamically-added** selects/dates too — cloned rows, `innerHTML`/`insertAdjacentHTML`, AJAX panels, modals — so this holds with **zero per-page wiring**. (Verified 2026-06-17: filters + forms + dynamic rows all open below the field, left-aligned, on 375px.)
+
+**🔒 The CSS+JS owner is [`accounts/_fancy_controls.html`](config/accounts/templates/accounts/_fancy_controls.html)** — one partial holding the fancy-select/fancy-date CSS, the upgrade JS, and the MutationObserver. `base.html` `{% include %}`s it. **Any standalone document that does NOT `{% extends "accounts/base.html" %}` (iframe panels, print sheets) MUST `{% include 'accounts/_fancy_controls.html' %}` itself** + define the design tokens it uses — otherwise its native selects/dates render OS-level and **misposition inside the iframe** (detach off-screen). This was the real bug: the Adda-detail stage panels load via `<iframe src=…?embedded=1>`, and the chromeless embedded docs (`stage_panel_embedded.html`, `worker_report_embedded.html`) shipped no FancySelect JS → native iframe dropdowns. Fixed 2026-06-17 by extracting the owner partial + including it in all standalone docs (+ `barcode_print_sheet.html`).
 
 | Attr / Class | Purpose |
 |---|---|
-| `<select data-no-fancy>` | Opt out of upgrade (keeps native dropdown) |
+| `<select data-no-fancy>` | Opt out of upgrade (keeps native dropdown). **⚠ Avoid on any visible select:** the native OS dropdown mispositions on mobile / DevTools device-emulation / transformed-overflow parents (detaches to screen-left instead of opening below the field). As of 2026-06-17 **no app select uses it** — all selects are FancySelect. Reserve only for genuine exceptions (and even then prefer wiring `window.fancifySelects(node)` for dynamically-cloned rows — see `roll_bulk_form.html`). |
 | `.fancy-select` | Wrap div (auto-generated) |
 | `.fancy-select-trigger` | Button replacing visual `<select>` (copies the select's **classes**) |
 | `.fancy-select-trigger--bare` | Auto-added fallback box when the select had **no class** (cream box + 44px touch target) |

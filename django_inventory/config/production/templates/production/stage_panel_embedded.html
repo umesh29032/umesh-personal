@@ -22,6 +22,9 @@ to fit iframe height. Implemented in script at bottom.
         --card-bg: #ffffff;
         --border-card: #cfc0aa;
         --border-subtle: #e6dcc9;
+        /* tokens the shared _fancy_controls.html needs (iframe doc has a minimal :root) */
+        --cream-3: #e2d5c3; --ink-2: #1c1814; --copper-l: #d4924a; --copper-d: #8a5520;
+        --text-primary: var(--ink); --text-tertiary: var(--stone);
         --shadow-card: 0 2px 12px rgba(14,11,9,0.08);
         --danger: #b91c1c;
         --danger-bg: rgba(220,38,38,0.10);
@@ -248,5 +251,7 @@ to fit iframe height. Implemented in script at bottom.
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     </script>
+    {# Canonical FancySelect/FancyDate (CSS+JS+observer): native <select>/date popups misposition inside this iframe — custom dropdown positions correctly + auto-upgrades dynamic rows. #}
+    {% include 'accounts/_fancy_controls.html' %}
 </body>
 </html>

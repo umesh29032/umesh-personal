@@ -23,12 +23,15 @@
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
     }
-    .cloth-dash .filter-card input,
-    .cloth-dash .filter-card select {
+    .cloth-dash .filter-card input {
         padding: 9px 12px; min-width: 150px;
         border: 1.5px solid #cfc0aa; border-radius: 10px;
         background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
         font-size: 13px; color: var(--ink);
+    }
+    /* F-Select A: select chrome from canonical .select-field--form; pad/font tokens only. */
+    .cloth-dash .filter-card select {
+        --select-field-padding: 9px 12px; --select-field-font: 13px; min-width: 150px;
     }
     .cloth-dash .filter-card input:focus,
     .cloth-dash .filter-card select:focus {
@@ -113,7 +116,8 @@
         </div>
         <div class="filter-field">
             <label>Color</label>
-            <select name="color" data-no-fancy>
+            {# Fancy-select (no data-no-fancy): native <select> popup mispositions on mobile/DevTools emulation; custom dropdown positions correctly. #}
+            <select name="color" class="select-field--form">
                 <option value="">All colors</option>
                 {% for c in active_colors %}
                     <option value="{{ c.pk }}" {% if filter_color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>

@@ -17,11 +17,9 @@
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
     }
+    /* F-Select A: chrome from canonical .select-field--form; page keeps only geometry tokens (preserve byte-identical) */
     .roll-list .filter-card select {
-        padding: 9px 12px; min-width: 150px;
-        border: 1.5px solid #cfc0aa; border-radius: 10px;
-        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
-        font-size: 13px;
+        --select-field-padding: 9px 12px; --select-field-font: 13px; min-width: 150px;
     }
 
     /* Active-filter summary strip — shows under filter card when any filter is on. */
@@ -96,10 +94,11 @@
     {% endif %}
 
     {# GET form — status/cloth_type/location querystring mein bhejta hai, view filter karta hai #}
+    {# Filter selects use FancySelect (no data-no-fancy): native <select> popup mispositions on mobile/DevTools emulation; custom dropdown positions correctly. #}
     <form method="get" class="filter-card">
         <div class="filter-field">
             <label>Status</label>
-            <select name="status" data-no-fancy>
+            <select name="status" class="select-field--form">
                 <option value="">All</option>
                 <option value="not_used" {% if filters.status == 'not_used' %}selected{% endif %}>Not Used</option>
                 <option value="used" {% if filters.status == 'used' %}selected{% endif %}>Used</option>
@@ -107,21 +106,21 @@
         </div>
         <div class="filter-field">
             <label>Cloth Type</label>
-            <select name="cloth_type" data-no-fancy>
+            <select name="cloth_type" class="select-field--form">
                 <option value="">All</option>
                 {% for t in cloth_types %}<option value="{{ t.pk }}" {% if filters.cloth_type == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
             </select>
         </div>
         <div class="filter-field">
             <label>Location</label>
-            <select name="location" data-no-fancy>
+            <select name="location" class="select-field--form">
                 <option value="">All</option>
                 {% for l in locations %}<option value="{{ l.pk }}" {% if filters.location == l.pk|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
             </select>
         </div>
         <div class="filter-field">
             <label>Color</label>
-            <select name="color" data-no-fancy>
+            <select name="color" class="select-field--form">
                 <option value="">All</option>
                 {% for c in colors %}<option value="{{ c.pk }}" {% if filters.color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
             </select>

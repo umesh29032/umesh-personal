@@ -1,0 +1,673 @@
+{% comment %}
+Canonical FancySelect + FancyDate controls — SINGLE OWNER (extracted from base.html 2026-06-17).
+Included by accounts/base.html AND the standalone iframe docs (stage_panel_embedded.html,
+worker_report_embedded.html) so <select>/<input type=date> rendered inside an iframe — where the
+native OS dropdown mispositions — get the mobile-safe custom dropdown + the MutationObserver that
+upgrades dynamically-added controls. Do NOT duplicate this CSS/JS elsewhere; include this partial.
+{% endcomment %}
+<style>
+        /* ── Fancy select — custom dropdown replaces native <select> ─
+           Why: native <select> dropdown renders OS-level, breaks position
+           inside DevTools device emulation, iframes, transformed parents.
+           Custom dropdown stays in DOM, always positions correctly. */
+        .fancy-select {
+            position: relative;
+            display: block;
+            width: 100%;
+        }
+        .fancy-select-trigger {
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-family: inherit;
+            background-image: none !important;
+        }
+        /* Class-less <select> → trigger inherits no input box. Give it a default
+           cream box + 44px touch target so it matches sibling inputs on phones.
+           (Triggers that DID inherit a class — .sf-input etc. — never get --bare.) */
+        .fancy-select-trigger--bare {
+            width: 100%;
+            min-height: 44px;
+            padding: 11px 13px;
+            font-size: 14px;
+            color: var(--text-primary);
+            background: var(--cream);
+            border: 1.5px solid var(--border-subtle);
+            border-radius: 10px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+        }
+        .fancy-select.open .fancy-select-trigger--bare { border-color: var(--copper); }
+        .fancy-select-label {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .fancy-select-label.placeholder { color: var(--text-tertiary); }
+        .fancy-select-arrow {
+            flex-shrink: 0;
+            width: 12px;
+            height: 8px;
+            transition: transform 0.2s ease;
+            opacity: 0.7;
+        }
+        .fancy-select.open .fancy-select-arrow { transform: rotate(180deg); }
+        .fancy-select-panel {
+            /* Default state — panel sits inside wrap, hidden. When opened, JS moves it
+               to <body> with position:fixed inline styles to escape overflow:hidden parents. */
+            display: none;
+            z-index: 1000;
+            background: var(--card-bg);
+            border: 1px solid var(--border-card);
+            border-radius: 10px;
+            box-shadow: 0 10px 28px -6px rgba(14,11,9,0.22);
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        /* When panel is appended to body (open state), show it */
+        body > .fancy-select-panel { display: block; }
+        .fancy-select-option {
+            padding: 9px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.1s, color 0.1s;
+            user-select: none;
+        }
+        .fancy-select-option:hover:not(.disabled) {
+            background: var(--surface-2);
+        }
+        .fancy-select-option.selected {
+            background: var(--copper);
+            color: #fff;
+            font-weight: 600;
+        }
+        .fancy-select-option.disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        html[data-theme="dark"] .fancy-select-panel {
+            background: var(--card-bg);
+            border-color: var(--cream-3);
+        }
+
+        /* ── Custom date picker (fancifyDate) ────────────────────────
+           Native <input type=date> shares the SAME popup-mispositioning
+           bug as native <select> (see note above .fancy-select) AND on
+           desktop only its tiny calendar icon is clickable. This custom
+           calendar is a .fancy-select-panel (reuses body>fixed escape +
+           show rule) so it positions correctly on mobile+desktop and the
+           whole field opens it. Opt-in via [data-fancy-date]. */
+        .fancy-date-trigger .fancy-date-icon {
+            flex-shrink: 0;
+            display: inline-flex;
+            opacity: 0.7;
+            color: var(--copper-d);
+        }
+        .fancy-date-panel {
+            /* width set inline by JS reposition(); these are calendar internals */
+            padding: 10px;
+            max-height: none;            /* day grid must not scroll-clip */
+            overflow: visible;
+        }
+        .fancy-date-head {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 8px;
+        }
+        .fancy-date-nav {
+            flex-shrink: 0;
+            width: 34px; height: 34px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border-card);
+            background: var(--cream);
+            border-radius: 8px;
+            font-size: 18px; line-height: 1; color: var(--ink-2);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background .12s, border-color .12s;
+        }
+        .fancy-date-nav:hover { background: var(--cream-2); border-color: var(--copper-l); }
+        .fancy-date-nav[hidden] { visibility: hidden; }
+        .fancy-date-title {
+            flex: 1;
+            min-height: 34px;
+            border: none; background: transparent;
+            font-family: inherit; font-size: 14px; font-weight: 700;
+            color: var(--ink); cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            border-radius: 8px;
+            transition: background .12s;
+        }
+        .fancy-date-title:hover { background: var(--cream); }
+        .fancy-date-caret { font-size: 10px; opacity: .6; }
+        .fancy-date-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .fancy-date-dow {
+            text-align: center;
+            font-size: 11px; font-weight: 700;
+            color: var(--stone);
+            padding: 4px 0;
+            text-transform: uppercase;
+        }
+        .fancy-date-cell {
+            aspect-ratio: 1 / 1;
+            min-height: 38px;
+            border: none; background: transparent;
+            border-radius: 8px;
+            font-family: inherit; font-size: 13px; color: var(--ink);
+            cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+            transition: background .1s, color .1s;
+        }
+        .fancy-date-cell.empty { cursor: default; }
+        .fancy-date-cell:not(.empty):hover { background: var(--cream-2); }
+        .fancy-date-cell.today { box-shadow: inset 0 0 0 1.5px var(--copper-l); }
+        .fancy-date-cell.selected {
+            background: var(--copper); color: #fff; font-weight: 700;
+        }
+        /* months + years pane */
+        .fancy-date-months {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+            margin-bottom: 8px;
+        }
+        .fancy-date-mo {
+            min-height: 38px;
+            border: 1px solid var(--border-card); background: var(--cream);
+            border-radius: 8px;
+            font-family: inherit; font-size: 13px; color: var(--ink-2);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background .1s;
+        }
+        .fancy-date-mo:hover { background: var(--cream-2); }
+        .fancy-date-mo.selected { background: var(--copper); color: #fff; border-color: var(--copper); font-weight: 700; }
+        .fancy-date-years {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+            max-height: 170px; overflow-y: auto;
+            padding: 2px;
+        }
+        .fancy-date-yr {
+            min-height: 36px;
+            border: 1px solid transparent; background: var(--cream);
+            border-radius: 8px;
+            font-family: inherit; font-size: 13px; color: var(--ink-2);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background .1s;
+        }
+        .fancy-date-yr:hover { background: var(--cream-2); }
+        .fancy-date-yr.selected { background: var(--copper); color: #fff; font-weight: 700; }
+        .fancy-date-foot {
+            display: flex; justify-content: flex-end;
+            margin-top: 8px; padding-top: 8px;
+            border-top: 1px solid var(--cream-3);
+        }
+        .fancy-date-clear {
+            border: none; background: transparent;
+            font-family: inherit; font-size: 12px; font-weight: 700;
+            color: var(--stone); cursor: pointer;
+            padding: 6px 10px; border-radius: 7px;
+            text-transform: uppercase; letter-spacing: .04em;
+        }
+        .fancy-date-clear:hover { background: var(--cream-2); color: var(--danger); }
+        html[data-theme="dark"] .fancy-date-nav,
+        html[data-theme="dark"] .fancy-date-mo,
+        html[data-theme="dark"] .fancy-date-yr { background: var(--cream); border-color: var(--cream-3); color: var(--ink-2); }
+</style>
+<script>
+    /* ── Fancy select — replace native <select> with custom dropdown ──
+       Fixes: native <select> dropdown opens at wrong position inside
+       DevTools device emulation, iframes, transformed parents. Custom
+       dropdown lives in DOM, position always correct. Original <select>
+       hidden but kept in DOM for form submission + change event sync. */
+    (function () {
+        function fancify(select) {
+            if (select.multiple || select.size > 1) return;
+            if (select.dataset.fancied) return;
+            if (select.hasAttribute('data-no-fancy')) return;
+            select.dataset.fancied = '1';
+
+            var wrap = document.createElement('div');
+            wrap.className = 'fancy-select';
+
+            var trigger = document.createElement('button');
+            trigger.type = 'button';
+            // Inherit select's classes so existing CSS (.form-control, .sf-input, .filter-select, etc) applies.
+            // When the <select> carries NO styling class, page CSS that targets `select` by tag
+            // can't reach the trigger (it's a <button>) — fall back to a default input box so the
+            // control isn't a bare ~20px UA-styled line (mobile touch-target + visual-consistency fix).
+            var inheritedCls = (select.className || '').trim();
+            trigger.className = 'fancy-select-trigger ' + (inheritedCls || 'fancy-select-trigger--bare');
+            trigger.setAttribute('aria-haspopup', 'listbox');
+            trigger.setAttribute('aria-expanded', 'false');
+            if (select.disabled) trigger.disabled = true;
+            // Inherit label[for=select.id] for screen readers
+            if (select.id) {
+                var labelEl = document.querySelector('label[for="' + select.id + '"]');
+                if (labelEl) trigger.setAttribute('aria-label', labelEl.textContent.trim());
+            }
+
+            var label = document.createElement('span');
+            label.className = 'fancy-select-label';
+
+            var arrow = document.createElement('span');
+            arrow.className = 'fancy-select-arrow';
+            arrow.innerHTML = '<svg viewBox="0 0 12 8" xmlns="http://www.w3.org/2000/svg"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>';
+
+            trigger.appendChild(label);
+            trigger.appendChild(arrow);
+
+            var panel = document.createElement('div');
+            panel.className = 'fancy-select-panel';
+            panel.setAttribute('role', 'listbox');
+
+            function syncLabel() {
+                var selected = select.options[select.selectedIndex];
+                if (!selected || selected.value === '') {
+                    label.classList.add('placeholder');
+                    label.textContent = selected ? selected.textContent : '— Select —';
+                } else {
+                    label.classList.remove('placeholder');
+                    label.textContent = selected.textContent;
+                }
+            }
+
+            function buildPanel() {
+                panel.innerHTML = '';
+                Array.prototype.forEach.call(select.options, function (opt) {
+                    var item = document.createElement('div');
+                    item.className = 'fancy-select-option';
+                    if (opt.value === select.value) item.classList.add('selected');
+                    if (opt.disabled) item.classList.add('disabled');
+                    item.textContent = opt.textContent;
+                    item.dataset.value = opt.value;
+                    item.setAttribute('role', 'option');
+                    item.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        if (opt.disabled) return;
+                        select.value = opt.value;
+                        // Dispatch native change so existing onchange handlers fire (e.g. this.form.submit())
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                        select.dispatchEvent(new Event('input', { bubbles: true }));
+                        close();
+                    });
+                    panel.appendChild(item);
+                });
+            }
+
+            function reposition() {
+                var rect = trigger.getBoundingClientRect();
+                var spaceBelow = window.innerHeight - rect.bottom;
+                panel.style.position = 'fixed';
+                panel.style.left = rect.left + 'px';
+                panel.style.width = rect.width + 'px';
+                if (spaceBelow < 260 && rect.top > spaceBelow) {
+                    panel.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                    panel.style.top = 'auto';
+                } else {
+                    panel.style.top = (rect.bottom + 4) + 'px';
+                    panel.style.bottom = 'auto';
+                }
+            }
+            function open() {
+                document.querySelectorAll('.fancy-select.open').forEach(function (s) {
+                    if (s !== wrap && s._close) s._close();
+                });
+                // Move panel to <body> so it escapes overflow:hidden / transform clipping
+                document.body.appendChild(panel);
+                wrap.classList.add('open');
+                trigger.setAttribute('aria-expanded', 'true');
+                reposition();
+                window.addEventListener('scroll', reposition, true);
+                window.addEventListener('resize', reposition);
+            }
+            function close() {
+                wrap.classList.remove('open');
+                trigger.setAttribute('aria-expanded', 'false');
+                panel.style.position = '';
+                panel.style.top = panel.style.left = panel.style.bottom = panel.style.width = '';
+                // Move panel back into wrap so `body > .fancy-select-panel { display:block }` no longer applies
+                wrap.appendChild(panel);
+                window.removeEventListener('scroll', reposition, true);
+                window.removeEventListener('resize', reposition);
+            }
+            wrap._panel = panel;
+            wrap._close = close;
+            trigger.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (wrap.classList.contains('open')) close();
+                else open();
+            });
+
+            // External change (form reset, JS .value = ...) → re-sync UI
+            select.addEventListener('change', function () {
+                syncLabel();
+                panel.querySelectorAll('.fancy-select-option').forEach(function (o) {
+                    o.classList.toggle('selected', o.dataset.value === select.value);
+                });
+            });
+
+            // Insert wrap before select, then move select inside (hidden) for form submission
+            select.parentNode.insertBefore(wrap, select);
+            wrap.appendChild(trigger);
+            wrap.appendChild(panel);
+            wrap.appendChild(select);
+            select.style.display = 'none';
+            select.setAttribute('aria-hidden', 'true');
+            select.tabIndex = -1;
+
+            syncLabel();
+            buildPanel();
+        }
+
+        function initAll(root) {
+            (root || document).querySelectorAll('select').forEach(fancify);
+        }
+
+        // Close on outside click — panel lives in <body> when open, exclude its clicks
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('.fancy-select') || e.target.closest('.fancy-select-panel')) return;
+            document.querySelectorAll('.fancy-select.open').forEach(function (s) {
+                if (s._close) s._close();
+            });
+        });
+
+        // Close on Escape
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.fancy-select.open').forEach(function (s) { if (s._close) s._close(); });
+            }
+        });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { initAll(); });
+        } else {
+            initAll();
+        }
+
+        // Expose for dynamic content (e.g. after AJAX inserts a new select)
+        window.fancifySelects = initAll;
+    })();
+
+    /* ── fancifyDate — custom calendar for <input type=date> ──────────
+       Mirrors fancify() above. WHY a custom calendar instead of the
+       browser's: the native date popup mispositions under transformed /
+       backdrop-filtered / view-transition ancestors (exact bug that
+       forced custom <select>), and on desktop Chromium only the small
+       calendar icon is clickable — not the text. This builds a panel that
+       is appended to <body> with position:fixed so it always anchors to
+       the field on mobile AND desktop, with full-size clickable day cells.
+       Opt-in: only inputs carrying [data-fancy-date] are upgraded, so the
+       date-range filters on dashboards keep native behaviour. */
+    (function () {
+        var MO_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var MO_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        var DOW = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+        function pad2(n) { return (n < 10 ? '0' : '') + n; }
+        function parseISO(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? { y:+m[1], mo:+m[2]-1, d:+m[3] } : null; }
+        function iso(y, mo, d) { return y + '-' + pad2(mo+1) + '-' + pad2(d); }
+        function daysIn(y, mo) { return new Date(y, mo+1, 0).getDate(); }      // day 0 of next month = last day of this
+        function firstDow(y, mo) { return new Date(y, mo, 1).getDay(); }       // 0=Sun
+
+        function fancifyDate(input) {
+            if (input.dataset.fancied) return;
+            input.dataset.fancied = '1';
+
+            var NOW = new Date();
+            var maxYear = input.dataset.maxYear ? +input.dataset.maxYear : NOW.getFullYear();
+            var minYear = input.dataset.minYear ? +input.dataset.minYear : (maxYear - 100);
+
+            var wrap = document.createElement('div');
+            wrap.className = 'fancy-select fancy-date';   // reuse .fancy-select positioning + shared close handler
+
+            var trigger = document.createElement('button');
+            trigger.type = 'button';
+            var inherited = (input.className || '').trim();
+            trigger.className = 'fancy-select-trigger fancy-date-trigger ' + (inherited || 'fancy-select-trigger--bare');
+            trigger.setAttribute('aria-haspopup', 'dialog');
+            trigger.setAttribute('aria-expanded', 'false');
+            if (input.id) {
+                var labelEl = document.querySelector('label[for="' + input.id + '"]');
+                if (labelEl) trigger.setAttribute('aria-label', labelEl.textContent.trim());
+            }
+
+            var label = document.createElement('span');
+            label.className = 'fancy-select-label';
+            var icon = document.createElement('span');
+            icon.className = 'fancy-date-icon';
+            icon.innerHTML = '<svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4.5" width="14" height="13" rx="2"/><path d="M3 8h14M7 2.5v4M13 2.5v4" stroke-linecap="round"/></svg>';
+            trigger.appendChild(label);
+            trigger.appendChild(icon);
+
+            var panel = document.createElement('div');
+            panel.className = 'fancy-select-panel fancy-date-panel';   // shared body>fixed escape + show rule
+            panel.setAttribute('role', 'dialog');
+
+            var view = { y: 0, mo: 0, pane: 'days' };
+
+            function selected() { return parseISO(input.value); }
+            function syncLabel() {
+                var s = selected();
+                if (!s) { label.classList.add('placeholder'); label.textContent = input.getAttribute('placeholder') || 'Select date'; }
+                else { label.classList.remove('placeholder'); label.textContent = pad2(s.d) + ' ' + MO_SHORT[s.mo] + ' ' + s.y; }
+            }
+            function resetView() {
+                var s = selected() || { y: Math.min(maxYear, NOW.getFullYear()), mo: NOW.getMonth() };
+                view.y = Math.max(minYear, Math.min(maxYear, s.y));
+                view.mo = s.mo;
+                view.pane = 'days';
+            }
+            function clampYear() { if (view.y < minYear) view.y = minYear; if (view.y > maxYear) view.y = maxYear; }
+
+            function mkBtn(cls, html) { var b = document.createElement('button'); b.type = 'button'; b.className = cls; b.innerHTML = html; return b; }
+
+            function step(dir) {
+                view.mo += dir;
+                if (view.mo < 0) { view.mo = 11; view.y--; }
+                else if (view.mo > 11) { view.mo = 0; view.y++; }
+                clampYear();
+                render();
+            }
+
+            function commit(y, mo, d) {
+                input.value = iso(y, mo, d);
+                // Native events so any onchange / form logic still fires
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                syncLabel();
+                close();
+            }
+
+            function render() {
+                panel.innerHTML = '';
+                var isDays = view.pane === 'days';
+
+                var head = document.createElement('div');
+                head.className = 'fancy-date-head';
+                var prev = mkBtn('fancy-date-nav', '‹');   // ‹
+                var next = mkBtn('fancy-date-nav', '›');   // ›
+                var title = mkBtn('fancy-date-title',
+                    (isDays ? MO_FULL[view.mo] + ' ' : '') + view.y + ' <span class="fancy-date-caret">▾</span>');
+                if (!isDays) { prev.hidden = true; next.hidden = true; }   // year pane uses scroll, not paging
+                prev.addEventListener('click', function () { step(-1); });
+                next.addEventListener('click', function () { step(1); });
+                title.addEventListener('click', function () { view.pane = isDays ? 'years' : 'days'; render(); });
+                head.appendChild(prev); head.appendChild(title); head.appendChild(next);
+                panel.appendChild(head);
+
+                if (isDays) renderDays(); else renderYears();
+
+                var foot = document.createElement('div');
+                foot.className = 'fancy-date-foot';
+                var clear = mkBtn('fancy-date-clear', 'Clear');
+                clear.addEventListener('click', function () {
+                    input.value = '';
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                    syncLabel(); close();
+                });
+                foot.appendChild(clear);
+                panel.appendChild(foot);
+            }
+
+            function renderDays() {
+                var grid = document.createElement('div');
+                grid.className = 'fancy-date-grid';
+                DOW.forEach(function (d) { var h = document.createElement('span'); h.className = 'fancy-date-dow'; h.textContent = d; grid.appendChild(h); });
+                var start = firstDow(view.y, view.mo), n = daysIn(view.y, view.mo), s = selected();
+                for (var i = 0; i < start; i++) { var b = document.createElement('span'); b.className = 'fancy-date-cell empty'; grid.appendChild(b); }
+                for (var d = 1; d <= n; d++) {
+                    (function (d) {
+                        var c = mkBtn('fancy-date-cell', '' + d);
+                        if (s && s.y === view.y && s.mo === view.mo && s.d === d) c.classList.add('selected');
+                        if (view.y === NOW.getFullYear() && view.mo === NOW.getMonth() && d === NOW.getDate()) c.classList.add('today');
+                        c.addEventListener('click', function () { commit(view.y, view.mo, d); });
+                        grid.appendChild(c);
+                    })(d);
+                }
+                panel.appendChild(grid);
+            }
+
+            function renderYears() {
+                var months = document.createElement('div');
+                months.className = 'fancy-date-months';
+                MO_SHORT.forEach(function (mn, mi) {
+                    var b = mkBtn('fancy-date-mo' + (mi === view.mo ? ' selected' : ''), mn);
+                    b.addEventListener('click', function () { view.mo = mi; view.pane = 'days'; render(); });
+                    months.appendChild(b);
+                });
+                panel.appendChild(months);
+
+                var years = document.createElement('div');
+                years.className = 'fancy-date-years';
+                var selYrBtn = null;
+                for (var y = maxYear; y >= minYear; y--) {
+                    (function (y) {
+                        var b = mkBtn('fancy-date-yr' + (y === view.y ? ' selected' : ''), '' + y);
+                        if (y === view.y) selYrBtn = b;
+                        b.addEventListener('click', function () { view.y = y; render(); });
+                        years.appendChild(b);
+                    })(y);
+                }
+                panel.appendChild(years);
+                if (selYrBtn) selYrBtn.scrollIntoView({ block: 'center' });
+            }
+
+            function reposition() {
+                var rect = trigger.getBoundingClientRect();
+                var pw = 290;
+                var left = rect.left;
+                if (left + pw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - pw - 8);
+                panel.style.position = 'fixed';
+                panel.style.left = left + 'px';
+                panel.style.width = pw + 'px';
+                var spaceBelow = window.innerHeight - rect.bottom;
+                var ph = panel.offsetHeight || 340;
+                if (spaceBelow < ph + 8 && rect.top > spaceBelow) {
+                    panel.style.top = 'auto';
+                    panel.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+                } else {
+                    panel.style.bottom = 'auto';
+                    panel.style.top = (rect.bottom + 4) + 'px';
+                }
+            }
+            function open() {
+                // Close any other open custom control (selects share the .fancy-select.open class)
+                document.querySelectorAll('.fancy-select.open').forEach(function (s) { if (s !== wrap && s._close) s._close(); });
+                resetView();
+                render();
+                document.body.appendChild(panel);   // escape overflow/transform clipping
+                wrap.classList.add('open');
+                trigger.setAttribute('aria-expanded', 'true');
+                reposition();
+                window.addEventListener('scroll', reposition, true);
+                window.addEventListener('resize', reposition);
+            }
+            function close() {
+                wrap.classList.remove('open');
+                trigger.setAttribute('aria-expanded', 'false');
+                panel.style.position = panel.style.top = panel.style.left = panel.style.bottom = panel.style.width = '';
+                if (panel.parentNode === document.body) wrap.appendChild(panel);   // back inside wrap → hidden again
+                window.removeEventListener('scroll', reposition, true);
+                window.removeEventListener('resize', reposition);
+            }
+            wrap._close = close;   // shared outside-click + Escape handlers (defined in fancify IIFE) call this
+
+            trigger.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                if (wrap.classList.contains('open')) close(); else open();
+            });
+            // External change (form reset / programmatic) → re-sync the trigger label
+            input.addEventListener('change', syncLabel);
+
+            input.parentNode.insertBefore(wrap, input);
+            wrap.appendChild(trigger);
+            wrap.appendChild(panel);
+            wrap.appendChild(input);
+            input.style.display = 'none';   // keep for form submission, hide UI
+            input.tabIndex = -1;
+            input.setAttribute('aria-hidden', 'true');
+
+            syncLabel();
+        }
+
+        function initAllDates(root) {
+            (root || document).querySelectorAll('input[type="date"][data-fancy-date]').forEach(fancifyDate);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () { initAllDates(); });
+        } else {
+            initAllDates();
+        }
+        window.fancifyDates = initAllDates;
+    })();
+
+    /* ── Auto-upgrade dynamically-added selects/dates ──────────────
+       initAll()/initAllDates() run ONCE at DOMContentLoaded. Any <select>
+       or [data-fancy-date] injected LATER — cloned rows, innerHTML/
+       insertAdjacentHTML, AJAX panels, modals, future code — would stay a
+       raw native control whose OS dropdown/calendar mispositions on mobile
+       & DevTools emulation (detaches off to the side instead of opening
+       below the field). A MutationObserver upgrades them the instant they
+       enter the DOM, so the fix holds everywhere with zero per-page wiring.
+       fancify()/fancifyDate() self-guard (skip already-upgraded, multiple/
+       size, data-no-fancy) → re-runs are safe and the observer never loops
+       on its own inserted nodes (wrap/trigger/panel are not selects). */
+    (function () {
+        if (!('MutationObserver' in window)) return;
+        function upgrade(node) {
+            if (!node || node.nodeType !== 1) return;   // element nodes only
+            // querySelectorAll scans DESCENDANTS only — if a bare <select>/date
+            // was inserted directly, scan its parent so the node itself is seen.
+            var root = node;
+            if (node.matches && (node.matches('select') ||
+                node.matches('input[type="date"][data-fancy-date]'))) {
+                root = node.parentNode || node;
+            }
+            if (window.fancifySelects) window.fancifySelects(root);
+            if (window.fancifyDates) window.fancifyDates(root);
+        }
+        var obs = new MutationObserver(function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                var added = mutations[i].addedNodes;
+                for (var j = 0; j < added.length; j++) upgrade(added[j]);
+            }
+        });
+        function start() { if (document.body) obs.observe(document.body, { childList: true, subtree: true }); }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', start);
+        } else {
+            start();
+        }
+    })();
+</script>
