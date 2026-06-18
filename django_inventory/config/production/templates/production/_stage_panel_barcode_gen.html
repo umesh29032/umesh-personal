@@ -228,9 +228,8 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-primary">Export CSV</button></form>
-        <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">Export XLSX</button></form>
-        <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">PDF Summary</button></form>
+        {# Export trio owner: shared/_export_buttons.html (Phase G S1). CSV primary; PDF label kept verbatim. #}
+        {% include 'shared/_export_buttons.html' with adda_code=adda.code csv_label='Export CSV' csv_variant='primary' xlsx_label='Export XLSX' pdf_label='PDF Summary' %}
         <a href="{% url 'tracking:export-list' %}" class="btn btn-ghost">View Export History →</a>
     </div>
 </section>

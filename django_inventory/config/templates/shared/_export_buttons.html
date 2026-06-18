@@ -1,0 +1,16 @@
+{% comment %}
+Canonical export-button group — SINGLE OWNER (Phase G · Stage 1 · INERT owner extraction).
+Renders the CSV / XLSX / PDF POST export forms (csrf + tokenized .btn buttons) that were
+duplicated across barcode_list.html and _stage_panel_barcode_gen.html. Backend routes/logic
+untouched. Labels + per-format variant are caller-supplied, so each surface renders
+byte-identically. NO icons · NO label rename · NO variant change here — that is Stage 2
+(VISUAL convergence, separate approval).
+
+Params:
+  adda_code (required) — Adda.code for the {% templatetag openblock %} url {% templatetag closeblock %} reverse.
+  csv_label / xlsx_label / pdf_label — exact button text.
+  csv_variant / xlsx_variant / pdf_variant — 'ghost' (default) or 'primary'.
+Include WITHOUT `only` so {% templatetag openblock %} csrf_token {% templatetag closeblock %} resolves from the page context.
+{% endcomment %}<form method="post" action="{% url 'tracking:export-csv' adda_code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-{{ csv_variant|default:'ghost' }}">{{ csv_label }}</button></form>
+<form method="post" action="{% url 'tracking:export-xlsx' adda_code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-{{ xlsx_variant|default:'ghost' }}">{{ xlsx_label }}</button></form>
+<form method="post" action="{% url 'tracking:export-pdf' adda_code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-{{ pdf_variant|default:'ghost' }}">{{ pdf_label }}</button></form>
