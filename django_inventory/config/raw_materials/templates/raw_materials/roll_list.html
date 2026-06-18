@@ -17,9 +17,13 @@
         font-size: 10px; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--stone);
     }
-    /* F-Select A: chrome from canonical .select-field--form; page keeps only geometry tokens (preserve byte-identical) */
-    .roll-list .filter-card select {
-        --select-field-padding: 9px 12px; --select-field-font: 13px; min-width: 150px;
+    /* F-Select A: chrome from canonical .select-field--form. Filters fancify → width on
+       the .fancy-select wrap (visible control), tokens on the trigger; the native
+       <select> is hidden and no longer drives layout. */
+    .roll-list .filter-card select,
+    .roll-list .filter-card .fancy-select { min-width: 150px; }
+    .roll-list .filter-card .fancy-select-trigger {
+        --select-field-padding: 9px 12px; --select-field-font: 13px;
     }
 
     /* Active-filter summary strip — shows under filter card when any filter is on. */
@@ -68,7 +72,8 @@
         /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
         .roll-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
         .roll-list .filter-card .filter-field { width: 100%; }
-        .roll-list .filter-card select { width: 100%; min-width: 0; }
+        .roll-list .filter-card select,
+        .roll-list .filter-card .fancy-select { width: 100%; min-width: 0; }
     }
 
     /* Time-log styling shared partial mein move ho gayi (inventory/_time_log_styles.html) */
