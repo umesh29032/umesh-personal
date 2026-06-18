@@ -41,6 +41,7 @@
 |---|---|---|
 | **Cards (D)** | `ccbfe8f7` D-1 (converge `.card`) · `b62b6157` D-2a (`.stat-card--serif`, user_dashboard) — **FROZEN at D-2a** | D-2b / D-2c — remaining inline-chrome consumer sweep |
 | **Financial (E)** | `e8c0181e` E-1 (`{% money %}`) · `466f7d75` E-2 (`.status-pill`) | `shared/financial/` owners — LedgerGrid · TotalsBar (SummaryCards/MoneyCell delivered as tag+pill instead of partials) |
+| **Export (F)** | `14b819b2` **Stage 1 (INERT)** — `_export_buttons.html` owner built; barcode_list + barcode_gen CSV/XLSX/PDF trios migrated byte-identical (computed-equal, console/overflow clean) | **Stage 2 (VISUAL)** — icons · label/variant convergence · `.action-link` pills (barcode_dashboard) · print-sheet button |
 
 ### ⏸️ FROZEN / DEFERRED (intentional — not pending work)
 - **Cards full 60-consumer sweep** — frozen at D-2a by owner decision; primitives are canonical, remaining consumers cosmetic.
@@ -49,7 +50,7 @@
 - **Component-token tier** (`--btn-radius`…), Storybook + visual-regression CI, React/Tailwind port, npm/versioning — future capability, separate triggers.
 
 ### ❌ REMAINING (real, not started) → see §6 roadmap
-- **Export (F)** — `_export_buttons.html` owner not built.
+- **Export Stage 2 (VISUAL)** — owner shipped (Stage 1, see §0 PARTIAL); convergence pass not started.
 - **Buttons B-4 / B-5 / B-6** — rationalization, escaped-raw convergence, touch/a11y pass.
 
 ---
@@ -101,7 +102,7 @@ config/
 │   │   ├─ _datatables_vendor_css.html
 │   │   ├─ _datatables_vendor_js.html . ★ TABLES vendor (engine = initFancyDataTable)      ✅
 │   │   ├─ _auth_shell.html ........... ★ AUTH (brand + card + slot) — 5/7 pages           ✅
-│   │   ├─ _export_buttons.html ....... ★ EXPORT (CSV/XLSX/PDF group)              [build F — TODO]
+│   │   ├─ _export_buttons.html ....... ★ EXPORT (CSV/XLSX/PDF group)              ✅ S1 (S2 visual TODO)
 │   │   └─ financial/ ................. ★ FINANCIAL partials                       [partial]
 │   │        ├─ (MoneyCell → delivered as {% money %})                            ✅ (tag)
 │   │        ├─ (StatusPill → delivered as .status-pill)                          ✅ (class)
@@ -151,9 +152,12 @@ config/
 - **OWN:** `₹` text formatting (template-only) · settlement/ledger status badge.
 - **MUST NOT OWN:** any money math · ledger writes · the golden ₹225 chain (server-side).
 
-### `shared/_export_buttons.html` — Export [TODO — build F]
-- **WILL OWN:** the CSV/XLSX/PDF button group (POST forms, tokenized, outside the table).
-- **CONSUMED BY (planned):** barcode_list · `_stage_panel_barcode_gen` · export pages.
+### `shared/_export_buttons.html` — Export ✅ Stage 1 (INERT)
+- **OWNS:** the CSV/XLSX/PDF POST export form group (csrf + tokenized `.btn` buttons). Labels +
+  per-format variant are caller args; included WITHOUT `only` so `csrf_token` resolves.
+- **MUST NOT OWN:** export view logic / routes / cell escaping (server-side) · button geometry (→ `.btn`).
+- **CONSUMED BY:** `barcode_list` · `_stage_panel_barcode_gen` (both live, byte-identical).
+- **STAGE 2 (VISUAL, TODO):** icons · label/variant convergence · fold in `barcode_dashboard` `.action-link` pills + the standalone `barcode_print_sheet` print button.
 
 ### `shared/financial/*` — Financial UI [PARTIAL]
 - Money + status delivered (tag + pill). **Remaining (optional):** `ledger_grid.html` · `totals_bar.html` ·
@@ -175,15 +179,17 @@ config/
 
 | # | Phase | Foundation | Files | Risk | Visual? | Kind |
 |---|---|---|---|---|---|---|
-| 1 | **F — Export** | Export | NEW `shared/_export_buttons.html` + 2–4 consumers (barcode_list · barcode_gen) | LOW | small | MANDATORY (owner missing) |
+| — | ~~F — Export Stage 1~~ | Export | `shared/_export_buttons.html` owner + barcode_list/barcode_gen | LOW | none | ✅ DONE `14b819b2` (INERT) |
+| 1 | **F — Export Stage 2 (VISUAL)** | Export | icons + label/variant convergence + `.action-link` pills + print-sheet button | MED | YES | OPTIONAL (owner already shipped) |
 | 2 | **B-4 Buttons** | Buttons | inline-mini (7) + inline-styled (15) + `.btn-mini` (2) → `.btn*` | MED | YES (rationalize) | OPTIONAL |
 | 3 | **B-5 Buttons** | Buttons | escaped raw (`.lybtn` 6 · next-up · so-tile) + delete `.lybtn` | LOW | small | OPTIONAL |
 | 4 | **B-6 Buttons** | Buttons | base touch ≥44 + `:focus-visible` · `.action-link`/`.action-icon` | LOW–MED | YES (intended a11y) | FUTURE (separable, important) |
 | 5 | **Cards D-2b / D-2c** | Cards | remaining inline-chrome consumers (beyond D-2a) | LOW–MED | mostly NO | OPTIONAL (frozen until resumed) |
 | 6 | **Financial LedgerGrid / TotalsBar** | Financial | NEW `shared/financial/ledger_grid.html` · `totals_bar.html` + ~10 surfaces | MED–HIGH | YES (new components) | OPTIONAL (money+status already owned) |
 
-**Resume point:** **Export (F)** — the only remaining MANDATORY owner. Then Buttons B-4→B-6;
-Cards D-2b/2c and Financial grids are optional polish.
+**Resume point:** Export owner shipped (Stage 1, `14b819b2`) — all mandatory owners now exist.
+Next per owner's plan: **Buttons B-4 → B-5 → B-6**. Export Stage 2 (VISUAL), Cards D-2b/2c,
+Financial LedgerGrid/TotalsBar = optional polish, separate approval.
 
 ---
 
