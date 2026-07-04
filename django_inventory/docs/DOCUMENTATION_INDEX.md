@@ -10,6 +10,8 @@
 |---|---|
 | [START_HERE.md](START_HERE.md) | **THE front door** — routes new dev / owner / AI agent to exactly what to read |
 | [PROJECT_KNOWLEDGE_MAP.md](PROJECT_KNOWLEDGE_MAP.md) | **the one overview** — business→architecture→DB→code (canonical big picture) |
+| [PRODUCT_DESIGN_DOCUMENT.md](PRODUCT_DESIGN_DOCUMENT.md) | **🔒 PDD v1.0 (FROZEN 2026-07-04) — product/business truth.** Business intent wins here; mechanism stays with ADRs/ARCHITECTURE_V2. §27 = owner decisions (resolved+binding), §29 = business-rule register, §31 = final validation. Change control: new ADR or approved PDD revision only |
+| [IMPLEMENTATION_ROADMAP_PDD_V1.md](IMPLEMENTATION_ROADMAP_PDD_V1.md) | **execution roadmap derived from PDD v1.0** — phases R1–R11 + gated backlog; every task cites its PDD §; one phase at a time, owner-gated |
 | [LEARNING_2_0/PROJECT_BRAIN/](LEARNING_2_0/PROJECT_BRAIN/README.md) | **fast-answer nav** — feature/search/debugging indexes + decision graph + change-history |
 | [LEARNING_2_0/PROJECT_ATLAS.md](LEARNING_2_0/PROJECT_ATLAS.md) | **PKALS index** — section-index for docs/LEARNING_2_0 (not an overview; points into the subdirs) |
 | [LEARNING_2_0/AI_AGENT_GUIDE/](LEARNING_2_0/AI_AGENT_GUIDE/README.md) | **AI-agent entry** — read-4-files + canonical lookup + never-modify (token reduction) |
