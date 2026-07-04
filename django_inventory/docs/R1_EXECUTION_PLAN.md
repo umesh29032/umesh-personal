@@ -2,7 +2,7 @@
 
 > Phase R1 of [IMPLEMENTATION_ROADMAP_PDD_V1.md](IMPLEMENTATION_ROADMAP_PDD_V1.md),
 > derived from 🔒 [PDD v1.0](PRODUCT_DESIGN_DOCUMENT.md).
-> STATUS: **IMPLEMENTED 2026-07-04 — awaiting owner acceptance.**
+> STATUS: **✅ COMPLETED — accepted by owner 2026-07-04, commit c957fa84.**
 > Approved with 2 owner clarifications (both honored): R1 strictly read-only
 > except the F1 guard; My Work presentation-only (no submit/edit surface).
 > Results: gate PASS (714 tests, +14 new) · golden ₹225 OK · browser-verified

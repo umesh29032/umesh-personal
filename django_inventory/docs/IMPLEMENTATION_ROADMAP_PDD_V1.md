@@ -40,8 +40,9 @@ R6 → R7 → R8 → R9 → R10 → R11.
 ## Phases
 
 ### R1 — Navigation, visibility & the F1 guard  *(UI-heavy, no money logic)*
-**STATUS: IMPLEMENTED 2026-07-04 (awaiting owner acceptance) — plan:
-[R1_EXECUTION_PLAN.md](R1_EXECUTION_PLAN.md); gate PASS 714 tests; browser-verified.**
+**STATUS: ✅ COMPLETED — accepted by owner 2026-07-04, commit c957fa84.
+Plan: [R1_EXECUTION_PLAN.md](R1_EXECUTION_PLAN.md); gate PASS 714 tests;
+golden OK; browser-verified 360/768/1280 both roles.**
 PDD: §3, §23, §27-D6, §27-D7, §31.1-F1.
 1. Adda detail: **Settlement** button (management-gated → settlement start/detail)
    + **Stage Rates** button (existing page; correction stays super-admin, §27-D3).
