@@ -189,7 +189,44 @@ class AddaDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
                 'has_access': s.has_access,
             })
 
+        # ── R1 (PDD §23): management navigation — state-aware Settlement button.
+        # Latest AddaSettlement decides the target: exists → its detail page,
+        # none → the settlement start page. READ-ONLY (navigation only, no
+        # settlement behavior change). Query gated to management — workers
+        # never load settlement data for this page (no leak, no cost).
+        adda_settlement = None
+        if is_management:
+            adda_settlement = adda.settlements.order_by('-created_at').first()
+
+        # ── R1 (PDD §27-D7): "My Work" — the viewing user's OWN tasks on this
+        # Adda. PRESENTATION-ONLY (owner clarification: display, never
+        # submit/edit — future phases own worker actions). Strictly self-scoped
+        # (worker=request.user), so one worker can never see another's numbers
+        # here (leak-tested). expected_earning shown is the user's own frozen
+        # visibility figure (Option B) — never money.
+        from decimal import Decimal
+        from production.models import WorkerStageTask
+        my_tasks = list(
+            WorkerStageTask.objects
+            .filter(stage_record__adda=adda, worker=user)
+            .exclude(status=WorkerStageTask.Status.CANCELLED)
+            .select_related('stage_record__workflow_stage__stage')
+            .prefetch_related('contributions__color', 'contributions__size')
+            .order_by('stage_record__workflow_stage__order')
+        )
+        my_expected_total = Decimal('0.00')
+        for t in my_tasks:
+            lines = t.contributions.all()
+            t.my_qty = sum((c.good_quantity for c in lines), Decimal('0'))
+            t.my_expected = sum(
+                (c.expected_earning for c in lines if c.expected_earning is not None),
+                Decimal('0.00'))
+            my_expected_total += t.my_expected
+
         ctx.update({
+            'adda_settlement': adda_settlement,
+            'my_tasks': my_tasks,
+            'my_expected_total': my_expected_total,
             'rolls': (
                 adda.rolls.select_related('cloth_type', 'cloth_color').all()
                 if hasattr(adda, 'rolls') else []

@@ -6,7 +6,7 @@
 ## models/ (split by domain — har file = ek concern)
 | File | What lives here | Pattern / why |
 |---|---|---|
-| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot, WorkerStageAllocation | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1; snapshot at stage-start, locked at first completion, per (stage_record,role)). RateCorrectionAudit = append-only re-rate audit (S1.1) |
+| `core.py` | Product, Stage (library), WorkflowStage (+RoleRate), AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions, StagePoolSnapshot, WorkerStageAllocation | WorkflowStage = per-product POLICY row (order, cost_rate dual-duty ADR-0009, credits_workers, cost_billed_at grouping; **S4/D1 `allocation_dimensions` = piece-pool grain, POOL-ONLY, orthogonal to credits_workers/cost_method**). AddaStageRoleRate = frozen resolved payable rate (S1; snapshot at stage-start, locked at first completion, per (stage_record,role)). RateCorrectionAudit = append-only re-rate audit (S1.1). Product.clean() = F1 guard (R1 2026-07-04): code IMMUTABLE once Addas exist (PDD §31.1-F1) |
 | `adda.py` | Adda, AddaStageRecord (+ pending_report_workers helper) | SR = stage ka polymorphic parent; processing_cost frozen (honest-NULL) |
 | `worker_task.py` | WorkerStageTask, WorkerStageContribution | THE production truth (ADR-0005, C-TM); partial-unique active task; settlement_line provenance string-FK. **S3: good/alter/missing columns (good NOT NULL = payable; alter/missing immutable observations); reported dual-written = good (renamed-not-dropped @S6); constraint wsc_gam_nonneg_sum_positive** |
 | `layering.py` | LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll | per-roll verify + MANDATORY leftovers (G1 ke facts) |
@@ -38,7 +38,9 @@ NAYA STAGE = naya package; worker UI ko haath nahi lagana padta.
 FILE MAPs already in code: `stage_views.py` (1.4k — layering+cutting consoles,
 6 sections documented at top), `pattern_stage_views.py`, `barcode_gen_views.py`,
 `worker_report_views.py` (★ phone report + AddaReportReviewView P1),
-`adda_views.py`, `flow_views.py`, `costing_views.py`, `dashboard.py`,
+`adda_views.py` (R1 2026-07-04: AddaDetailView ctx adds mgmt state-aware
+Settlement button target + self-scoped presentation-only "My Work" tasks —
+PDD §23/§27-D7), `flow_views.py`, `costing_views.py`, `dashboard.py`,
 `product_views.py`, `pattern_views.py`, `access_views.py`, `mixins.py` (RBAC).
 
 ## forms/ · urls.py · templates/

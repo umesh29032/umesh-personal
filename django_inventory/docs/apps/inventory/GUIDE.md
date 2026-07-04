@@ -7,7 +7,7 @@
 |---|---|
 | `middleware.py` | ★ SidebarAccessMiddleware — menu hidden ⇒ URL blocked |
 | `context_processors.py` | sidebar data har template ko |
-| `views/dashboard.py` | role-aware home (worker badges vs mgmt summary) |
+| `views/dashboard.py` | role-aware home (worker badges vs mgmt summary); R1 2026-07-04: worker-only "new Adda started" broadcast rows (read-only, no link — PDD §27-D6) |
 | `views/access_hub_views.py` + `role_views.py` + `sidebar_access_views.py` | Access-Control hub |
 | `views/tracking_*.py` (4) | /tracking/ surface (P4.2: views YAHAN, tracking app primitive rahe) |
 | `views/mixins.py` | RBAC gates (permission_service delegate) |

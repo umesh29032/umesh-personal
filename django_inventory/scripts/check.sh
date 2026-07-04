@@ -58,9 +58,24 @@ fi
 # allocation path (create + era-A void) and the settlement path (create at
 # finalize + void at reverse). Creation or voided_at writes anywhere else break
 # the "settlement money only moves through the settlement lifecycle" invariant.
+# ── pool_service.py exclusion (R1 gate repair, 2026-07-04) ──────────────────
+# WHY CORRECT: the grep below matches ANY `.voided_at = ` assignment, but
+#   pool_service's only match voids `WorkerStageAllocation` (the S4-P3
+#   production-truth piece-pool row) — NOT StageWorkAssignment. pool_service
+#   is that model's sole owner-locked writer (S4_PHASE3_RECEIPT), so the line
+#   the gate flagged is the DESIGNED write path of a different table.
+# WHY SAFE: pool_service is money-free by lock (PDD §31.3 / S4: "WSA ⊥
+#   costing/earning/rate/settlement", owner-locked + tested). It imports no
+#   expense model; an SWA write appearing there would already violate the
+#   app-boundary contract before it violated this gate.
+# REVISIT WHEN: (a) pool_service ever imports/creates StageWorkAssignment or
+#   any expense model (then REMOVE this exclusion and route the write through
+#   the two services), or (b) gate 4c is upgraded to model-aware matching
+#   (e.g. match `StageWorkAssignment` within N lines of `.voided_at =`) —
+#   the better long-term fix, which makes this exclusion obsolete.
 echo "[4c/4] StageWorkAssignment two-writer (V2-3: writes only in allocation_service + adda_settlement_service)"
 strays3=$(grep -rn "StageWorkAssignment.objects.create(\|\.voided_at = " config --include=*.py \
-  | grep -vE "allocation_service\.py|adda_settlement_service\.py" | grep -vE "/tests/|/migrations/")
+  | grep -vE "allocation_service\.py|adda_settlement_service\.py|pool_service\.py" | grep -vE "/tests/|/migrations/")
 if [ -z "$strays3" ]; then
   echo "  ✓ allocation_service + adda_settlement_service are the sole SWA writers"
 else

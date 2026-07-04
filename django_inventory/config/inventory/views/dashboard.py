@@ -26,6 +26,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
     helper_data = None
     my_activity = []
     active_addas = []
+    broadcast_addas = []
     is_skilled_user = False
 
     try:
@@ -36,11 +37,14 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
         )
 
+        # R1: role checked ONCE, reused below (skilled gate + isolation +
+        # broadcast) — avoids re-querying extra_roles per check.
+        is_mgmt = user_has_role(request.user, MANAGEMENT_ROLES)
         # "Skilled user" = layering skill OR management role.
         # Drives accordion vs status-card decision in template.
         is_skilled_user = (
             user_has_skill(request.user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER])
-            or user_has_role(request.user, MANAGEMENT_ROLES)
+            or is_mgmt
         )
 
         # In-progress Addas — annotated with rolls count + per-stage pipeline state.
@@ -48,7 +52,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         # V2-1c-iv isolation: a worker sees ONLY Addas they're actively assigned to
         # (an active WorkerStageTask on any stage). Management sees all. Exists()
         # avoids a join so the rolls_count annotation stays correct.
-        if not user_has_role(request.user, MANAGEMENT_ROLES):
+        if not is_mgmt:
             assigned = WorkerStageTask.objects.filter(
                 stage_record__adda=OuterRef('pk'), worker=request.user,
             ).exclude(status=WorkerStageTask.Status.CANCELLED)
@@ -85,6 +89,18 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     })
             a.pipeline = pipeline
             a.done_stages = done_stages
+
+        # R1 (PDD §27-D6): "new Adda started" broadcast — every worker sees that
+        # production started. Read-only: code/product/start date ONLY (no
+        # financials, no task link — the assigned list above stays the
+        # actionable set). Management already sees all Addas → worker-only.
+        if not is_mgmt:
+            broadcast_addas = list(
+                Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
+                .exclude(pk__in=[a.pk for a in active_addas])
+                .select_related('product')
+                .order_by('-started_at')[:5]
+            )
         # P5.1: the layering snapshot is rendered ONLY in the skilled-user accordion.
         # Bulk-attach it (a fixed handful of queries, N+1-free) for skilled users;
         # skip entirely for everyone else (it's never rendered).
@@ -169,6 +185,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         helper_data = None
         my_activity = []
         active_addas = []
+        broadcast_addas = []
         is_skilled_user = False
 
     return {
@@ -177,6 +194,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         'helper_data': helper_data,
         'my_activity': my_activity,
         'active_addas': active_addas,
+        'broadcast_addas': broadcast_addas,
         'is_skilled_user': is_skilled_user,
     }
 

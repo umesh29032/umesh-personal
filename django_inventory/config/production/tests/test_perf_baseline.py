@@ -151,4 +151,8 @@ BULK_SNAPSHOT_QUERIES = 5
 WORKER_DASHBOARD_QUERIES = 16   # was 14 — pt.2c: +1 badge task query, +1 my_active_stages
                                 # now materialized in the builder (list() for badge attach;
                                 # previously lazy = uncounted here). Bounded, not per-row.
-MANAGEMENT_DASHBOARD_QUERIES = 21   # was 20 (25 pre-P5.1) — pt.2c: +1 badge task query
+                                # R1 §27-D6: +1 broadcast select, −1 role-check reuse → net 16.
+MANAGEMENT_DASHBOARD_QUERIES = 20   # was 21 — R1: role checked once + reused
+                                    # (is_mgmt), removing a duplicate extra_roles
+                                    # query on the mgmt path; broadcast is
+                                    # worker-only so adds nothing here.

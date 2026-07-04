@@ -33,6 +33,37 @@
         letter-spacing: 0.1em; background: rgba(34,197,94,0.18); color: #4ade80;
         border: 1px solid rgba(34,197,94,0.3);
     }
+    /* R1 (PDD §23): hero navigation pill — 44px touch target (rule 11). */
+    .adda-detail .hero-action-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px; padding: 8px 16px; border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.35); color: #fff;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        background: rgba(255,255,255,0.08); cursor: pointer; font-family: inherit;
+    }
+    .adda-detail .hero-action-btn:hover { background: rgba(255,255,255,0.16); }
+    /* R1 (PDD §27-D7): My Work cards — mobile-first, presentation-only. */
+    .adda-detail .my-work {
+        background: var(--surface-card, #fff); border: var(--border-card, 1px solid #e5e0d8);
+        border-radius: 14px; box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.06));
+        padding: 16px 18px; margin-bottom: 18px;
+    }
+    .adda-detail .my-work-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+    .adda-detail .my-work-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .adda-detail .my-work-card { border: 1px solid #eee7db; border-radius: 12px; padding: 12px 14px; background: #fffdf9; }
+    .adda-detail .mw-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .adda-detail .mw-stage { font-weight: 600; font-size: 14px; }
+    .adda-detail .mw-status { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #f1ede4; color: #6b6357; text-transform: uppercase; letter-spacing: 0.4px; }
+    .adda-detail .mw-status.mw-completed, .adda-detail .mw-status.mw-verified { background: #e7f6ec; color: #1a7f45; }
+    .adda-detail .mw-status.mw-in_progress { background: #eaf1fd; color: #2563eb; }
+    .adda-detail .mw-lines { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; color: #4b4437; }
+    .adda-detail .mw-lines li { padding: 2px 0; }
+    .adda-detail .mw-total { font-size: 13px; font-weight: 700; border-top: 1px dashed #e2dbcd; padding-top: 8px; }
+    .adda-detail .mw-empty { font-size: 13px; color: #8a8071; font-style: italic; }
+    .adda-detail .my-work-footer { margin-top: 12px; font-size: 14px; }
+    @media (max-width: 600px) {
+        .adda-detail .my-work-grid { grid-template-columns: 1fr; }  /* stack cards on phones */
+    }
     .adda-detail .hero-badge.inprogress { background: rgba(37,99,235,0.18); color:#60a5fa; border-color: rgba(37,99,235,0.3); }
     .adda-detail .hero-badge.onhold     { background: rgba(217,119,6,0.18); color:#fbbf24; border-color: rgba(217,119,6,0.3); }
     .adda-detail .hero-badge.cancelled  { background: rgba(220,38,38,0.18); color:#fca5a5; border-color: rgba(220,38,38,0.3); }
@@ -469,6 +500,19 @@
                 <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
                     ● {{ adda.get_status_display }}
                 </span>
+                {% if is_management %}
+                {# R1 (PDD §23): state-aware Settlement navigation — mgmt only. #}
+                {% if adda_settlement %}
+                <a href="{% url 'expense:adda-settlement-detail' reference=adda_settlement.reference %}"
+                   class="hero-action-btn">Settlement · {{ adda_settlement.reference }}</a>
+                {% else %}
+                {# Start view is POST-only (405 on GET) — csrf form, not a link. #}
+                <form method="post" action="{% url 'expense:adda-settlement-start' adda_pk=adda.pk %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="hero-action-btn">Start Settlement</button>
+                </form>
+                {% endif %}
+                {% endif %}
                 {% if is_super_admin %}
                 {# S1.1: super-admin rate-correction entry — before-settlement only. #}
                 <a href="{% url 'production:stage-rates' code=adda.code %}"
@@ -477,6 +521,46 @@
             </div>
         </div>
     </div>
+
+    {% comment %}
+    R1 (PDD §27-D7): MY WORK — the viewing user's own tasks on THIS Adda.
+    PRESENTATION-ONLY: display quantities + own expected earning; no submit,
+    no edit, no action buttons (future phases own worker actions). Self-scoped
+    in the view (worker=request.user) — renders only when the user has tasks,
+    so management (no tasks) never sees it.
+    {% endcomment %}
+    {% if my_tasks %}
+    <div class="my-work">
+        <div class="my-work-title">My Work on this Adda</div>
+        <div class="my-work-grid">
+            {% for t in my_tasks %}
+            <div class="my-work-card">
+                <div class="mw-head">
+                    <span class="mw-stage">{{ t.stage_record.workflow_stage.stage.name }}</span>
+                    <span class="mw-status mw-{{ t.status }}">{{ t.get_status_display }}</span>
+                </div>
+                {% if t.contributions.all %}
+                <ul class="mw-lines">
+                    {% for c in t.contributions.all %}
+                    <li>
+                        {% if c.color %}{{ c.color.name }} · {% endif %}{% if c.size %}{{ c.size.label }} · {% endif %}{{ c.good_quantity|floatformat:"-2" }} pcs
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="mw-total">
+                    Qty {{ t.my_qty|floatformat:"-2" }}{% if t.my_expected > 0 %} · Expected ₹{{ t.my_expected }}{% endif %}
+                </div>
+                {% else %}
+                <div class="mw-empty">No lines reported yet</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% if my_expected_total > 0 %}
+        <div class="my-work-footer">Total expected on this Adda: <strong>₹{{ my_expected_total }}</strong></div>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {% comment %}
     STAGES OVERVIEW PANEL — saare stages ka headline summary ek jagah.

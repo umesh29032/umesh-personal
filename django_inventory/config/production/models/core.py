@@ -72,6 +72,29 @@ class Product(TimeStampedModel):
     class Meta:
         ordering = ['name']
 
+    def clean(self):
+        """PDD §31.1-F1 (R1): `code` is IMMUTABLE once the product has any Adda.
+
+        Adda codes ('3-PATTI-001') and permanent barcode payloads (ADR-0010)
+        embed this prefix; a rename would let a future product reuse the old
+        code and collide on Adda.code UNIQUE. The edit form already disables
+        the field and update_product never writes code — this model-level guard
+        (Django full_clean, so admin/ModelForm paths hit it too) is the
+        defense-in-depth backstop (PDD P10).
+        """
+        super().clean()
+        if self.pk:
+            old_code = (
+                Product.objects.filter(pk=self.pk)
+                .values_list('code', flat=True).first()
+            )
+            if old_code is not None and old_code != self.code and self.addas.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'code': f"Product code is locked once Addas exist ('{old_code}' "
+                            "is embedded in Adda codes and barcode payloads forever).",
+                })
+
     def __str__(self):
         return self.name
 

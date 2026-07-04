@@ -169,6 +169,20 @@
         .user-dash .iframe-wrap { margin-left: -10px; margin-right: -10px; }
         .user-dash .adda-stage-iframe { border-radius: 0; }
     }
+    /* R1 (PDD §27-D6): broadcast rows — read-only, no link affordance. */
+    .user-dash .broadcast-list { list-style: none; margin: 0; padding: 0; }
+    .user-dash .broadcast-row {
+        display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px;
+        padding: 10px 4px; border-bottom: 1px dashed #e7e0d2; font-size: 14px;
+    }
+    .user-dash .broadcast-row:last-child { border-bottom: 0; }
+    .user-dash .broadcast-code { font-weight: 700; }
+    .user-dash .broadcast-product { color: #6b6357; }
+    .user-dash .broadcast-date { margin-left: auto; font-size: 12px; color: #8a8071; }
+    .user-dash .broadcast-hint { font-size: 12px; color: #8a8071; padding-top: 8px; }
+    @media (max-width: 600px) {
+        .user-dash .broadcast-date { margin-left: 0; width: 100%; }  /* stack on phones */
+    }
 </style>
 {% endblock %}
 
@@ -179,6 +193,30 @@
         <div class="hero-title">Welcome, {{ request.user.get_full_name|default:request.user.email }}</div>
         {% if helper_data %}<span class="helper-tag">CUTTING MASTER HELPER</span>{% endif %}
     </div>
+
+    {% comment %}
+    R1 (PDD §27-D6): "New Adda started" broadcast — read-only rows for
+    IN_PROGRESS Addas the worker is NOT assigned to. Code/product/date only:
+    no financials, no link (the assigned Active-Addas list below stays the
+    actionable set). Worker-only (management sees all Addas anyway).
+    {% endcomment %}
+    {% if broadcast_addas %}
+    <div class="card broadcast-card" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">New Addas Started</div></div>
+        <div class="card-body">
+            <ul class="broadcast-list">
+                {% for b in broadcast_addas %}
+                <li class="broadcast-row">
+                    <span class="broadcast-code">{{ b.code }}</span>
+                    <span class="broadcast-product">{{ b.product.name }}</span>
+                    <span class="broadcast-date">started {{ b.started_at|date:"d M Y" }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="broadcast-hint">Production started — you'll see a task here if you're assigned.</div>
+        </div>
+    </div>
+    {% endif %}
 
     {% comment %}
     Active Addas list — shown to everyone.
