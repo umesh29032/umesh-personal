@@ -1,3 +1,13 @@
+---
+id: docs-audit-phases-phase-a-core-manufacturing-flow
+type: receipt
+status: active
+owner: append-only
+scope: audit
+anchors: —
+verified: 2026-07-18
+---
+
 # Phase A — Core Manufacturing Flow
 
 **Scope:** product create → workflow stage create → rate setup → cloth intake → adda create → stage progression (layering→pattern→cutting→barcode) → worker assignment → worker reporting → stage completion → settlement draft → finalize → payment → My Earnings → advances.

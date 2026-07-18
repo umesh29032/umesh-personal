@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-01-why-workerstagetask
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why WorkerStageTask exists
 
 **Problem:** Pehle ek Adda-stage ke saath bas ek "workers" list judi thi (M2M) —

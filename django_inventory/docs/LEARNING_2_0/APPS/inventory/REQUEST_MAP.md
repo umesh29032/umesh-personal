@@ -1,3 +1,13 @@
+---
+id: l2-apps-inventory-request-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: inventory
+anchors: config/inventory/
+verified: 2026-07-13
+---
+
 # inventory — REQUEST_MAP (`/inventory/` + `/tracking/`)
 
 ## TL;DR (1 min)

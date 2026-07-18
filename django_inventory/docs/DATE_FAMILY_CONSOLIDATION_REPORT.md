@@ -1,3 +1,13 @@
+---
+id: docs-date-family-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Date Family Consolidation Report (Phase C)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase C (Dates).**

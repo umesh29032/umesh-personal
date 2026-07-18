@@ -5,22 +5,18 @@ YEH FILE KYU HAI?
 ClothRollHistory / AddaHistory rows ko time-ordered timeline render karte hain.
 select_related actor/stage FK pe → N+1 query bachi (template har row pe email + stage display use karta hai).
 """
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.views.generic import TemplateView
 
 from accounts.services import (
-    MANAGEMENT_ROLES, PRODUCTION_ROLES, user_can_view_financials, user_has_role,
+    MANAGEMENT_ROLES, user_can_view_financials, user_has_role,
 )
+from inventory.views.mixins import ProductionRoleMixin as _ProductionRoleMixin
 from production.models import Adda, WorkerStageTask
 from raw_materials.models import ClothRoll
 from tracking.models import AddaHistory, ClothRollHistory
-
-
-class _ProductionRoleMixin(UserPassesTestMixin):
-    def test_func(self):
-        return user_has_role(self.request.user, PRODUCTION_ROLES)
 
 
 def _assigned_to_adda(user, adda) -> bool:

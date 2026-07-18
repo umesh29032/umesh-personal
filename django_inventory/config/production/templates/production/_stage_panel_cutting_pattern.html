@@ -40,13 +40,13 @@ REQUIRED CONTEXT (from _build_pattern_context):
 
 {% comment %}
 COMPLETED-STATE TOP SUMMARY CARD
-Cutting Pattern stage finalize hone par yahin headline summary dikhao —
+Pattern Design stage finalize hone par yahin headline summary dikhao —
 photos count, video status, completed timestamp + by-user. Photos grid
 neeche Section 04 me already render hota hai (full thumbnails).
 {% endcomment %}
 {% if stage_record.completed_at %}
 <div class="cp-summary-card">
-    <div class="cp-summary-title">Cutting Pattern — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
+    <div class="cp-summary-title">Pattern Design — Completed {{ stage_record.completed_at|date:"d M Y H:i" }}{% if stage_record.completed_by %} by {{ stage_record.completed_by.get_full_name|default:stage_record.completed_by.email }}{% endif %}</div>
     <div class="cp-summary-grid">
         <div><span class="lbl">Patterns Verified</span><span class="val">{{ verified_count }}/{{ expected_pattern_count }}</span></div>
         <div><span class="lbl">Photos Uploaded</span><span class="val">{{ photos|length }}</span></div>
@@ -59,11 +59,11 @@ neeche Section 04 me already render hota hai (full thumbnails).
 {% if can_reopen %}
 <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
     <form method="post" action="{% url 'production:pattern-reopen' adda.code %}"
-          onsubmit="return confirm('Reopen Cutting Pattern for corrections?\n\nThe Adda will roll back to the Cutting Pattern stage. Existing photos + video are kept. Downstream stages must not have been started.');">
+          onsubmit="return confirm('Reopen Pattern Design for corrections?\n\nThe Adda will roll back to the Pattern Design stage. Existing photos + video are kept. Downstream stages must not have been started.');">
         {% csrf_token %}
         {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
         <button type="submit" class="btn btn-ghost" style="color:var(--copper); border-color:var(--copper); padding:6px 14px; font-size:12px;">
-            ✎ Edit / Reopen Cutting Pattern
+            ✎ Edit / Reopen Pattern Design
         </button>
     </form>
 </div>
@@ -124,6 +124,31 @@ Skipping these tiles avoids duplicate Patterns/Photos/Video/Status display.
             {% else %}Not Started{% endif %}
         </div>
     </div>
+</div>
+{% endif %}
+
+{% if layout_panel %}
+{# Phase 8B: the MANUFACTURING LAYOUT contract — plain dict from the registered provider (ADR-H: production renders data, imports nothing) #}
+<div class="panel" style="margin-bottom:14px;">
+  <div class="panel-title">Manufacturing Layout
+    <small style="font-weight:400;">— the approved contract this Adda cuts from (library-only)</small></div>
+  {% for g in layout_panel.groups %}
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12.5px; padding:6px 0; border-bottom:1px dashed var(--border-subtle);">
+      <span style="font-size:10px; padding:1px 7px; border-radius:999px; background:#eee; color:#555; text-transform:uppercase;">{{ g.group }}</span>
+      <span style="font-family:monospace; font-weight:700;">{{ g.uid }}</span>
+      <span>V{{ g.version }} · {{ g.name }}</span>
+      <span style="color:var(--stone);">{{ g.width_mm }} mm × {{ g.length_mm }} mm</span>
+      {% if g.stale %}<span style="color:#b91c1c; font-weight:800; font-size:11px;" title="LAW 11: frozen geometry superseded — supersede the layout before cutting">⚠ STALE</span>{% endif %}
+      <span style="flex:1;"></span>
+      <a class="btn btn-ghost" href="{{ g.svg_url }}">Marker SVG</a>
+    </div>
+  {% empty %}
+    <p style="font-size:12.5px; color:var(--stone); font-style:italic;">No manufacturing layout chosen yet.</p>
+  {% endfor %}
+  {% if is_management %}
+    <a class="btn btn-ghost" style="margin-top:8px;" href="{{ layout_panel.choose_url }}">
+      {% if layout_panel.has_usage %}Manage layouts →{% else %}★ Choose approved layout →{% endif %}</a>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -508,9 +533,10 @@ allocation_sum = live sum of proportion_pct (red badge if != 100)
             </p>
             <form method="post" action="{% url 'production:pattern-complete' adda.code %}"
                   data-next-stage="{{ next_stage.get_stage_type_display|default:'next stage' }}"
-                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Mark cutting-pattern complete and advance to ' + (this.dataset.nextStage || 'next stage') + '?\n\nUploaded photos and video will lock for editing.');">
+                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completion will be BLOCKED unless a Super Admin overrides with a reason (R3).\n\n{% endif %}{% endwith %}Mark cutting-pattern complete and advance to ' + (this.dataset.nextStage || 'next stage') + '?\n\nUploaded photos and video will lock for editing.');">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                {% include "production/_completion_override.html" %}
                 <div class="stage-actions-row">
                     <button type="submit" class="btn btn-primary">Complete Pattern{% if next_stage %} → Advance to {{ next_stage.get_stage_type_display }}{% endif %}</button>
                 </div>

@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-stage-work-assignment
+type: database-guide
+status: active
+owner: handwritten
+scope: stage_work_assignment (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: StageWorkAssignment (SWA) — the earning line
 
 ## TL;DR

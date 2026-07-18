@@ -48,6 +48,11 @@
             <div class="v">{% money grand_cost %}</div>
             <div class="l">Total (shown Addas)</div>
         </div>
+        {# RMX-D: the ADR-0009 Decision-2 grand line — material + settled + non-payable, from THE certified assembly #}
+        <div class="total">
+            <div class="v">{% money grand_full_cost %}</div>
+            <div class="l">Full cost (ADR-0009, shown Addas)</div>
+        </div>
     </div>
 
     {% if total_unpriced_rolls %}
@@ -67,8 +72,14 @@
                     <th>Stage</th>
                     <th>Status</th>
                     <th class="num">Pieces</th>
-                    <th class="num">Mfg Cost</th>
-                    <th class="num">Worker Earnings</th>
+                    {# A360/P-COST relabel: this column is STANDARD labor only (rate × output) — not full manufacturing cost #}
+                    <th class="num">Standard Labor (payable)</th>
+                    <th class="num">Non-payable priced</th>
+                    <th class="num">Actual Settled Labor</th>
+                    <th class="num">Variance (payable std − actual)</th>
+                    {# RMX-D: Model-B completion — values from cost_service.full_costs_for_addas (the A360 assembly) #}
+                    <th class="num">Material (net)</th>
+                    <th class="num">Full Cost (ADR-0009)</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,15 +92,21 @@
                         <td data-label="Stage">{{ r.current_stage }}</td>
                         <td data-label="Status">{{ r.adda.get_status_display }}</td>
                         <td class="num" data-label="Pieces">{{ r.pieces }}</td>
-                        <td class="num" data-label="Mfg Cost">
-                            <span class="cost">{% money r.total_cost %}</span>
+                        <td class="num" data-label="Standard Labor (payable)">
+                            <span class="cost">{% money r.payable_cost %}</span>
                             {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced stage{{ r.unpriced|pluralize }}</div>{% endif %}
                             {% if r.unpriced_rolls %}<div class="unpriced">{{ r.unpriced_rolls }} unpriced roll{{ r.unpriced_rolls|pluralize }} — material cost incomplete</div>{% endif %}
                         </td>
-                        <td class="num" data-label="Worker Earnings">{% money r.worker_earnings %}</td>
+                        <td class="num" data-label="Non-payable priced">{% money r.nonpayable_cost %}</td>
+                        <td class="num" data-label="Actual Settled Labor">{% money r.worker_earnings %}</td>
+                        <td class="num" data-label="Variance (payable std − actual)">{% money r.variance %}</td>
+                        <td class="num" data-label="Material (net)">
+                            {% if r.has_material %}{% money r.material_net %}{% if r.material_unpriced_rolls %}<div class="unpriced">{{ r.material_unpriced_rolls }} unpriced roll{{ r.material_unpriced_rolls|pluralize }} — incomplete</div>{% endif %}{% else %}<span class="unpriced">not priced</span>{% endif %}
+                        </td>
+                        <td class="num" data-label="Full Cost (ADR-0009)"><strong>{% money r.full_cost %}</strong></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" class="empty">No Addas yet.</td></tr>
+                    <tr><td colspan="9" class="empty">No Addas yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

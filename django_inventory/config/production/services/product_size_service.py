@@ -36,6 +36,36 @@ def _ensure_can_manage(user):
         raise PermissionDenied("Only Super Admin can manage product sizes")
 
 
+# ── Phase-3 platform convention: Universal size ─────────────────────────────
+
+UNIVERSAL_CODE = 'universal'
+
+# Archive guard hooks (Phase-3 D-3, dependency inversion): other apps append
+# callables(size) that raise ValidationError to BLOCK an archive. patterns_ai
+# registers its confirmed-designs guard in apps.ready() — production imports
+# nothing (ADR-H wall intact).
+ARCHIVE_VALIDATORS = []
+
+
+@transaction.atomic
+def ensure_universal_size(product: Product) -> ProductSize:
+    """Idempotent platform convention (Phase-3 D-1/D-2): every product
+    entering pattern preparation has ≥1 active size — creates, or adopts/
+    reactivates, the REAL ProductSize row code='universal'. No user gate:
+    convention write, not operator CRUD (callers already role-gated).
+    Universal is a NORMAL size everywhere else (owner note #1)."""
+    size = ProductSize.objects.filter(product=product,
+                                      code=UNIVERSAL_CODE).first()
+    if size is None:
+        return ProductSize.objects.create(
+            product=product, code=UNIVERSAL_CODE, label='Universal',
+            display_order=0, is_active=True)
+    if not size.is_active:
+        size.is_active = True
+        size.save(update_fields=['is_active', 'updated_at'])
+    return size
+
+
 def _normalise_code(code: str) -> str:
     code = (code or '').strip().lower()
     if not _SIZE_CODE_RE.match(code):
@@ -93,6 +123,10 @@ def archive_product_size(user, *, product: Product, size_id: int) -> ProductSize
         size = ProductSize.objects.get(pk=size_id, product=product)
     except ProductSize.DoesNotExist:
         raise ValidationError("Size not found on this product")
+    # Phase-3 D-3: registered guards may refuse (ValidationError bubbles
+    # with the guard's honest message).
+    for validator in ARCHIVE_VALIDATORS:
+        validator(size)
     size.is_active = False
     size.save(update_fields=['is_active', 'updated_at'])
     return size

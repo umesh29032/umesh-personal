@@ -1,3 +1,13 @@
+---
+id: l2-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system
+anchors: —
+verified: 2026-07-13
+---
+
 # LEARNING_2_0 — PKALS (the project's knowledge system)
 
 **Purpose.** PKALS = the permanent knowledge layer over the codebase: onboarding

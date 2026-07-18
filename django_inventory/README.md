@@ -1,3 +1,13 @@
+---
+id: root-readme
+type: topic-canonical
+status: active
+owner: handwritten
+scope: all — system-level
+anchors: —
+verified: 2026-07-13
+---
+
 # Kapil Enterprises Inventory
 
 Django 5.2 + PostgreSQL ERP for a garment manufacturing factory.

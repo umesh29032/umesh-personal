@@ -1,3 +1,13 @@
+---
+id: docs-family-f-modals-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Family F — Modals Consolidation Report (Phase F)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase F (Modals).** Short by design — the modal

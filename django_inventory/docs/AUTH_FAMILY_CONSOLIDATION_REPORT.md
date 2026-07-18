@@ -1,3 +1,13 @@
+---
+id: docs-auth-family-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Auth Family Consolidation Report (Phase D — Auth subset)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase D auth cluster.**

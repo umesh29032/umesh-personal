@@ -32,3 +32,9 @@ ACCOUNT_EMAIL_VERIFICATION = "none"
 # '*' matlab wildcard — production mein yeh dangerous hai (Host header attack)
 # local.py mein safe hai kyunki yeh server internet pe nahi hai
 ALLOWED_HOSTS = ['*']
+
+# devseed: dev-only seeder engine (Campaign Phase 12, SEED-D1 2026-07-17).
+# INSTALLED_APPS += : app registry mein SIRF local settings ke through add hota
+# hai — production settings mein yeh app EXIST hi nahi karta (structural guard
+# factor 5: commands are undiscoverable outside dev). base.py kabhi mat chhedo.
+INSTALLED_APPS += ["devseed"]

@@ -107,9 +107,17 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         if color_id.isdigit():
             rolls = rolls.filter(cloth_color_id=int(color_id))
 
-        ctx['total_rolls'] = rolls.count()
-        ctx['available_rolls'] = rolls.filter(status=ClothRoll.Status.NOT_USED).count()
-        ctx['used_rolls'] = rolls.filter(status=ClothRoll.Status.USED).count()
+        # G-1 (BOD-C, 2026-07-18): the status counts now live in roll_service —
+        # one calculation, two consumers (this page + the BOD tile). INERT:
+        # same keys, same numbers, same filter semantics.
+        from raw_materials.services import roll_service
+        _c = int(color_id) if color_id.isdigit() else None
+        counts = roll_service.stock_status_counts(from_dt=from_dt, to_dt=to_dt,
+                                                  color_id=_c)
+        ctx['total_rolls'] = counts['total']
+        ctx['available_rolls'] = counts['available']
+        ctx['damaged_rolls'] = counts['damaged']
+        ctx['used_rolls'] = counts['used']
 
         # ── Type × Color breakup ───────────────────────────────────────────
         # Rows = ClothType (active). Inside each row, list every color present
@@ -145,24 +153,9 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             type_rows[t_id]['available'] += row['available']
         ctx['type_breakup'] = sorted(type_rows.values(), key=lambda r: r['name'])
 
-        # ── By location ───────────────────────────────────────────────────
-        ctx['by_location'] = (
-            StorageLocation.active
-            .annotate(
-                roll_count=Count('rolls', filter=(
-                    (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
-                    & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
-                    & (Q(rolls__cloth_color_id=int(color_id)) if color_id.isdigit() else Q())
-                )),
-                available=Count('rolls', filter=(
-                    Q(rolls__status=ClothRoll.Status.NOT_USED)
-                    & (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
-                    & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
-                    & (Q(rolls__cloth_color_id=int(color_id)) if color_id.isdigit() else Q())
-                )),
-            )
-            .order_by('name')
-        )
+        # ── By location ── G-2 (BOD-C): extracted to roll_service, verbatim.
+        ctx['by_location'] = roll_service.stock_by_location(
+            from_dt=from_dt, to_dt=to_dt, color_id=_c)
 
         ctx['recent_rolls'] = (
             rolls.select_related('cloth_type', 'cloth_color', 'storage_location')

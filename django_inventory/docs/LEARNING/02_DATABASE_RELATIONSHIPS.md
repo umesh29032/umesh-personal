@@ -1,3 +1,13 @@
+---
+id: learning-02-database-relationships
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Database — how models STORE data, how they CONNECT, how a row is BORN
 
 > THE canonical answer to: "kaunsa model data kaise save karta hai, backend me

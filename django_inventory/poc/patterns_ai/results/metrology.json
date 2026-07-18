@@ -1,0 +1,33 @@
+{
+ "ground_truth_mm": {
+  "e1": 600.0,
+  "e2": 400.0,
+  "diag": 721.1102550927978
+ },
+ "scenarios": [
+  {
+   "scenario": "flat",
+   "detected_corners": 84,
+   "held_out_pairs": 59,
+   "err_mean_mm": 0.003,
+   "err_p95_mm": 0.007,
+   "err_max_mm": 0.007
+  },
+  {
+   "scenario": "tilt_mild",
+   "detected_corners": 84,
+   "held_out_pairs": 59,
+   "err_mean_mm": 0.023,
+   "err_p95_mm": 0.053,
+   "err_max_mm": 0.06
+  },
+  {
+   "scenario": "tilt_strong_noise",
+   "detected_corners": 84,
+   "held_out_pairs": 59,
+   "err_mean_mm": 0.03,
+   "err_p95_mm": 0.071,
+   "err_max_mm": 0.076
+  }
+ ]
+}

@@ -1,3 +1,13 @@
+---
+id: docs-ui-components-catalog
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # UI COMPONENTS CATALOG
 
 > **Status:** Component reference — **DESIGN ONLY, NO CODE.** The "where does it live + how

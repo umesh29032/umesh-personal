@@ -20,7 +20,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from accounts.models import Skill
 from inventory.models import Role
 from accounts.services import ROLE_SUPER_ADMIN, user_has_perm
-from production.models import Stage, WorkflowStage
+from production.models import MachineType, Stage, StageCategory, WorkflowStage
 
 
 class _StagePermissionRequired(UserPassesTestMixin):
@@ -59,11 +59,34 @@ class StageForm(forms.ModelForm):
 
     class Meta:
         model = Stage
+        # R10 frozen model: every operation declares category + work type
+        # (+ machine type when Machine) — the pickers for the config-only flow.
         fields = ['code', 'name', 'description', 'is_active',
+                  'category', 'work_type', 'machine_type',
                   'access_by_skill', 'access_by_role']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Data-driven masters (owner rule): pickers read ACTIVE rows only;
+        # existing stages keep deactivated FKs (PROTECT) for honest history.
+        self.fields['category'].queryset = StageCategory.active.all()
+        self.fields['machine_type'].queryset = MachineType.active.all()
+
+    def clean(self):
+        # Friendly mirror of the DB pair-constraint (rule 4): Machine ⇒ type
+        # required; Manual ⇒ type forbidden (auto-cleared, not errored — the
+        # user just flipped the radio, don't punish a leftover picker value).
+        cleaned = super().clean()
+        work_type = cleaned.get('work_type')
+        if work_type == Stage.WorkType.MACHINE and not cleaned.get('machine_type'):
+            self.add_error('machine_type',
+                           'Machine stages must declare their Machine Type.')
+        if work_type != Stage.WorkType.MACHINE:
+            cleaned['machine_type'] = None
+        return cleaned
 
 
 class StageListView(LoginRequiredMixin, _StagePermissionRequired, ListView):
@@ -155,3 +178,114 @@ class StageDeleteView(LoginRequiredMixin, _StagePermissionRequired, DeleteView):
             return redirect('production:stage-list')
         messages.success(self.request, f'Stage "{self.object.name}" deleted.')
         return super().form_valid(form)
+
+
+# ── R10-C data-driven masters — StageCategory + MachineType CRUD ────────────
+# Owner rule ("business owns the data, not the code"): classifications are
+# editable rows, never Python options. Same perm seam as the Stage library.
+
+class StageCategoryForm(forms.ModelForm):
+    class Meta:
+        model = StageCategory
+        fields = ['code', 'name', 'display_order', 'is_active']
+
+
+class MachineTypeForm(forms.ModelForm):
+    class Meta:
+        model = MachineType
+        fields = ['code', 'name', 'is_active']
+
+
+class StageCategoryListView(LoginRequiredMixin, _StagePermissionRequired, ListView):
+    required_perm = 'production.view_stagecategory'
+    model = StageCategory
+    template_name = 'production/master_list.html'
+    context_object_name = 'rows'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'master_title': 'Stage Categories',
+            'master_sub': ('Business-process grouping (Pre Production, Stitching…). '
+                           'Presentation only — the workflow engine never reads these.'),
+            'add_url': 'production:stage-category-add',
+            'edit_url': 'production:stage-category-edit',
+            'back_url': 'production:stage-list',
+            'can_add': user_has_perm(self.request.user, 'production.add_stagecategory'),
+            'can_change': user_has_perm(self.request.user, 'production.change_stagecategory'),
+            'show_order': True,
+        })
+        for r in ctx['rows']:
+            r.usage = r.stages.count()
+        return ctx
+
+
+class MachineTypeListView(LoginRequiredMixin, _StagePermissionRequired, ListView):
+    required_perm = 'production.view_machinetype'
+    model = MachineType
+    template_name = 'production/master_list.html'
+    context_object_name = 'rows'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update({
+            'master_title': 'Machine Types',
+            'master_sub': ('The KIND of machine an operation runs on — reusable '
+                           'across any number of stages. Physical machines live '
+                           'in the Machines register.'),
+            'add_url': 'production:machine-type-add',
+            'edit_url': 'production:machine-type-edit',
+            'back_url': 'production:stage-list',
+            'can_add': user_has_perm(self.request.user, 'production.add_machinetype'),
+            'can_change': user_has_perm(self.request.user, 'production.change_machinetype'),
+            'show_order': False,
+        })
+        for r in ctx['rows']:
+            r.usage = r.stages.count()
+        return ctx
+
+
+class _MasterEditBase(LoginRequiredMixin, _StagePermissionRequired):
+    template_name = 'production/master_form.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['master_title'] = self.master_title
+        ctx['back_url'] = self.back_url
+        return ctx
+
+    def get_success_url(self):
+        from django.urls import reverse
+        return reverse(self.back_url)
+
+
+class StageCategoryCreateView(_MasterEditBase, CreateView):
+    required_perm = 'production.add_stagecategory'
+    model = StageCategory
+    form_class = StageCategoryForm
+    master_title = 'New Stage Category'
+    back_url = 'production:stage-category-list'
+
+
+class StageCategoryUpdateView(_MasterEditBase, UpdateView):
+    required_perm = 'production.change_stagecategory'
+    model = StageCategory
+    form_class = StageCategoryForm
+    master_title = 'Edit Stage Category'
+    back_url = 'production:stage-category-list'
+
+
+class MachineTypeCreateView(_MasterEditBase, CreateView):
+    required_perm = 'production.add_machinetype'
+    model = MachineType
+    form_class = MachineTypeForm
+    master_title = 'New Machine Type'
+    back_url = 'production:machine-type-list'
+
+
+class MachineTypeUpdateView(_MasterEditBase, UpdateView):
+    required_perm = 'production.change_machinetype'
+    model = MachineType
+    form_class = MachineTypeForm
+    master_title = 'Edit Machine Type'
+    back_url = 'production:machine-type-list'

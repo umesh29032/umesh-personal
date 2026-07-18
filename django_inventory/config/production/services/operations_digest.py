@@ -50,6 +50,65 @@ def pending_report_tasks():
     )
 
 
+def adda_status_counts(*, from_dt=None, to_dt=None, fields=None) -> dict:
+    """G-4 (BOD-C, 2026-07-18, owner-gated): the Adda dashboard's KPI counts,
+    extracted VERBATIM from AddaDashboardView — one calculation, two consumers
+    (that page + the BOD on-hold tile). Same filter semantics: from/to bound
+    created_at; completed_today is deliberately GLOBAL (today's date, unfiltered),
+    exactly as the dashboard always showed it.
+
+    fields (BOD-D, 2026-07-18): optional subset — run ONLY the named counts
+    (same expressions, ONE calculation site; a consumer needing one number
+    shouldn't pay for four — BOD-D6). None = all four (the dashboard call,
+    unchanged)."""
+    from production.models import Adda
+    addas = Adda.objects.all()
+    if from_dt:
+        addas = addas.filter(created_at__gte=from_dt)
+    if to_dt:
+        addas = addas.filter(created_at__lt=to_dt)
+    wanted = set(fields) if fields is not None else {
+        'in_progress', 'on_hold', 'completed_today', 'total_completed'}
+    out = {}
+    if 'in_progress' in wanted:
+        out['in_progress'] = addas.filter(status=Adda.Status.IN_PROGRESS).count()
+    if 'on_hold' in wanted:
+        out['on_hold'] = addas.filter(status=Adda.Status.ON_HOLD).count()
+    if 'completed_today' in wanted:
+        out['completed_today'] = Adda.objects.filter(
+            status=Adda.Status.COMPLETED,
+            completed_at__date=timezone.now().date(),
+        ).count()
+    if 'total_completed' in wanted:
+        out['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
+    return out
+
+
+def stage_breakdown(*, from_dt=None, to_dt=None) -> list:
+    """G-4 (BOD-C, 2026-07-18, owner-gated): in-progress Adda count per stage,
+    extracted VERBATIM from AddaDashboardView (single grouped aggregate, no N+1;
+    only stages actually holding an in-progress Adda — zero-chips stay hidden)."""
+    from django.db.models import Count
+    from production.models import Adda, Stage
+    addas = Adda.objects.all()
+    if from_dt:
+        addas = addas.filter(created_at__gte=from_dt)
+    if to_dt:
+        addas = addas.filter(created_at__lt=to_dt)
+    stage_counts = {
+        r['current_stage__stage']: r['n']
+        for r in addas.filter(
+            status=Adda.Status.IN_PROGRESS,
+            current_stage__stage__isnull=False,
+        ).values('current_stage__stage').annotate(n=Count('id'))
+    }
+    return [
+        {'label': stage.name, 'count': stage_counts.get(stage.id, 0)}
+        for stage in Stage.active.order_by('name')
+        if stage_counts.get(stage.id, 0) > 0
+    ]
+
+
 def operations_digest() -> dict:
     """Return the six digest tiles (priority order):
       1. stalled Addas   2. pending reports   3. active Addas

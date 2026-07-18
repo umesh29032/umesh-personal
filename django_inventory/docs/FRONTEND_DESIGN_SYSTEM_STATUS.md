@@ -1,3 +1,13 @@
+---
+id: docs-frontend-design-system-status
+type: status-anchor
+status: active
+owner: handwritten
+scope: campaign
+anchors: —
+verified: 2026-07-18
+---
+
 > # ⛔ SUPERSEDED (2026-06-15)
 > This phase-based audit is **superseded** by the per-HTML
 > [HTML_AUDIT_MASTER.md](HTML_AUDIT_MASTER.md) +

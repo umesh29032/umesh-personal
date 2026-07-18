@@ -1,0 +1,100 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Full & Final · {{ viewed_worker.get_full_name|default:viewed_worker.email }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Page-scoped (rule 10). Mobile-first single column. */
+    .fnf { max-width: 720px; margin: 0 auto; }
+    .fnf .panel { padding: 18px 20px; margin-bottom: 14px; }
+    .fnf h2 { margin: 0 0 10px; font-size: 15px; }
+    .fnf .blocker { background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #991b1b; margin-bottom: 10px; }
+    .fnf .okrow { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: 14px; flex-wrap: wrap; }
+    .fnf .okrow:last-child { border-bottom: 0; }
+    .fnf .muted { color: var(--stone); font-size: 13px; }
+    .fnf .warn { background: #fffbeb; border: 1.5px solid #f6ce8f; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #92400e; margin: 10px 0; }
+    .fnf input[type=text] { width: 100%; padding: 11px 13px; font-size: 14px; background: var(--cream); border: 1.5px solid var(--border-subtle); border-radius: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.04); min-height: 44px; }
+    .fnf .confirm { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; font-size: 13px; margin: 12px 0; cursor: pointer; }
+    .fnf .confirm input { width: 20px; height: 20px; margin-top: 1px; flex-shrink: 0; }
+    .fnf .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-subtle); padding: 14px 0; display: flex; justify-content: flex-end; gap: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fnf">
+    <div class="hero-strip copper">
+        <h1>Full &amp; Final Settlement</h1>
+        <p>{{ viewed_worker.get_full_name|default:viewed_worker.email }}
+           {% if pv.is_monthly %}<span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span>{% endif %}
+           — settle everything, clear advances, pay cash, deactivate. History is preserved forever.</p>
+    </div>
+
+    {% if not is_super_admin %}
+    <div class="panel"><div class="muted">Only a Super Admin can run a Full &amp; Final settlement.</div></div>
+    {% else %}
+
+    {% comment %}R7 blockers — resolved through EXISTING flows only (P-3/P-5).{% endcomment %}
+    {% if pv.open_tasks %}
+    <div class="panel">
+        <h2>⛔ Open tasks — resolve first</h2>
+        {% for t in pv.open_tasks %}
+        <div class="blocker">
+            {{ t.stage_record.adda.code }} · {{ t.stage_record.workflow_stage.stage.name }} — {{ t.get_status_display }}.
+            <a href="{% url 'production:adda-detail' t.stage_record.adda.code %}">Open Adda</a>
+            (submit the report, or remove the worker from the stage roster to cancel).
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if pv.blocked_addas %}
+    <div class="panel">
+        <h2>⛔ Quantities not final yet</h2>
+        {% for b in pv.blocked_addas %}
+        <div class="blocker">
+            {{ b.adda.code }}: payable stage(s) not completed — {{ b.incomplete|join:", " }}.
+            <a href="{% url 'production:adda-detail' b.adda.code %}">Open Adda</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="panel">
+        <h2>Will be settled ({{ pv.ready_addas|length }} Adda{{ pv.ready_addas|length|pluralize }})</h2>
+        {% for r in pv.ready_addas %}
+        <div class="okrow"><span>{{ r.adda.code }} · {{ r.adda.product.name }}</span>
+            <span>{{ r.lines }} line{{ r.lines|pluralize }} · <strong>₹{{ r.expected }}</strong></span></div>
+        {% empty %}
+        <div class="muted">No unsettled work lines{% if pv.is_monthly %} — monthly workers never settle (salary via Factory Expenses){% endif %}.</div>
+        {% endfor %}
+    </div>
+
+    <div class="panel">
+        <h2>Money position</h2>
+        <div class="okrow"><span>Payable today (before F&amp;F settlements)</span><strong>₹{{ pv.payable_now }}</strong></div>
+        <div class="okrow"><span>Outstanding advances</span>
+            <span>{% for a in pv.advances %}#{{ a.advance.pk }}: ₹{{ a.remaining }}{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</span></div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            <h2>Execute</h2>
+            {% if pv.advances %}
+            <div class="warn">⚠ Residual advances will be <strong>WRITTEN OFF</strong> (forgiven on record — audited, reversible, never touches payable). Reason is mandatory.</div>
+            <input type="text" name="write_off_reason" placeholder="Write-off reason (required)" {% if pv.ready %}required{% endif %}>
+            {% endif %}
+            <label class="confirm"><input type="checkbox" required>
+                I understand: remaining payable is paid in full, residual advances are written off,
+                and the account is deactivated (login blocked; history and money records stay).</label>
+            <div class="muted">Not one giant transaction — each step is its own audited event; if anything stops midway, reopen this page and it resumes from what is left.</div>
+        </div>
+        <div class="sticky-bar">
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:worker-detail' viewed_worker.pk %}">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg" {% if not pv.ready %}disabled title="Resolve the blockers above first"{% endif %}>
+                Run Full &amp; Final</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

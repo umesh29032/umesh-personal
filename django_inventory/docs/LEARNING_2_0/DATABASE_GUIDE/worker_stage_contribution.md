@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-worker-stage-contribution
+type: database-guide
+status: active
+owner: handwritten
+scope: worker_stage_contribution (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: WorkerStageContribution (WSC) — production truth
 
 ## TL;DR

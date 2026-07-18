@@ -31,10 +31,14 @@ class UnifiedTrackingTests(TestCase):
             AddaHistory.objects.filter(adda=adda).values_list('change_type', flat=True)
         )
 
-    def test_create_adda_logs_workers_assigned(self):
+    def test_create_adda_logs_created_only_then_explicit_assign_logs_workers(self):
+        """F-2 polish: creation logs CREATED only (no auto-assign event);
+        WORKERS_ASSIGNED appears when the manager assigns explicitly."""
         adda = create_adda(self.user, product=self.product)
+        self.assertEqual(self._types(adda), {'created'})
+        from production.services import start_layering
+        start_layering(adda=adda, worker_ids=[self.user.pk], user=self.user)
         types = self._types(adda)
-        self.assertIn('created', types)
         self.assertIn('workers_assigned', types)
         wa = AddaHistory.objects.get(adda=adda, change_type='workers_assigned')
         self.assertIsNotNone(wa.stage_record)              # bound to execution row
@@ -48,8 +52,17 @@ class UnifiedTrackingTests(TestCase):
         from raw_materials.models import ClothColor
         adda = create_adda(self.user, product=self.product)
         cutting_wf = self.product.workflow_stages.get(stage__code='cutting')
-        adda.current_stage = cutting_wf            # add_bundle_item requires being at cutting
+        adda.current_stage = cutting_wf
         adda.save(update_fields=['current_stage'])
+        # GAP-5: bundling is POST-JOIN — complete the cutting lane first.
+        from django.utils import timezone as _tz
+        from production.models import AddaStageRecord as _ASR, CuttingRecord as _CRec
+        _sr, _ = _ASR.objects.get_or_create(
+            adda=adda, workflow_stage=cutting_wf,
+            defaults={'started_at': _tz.now()})
+        _CRec.objects.get_or_create(stage_record=_sr, defaults={'pieces_cut': 0})
+        _sr.completed_at = _tz.now()
+        _sr.save(update_fields=['completed_at'])
         size = ProductSize.objects.create(product=self.product, code='m', label='M')
         pat, _ = ProductPattern.objects.get_or_create(code='bc-test', defaults={'name': 'Front'})
         ProductPatternAssignment.objects.get_or_create(

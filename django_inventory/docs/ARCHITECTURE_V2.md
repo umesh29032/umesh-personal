@@ -1,3 +1,13 @@
+---
+id: docs-architecture-v2
+type: truth-lock
+status: active
+owner: frozen
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Architecture V2 — Adda Production Tracking & Settlement
 
 > Status (updated 2026-06-14): **V2-1a→1d + V2-2 + V2-3 BUILT & COMMITTED**, AND the

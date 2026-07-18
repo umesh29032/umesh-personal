@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-05-why-settlement-not-payment
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why settlement ≠ payment (Model A)
 
 **Problem:** "Settle karna" aur "cash dena" ek hi cheez maan lein to: earning,

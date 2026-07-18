@@ -40,13 +40,22 @@
             <a class="primary" href="{% url 'expense:settlement-create' viewed_worker.pk %}">Start Settlement</a>
             <a href="{% url 'expense:advance-add' %}">+ Advance</a>
             <a href="{% url 'expense:worker-profile' viewed_worker.pk %}">Profile</a>
+            {% if is_super_admin and viewed_worker.is_active %}
+            {# R7 (PDD §20): exit flow — super-admin only, service re-validates #}
+            <a href="{% url 'expense:worker-fnf' viewed_worker.pk %}">Full &amp; Final</a>
+            {% endif %}
         </div>
         {% endif %}
     </div>
 
     <div class="stat-grid">
         <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value">{% money summary.pending_payable %}</div></div>
+        {# R4 (D4/P-4): monthly worker → suppress ₹ expectation entirely, badge instead #}
+        {% if is_monthly %}
+        <div class="stat-card"><div class="label">Pay Basis</div><div class="value"><span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span></div></div>
+        {% else %}
         <div class="stat-card"><div class="label">Expected (unsettled)</div><div class="value">{% money unsettled_expected %}</div></div>
+        {% endif %}
         <div class="stat-card"><div class="label">Earned (settled)</div><div class="value">{% money summary.total_earnings %}</div></div>
         <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">{% money summary.advance_outstanding %}</div></div>
         <div class="stat-card"><div class="label">Paid (cash)</div><div class="value">{% money summary.total_settled %}</div></div>
@@ -61,7 +70,8 @@
             <div><div class="k">Bank A/C</div>{{ profile.bank_account_name|default:"—" }}{% if profile.bank_account_number %} · {{ profile.bank_account_number }}{% endif %}</div>
             <div><div class="k">IFSC</div>{{ profile.bank_ifsc|default:"—" }}</div>
             <div><div class="k">Joined</div>{{ profile.joining_date|default:"—" }}</div>
-            <div><div class="k">Status</div>{% if profile.is_active %}Active{% else %}Inactive{% endif %}</div>
+            {# WP-B (audit 2026-07-05): account state = User.is_active (F&F flips it); the profile flag is legacy/display-only and went stale after exits #}
+            <div><div class="k">Status</div>{% if viewed_worker.is_active %}Active{% else %}Inactive{% endif %}</div>
         </div>
     </div>
     {% endif %}
@@ -86,7 +96,7 @@
     {% endif %}
 
     <div class="panel">
-        <h2>Settlement History</h2>
+        <h2>Payments</h2>
         {% for s in settlements %}
             <div class="line">
                 <div>
@@ -96,7 +106,7 @@
                 <div class="amt-debit">{% money s.amount_paid %}</div>
             </div>
         {% empty %}
-            <div class="empty">No settlements yet.</div>
+            <div class="empty">No cash payments yet.</div>
         {% endfor %}
     </div>
 

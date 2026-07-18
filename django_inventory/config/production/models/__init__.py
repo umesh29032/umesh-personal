@@ -21,6 +21,8 @@ Subdomain map:
   barcode.py   → BarcodeGenerationRecord, LabelPrintQueue
 """
 from .core import (
+    MachineType,
+    StageCategory,
     AllocationDimensions,
     CostMethod,
     Product,
@@ -35,6 +37,7 @@ from .core import (
 from .adda import (
     Adda,
     AddaStageRecord,
+    CuttingStream,
 )
 from .layering import (
     LayeringRecord,
@@ -72,6 +75,8 @@ __all__ = [
     'CostMethod',
     'Product',
     'Stage',
+    'StageCategory',
+    'MachineType',
     'WorkflowStage',
     'AllocationDimensions',
     'WorkflowStageRoleRate',
@@ -81,6 +86,7 @@ __all__ = [
     'WorkerStageAllocation',
     'Adda',
     'AddaStageRecord',
+    'CuttingStream',
     'LayeringRecord',
     'LayeringRollEntry',
     'RemainingClothOfClothRoll',

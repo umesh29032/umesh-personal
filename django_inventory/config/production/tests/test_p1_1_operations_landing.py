@@ -33,6 +33,17 @@ def _worker(email):
 
 
 class LandingRoutingTests(TestCase):
+    def test_super_admin_lands_on_bod(self):
+        # D9 landing override (BOD-E, owner charter 2026-07-18): Owner/SA → BOD;
+        # every other role keeps its P1-1 landing (the tests below, unchanged).
+        sa = User.objects.create_user(email='p11-sa@test', password='x')
+        sa.role = Role.objects.get(code='super_admin')
+        sa.save()
+        self.client.force_login(sa)
+        resp = self.client.get(reverse('accounts:home'))
+        self.assertRedirects(resp, reverse('bod:dashboard'),
+                             fetch_redirect_response=False)
+
     def test_management_lands_on_operations(self):
         self.client.force_login(_mgr('p11-mgr@test'))
         resp = self.client.get(reverse('accounts:home'))
@@ -42,7 +53,7 @@ class LandingRoutingTests(TestCase):
     def test_worker_lands_on_my_dashboard(self):
         self.client.force_login(_worker('p11-w@test'))
         resp = self.client.get(reverse('accounts:home'))
-        self.assertRedirects(resp, reverse('inventory:user_dashboard'),
+        self.assertRedirects(resp, reverse('inventory:my_dashboard'),
                              fetch_redirect_response=False)
 
 

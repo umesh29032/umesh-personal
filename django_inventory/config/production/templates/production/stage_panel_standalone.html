@@ -1,6 +1,6 @@
 {% extends "accounts/base.html" %}
 
-{% block page_title %}{{ adda.code }} · {{ stage_type|capfirst }}{% endblock %}
+{% block page_title %}{{ adda.code }} · {{ stage_label|default:stage_type|capfirst }}{% endblock %}
 
 {% block extra_head %}{% include 'shared/_form_styles.html' %}{% endblock %}
 
@@ -11,15 +11,26 @@ as the embedded version. Use this when opening the stage URL directly in a tab.
 {% endcomment %}
 <div class="form-shell">
     <div class="hero">
-        <h1>{{ adda.code }} — {{ stage_type|capfirst }}</h1>
+        <h1>{{ adda.code }} — {{ stage_label|default:stage_type|capfirst }}</h1>
         <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
-        <span class="hero-chip">{{ stage_type|upper }} STAGE</span>
+        <span class="hero-chip">{{ stage_label|default:stage_type|upper }} STAGE</span>
     </div>
 
+    {# R8: generic prev-stage admin snapshot — ctx is management-gated #}
+    {% include 'production/_stage_admin_snapshot.html' %}
+    {# OP-1 fix: mirror the embedded template's dispatch — the standalone page #}
+    {# previously knew only layering/cutting, so every OTHER stage rendered an #}
+    {# empty panel here (generic operations included). #}
     {% if stage_type == 'layering' %}
         {% include 'production/_stage_panel_layering.html' %}
+    {% elif stage_type == 'cutting_pattern' %}
+        {% include 'production/_stage_panel_cutting_pattern.html' %}
     {% elif stage_type == 'cutting' %}
         {% include 'production/_stage_panel_cutting.html' %}
+    {% elif stage_type == 'barcode_generation' %}
+        {% include 'production/_stage_panel_barcode_gen.html' %}
+    {% else %}
+        {% include 'production/_stage_panel_generic.html' %}
     {% endif %}
 
     <div style="margin: 18px 0;">

@@ -1,3 +1,13 @@
+---
+id: l2-living-documentation-system-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system (PKALS-LIVE)
+anchors: —
+verified: 2026-07-13
+---
+
 # LIVING DOCUMENTATION SYSTEM (PKALS-LIVE)
 
 ## TL;DR (2 min)

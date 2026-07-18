@@ -1,0 +1,88 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Record Expense{% endblock %}
+
+{% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-4a: canonical .field (page label/input rules below still win) #}
+<style>
+    .expense-form { max-width: 640px; margin: 0 auto; }
+    .expense-form .panel { padding: 20px 22px; margin-bottom: 80px; }   /* sticky-bar glue */
+    .expense-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .expense-form input, .expense-form select, .expense-form textarea {
+        width: 100%; padding: 11px 13px; font-size: 14px;
+        background: var(--cream); border: 1.5px solid var(--border-subtle);
+        border-radius: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+    }
+    .expense-form input:focus, .expense-form select:focus, .expense-form textarea:focus { outline: none; border-color: var(--copper); }
+    .expense-form .errs { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+    .expense-form .hint { font-size: 11px; color: var(--stone); margin-top: 4px; }
+    .expense-form .dup-warn { background: #fffbeb; border: 1.5px solid #f6ce8f; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #92400e; margin: 12px 0; }
+    .expense-form .dup-warn label { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; margin: 10px 0 0; cursor: pointer; }
+    .expense-form .dup-warn input[type=checkbox] { width: 20px; height: 20px; margin-top: 1px; flex-shrink: 0; }
+    .expense-form .sticky-bar {
+        position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px);
+        border-top: 1px solid var(--border-subtle); padding: 14px 0; margin-top: -64px;
+        display: flex; justify-content: flex-end; gap: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="expense-form">
+    <div class="hero-strip copper">
+        <h1>Record Expense</h1>
+        <p>Factory running cost — rent, electricity, monthly salary, other. Append-only: mistakes are voided with a reason, never edited. Not part of Adda cost or worker ledgers.</p>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            {% if form.non_field_errors %}<div class="errs">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+                <div class="field" {% if field.name == 'worker' %}id="worker-field"{% endif %}>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.name == 'worker' %}<div class="hint">Required for salary — records WHOSE salary this is (audit only; never touches their ledger or settlement).</div>{% endif %}
+                    {% if field.errors %}<div class="errs">{{ field.errors|striptags }}</div>{% endif %}
+                </div>
+            {% endfor %}
+            {% if duplicate_warning %}
+            {# M-3: warn-and-confirm — the SERVICE refuses without this box ticked #}
+            <div class="dup-warn">
+                ⚠ {{ duplicate_warning }}
+                <label><input type="checkbox" name="confirm_duplicate" value="1">
+                I understand — record this additional salary entry anyway.</label>
+            </div>
+            {% endif %}
+        </div>
+        <div class="sticky-bar">
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:factory-expense-list' %}">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">Record Expense</button>
+        </div>
+    </form>
+</div>
+{{ worker_salaries|json_script:"worker-salaries" }}
+<script>
+// R5/P-1: worker picker only makes sense for salary — show/hide follows the
+// category. Display-only sugar; expense_service enforces the actual rule.
+// L-3: picking a worker prefills an EMPTY amount from User.salary (the agreed
+// reference salary) — convenience only, freely editable before submit.
+(function () {
+    var cat = document.getElementById('id_category');
+    var wf = document.getElementById('worker-field');
+    var worker = document.getElementById('id_worker');
+    var amount = document.getElementById('id_amount');
+    var salaries = JSON.parse(document.getElementById('worker-salaries').textContent || '{}');
+    if (!cat || !wf) return;
+    function sync() { wf.style.display = (cat.value === 'salary') ? '' : 'none'; }
+    cat.addEventListener('change', sync);
+    sync();
+    if (worker && amount) {
+        worker.addEventListener('change', function () {
+            if (cat.value === 'salary' && !amount.value && salaries[worker.value]) {
+                amount.value = salaries[worker.value];
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

@@ -1,3 +1,13 @@
+---
+id: docs-adr-0009-cost-truth
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR-0009 — Cost truth: the duality, the full-cost formula, and material price semantics
 
 Status: **ACCEPTED** (owner, 2026-06-11 — C-1 pre-deploy hardening).

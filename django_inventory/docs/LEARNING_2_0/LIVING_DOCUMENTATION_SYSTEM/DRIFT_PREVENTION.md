@@ -1,3 +1,13 @@
+---
+id: l2-living-documentation-system-drift-prevention
+type: topic-canonical
+status: active
+owner: handwritten
+scope: documentation system (PKALS-LIVE)
+anchors: —
+verified: 2026-07-13
+---
+
 # DRIFT PREVENTION — rules + detection
 
 ## TL;DR

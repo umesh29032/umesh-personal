@@ -1,0 +1,95 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Factory Expenses{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Page-scoped (rule 10). */
+    .factory-expenses .month-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .factory-expenses .month-nav .label { font-weight: 700; font-size: 15px; }
+    .factory-expenses .totals { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .factory-expenses .tot { background: var(--cream); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 14px; min-width: 120px; }
+    .factory-expenses .tot .v { font-size: 17px; font-weight: 800; }
+    .factory-expenses .tot .l { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .05em; }
+    .factory-expenses tr.voided td { text-decoration: line-through; color: var(--stone); }
+    .factory-expenses tr.voided td .void-why { text-decoration: none; display: block; font-size: 11px; color: #b91c1c; }
+    .factory-expenses details.void-box { margin-top: 4px; }
+    .factory-expenses details.void-box input { padding: 8px 10px; font-size: 13px; background: var(--cream); border: 1.5px solid var(--border-subtle); border-radius: 8px; width: 100%; max-width: 260px; margin: 6px 0; display: block; min-height: 40px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="factory-expenses">
+    <div class="hero-strip copper">
+        <h1>Factory Expenses</h1>
+        <p>Running costs — rent, electricity, monthly salaries, other. Factory-level only: never part of any Adda's manufacturing cost or a worker's ledger (ADR-0011). Voided rows stay visible.</p>
+    </div>
+
+    {# Prev / month / Next — deliberate NO native month input (owner no-native-popup rule). #}
+    <div class="month-nav">
+        {% if month == 1 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"-1" }}-12">‹ Prev</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 11 %}0{% endif %}{{ month|add:"-1" }}">‹ Prev</a>
+        {% endif %}
+        <span class="label">{{ month_value }}</span>
+        {% if month == 12 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"1" }}-01">Next ›</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 9 %}0{% endif %}{{ month|add:"1" }}">Next ›</a>
+        {% endif %}
+        <a class="btn btn-copper" href="{% url 'expense:factory-expense-add' %}">+ Record Expense</a>
+        {# RMX-D: the approved sibling navigation — material money lives on its own page, never blended here (ADR-0011) #}
+        <a class="btn btn-ghost" href="{% url 'expense:material-spend' %}?month={{ month_value }}">Material spend →</a>
+    </div>
+
+    <div class="totals">
+        <div class="tot"><div class="v">₹{{ totals.total }}</div><div class="l">This month</div></div>
+        {% for cat in totals.by_category.values %}
+        <div class="tot"><div class="v">₹{{ cat.total }}</div><div class="l">{{ cat.label }}</div></div>
+        {% endfor %}
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Category</th><th class="num">Amount ₹</th><th>Worker</th><th>Notes</th><th>Entered by</th>{% if is_super_admin %}<th>Actions</th>{% endif %}</tr>
+            </thead>
+            <tbody>
+            {% for e in expenses %}
+                <tr {% if e.voided_at %}class="voided"{% endif %}>
+                    <td data-label="Date">{{ e.expense_date }}</td>
+                    <td data-label="Category">{{ e.get_category_display }}</td>
+                    <td data-label="Amount ₹" class="num">{{ e.amount }}</td>
+                    <td data-label="Worker">{% if e.worker %}{{ e.worker.get_full_name|default:e.worker.email }}{% else %}—{% endif %}</td>
+                    <td data-label="Notes">{{ e.notes|default:"—" }}
+                        {% if e.voided_at %}<span class="void-why">Voided by {{ e.voided_by.get_full_name|default:e.voided_by.email }}: {{ e.void_reason }}</span>{% endif %}
+                    </td>
+                    <td data-label="Entered by">{{ e.entered_by.get_full_name|default:e.entered_by.email }}</td>
+                    {% if is_super_admin %}
+                    <td data-label="Actions" class="td-actions">
+                        {% if not e.voided_at %}
+                        {# Void = the ONLY correction path (no edit). Reason mandatory — service re-validates. #}
+                        <details class="void-box">
+                            <summary class="btn btn-ghost">Void…</summary>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="expense_id" value="{{ e.pk }}">
+                                <input type="hidden" name="month" value="{{ month_value }}">
+                                <input type="text" name="void_reason" placeholder="Reason (required)" required>
+                                <button type="submit" class="btn btn-copper"
+                                        onclick="return confirm('Void this {{ e.get_category_display|lower }} expense of ₹{{ e.amount }}? It stays visible but leaves the totals.');">Confirm void</button>
+                            </form>
+                        </details>
+                        {% else %}—{% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                <tr><td colspan="7">No expenses recorded for {{ month_value }}.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

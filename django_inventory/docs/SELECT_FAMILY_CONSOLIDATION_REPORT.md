@@ -1,3 +1,13 @@
+---
+id: docs-select-family-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Select Family Consolidation Report (Phase A)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase A (Selects), 21/21 units.**

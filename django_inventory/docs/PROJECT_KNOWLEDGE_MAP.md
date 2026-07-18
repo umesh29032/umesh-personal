@@ -1,3 +1,13 @@
+---
+id: project-knowledge-map
+type: entry-index
+status: active
+owner: handwritten
+scope: all — navigation/state
+anchors: —
+verified: 2026-07-13
+---
+
 # PROJECT KNOWLEDGE MAP — Kapil Enterprises ERP
 
 > **Mandatory first read** for every new developer — and for the owner
@@ -13,7 +23,7 @@
 ```
  CLOTH ROLLS ──▶ ADDA (production batch of ONE product) ──▶ GARMENTS
  (raw_materials)        moves through STAGES                (future G5 stock)
-                Layering → Cutting-Pattern → Cutting → Barcode-Gen
+                Layering → Pattern Design → Cutting → Barcode-Gen
                      workers REPORT what they made (phones!)
                               │
             ┌─────────────────┴───────────────────┐
@@ -55,7 +65,12 @@ worker phone: report_contributions(task, lines)
 worker: complete_worker_task
    └▶ FREEZES expected_rate / expected_earning   (visibility, NEVER money)
 management (P1): set_verified_quantity          ← correction, reported untouched
-stage completes: unreported tasks AUTO-CANCEL (F3) — P2 dialog names them first
+stage completes: BLOCKS while workers are mid-work (C3, R3 — transitional
+   IN_PROGRESS-only; auto-assignment is fully REMOVED (freeze closeout C-1,
+   2026-07-05 — manager assignment = the ONLY roster source, PDD amendment 4);
+   the strict-C3 flip to also block on ASSIGNED stays owner-gated pending
+   manual testing); super-admin override w/ audited reason; untouched
+   ASSIGNED still auto-cancel (F3)
 ```
 **C-TM (locked):** every capture path — manual today, barcode scans tomorrow —
 converges into WSC through worker_task_service. No second door, ever.
@@ -95,7 +110,9 @@ START (one click: pick product → code auto e.g. 3-PATTI-003)
       in the Flow Editor: order, rate, billed-at grouping, pay-eligibility,
       future Tracking Mode TM-1)
 LAYERING   rolls attach (weight verified) … leftovers MANDATORY at complete
-CUTTING-PATTERN  evidence (photos/video)
+           (production-INPUT stage — non-payable since the stage-trio spec)
+PATTERN DESIGN  (code cutting_pattern) — pattern master phone CHECKLIST of
+           ProductPatternAssignments + photos/video evidence; FIXED-per-Adda pay
 CUTTING    breakup per size, bundles, workers report color/size/qty  ← first
            real quantities; duration auto from timestamps (owner rule)
 BARCODE-GEN  BarcodeBatch ranges per (adda,color,size) — piece identity =
@@ -145,11 +162,17 @@ Full service-connection diagram: [LEARNING/04_SERVICE_LAYER.md](LEARNING/04_SERV
 | `adda_settlement_service` | AddaSettlement(+Item), era-B SWAs | management UI only | a line is paid AT MOST ONCE; full provenance item↔SWA↔ledger↔WSC; strict lock order | double-pay, deadlocks, unauditable money |
 | `ledger_service` | WorkerLedgerEntry | other expense services only | append-only money; reversal nets in-period | silent balance corruption, permanent |
 | `allocation_service` | era-A SWAs (+era-A void) | lever-ON only (rollback) | symmetric double-credit guard; era-B lines refuse void | legacy path racing settlements |
-| `cost_service` | processing_cost freeze; `role_rate_for` | stage services | standard-cost frozen price-at-time; grouped members yield NO rate (C-1 — no double pay) | retro cost rewrites; grouped double-pay |
+| `cost_service` | processing_cost freeze; `role_rate_for`; `effective_pay_rate` = the F2 chokepoint (grouped→0 AND non-payable→0, one rule everywhere) | stage services + every expected recompute | standard-cost frozen price-at-time; grouped/non-payable stages yield rate 0 (C-1 + A360 one-rule — no double/phantom pay) | retro cost rewrites; grouped double-pay; hidden expectations |
+| `stage_rate_service` | AddaStageRoleRate + RateCorrectionAudit | stage services; super-admin rerate | frozen per-(SR,role) payable rate; correct-until-settlement, audited | retro re-pricing of frozen work |
+| `settlement_service` | PayrollSettlement(+Item incl. R7 write-offs) | management UI; fnf orchestration | payment-only event; write-off = audited PSI without ledger debit | cash without trail; silent loan forgiveness |
+| `advance_service` | WorkerAdvance | management UI | separate loan pool; monthly workers refused (M-2 temporary rule) | unrecoverable loans |
+| `payroll_service.set_pay_basis` | WorkerPayBasisAudit (+ the pay_basis write) | super-admin | audited monthly/piece-rate switches, settlement-lock-joined | unaudited pay-structure flips |
+| `expense_service` | FactoryExpense | management create / super-admin void | factory-level cost only (ADR-0011) — zero ledger interaction, test-pinned | salary leaking into Adda cost |
 
 (`history_service` also single-writes every `*History` row; `consume_leftover`
-writes material consumption, C-1. The list above is the canonical set; it is not
-a fixed number — phases may add a single-writer service.)
+writes material consumption, C-1; `fnf_service` is ORCHESTRATION-only — it
+writes nothing itself. The list above is the canonical set; it is not a fixed
+number — phases may add a single-writer service.)
 
 ## 8) Phase history (how we got here)
 
@@ -163,6 +186,11 @@ a fixed number — phases may add a single-writer service.)
 | C-1 (2026-06-11) | grouped-member guard, leftover write path, ADR-0009/0010 | regret-prevention before real data |
 | P1/P2/P3 (2026-06-12) | verified-qty surface, completion warning, duality hint | normal human mistakes stop costing pay |
 | Frontend S1 + A-scope (2026-06-12) | mobile table fix, vendor central, canon CSS vocabulary | money screens = reference UI for G4/Missing/Alter |
+| Foundation S1–S5 + F1–F4 (2026-06-14) | rate snapshots, good/alter/missing, piece pools, enforcement flags (default OFF) | production-truth foundation ahead of stitching |
+| Production audit 01–17 (2026-06-14→15) | 92 findings, 45 fixed, 700 green — CLOSED baseline | stabilization before features |
+| 🔒 PDD v1.0 + roadmap (2026-07-04) | product design frozen; R1–R11 derived | execution, not redesign |
+| **PDD stream R1–R8 + A360 (2026-07-04→05)** | nav+F1 · layering earnings→later non-payable · C3 guard · MONTHLY pay basis · FactoryExpense+ADR-0011 · verified-qty audit · F&F (only_worker + write-off) · Pattern Design rename + checklist + FIXED pay + generic snapshots · A360 read-only hub + one-rule non-payable freeze | the complete earning/settlement/overview foundation (gate 811, all owner-accepted, uncommitted) |
+| **R10 machines · OP-1 + hardening · pre-Phase-3 A-D · Phase-3 config + 3 journeys · excellence audits (2026-07-05→06)** | machines app + Stage.work_type/machine_type · multi-worker dim-scoped allocation (blind, verify-reduce, audited void) · damaged/machine_code/first_report_at · REAL flows T-SHIRT 16/LOWER 13/3-PATTI 12 settled ₹801.00/₹344.25/₹633.00 · UX+engineering sweeps (gate 885) | **MANUFACTURING V1 FROZEN — [MANUFACTURING_V1_FREEZE.md](MANUFACTURING_V1_FREEZE.md); next = AI Pattern Intelligence ([AI_PATTERN_INTELLIGENCE/PRODUCT_VISION_V2.md](AI_PATTERN_INTELLIGENCE/PRODUCT_VISION_V2.md); enterprise-era KICKOFF archived)** |
 
 ## 9) ADR summary (locked decisions — contradicting one needs a new ADR)
 
@@ -178,8 +206,9 @@ a fixed number — phases may add a single-writer service.)
 | 0008 | commerce boundary: Order↔Adda only via stock; revenue never in manufacturing (+margin addendum) |
 | 0009 | cost duality NEVER additive; full-cost formula; labor-source rule; purchase-price semantics |
 | 0010 | global references forever; multi-factory = one DB + site dim (never fork); barcode payloads permanent; rework case-scoped; no price fields in production |
+| 0011 | monthly salary = factory-level FactoryExpense; NEVER allocated into per-Adda cost until an owner-approved allocation phase (which must not rewrite history) |
 
-## 10) Roadmap (canonical: ROADMAP_REVIEW_POST_C1_2026_06_11.md)
+## 10) Roadmap (canonical: IMPLEMENTATION_ROADMAP_PDD_V1.md — the PDD-derived roadmap; ROADMAP_REVIEW_POST_C1_2026_06_11.md = pre-PDD historical source for R11/gated items)
 
 ```
 DEPLOY ─▶ soak (G4 thin slice rides along; TM-1 week 1-2)

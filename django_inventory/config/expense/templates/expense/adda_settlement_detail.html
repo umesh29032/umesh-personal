@@ -126,7 +126,31 @@
         {% endfor %}
 
         {% if not workers %}
-        <div class="panel"><div class="muted">No settleable lines — every completed contribution on payable stages is already credited (see below).</div></div>
+        <div class="panel"><div class="muted">No settleable lines — every completed contribution on payable stages is already credited or excluded (see below).</div></div>
+        {% endif %}
+
+        {# R4 (PDD §27-D4): monthly workers' lines — visible so the admin SEES what won't pay #}
+        {% if skip_monthly %}
+        <div class="panel">
+            <h2>Excluded — monthly-salary worker <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span></h2>
+            <div class="skip">
+                <div class="why">Why excluded: these workers are paid a monthly salary (recorded under Expenses), so their production is tracked for records but never becomes a settlement line. If a worker is switched back to piece-rate before settling, these lines become payable again.</div>
+                <div class="table-responsive">
+                <table>
+                    <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th></tr></thead>
+                    <tbody>
+                    {% for l in skip_monthly %}
+                        <tr>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
         {% endif %}
 
         {% if skip_a %}

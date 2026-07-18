@@ -7,7 +7,7 @@
     .product-flow { max-width: 1100px; margin: 0 auto; }
 
     .product-flow .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px;
         padding: 26px 30px; margin-bottom: 22px;
         position: relative; overflow: hidden;
@@ -265,6 +265,12 @@
                         {% else %}
                             <span class="cost-tag unpriced">Unpriced — set a rate</span>
                         {% endif %}
+                        {% if ws.credits_workers %}
+                            <span class="cost-tag priced">Pays workers</span>
+                        {% endif %}
+                        {% if ws.allocation_dimensions != 'none' %}
+                            <span class="cost-tag priced">Split: {{ ws.get_allocation_dimensions_display }}</span>
+                        {% endif %}
                         <form method="post" class="cost-form">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="set_cost">
@@ -292,6 +298,25 @@
                                         {% endif %}
                                     {% endfor %}
                                 </select>
+                            </label>
+                            {% comment %}OP-1 (S4/D1): piece-pool work split — how the manager
+                            divides upstream pieces among this stage's workers. Pool-only;
+                            never touches cost/settlement. Grain may only coarsen downstream.{% endcomment %}
+                            <label class="cost-field">
+                                <span class="cost-label">Work split</span>
+                                <select name="work_split">
+                                    {% for val, label in grain_choices %}
+                                        <option value="{{ val }}" {% if ws.allocation_dimensions == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            {% comment %}R2 (PDD §6/§17): payability — completing this stage
+                            credits workers. Enabling makes worker reporting MANDATORY
+                            before the stage can complete (PAY-2, owner P-4).{% endcomment %}
+                            <label class="cost-field cost-field--pays">
+                                <span class="cost-label">Pays workers</span>
+                                <input type="checkbox" name="credits_workers" value="1"
+                                       {% if ws.credits_workers %}checked{% endif %}>
                             </label>
                             <button type="submit" class="cost-save">Save cost</button>
                         </form>

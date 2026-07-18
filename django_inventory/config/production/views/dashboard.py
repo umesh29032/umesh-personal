@@ -10,11 +10,11 @@ Date filter: ?from=&to= ke saath created_at range filter.
 from datetime import datetime, time
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from production.models import Adda, Stage
+from production.models import Adda
 
 from .mixins import ProductionRoleMixin
 
@@ -46,32 +46,20 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         if to_dt:
             addas = addas.filter(created_at__lt=to_dt)
 
-        ctx['in_progress'] = addas.filter(status=Adda.Status.IN_PROGRESS).count()
-        ctx['on_hold'] = addas.filter(status=Adda.Status.ON_HOLD).count()
-        ctx['completed_today'] = Adda.objects.filter(
-            status=Adda.Status.COMPLETED,
-            completed_at__date=timezone.now().date(),
-        ).count()
-        ctx['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
-
-        # Single grouped aggregate instead of one COUNT per stage (was N+1):
-        # count in-progress Addas grouped by current stage, then map onto the
-        # active Stage list.
-        stage_counts = {
-            r['current_stage__stage']: r['n']
-            for r in addas.filter(
-                status=Adda.Status.IN_PROGRESS,
-                current_stage__stage__isnull=False,
-            ).values('current_stage__stage').annotate(n=Count('id'))
-        }
-        stage_breakdown = [
-            {'label': stage.name, 'count': stage_counts.get(stage.id, 0)}
-            for stage in Stage.active.order_by('name')
-        ]
-        ctx['stage_breakdown'] = stage_breakdown
+        # G-4 (BOD-C, 2026-07-18): KPI counts + stage chips now live in
+        # operations_digest — one calculation, two consumers (this page + the
+        # BOD tiles). INERT: same keys, same numbers, same filter semantics.
+        from production.services.operations_digest import (
+            adda_status_counts, stage_breakdown)
+        counts = adda_status_counts(from_dt=from_dt, to_dt=to_dt)
+        ctx['in_progress'] = counts['in_progress']
+        ctx['on_hold'] = counts['on_hold']
+        ctx['completed_today'] = counts['completed_today']
+        ctx['total_completed'] = counts['total_completed']
+        ctx['stage_breakdown'] = stage_breakdown(from_dt=from_dt, to_dt=to_dt)
 
         recent = list(
-            addas.select_related('product', 'current_stage')
+            addas.select_related('product', 'current_stage__stage')
             .prefetch_related('product__workflow_stages')
             .order_by('-started_at')[:12]
         )

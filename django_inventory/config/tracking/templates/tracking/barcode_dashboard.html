@@ -3,21 +3,7 @@
 {% block page_title %}Barcode Dashboard{% endblock %}
 
 {% block extra_head %}
-<style>
-    .bc-dash .filter-card {
-        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
-        padding: 14px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card); margin-bottom: 18px;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .bc-dash .filter-card > * { flex-shrink: 0; }
-    .bc-dash .filter-card .filter-field { display: flex; flex-direction: column; gap: 4px; }
-    .bc-dash .filter-card label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--stone);
-    }
-    .bc-dash .filter-card input {
+<style>    .bc-dash .filter-card input {
         padding: 9px 12px; min-width: 150px;
         border: 1.5px solid #cfc0aa; border-radius: 10px;
         background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
@@ -37,9 +23,6 @@
 
     @media (max-width: 600px) {
         .bc-dash .table-responsive .td-actions { display: flex; flex-direction: column; gap: 6px; }
-        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
-        .bc-dash .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
-        .bc-dash .filter-card .filter-field { width: 100%; }
         .bc-dash .filter-card input, .bc-dash .filter-card select { width: 100%; min-width: 0; }
     }
 </style>
@@ -112,7 +95,8 @@
                     <td data-label="Actions" class="td-actions">
                         <a href="{% url 'tracking:barcode-list' a.code %}" class="action-link">View</a>
                         <a href="{% url 'tracking:barcode-print' a.code %}" target="_blank" class="action-link">Print QR</a>
-                        <a href="{% url 'tracking:barcode-export' a.code %}" class="action-link">Export CSV</a>
+                        {# V1.1 Item 3: exports = management-only (endpoint 403s workers too). #}
+                        {% if is_management %}<a href="{% url 'tracking:barcode-export' a.code %}" class="action-link">Export CSV</a>{% endif %}
                     </td>
                 </tr>
                 {% empty %}

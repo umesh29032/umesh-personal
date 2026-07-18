@@ -1,3 +1,13 @@
+---
+id: learning-07-costing
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Costing — two measurements, one labor (NEVER add them)
 
 ## The duality (ADR-0009 — the #1 trap)

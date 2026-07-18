@@ -15,7 +15,9 @@ Role-aware sections:
 """
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Exists, OuterRef, Sum
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
 
 from ..services import MANAGEMENT_ROLES, user_has_role
 
@@ -33,19 +35,14 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         from production.constants import STAGE_LAYERING
         from production.models import Adda, AddaStageRecord, LayeringRecord, WorkerStageTask
         from production.services import user_activity_across_addas
-        from accounts.skills import (
-            SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill,
-        )
 
         # R1: role checked ONCE, reused below (skilled gate + isolation +
         # broadcast) — avoids re-querying extra_roles per check.
         is_mgmt = user_has_role(request.user, MANAGEMENT_ROLES)
-        # "Skilled user" = layering skill OR management role.
-        # Drives accordion vs status-card decision in template.
-        is_skilled_user = (
-            user_has_skill(request.user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER])
-            or is_mgmt
-        )
+        # C-2 (freeze closeout 2026-07-05): visibility derives from the LIVE
+        # Stage-Access rows (access_service — the single predicate), never
+        # from hardcoded skill constants. Access-hub edits reflect instantly.
+        from production.services import stage_access_map
 
         # In-progress Addas — annotated with rolls count + per-stage pipeline state.
         addas_qs = Adda.objects.filter(status=Adda.Status.IN_PROGRESS)
@@ -64,6 +61,55 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             .annotate(rolls_count=Count('rolls'))
             .order_by('-started_at')
         )
+        # C-2: workspace accordions render ONLY what the viewer can actually
+        # open — the SAME rule the panel gate enforces (access AND, for
+        # workers, an active assignment on that stage record). The pipeline
+        # CHIPS stay unfiltered on purpose (flow-shape status summary, not a
+        # workspace). my_active_stages is fetched HERE so the whole page needs
+        # exactly ONE stage_access_map call (perf: one principal+Stage fetch).
+        my_active_stages = list(
+            AddaStageRecord.objects
+            # V2-1b: "assigned to me" = an active WorkerStageTask (not the M2M).
+            .filter(worker_tasks__worker=request.user,
+                    worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
+                    completed_at__isnull=True,
+                    adda__status=Adda.Status.IN_PROGRESS)
+            .select_related('adda', 'workflow_stage__stage', 'adda__product')
+            .order_by('-created_at')
+            .distinct()
+        )
+        all_types = sorted(
+            {ws.stage_type
+             for a in active_addas for ws in a.product.workflow_stages.all()}
+            | {sr.workflow_stage.stage_type for sr in my_active_stages}
+            | {STAGE_LAYERING}
+        )
+        access_by_type = stage_access_map(request.user, all_types)
+        # "Skilled user" kept as the template's variable name; its VALUE is now
+        # "may access the layering stage" (management always True via the map).
+        is_skilled_user = access_by_type.get(STAGE_LAYERING, False)
+        if is_mgmt:
+            my_sr_ids = None                       # management opens everything
+        else:
+            my_sr_ids = set(
+                WorkerStageTask.objects
+                .filter(stage_record__adda__in=active_addas, worker=request.user)
+                .exclude(status=WorkerStageTask.Status.CANCELLED)
+                .values_list('stage_record_id', flat=True)
+            )
+        sr_id_by_adda_type = {
+            (sr.adda_id, sr.workflow_stage.stage_type): sr.pk
+            for a in active_addas for sr in a.stage_records.all()
+        }
+
+        def _can_open(adda, stage_type):
+            if not access_by_type.get(stage_type, False):
+                return False
+            if my_sr_ids is None:
+                return True
+            sr_id = sr_id_by_adda_type.get((adda.pk, stage_type))
+            return sr_id is not None and sr_id in my_sr_ids
+
         for a in active_addas:
             pipeline = []
             done_stages = []  # (label, stage_type) for revisit links — dashboard accordion
@@ -82,13 +128,26 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                     'state': state,
                     'stage_type': s.stage_type,
                 })
-                if state == 'done':
+                if state == 'done' and _can_open(a, s.stage_type):
                     done_stages.append({
                         'label': s.get_stage_type_display(),
                         'stage_type': s.stage_type,
                     })
             a.pipeline = pipeline
             a.done_stages = done_stages
+            a.current_can_open = (
+                a.current_stage is not None
+                and _can_open(a, a.current_stage.stage_type)
+            )
+            # R10-B UI philosophy: workers get CURRENT-OPERATION focus, never
+            # the full pipeline (prev ✔ / current / next only).
+            cur_i = next((i for i, st in enumerate(pipeline)
+                          if st['state'] == 'current'), None)
+            a.current_focus = None if cur_i is None else {
+                'prev': pipeline[cur_i - 1]['label'] if cur_i > 0 else None,
+                'current': pipeline[cur_i]['label'],
+                'next': pipeline[cur_i + 1]['label'] if cur_i + 1 < len(pipeline) else None,
+            }
 
         # R1 (PDD §27-D6): "new Adda started" broadcast — every worker sees that
         # production started. Read-only: code/product/start date ONLY (no
@@ -111,21 +170,17 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
             for a in active_addas:
                 a.layering_snap = None
 
-        my_active_stages = (
-            AddaStageRecord.objects
-            # V2-1b: "assigned to me" = an active WorkerStageTask (not the M2M).
-            .filter(worker_tasks__worker=request.user,
-                    worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
-                    completed_at__isnull=True,
-                    adda__status=Adda.Status.IN_PROGRESS)
-            .select_related('adda', 'workflow_stage__stage', 'adda__product')
-            .order_by('-created_at')
-            .distinct()
-        )
+        # (my_active_stages was fetched ABOVE, before the single access-map call.)
+        # C-2: assignment alone is not visibility — if Stage Access was revoked
+        # AFTER assignment, the row must vanish here too (the report/panel
+        # gates already refuse it; a dead link would violate minimum-info).
+        my_active_stages = [
+            sr for sr in my_active_stages
+            if access_by_type.get(sr.workflow_stage.stage_type, False)
+        ]
         # pt.2c: report badge per assigned stage — ONE extra query for all my
         # tasks (annotate counts lines), then attach in Python. Badge states:
         # submitted (task completed/verified) > draft (has lines) > needed.
-        my_active_stages = list(my_active_stages)
         my_report_tasks = (
             WorkerStageTask.objects
             .filter(worker=request.user,
@@ -147,7 +202,11 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                 sr.report_badge = 'needed'
         my_activity = user_activity_across_addas(request.user, limit=30)
 
-        if user_has_skill(request.user, SKILL_CUTTING_MASTER_HELPER):
+        # C-2: the layering board is gated by LIVE layering ACCESS (was a
+        # hardcoded helper-skill check), and non-management see only the
+        # layerings they're actually assigned to (same isolation rule as the
+        # Adda cards — no dead OPEN links to 403 workspaces).
+        if is_skilled_user:
             active_layering = (
                 AddaStageRecord.objects
                 .filter(
@@ -161,6 +220,11 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
                 .annotate(rolls_count=Count('layering_roll_entries'))
                 .order_by('-started_at')
             )
+            if not is_mgmt:
+                active_layering = active_layering.filter(
+                    worker_tasks__worker=request.user,
+                    worker_tasks__status__in=WorkerStageTask.ACTIVE_STATUSES,
+                ).distinct()
             completed_qs = LayeringRecord.objects.filter(
                 stage_record__completed_by=request.user,
             )
@@ -188,6 +252,19 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         broadcast_addas = []
         is_skilled_user = False
 
+    # R5 (PDD §21/§23): this-month factory-expense digest — management only
+    # (workers never load expense data for their dashboard). Read-only ctx,
+    # same graceful-degrade posture as the production panels above.
+    expense_month = None
+    if is_admin_view:
+        try:
+            from expense.services import expense_service
+            today = timezone.now().date()
+            expense_month = expense_service.monthly_totals(today.year, today.month)
+            expense_month['month_value'] = f"{today.year:04d}-{today.month:02d}"
+        except Exception:
+            expense_month = None
+
     return {
         'is_admin_view': is_admin_view,
         'my_active_stages': my_active_stages,
@@ -196,16 +273,17 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         'active_addas': active_addas,
         'broadcast_addas': broadcast_addas,
         'is_skilled_user': is_skilled_user,
+        'expense_month': expense_month,
     }
 
 
 @login_required
-def dashboard(request):
-    """Unified dashboard URL for management roles.
+def user_dashboard(request):
+    """THE personal dashboard (canonical url_name `inventory:my_dashboard`).
 
-    Same content as user_dashboard — just flagged is_admin_view=True so the
-    template can show admin-only sections in the future. Both URLs are kept for
-    backward-compat (sidebar uses one canonical link).
+    F-1 polish (2026-07-05): the historical management/worker URL twins now
+    both redirect here — one page, one menu item, same role-aware content
+    (`is_admin_view` computed from role, not from which URL was hit).
     """
     ctx = _build_dashboard_context(
         request,
@@ -215,10 +293,8 @@ def dashboard(request):
 
 
 @login_required
-def user_dashboard(request):
-    """Non-management dashboard URL. Renders the same unified template + content."""
-    ctx = _build_dashboard_context(
-        request,
-        is_admin_view=user_has_role(request.user, MANAGEMENT_ROLES),
-    )
-    return render(request, 'inventory/user_dashboard.html', ctx)
+def dashboard_redirect(request):
+    """Backward-compat: old bookmark URLs 301 to the canonical dashboard."""
+    # HttpResponsePermanentRedirect via redirect(permanent=True) — browsers
+    # update bookmarks; content identical so a permanent redirect is safe.
+    return redirect(reverse('inventory:my_dashboard'), permanent=True)

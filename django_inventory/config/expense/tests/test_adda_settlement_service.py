@@ -167,14 +167,14 @@ class InvariantTests(_Base):
             earning_rate_snapshot=Decimal('3'),
             earning_amount_snapshot=Decimal('135'),
             entered_by=self.mgmt)
-        lines, skip_a, skip_b = preview_lines(self._draft())
+        lines, skip_a, skip_b, _skip_m = preview_lines(self._draft())
         self.assertEqual({c.task.worker_id for c in lines}, {self.w2.pk})
         self.assertEqual({c.task.worker_id for c in skip_a}, {self.w1.pk})
         # NET counting: void the era-A SWA → w1 becomes settleable
         era_a.voided_at = timezone.now()
         era_a.save(update_fields=['voided_at'])
         s = AddaSettlement.objects.filter(status='draft').first()
-        lines2, skip_a2, _ = preview_lines(s)
+        lines2, skip_a2, _, _ = preview_lines(s)
         self.assertEqual({c.task.worker_id for c in lines2},
                          {self.w1.pk, self.w2.pk})
         self.assertEqual(skip_a2, [])
@@ -309,7 +309,7 @@ class ReversalLifecycleTests(_Base):
         c = WorkerStageContribution.objects.get(task__worker=self.w1)
         self.assertIsNotNone(c.settlement_line.voided_at)
         s2 = self._draft()
-        lines, skip_a, skip_b = preview_lines(s2)
+        lines, skip_a, skip_b, _skip_m = preview_lines(s2)
         self.assertEqual(len(lines), 1)
         self.assertEqual(skip_b, [])
 

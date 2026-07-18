@@ -1,0 +1,120 @@
+{% extends "accounts/base.html" %}
+{# P2 — mat lifecycle hub: commission / checks history / retire (ADR-E) #}
+{% block page_title %}Mat {{ mat.mat_code }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-mat .panel { margin-bottom:18px; }
+  .pai-mat .status { padding:2px 10px; border-radius:10px; font-size:13px; }
+  .pai-mat .st-active { background:#d9efe1; color:#20603c; }
+  .pai-mat .st-uncommissioned { background:#fdf3d8; color:#7a5c10; }
+  .pai-mat .st-retired { background:#eee; color:#666; }
+  .pai-mat .check-pass { color:#20603c; font-weight:600; }
+  .pai-mat .check-fail { color:#a33; font-weight:600; }
+  .pai-mat .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .pai-mat .grid2 { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-mat">
+  <div class="page-header">
+    <h1>Mat {{ mat.mat_code }}
+      <span class="status st-{{ mat.status }}">{{ mat.get_status_display }}</span></h1>
+    <p class="subtitle">{{ mat.name|default:"" }}
+      {% if mat.commissioned_at %} · commissioned {{ mat.commissioned_at|date:"Y-m-d" }}{% endif %}
+      {% if mat.status_reason %} · {{ mat.status_reason }}{% endif %}</p>
+  </div>
+  <p><a class="btn" href="{% url 'patterns_ai:mat-list' %}">← All mats</a></p>
+
+  {% if mat.status == 'uncommissioned' %}
+  <div class="card panel" style="padding:20px;">
+    <h2>1 · Commission (tape truth first)</h2>
+    <p class="muted">Tape-measure at least one known corner-to-corner span on
+    the PRINTED mat and enter it below — print-shop scale error is caught
+    here, before any capture trusts this mat. Corner ids count row-major
+    from the board's inner-corner grid (0,12 = first row ends on a
+    14×10 board).</p>
+    <form method="post" enctype="multipart/form-data"
+          action="{% url 'patterns_ai:mat-commission' mat.pk %}">
+      {% csrf_token %}
+      <div class="grid2">
+        <div class="field"><label>Squares X</label>{{ commission_form.squares_x }}</div>
+        <div class="field"><label>Squares Y</label>{{ commission_form.squares_y }}</div>
+        <div class="field"><label>Square size (mm)</label>{{ commission_form.square_mm }}</div>
+        <div class="field"><label>Marker size (mm)</label>{{ commission_form.marker_mm }}</div>
+      </div>
+      <div class="field"><label>ArUco dictionary</label>{{ commission_form.aruco_dict }}</div>
+      <div class="field"><label>Tape control distances (from_id,to_id,expected_mm — one per line)</label>
+        {{ commission_form.distances_text }}</div>
+      <div class="field"><label>Notes</label>{{ commission_form.notes }}</div>
+      <button type="submit" class="btn btn-primary">Commission mat</button>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if mat.status == 'active' %}
+  <div class="card panel" style="padding:20px;">
+    <h2>Board spec</h2>
+    <p>{{ mat.board_spec.squares_x }}×{{ mat.board_spec.squares_y }} ·
+       {{ mat.board_spec.square_mm }} mm squares ·
+       {{ mat.board_spec.aruco_dict }} ·
+       {{ mat.control_distances.distances|length }} control distance(s)</p>
+  </div>
+  {% endif %}
+
+  <div class="card panel" style="padding:20px;">
+    <h2>Check history (append-only)</h2>
+    {% if checks %}
+    <div class="table-responsive"><table>
+      <thead><tr><th>#</th><th>Kind</th><th>Result</th><th>By</th><th>When</th><th>Notes</th></tr></thead>
+      <tbody>
+      {% for c in checks %}
+        <tr>
+          <td data-label="#">{{ c.pk }}</td>
+          <td data-label="Kind">{{ c.get_kind_display }}</td>
+          <td data-label="Result">
+            <span class="{% if c.passed %}check-pass{% else %}check-fail{% endif %}">
+              {% if c.passed %}PASS{% else %}FAIL{% endif %}</span>
+            {% if c.evidence.gate.reasons %}<div class="muted">{{ c.evidence.gate.reasons|join:"; " }}</div>{% endif %}
+          </td>
+          <td data-label="By">{{ c.checked_by.get_full_name|default:c.checked_by|default:"—" }}</td>
+          <td data-label="When">{{ c.created_at|date:"Y-m-d H:i" }}</td>
+          <td data-label="Notes">{{ c.notes|default:"—" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="muted">No checks yet.</p>{% endif %}
+  </div>
+
+  {% if mat.status == 'active' and recent_captures %}
+  <div class="card panel" style="padding:20px;">
+    <h2>Recheck</h2>
+    <p class="muted">Re-run the calibration gate on a capture already taken
+    on this mat — a FAILED recheck records evidence but never auto-retires;
+    you decide.</p>
+    {% for cap in recent_captures %}
+    <form method="post" action="{% url 'patterns_ai:mat-recheck' mat.pk %}"
+          style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+      {% csrf_token %}
+      <input type="hidden" name="capture" value="{{ cap.pk }}">
+      <span>capture #{{ cap.pk }} · {{ cap.created_at|date:"Y-m-d H:i" }}</span>
+      <button type="submit" class="btn">Run recheck</button>
+    </form>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if mat.status != 'retired' %}
+  <div class="card panel" style="padding:20px;">
+    <h2>Retire</h2>
+    <form method="post" action="{% url 'patterns_ai:mat-retire' mat.pk %}"
+          onsubmit="return this.reason.value.trim() !== '' || (alert('reason required'), false);">
+      {% csrf_token %}
+      <div class="field"><label>Reason (mandatory — mats never delete)</label>
+        <input type="text" name="reason" maxlength="200"></div>
+      <button type="submit" class="btn btn-danger">Retire mat</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

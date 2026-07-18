@@ -52,6 +52,8 @@ def _adda_history_events(adda_filter: dict, user=None) -> Iterable[ActivityEvent
         AddaHistory.ChangeType.BUNDLE_CREATED: 'created bundle',
         AddaHistory.ChangeType.BARCODES_GENERATED: 'generated barcodes',
         AddaHistory.ChangeType.EXPORTED: 'exported barcodes',
+        AddaHistory.ChangeType.COMPLETION_OVERRIDE: 'overrode stage completion',
+        AddaHistory.ChangeType.VERIFIED_QTY_CORRECTED: 'corrected verified qty',
     }
     for h in qs:
         verb = verb_map.get(h.change_type, h.change_type)

@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-login
+type: request-journey
+status: active
+owner: handwritten
+scope: login (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Login (OTP / password)
 
 ## TL;DR (1 min)

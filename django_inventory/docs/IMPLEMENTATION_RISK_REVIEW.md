@@ -1,3 +1,13 @@
+---
+id: docs-implementation-risk-review
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Implementation Risk Review — adversarial pass on IMPLEMENTATION_MASTER_PLAN.md
 
 **Stance:** challenge, not agree. Reviewing [MASTER_PLAN](IMPLEMENTATION_MASTER_PLAN.md) + [FOUNDATION_LOCKED](PRODUCTION_TRUTH_FOUNDATION_LOCKED.md) + [FOUNDATION_ROADMAP](PRODUCTION_TRUTH_FOUNDATION_ROADMAP.md) for execution / migration / operational / deployment risk only. Locked decisions not reopened. No implementation.

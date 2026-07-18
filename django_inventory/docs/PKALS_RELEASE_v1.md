@@ -1,3 +1,13 @@
+---
+id: docs-pkals-release-v1
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # PKALS v1 — RELEASE RECORD
 
 > Released 2026-06-13 on branch `new_flask_app`. PKALS = the project's permanent

@@ -1,0 +1,141 @@
+{% extends "accounts/base.html" %}
+{# P3 — candidate: visualization + benchmark evidence + the human promotion decision #}
+{% block page_title %}Layout #{{ c.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-cand .viz { background:#fff; border:var(--border-card, 1px solid #e5e0d5);
+    border-radius:12px; padding:14px; overflow:auto; }
+  .pai-cand .viz svg { min-width:320px; max-height:70vh; display:block; margin:0 auto; }
+  .pai-cand .stats { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  .pai-cand .stat { background:#f4f1e8; border-radius:10px; padding:8px 12px; font-size:13px; }
+  .pai-cand .bench { border-radius:10px; padding:12px 14px; margin:12px 0; }
+  .pai-cand .b-beats { background:#e8f4ec; border:1px solid #bfe0cb; }
+  .pai-cand .b-no { background:#fbe9e7; border:1px solid #eac4bd; }
+  .pai-cand .b-none { background:#fdf7e7; border:1px solid #eadfc0; }
+  .pai-cand .v-bad { color:#a33; font-weight:700; }
+  /* M7 §3f/§3g — production panel + summary */
+  .pai-cand .prod-panel { border-radius:12px; padding:14px 16px; margin:12px 0;
+    border:1px solid var(--border-card); background:var(--card-bg); }
+  .pai-cand .prod-panel.live { background:#eef7f0; border-color:#bfe0cb; }
+  .pai-cand .prod-title { font-weight:800; font-size:14px; margin-bottom:8px; }
+  .pai-cand .prod-panel.live .prod-title { color:#20603c; }
+  .pai-cand .sum-table { width:100%; max-width:520px; border-collapse:collapse;
+    font-size:13px; }
+  .pai-cand .sum-table th { text-align:left; font-size:10px;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--stone);
+    padding:6px 8px 6px 0; width:46%; }
+  .pai-cand .sum-table td { padding:6px 0; font-weight:600; }
+  .pai-cand .sum-table tr { border-bottom:1px solid var(--border-subtle); }
+  .pai-cand .prod-meta { font-size:12px; color:var(--stone); margin-top:8px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-cand">
+  <div class="page-header">
+    <h1>Layout #{{ c.pk }}</h1>
+    <p class="subtitle">{{ run.product.code }} · run #{{ run.pk }} ·
+      width {{ run.usable_width_mm }} mm · ratio {{ ratio_labels|join:" · " }} ·
+      seed {{ c.seed }}{% if c.trials %} · {{ c.trials }} trials{% endif %} ·
+      immutable layout, metrics derived at read.</p>
+  </div>
+  <p><a class="btn" href="{% url 'patterns_ai:generation-run' run.pk %}">← Run #{{ run.pk }}</a>
+     <a class="btn" href="{% url 'patterns_ai:candidate-svg' c.pk %}">Download SVG</a>
+     {% if metrics.verified %}
+     <a class="btn" href="{% url 'patterns_ai:candidate-pdf' c.pk %}">⬇ Production PDF</a>
+     <a class="btn" href="{% url 'patterns_ai:candidate-print' c.pk %}">🖨 Print tiles</a>
+     {% endif %}
+     <a class="btn btn-primary" href="{% url 'patterns_ai:workspace' c.pk %}">🛠 Open layout editor</a></p>
+
+  {% if not metrics.verified %}
+  <div class="bench b-no"><span class="v-bad">INDEPENDENT VERIFICATION FAILED</span> —
+    {{ c.verification }} . This candidate can never be promoted.</div>
+  {% endif %}
+
+  {# ── M7: Production Layout Summary (§3f) + the explicit Approve act (§3g) ── #}
+  <div class="prod-panel {% if is_production %}live{% endif %}">
+    <div class="prod-title">
+      {% if is_production %}★ THE production layout — what production cuts from
+      {% else %}Production Layout Summary{% endif %}
+    </div>
+    <table class="sum-table">
+      <tr><th>Fabric width</th><td>{{ run.usable_width_mm }} mm</td></tr>
+      <tr><th>Required layer length</th><td>{{ metrics.length_mm }} mm</td></tr>
+      <tr><th>Utilization / waste</th><td>{{ metrics.utilization_pct }}% / {{ metrics.waste_pct }}% <small style="color:var(--stone);">(derived at read)</small></td></tr>
+      <tr><th>Pattern count</th><td>{{ metrics.piece_count }} pieces · {{ metrics.garments }} garment(s)</td></tr>
+      <tr><th>Size ratio</th><td>{{ ratio_labels|join:" · " }}</td></tr>
+    </table>
+    {% if is_production %}
+      <div class="prod-meta">Approved by {{ designation.approved_by }} ·
+        {{ designation.approved_at }} · replaced layouts stay reachable in
+        the Layout switcher. Editing + saving creates DRAFTS — the
+        designation moves only by a new explicit approve.</div>
+    {% else %}
+      <div class="prod-meta">
+        {% if designation %}Current production layout:
+          <a href="{% url 'patterns_ai:candidate-detail' designation.approved_layout_id %}">#{{ designation.approved_layout_id }}</a>
+          — approving this one moves the pointer; nothing is deleted.
+        {% else %}No production layout designated for
+          {{ run.product.code }} yet.{% endif %}
+      </div>
+      {% if metrics.verified %}
+      <div style="margin-top:10px;">
+        <a class="btn btn-primary" href="{% url 'patterns_ai:candidate-approve' c.pk %}">★ Approve for production…</a>
+      </div>
+      {% else %}
+      <div class="prod-meta">Unverified layouts cannot be approved.</div>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="viz">{{ svg|safe }}</div>
+
+  <div class="stats">
+    <span class="stat"><strong>{{ metrics.length_mm }} mm</strong> length</span>
+    <span class="stat"><strong>{{ metrics.utilization_pct }}%</strong> utilization</span>
+    <span class="stat">{{ metrics.waste_pct }}% waste</span>
+    <span class="stat">{{ metrics.per_garment_m }} m / garment</span>
+    <span class="stat">theory {{ metrics.theoretical_m_per_100 }} m/100</span>
+    <span class="stat">{{ metrics.piece_count }} pieces · {{ metrics.garments }} garments</span>
+    <span class="stat">overlap {{ c.verification.max_overlap_mm2 }} mm²</span>
+  </div>
+
+  {% if bench.verdict == 'beats' %}
+    <div class="bench b-beats"><strong>Beats the manual baseline.</strong>
+      Theory {{ metrics.theoretical_m_per_100 }} m/100 vs
+      {{ bench.baseline.marker.reference }} recorded reality
+      {{ bench.baseline.actual_m_per_100 }} m/100 (n={{ bench.baseline.n }}
+      {% if not bench.baseline.same_width_band %}· different width band — labeled{% endif %}).
+      Candidate number is THEORY (perfect lay); baseline is RECORDED REALITY.</div>
+  {% elif bench.verdict == 'does_not_beat' %}
+    <div class="bench b-no"><strong>Does NOT beat the manual baseline.</strong>
+      Theory {{ metrics.theoretical_m_per_100 }} m/100 vs
+      {{ bench.baseline.marker.reference }} at {{ bench.baseline.actual_m_per_100 }} m/100
+      (n={{ bench.baseline.n }}). Promotion will refuse (owner principle:
+      generated must beat the baseline).</div>
+  {% else %}
+    <div class="bench b-none"><strong>No manual baseline yet</strong> — this product
+      has no non-generated marker with recorded outcomes. Promotion is allowed;
+      the evidence records "no_baseline" honestly.</div>
+  {% endif %}
+
+  {% if promoted %}
+    <p>Promoted → <a href="{% url 'patterns_ai:marker-detail' promoted.reference %}">
+      {{ promoted.reference }}</a> (candidates promote once).</p>
+  {% elif metrics.verified %}
+  <form method="post" class="card" style="padding:16px; max-width:560px;">
+    {% csrf_token %}
+    <h2>Promote to Marker Library</h2>
+    <p class="muted">Creates a real GENERATED marker (via the marker
+    single-writer) carrying this candidate + benchmark evidence in its
+    creation event. Usage/outcomes/Yield Board then treat it like any
+    marker — reality gets measured.</p>
+    <div class="field"><label>Label</label>
+      <input type="text" name="label" maxlength="120"
+             placeholder="e.g. Generated {{ c.engine }} · {{ run.usable_width_mm }}mm"></div>
+    <div class="field"><label>Notes</label>
+      <input type="text" name="notes" maxlength="200"></div>
+    <button type="submit" class="btn btn-primary">Promote candidate</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

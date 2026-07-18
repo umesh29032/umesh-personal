@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-ledger-and-payment
+type: chokepoint
+status: active
+owner: handwritten
+scope: ledger_and_payment (chokepoint)
+anchors: —
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
 Two services. `ledger_service` = the ONLY pen that writes WorkerLedgerEntry
 (append-only; log_credit/log_debit/reverse_entry; balance = live SUM).

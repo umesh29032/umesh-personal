@@ -1,3 +1,13 @@
+---
+id: docs-adr-0006-architect-for-scale-do-not-implement
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0006 — Architect for multi-factory / async / scale; do NOT implement them
 
 **Status:** Accepted (governing principle; docs/TARGET_ARCHITECTURE.md)

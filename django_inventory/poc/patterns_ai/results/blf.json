@@ -1,0 +1,290 @@
+[
+ {
+  "set": "T-SHIRT body M-ratio S2M2L1",
+  "engine": "BLF-grid",
+  "grid_mm": 2.0,
+  "spacing_mm": 2.0,
+  "pieces_placed": 20,
+  "marker_length_mm": 4974.0,
+  "utilization_pct": 79.86,
+  "wall_clock_s": 171.65,
+  "placements": [
+   {
+    "id": "back-L",
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "variant": "r0"
+   },
+   {
+    "id": "front-L",
+    "x_mm": 540.0,
+    "y_mm": 288.0,
+    "variant": "r180"
+   },
+   {
+    "id": "back-M",
+    "x_mm": 0.0,
+    "y_mm": 716.0,
+    "variant": "r0"
+   },
+   {
+    "id": "back-M",
+    "x_mm": 512.0,
+    "y_mm": 1004.0,
+    "variant": "r180"
+   },
+   {
+    "id": "front-M",
+    "x_mm": 0.0,
+    "y_mm": 1526.0,
+    "variant": "r180"
+   },
+   {
+    "id": "front-M",
+    "x_mm": 532.0,
+    "y_mm": 1686.0,
+    "variant": "r0"
+   },
+   {
+    "id": "back-S",
+    "x_mm": 0.0,
+    "y_mm": 2208.0,
+    "variant": "r0"
+   },
+   {
+    "id": "back-S",
+    "x_mm": 506.0,
+    "y_mm": 2366.0,
+    "variant": "r180"
+   },
+   {
+    "id": "front-S",
+    "x_mm": 16.0,
+    "y_mm": 2854.0,
+    "variant": "r180"
+   },
+   {
+    "id": "front-S",
+    "x_mm": 522.0,
+    "y_mm": 3014.0,
+    "variant": "r0"
+   },
+   {
+    "id": "sleeve-L",
+    "x_mm": 0.0,
+    "y_mm": 3502.0,
+    "variant": "r0"
+   },
+   {
+    "id": "sleeve-L",
+    "x_mm": 574.0,
+    "y_mm": 3632.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve-M",
+    "x_mm": 210.0,
+    "y_mm": 3790.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve-M",
+    "x_mm": 564.0,
+    "y_mm": 3994.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve-M",
+    "x_mm": 0.0,
+    "y_mm": 4134.0,
+    "variant": "r0"
+   },
+   {
+    "id": "sleeve-M",
+    "x_mm": 276.0,
+    "y_mm": 4302.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve-S",
+    "x_mm": 634.0,
+    "y_mm": 0.0,
+    "variant": "r0"
+   },
+   {
+    "id": "sleeve-S",
+    "x_mm": 620.0,
+    "y_mm": 4338.0,
+    "variant": "r0"
+   },
+   {
+    "id": "sleeve-S",
+    "x_mm": 0.0,
+    "y_mm": 4610.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve-S",
+    "x_mm": 328.0,
+    "y_mm": 4646.0,
+    "variant": "r0"
+   }
+  ]
+ },
+ {
+  "set": "3-PATTI brief S2M2L1 (tube-flat 940)",
+  "engine": "BLF-grid",
+  "grid_mm": 2.0,
+  "spacing_mm": 2.0,
+  "pieces_placed": 15,
+  "marker_length_mm": 1160.0,
+  "utilization_pct": 73.9,
+  "wall_clock_s": 10.93,
+  "placements": [
+   {
+    "id": "pback-L",
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pback-M",
+    "x_mm": 330.0,
+    "y_mm": 0.0,
+    "variant": "r180"
+   },
+   {
+    "id": "pback-M",
+    "x_mm": 606.0,
+    "y_mm": 110.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pback-S",
+    "x_mm": 280.0,
+    "y_mm": 282.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pback-S",
+    "x_mm": 594.0,
+    "y_mm": 392.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pfront-L",
+    "x_mm": 0.0,
+    "y_mm": 446.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pfront-M",
+    "x_mm": 294.0,
+    "y_mm": 550.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pfront-M",
+    "x_mm": 574.0,
+    "y_mm": 660.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pfront-S",
+    "x_mm": 0.0,
+    "y_mm": 720.0,
+    "variant": "r0"
+   },
+   {
+    "id": "pfront-S",
+    "x_mm": 266.0,
+    "y_mm": 812.0,
+    "variant": "r0"
+   },
+   {
+    "id": "gusset-L",
+    "x_mm": 0.0,
+    "y_mm": 296.0,
+    "variant": "r0"
+   },
+   {
+    "id": "gusset-M",
+    "x_mm": 530.0,
+    "y_mm": 922.0,
+    "variant": "r0"
+   },
+   {
+    "id": "gusset-M",
+    "x_mm": 682.0,
+    "y_mm": 922.0,
+    "variant": "r180"
+   },
+   {
+    "id": "gusset-S",
+    "x_mm": 0.0,
+    "y_mm": 968.0,
+    "variant": "r0"
+   },
+   {
+    "id": "gusset-S",
+    "x_mm": 526.0,
+    "y_mm": 1044.0,
+    "variant": "r180"
+   }
+  ]
+ },
+ {
+  "set": "stress: >1m leg + curved sleeve + on-fold half-front",
+  "engine": "BLF-grid",
+  "grid_mm": 2.0,
+  "spacing_mm": 2.0,
+  "pieces_placed": 7,
+  "marker_length_mm": 2412.0,
+  "utilization_pct": 76.78,
+  "wall_clock_s": 28.69,
+  "placements": [
+   {
+    "id": "halffront-fold",
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "variant": "r0"
+   },
+   {
+    "id": "leg-L",
+    "x_mm": 220.0,
+    "y_mm": 0.0,
+    "variant": "m0"
+   },
+   {
+    "id": "leg-L",
+    "x_mm": 542.0,
+    "y_mm": 0.0,
+    "variant": "r0"
+   },
+   {
+    "id": "leg-R",
+    "x_mm": 0.0,
+    "y_mm": 834.0,
+    "variant": "r0"
+   },
+   {
+    "id": "leg-R",
+    "x_mm": 284.0,
+    "y_mm": 1082.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve",
+    "x_mm": 0.0,
+    "y_mm": 1916.0,
+    "variant": "r180"
+   },
+   {
+    "id": "sleeve",
+    "x_mm": 556.0,
+    "y_mm": 2068.0,
+    "variant": "r180"
+   }
+  ]
+ }
+]

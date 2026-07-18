@@ -1,3 +1,13 @@
+---
+id: docs-erp-master-context
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # ERP_MASTER_CONTEXT.md
 
 ## Garment Manufacturing ERP — Master Project Context

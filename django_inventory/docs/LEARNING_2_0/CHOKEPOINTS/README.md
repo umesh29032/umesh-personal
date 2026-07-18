@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system
+anchors: —
+verified: 2026-07-13
+---
+
 # CHOKEPOINTS — the single-writer services where integrity lives
 
 > A chokepoint = the ONE service allowed to write a truth table. Bypass any of

@@ -1,3 +1,13 @@
+---
+id: l2-apps-production-file-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production
+anchors: config/production/
+verified: 2026-07-13
+---
+
 # production — every important file (FILE_MAP)
 
 ## TL;DR (1 min)

@@ -1,3 +1,13 @@
+---
+id: s3-design-receipt-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # S3 Design Receipt — good / alter / missing + constraint sequencing (2026-06-14)
 
 **Architecture checkpoint, NOT a coding task.** Scope locked by owner: **thin slice —

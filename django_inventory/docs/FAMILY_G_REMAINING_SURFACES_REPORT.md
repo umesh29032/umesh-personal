@@ -1,3 +1,13 @@
+---
+id: docs-family-g-remaining-surfaces-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Family G — Remaining Surfaces Consolidation Report (Phase G)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase G (remaining surfaces: cards/dashboards/details/timelines/standalone + partials/infra).**

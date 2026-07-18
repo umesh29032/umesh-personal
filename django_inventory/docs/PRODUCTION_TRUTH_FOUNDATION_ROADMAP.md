@@ -1,3 +1,13 @@
+---
+id: docs-production-truth-foundation-roadmap
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Production-Truth Foundation — Implementation Roadmap & Migration-Safety Review
 
 Planning only. **No code, no migrations, no implementation.** Baseline = the approved foundation ([REVIEW](PRODUCTION_TRUTH_FOUNDATION_REVIEW.md) + [FINAL](PRODUCTION_TRUTH_FOUNDATION_FINAL.md)). Current migration heads: **production 0036, expense 0009, tracking 0014.**

@@ -1,0 +1,62 @@
+{% extends "accounts/base.html" %}
+{# M7 §3g + owner refinement 5 — review the Production Layout Summary BEFORE the explicit audited Approve. #}
+{% block page_title %}Approve for production · Layout #{{ c.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-appr { max-width: 640px; margin: 0 auto; }
+  .pai-appr .card { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card); padding:20px 22px; }
+  .pai-appr .sum-table { width:100%; border-collapse:collapse; font-size:14px; margin:12px 0; }
+  .pai-appr .sum-table th { text-align:left; font-size:10px; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--stone); padding:8px 8px 8px 0; width:46%; }
+  .pai-appr .sum-table td { padding:8px 0; font-weight:600; }
+  .pai-appr .sum-table tr { border-bottom:1px solid var(--border-subtle); }
+  .pai-appr .law { background:#fdf7e7; border:1px solid #eadfc0; border-radius:10px;
+    padding:10px 12px; font-size:13px; margin:12px 0; }
+  .pai-appr .already { background:#eef7f0; border:1px solid #bfe0cb; border-radius:10px;
+    padding:10px 12px; font-size:13px; margin:12px 0; }
+  @media (max-width:640px){ .pai-appr .btn { min-height:44px; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-appr">
+  <div class="page-header">
+    <h1>Approve for production · Layout #{{ c.pk }}</h1>
+    <p class="subtitle">{{ product.name }} ({{ product.code }}) — review the
+    numbers, then approve explicitly. Approval only moves the pointer;
+    no layout is modified, regenerated or re-verified.</p>
+  </div>
+  <div class="card">
+    <strong style="font-size:14px;">Production Layout Summary</strong>
+    <table class="sum-table">
+      <tr><th>Fabric width</th><td>{{ run.usable_width_mm }} mm</td></tr>
+      <tr><th>Required layer length</th><td>{{ metrics.length_mm }} mm</td></tr>
+      <tr><th>Utilization / waste</th><td>{{ metrics.utilization_pct }}% / {{ metrics.waste_pct }}%</td></tr>
+      <tr><th>Pattern count</th><td>{{ metrics.piece_count }} pieces · {{ metrics.garments }} garment(s)</td></tr>
+      <tr><th>Size ratio</th><td>{{ ratio_labels|join:" · " }}</td></tr>
+      <tr><th>Verified</th><td>{% if metrics.verified %}✓ independently verified{% else %}✗ NOT verified — approval will refuse{% endif %}</td></tr>
+    </table>
+    {% if already %}
+      <div class="already">Layout #{{ c.pk }} is ALREADY the production
+      layout — approving again changes nothing (the first approval stays
+      on record).</div>
+    {% elif designation %}
+      <div class="law">This replaces layout
+      <strong>#{{ designation.approved_layout_id }}</strong> as the
+      production layout. The replaced layout is NOT deleted — it stays in
+      the Layout switcher history. Saving edits later creates drafts; the
+      designation moves only by this explicit act.</div>
+    {% else %}
+      <div class="law">This becomes {{ product.code }}'s FIRST production
+      layout — the Pattern Design stage and the smart entry will open it
+      first. Saving edits later creates drafts; the designation moves only
+      by this explicit act.</div>
+    {% endif %}
+    <form method="post" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+      {% csrf_token %}
+      <a class="btn btn-clear" href="{% url 'patterns_ai:candidate-detail' c.pk %}">← Cancel</a>
+      <button type="submit" class="btn btn-primary">★ Approve for production</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

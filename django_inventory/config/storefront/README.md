@@ -1,3 +1,13 @@
+---
+id: app-storefront-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: storefront
+anchors: config/storefront/
+verified: 2026-07-13
+---
+
 # `storefront` app — Public Marketing Site (commerce's future home)
 
 > Dual-register guide. Boundary law: [ADR-0008](../../docs/adr/0008-commerce-manufacturing-boundary.md)

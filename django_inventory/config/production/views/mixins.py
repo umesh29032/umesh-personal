@@ -1,4 +1,4 @@
-"""production app ke view mixins — RBAC gates.
+"""production app ke view mixins — RBAC gates (+ the shared post-advance redirect).
 
 YEH FILE KYU HAI?
 ─────────────────
@@ -7,10 +7,34 @@ test_func() False → 403 Forbidden.
 """
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
+from django.urls import reverse
 
 from accounts.services import (
     MANAGEMENT_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role,
 )
+
+
+def get_adda(code):
+    """One lookup rule for every per-Adda view: 404 by unique code."""
+    from django.shortcuts import get_object_or_404
+    from production.models import Adda
+    return get_object_or_404(Adda, code=code)
+
+
+def embedded_advance_redirect(adda):
+    """Post-COMPLETE redirect target for EMBEDDED stage panels (F-3 polish).
+
+    A dedicated login-only BOUNCE page (no stage data, no access gates beyond
+    login) whose sole job is to postMessage the parent to reload. Neither the
+    next stage's panel nor the completed stage's own panel is safe for the
+    completing WORKER: the next stage may not be theirs, and stage completion
+    auto-cancels their unreported task, so even the completed panel's
+    assignment gate can refuse them. The bounce page can never 403.
+    """
+    return redirect(
+        reverse('production:stage-advanced', kwargs={'code': adda.code})
+    )
 
 
 class StageViewAccessMixin:
@@ -38,10 +62,14 @@ class StageViewAccessMixin:
         adda_code = kwargs.get('code')
         if code and adda_code and not user_has_role(request.user, MANAGEMENT_ROLES):
             from production.models import AddaStageRecord
-            sr = AddaStageRecord.objects.filter(
+            srs = list(AddaStageRecord.objects.filter(
                 adda__code=adda_code, workflow_stage__stage__code=code,
-            ).first()
-            if sr is None or not sr.is_worker_assigned(request.user):
+            ))
+            # streams: a trio stage may have one SR PER LANE — assignment
+            # on ANY lane of this stage opens the console (the lane
+            # switcher + task-scoped reports keep the work honest).
+            if not srs or not any(
+                    sr.is_worker_assigned(request.user) for sr in srs):
                 raise PermissionDenied("You are not assigned to this stage.")
         return super().dispatch(request, *args, **kwargs)
 

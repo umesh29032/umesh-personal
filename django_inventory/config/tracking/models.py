@@ -73,9 +73,11 @@ class BarcodeBatch(TimeStampedModel):
     total_pieces = models.PositiveIntegerField()
 
     class Meta:
-        # Ek Adda mein same (color, size) combo do baar nahi. Legacy null+null
-        # batch sirf ek baar (legacy Addas mein only one batch total).
-        unique_together = [('adda', 'color', 'size')]
+        # IDENTITY LAW append (2026-07-11): a late Cutting Stream may add a
+        # SECOND batch for the same (color, size) — ranges are the identity
+        # truth, so uniqueness moved to (adda, start_seq); non-overlap is
+        # guaranteed by the Max(end_seq)+1 allocation under the writers.
+        unique_together = [('adda', 'start_seq')]
         indexes = [
             models.Index(fields=['adda', 'start_seq']),
             models.Index(fields=['adda', 'end_seq']),
@@ -257,6 +259,26 @@ class AddaHistory(AbstractHistoryEntry):
         SETTLEMENT_FINALIZED = 'settlement_finalized', 'Settlement Finalized'
         SETTLEMENT_REVERSED = 'settlement_reversed', 'Settlement Reversed'
         SETTLEMENT_SUPERSEDED = 'settlement_superseded', 'Settlement Superseded'
+        # R3 (PDD §27-C3): super-admin forced a stage complete past pending
+        # workers. metadata = {stage, pending_workers, pending_count, reason};
+        # actor/created_at carry who/when — audit-complete by itself, never
+        # dependent on external logs (owner instruction 2026-07-04).
+        COMPLETION_OVERRIDE = 'completion_override', 'Completion Override'
+        # R6 (PDD §31.1-F6): management corrected a reported quantity.
+        # metadata = {contribution, worker, worker_id, stage, reported, old,
+        # new}; new=None means "correction cleared, back to reported". DB-
+        # resident audit (owner: investigations never depend on app logs).
+        VERIFIED_QTY_CORRECTED = 'verified_qty_corrected', 'Verified Qty Corrected'
+        # Pre-Phase-3 D (owner 2026-07-06): manager VOIDED a submitted report so
+        # the worker can re-report — the audited path for corrections that would
+        # INCREASE production (verification only confirms/reduces). metadata =
+        # {task, new_task, worker, worker_id, stage, reason,
+        # lines:[{color,size,good,alter,missing,damaged}]}.
+        REPORT_VOIDED = 'report_voided', 'Report Voided'
+        # GAP-4 (lifecycle §9.5): the two lane-lifecycle events land with the
+        # Add-lane flow. metadata = {stream_id, fabric_group, sequence, reason}.
+        STREAM_ADDED = 'stream_added', 'Cutting Lane Added'
+        STREAM_CANCELLED = 'stream_cancelled', 'Cutting Lane Cancelled'
 
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='history',
@@ -292,7 +314,12 @@ class AddaHistory(AbstractHistoryEntry):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=['adda', '-created_at'])]
+        indexes = [
+            models.Index(fields=['adda', '-created_at']),
+            # global recent-events feed on the management landing page
+            # (ORDER BY created_at DESC LIMIT n) — adda-led index can't serve it
+            models.Index(fields=['-created_at']),
+        ]
         ordering = ['-created_at']
 
 

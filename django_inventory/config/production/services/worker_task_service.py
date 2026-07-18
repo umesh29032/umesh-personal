@@ -96,12 +96,17 @@ def set_stage_workers(stage_record, worker_ids, *, cancel_note: str = ''):
 AUTO_CANCEL_NOTE = "auto-cancelled: stage completed without submitted report"
 
 
-def resolve_stage_tasks_on_complete(stage_record):
+def resolve_stage_tasks_on_complete(stage_record, *, cancel_note: str = ''):
     """F3/F8 (owner-locked 2026-06-11): a completed stage leaves NO unresolved
     active tasks. assigned / in_progress (with or without draft lines) → CANCELLED;
     completed / verified → untouched (immutable work). Draft contribution lines on
     cancelled tasks are RETAINED (evidence of partial work; invisible to business
     reads, which only consume completed tasks).
+
+    R3 (PDD §27-C3): this now runs only when nothing is pending OR behind the
+    super-admin override — advance_to_next_stage BLOCKS first. `cancel_note`
+    lets the override stamp its reason on each cancelled task (defaults to the
+    legacy auto-cancel note).
 
     Routed through set_stage_workers — the completed-stage roster (active tasks)
     then shows only workers who actually reported (owner decision: truthful
@@ -115,7 +120,8 @@ def resolve_stage_tasks_on_complete(stage_record):
                             WorkerStageTask.Status.VERIFIED))
         .values_list('worker_id', flat=True)
     )
-    set_stage_workers(stage_record, keep, cancel_note=AUTO_CANCEL_NOTE)
+    set_stage_workers(stage_record, keep,
+                      cancel_note=cancel_note or AUTO_CANCEL_NOTE)
     logger.info("worker_task.resolve_on_complete sr=%s kept=%s",
                 stage_record.pk, sorted(keep))
 
@@ -149,6 +155,110 @@ def _ensure_task_actor(task, user):
         raise PermissionDenied("not your task")
 
 
+def _resolve_machine_code(task) -> str:
+    """Pre-Phase-3 B: which physical machine is this worker on RIGHT NOW?
+    Only meaningful on machine stages; resolution = the worker's OPEN
+    MachineAssignment of the stage's machine type (adda-matched window wins over
+    a global one). Returns '' when unresolvable — passive metadata, never an
+    error. Lazy machines import (function-level, same as generic_stage handler —
+    model-level FKs stay machines→production only)."""
+    stage = task.stage_record.workflow_stage.stage
+    if stage.work_type != stage.WorkType.MACHINE or not stage.machine_type_id:
+        return ''
+    from machines.models import MachineAssignment
+    open_assignments = (
+        MachineAssignment.objects
+        .filter(worker_id=task.worker_id, end_at__isnull=True,
+                machine__machine_type_id=stage.machine_type_id)
+        .select_related('machine')
+        .order_by('-start_at'))
+    adda_match = next((a for a in open_assignments
+                       if a.adda_id == task.stage_record.adda_id), None)
+    chosen = adda_match or next(iter(open_assignments), None)
+    return chosen.machine.code if chosen else ''
+
+
+@transaction.atomic
+def void_submitted_report(task, *, actor, reason: str):
+    """Pre-Phase-3 D (owner-approved 2026-07-06): audited, MANAGER-ONLY recovery
+    for a wrongly-submitted report (fat-finger). Workers never edit after
+    submit; verification never increases — this is THE explicit path when the
+    true number is HIGHER than submitted.
+
+    Mechanics (append-only, first-pass truth never edited — ADR-0010 D4):
+      • the COMPLETED task is set to CANCELLED (its contributions stay attached
+        as inert history: settlement funnel + pool materialize + board totals
+        all read completed/verified tasks only, so the voided lines drop out of
+        every truth surface without a row edit);
+      • a FRESH active task is created for the same worker (existing
+        add_stage_worker primitive) — they re-report through the normal path;
+      • the void is a DB-resident AddaHistory event (REPORT_VOIDED) with the
+        voided lines snapshot + mandatory reason.
+
+    Guards: management only · mandatory reason · task must be COMPLETED/VERIFIED
+    · REFUSED once the stage has completed (the downstream pool froze at
+    advance — reopen the stage first) · REFUSED if any line is settlement-
+    credited (reverse the settlement first — money armor).
+    """
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    from production.models import WorkerStageTask
+
+    if not user_has_role(actor, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can void a submitted report.")
+    if not (reason or '').strip():
+        raise ValidationError("A reason is required to void a submitted report.")
+    t = (WorkerStageTask.objects.select_for_update()
+         .select_related('stage_record__workflow_stage__stage', 'worker')
+         .get(pk=task.pk))
+    if t.status not in (WorkerStageTask.Status.COMPLETED,
+                        WorkerStageTask.Status.VERIFIED):
+        raise ValidationError("Only a submitted (completed) report can be voided.")
+    sr = t.stage_record
+    if sr.completed_at is not None:
+        raise ValidationError(
+            "This stage has already been completed — its output pool is frozen. "
+            "Reopen the stage first, then void the report.")
+    lines = list(t.contributions.select_related('settlement_line').all())
+    for c in lines:
+        if c.settlement_line_id and c.settlement_line.voided_at is None:
+            raise ValidationError(
+                "This report was already settled "
+                f"({c.settlement_line.adda_settlement.reference}) — reverse that "
+                "settlement first.")
+    t.status = WorkerStageTask.Status.CANCELLED
+    note = f"[report voided: {reason.strip()}]"
+    t.notes = (f"{t.notes} | {note}" if t.notes else note)[:200]
+    t.save(update_fields=['status', 'notes', 'updated_at'])
+    # Fresh active task — same primitive manager rostering uses (additive;
+    # partial-unique one-active-per(sr,worker) permits it past the cancelled row).
+    add_stage_worker(sr, t.worker)
+    new_task = (WorkerStageTask.objects
+                .filter(stage_record=sr, worker=t.worker)
+                .exclude(status=WorkerStageTask.Status.CANCELLED)
+                .latest('pk'))
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+    log_adda(
+        sr.adda, AddaHistory.ChangeType.REPORT_VOIDED, actor,
+        stage_record=sr,
+        note=(f"{t.worker.get_full_name() or t.worker.email}: submitted report "
+              f"voided — {reason.strip()[:80]}"),
+        metadata={
+            'task': t.pk, 'new_task': new_task.pk,
+            'worker': t.worker.get_full_name() or t.worker.email,
+            'worker_id': t.worker_id,
+            'stage': sr.workflow_stage.stage.name,
+            'reason': reason.strip()[:200],
+            'lines': [{'color': c.color_id, 'size': c.size_id,
+                       'good': str(c.good_quantity), 'alter': str(c.alter_quantity),
+                       'missing': str(c.missing_quantity),
+                       'damaged': str(c.damaged_quantity)} for c in lines],
+        })
+    logger.info("worker_task.void_report task=%s new_task=%s by=%s",
+                t.pk, new_task.pk, actor.pk)
+    return new_task
+
+
 @transaction.atomic
 def report_contributions(task, lines, *, actor):
     """Worker submits reported production lines (append-only) for their task.
@@ -164,6 +274,8 @@ def report_contributions(task, lines, *, actor):
               WorkerStageTask.Status.CANCELLED)
     if task.status in locked:
         raise ValidationError("Cannot report on a completed or cancelled task.")
+    # Pre-Phase-3 B: machine identity snapshot, resolved ONCE per report call.
+    machine_code = _resolve_machine_code(task)
     created = []
     for line in lines:
         # PA-07-1: the worker view passes reported_quantity as a RAW string. A
@@ -175,26 +287,62 @@ def report_contributions(task, lines, *, actor):
             qty = Decimal(str(line['reported_quantity']))
         except InvalidOperation:
             raise ValidationError("Quantity must be a number.")
-        if qty <= 0:
+        if qty < 0:
+            raise ValidationError("reported_quantity cannot be negative.")
+        # Foundation S3 (RC-3 dual-write): the worker UI submits the payable
+        # GOOD quantity; reported_quantity is dual-written equal (legacy column,
+        # renamed-not-dropped at S6). R10-B: generic machine/manual stages also
+        # capture ALTER + MISSING observations per line (S3 columns; immutable
+        # analytics — D2: only good is EVER payable; the freeze reads good only).
+        # Pre-Phase-3 A: DAMAGED (scrap) is the 4th observation.
+        def _obs(key):
+            raw = line.get(key)
+            if raw in (None, ''):
+                return Decimal('0')
+            try:
+                val = Decimal(str(raw))
+            except InvalidOperation:
+                raise ValidationError(f"{key} must be a number.")
+            if val < 0:
+                raise ValidationError(f"{key} cannot be negative.")
+            return val
+
+        alter = _obs('alter_quantity')
+        missing = _obs('missing_quantity')
+        damaged = _obs('damaged_quantity')
+        # A line must observe SOMETHING (mirrors wsc_gamd constraint): good may be
+        # 0 only when an alter/missing/damaged observation is positive.
+        if qty == 0 and alter == 0 and missing == 0 and damaged == 0:
             raise ValidationError("reported_quantity must be greater than 0.")
-        # Foundation S3 (RC-3 dual-write): the worker UI submits ONE quantity = the
-        # payable good. good_quantity is the truth; reported_quantity is dual-written
-        # equal (legacy column, kept valid through S3→S5, renamed-not-dropped at S6).
-        # alter/missing default 0 — the future Missing/Alter modules set them.
+
         created.append(WorkerStageContribution.objects.create(
             task=task,
             reported_quantity=qty,
             good_quantity=qty,
+            alter_quantity=alter,
+            missing_quantity=missing,
+            damaged_quantity=damaged,
+            machine_code=machine_code,
             color_id=line.get('color_id'),
             size_id=line.get('size_id'),
             bundle_item_id=line.get('bundle_item_id'),
         ))
+    now = timezone.now()
+    update = ['updated_at']
+    # Pre-Phase-3 C: first WORKER report timestamp (passive — nothing reads it).
+    if created and task.first_report_at is None:
+        task.first_report_at = now
+        update.append('first_report_at')
     if task.status == WorkerStageTask.Status.ASSIGNED:
         task.status = WorkerStageTask.Status.IN_PROGRESS
+        update.append('status')
         if task.started_at is None:
-            task.started_at = timezone.now()
-        task.save(update_fields=['status', 'started_at', 'updated_at'])
-    logger.info("worker_task.report task=%s lines=%s", task.pk, len(created))
+            task.started_at = now
+            update.append('started_at')
+    if len(update) > 1:
+        task.save(update_fields=update)
+    logger.info("worker_task.report task=%s lines=%s machine=%s",
+                task.pk, len(created), machine_code or '-')
     return created
 
 
@@ -253,6 +401,22 @@ def complete_worker_task(task, *, actor):
     from production.services import pool_service
     pool_service.check_allocation_bound(task)
     ws = task.stage_record.workflow_stage
+    # R8 WP-4: a FIXED-pay stage pays rate × 1 exactly ONCE per stage record —
+    # a second completed report would double the fixed amount (two assigned
+    # workers each reporting "done"). Refuse with the responsible name.
+    # Reverse/re-settle is unaffected (this reads task status, never money).
+    from production.models import CostMethod as _CM
+    if ws.cost_method == _CM.FIXED:
+        other = (WorkerStageTask.objects
+                 .filter(stage_record=task.stage_record,
+                         status__in=(WorkerStageTask.Status.COMPLETED,
+                                     WorkerStageTask.Status.VERIFIED))
+                 .exclude(pk=task.pk).select_related('worker').first())
+        if other is not None:
+            raise ValidationError(
+                "This fixed-pay stage was already reported complete by "
+                f"{other.worker.get_full_name() or other.worker.email} — a "
+                "fixed amount pays once. Ask a manager if this is wrong.")
     from production.services import stage_rate_service
     # Foundation S2 (addendum M-5): freeze the worker's ROLE now, and pay the rate
     # FROZEN on the Adda (AddaStageRoleRate), not the live workflow — so a later
@@ -343,8 +507,70 @@ def set_verified_quantity(contribution, quantity, *, actor):
             raise ValidationError("Verified quantity must be a number.")
         if quantity < 0:
             raise ValidationError("Verified quantity cannot be negative.")
+        # H-1 (owner-approved 2026-07-06): verification REDUCES or CONFIRMS
+        # production — it can never create it. Two ceilings, flag-independent
+        # (this is a post-complete money path ENFORCE_ALLOCATION_BOUND never
+        # touches — settlement pays verified-else-good):
+        #   1. never above what the worker reported good;
+        if quantity > c.good_quantity:
+            raise ValidationError(
+                f"Verified quantity ({quantity}) cannot exceed the reported good "
+                f"quantity ({c.good_quantity}) — verification reduces or confirms "
+                "production, never creates it.")
+        #   2. on a piece-pool stage WHERE this worker holds an allocation for
+        #      the dimension, never above that allocation (Σ verified-else-good
+        #      of the task's OTHER lines on the same dimension counts against
+        #      the same ceiling). allocated == 0 → the stage ran un-split
+        #      (rollout phase, ENFORCE_ALLOCATION_BOUND off) — ceiling 1 alone
+        #      governs, otherwise verification would be unusable exactly where
+        #      corrections are most needed.
+        from production.constants import ALLOC_DIM_NONE
+        sr_ = c.task.stage_record
+        if sr_.workflow_stage.allocation_dimensions != ALLOC_DIM_NONE:
+            from production.services import pool_service
+            allocated = pool_service.worker_allocated(
+                sr_, c.task.worker, c.color_id, c.size_id)
+            if allocated > 0:
+                siblings = (WorkerStageContribution.objects
+                            .filter(task=c.task, color_id=c.color_id,
+                                    size_id=c.size_id)
+                            .exclude(pk=c.pk))
+                others = sum(((s.verified_quantity if s.verified_quantity is not None
+                               else s.good_quantity) for s in siblings), Decimal('0'))
+                if quantity + others > allocated:
+                    raise ValidationError(
+                        f"Verified quantity ({quantity}) would take this worker's "
+                        f"dimension total to {quantity + others}, above the "
+                        f"{allocated} allocated. Allocate more first, or correct "
+                        "the allocation.")
+    old = c.verified_quantity
+    if old == quantity:
+        return c        # no-op — no row churn, no timeline noise (R6)
     c.verified_quantity = quantity
     c.save(update_fields=['verified_quantity', 'updated_at'])
+    # R6 (PDD §31.1-F6): DB-resident audit on the Adda timeline — who/old/new/
+    # when, never dependent on this log line. Same atomic txn as the write
+    # (event and correction commit or roll back together). History goes
+    # through log_adda — the single AddaHistory writer (rule 5).
+    from tracking.services import log_adda
+    from tracking.models import AddaHistory
+    sr = c.task.stage_record
+    worker = c.task.worker
+    log_adda(
+        sr.adda, AddaHistory.ChangeType.VERIFIED_QTY_CORRECTED, actor,
+        stage_record=sr,
+        note=(f"{worker.get_full_name() or worker.email}: "
+              f"{old if old is not None else 'reported'} → "
+              f"{quantity if quantity is not None else 'cleared (reported)'}"),
+        metadata={
+            'contribution': c.pk,
+            'worker': worker.get_full_name() or worker.email,
+            'worker_id': worker.pk,
+            'stage': sr.workflow_stage.stage.name,
+            'reported': str(c.reported_quantity),
+            'old': str(old) if old is not None else None,
+            'new': str(quantity) if quantity is not None else None,
+        })
     logger.info("worker_task.verify_qty wsc=%s task=%s qty=%s by=%s",
                 c.pk, c.task_id, quantity, actor.pk)
     return c

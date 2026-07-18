@@ -1,0 +1,40 @@
+{% comment %}
+R3 (PDD §27-C3): Super-Admin completion override — shared partial, included
+inside every stage panel's COMPLETE form. Display-only gate here; the service
+re-validates role + non-empty reason (never trust the form). Hidden for
+everyone below super_admin. Unticked checkbox ⇒ no override key posted ⇒
+normal C3 BLOCK applies.
+{% endcomment %}
+{% if is_super_admin %}
+<details class="c3-override">
+    <summary>Super-Admin: override pending worker reports</summary>
+    <div class="c3-override-body">
+        <label class="c3-override-check">
+            <input type="checkbox" name="override_pending" value="1">
+            <span>Force-complete this stage even though assigned workers have
+            not submitted their reports (their tasks will be CANCELLED and the
+            override recorded on the Adda timeline forever).</span>
+        </label>
+        <label class="c3-override-reason">
+            <span>Reason (required — permanent audit trail)</span>
+            <input type="text" name="override_reason" maxlength="200"
+                   placeholder="e.g. worker absconded; stage must move today">
+        </label>
+    </div>
+</details>
+<style>
+    /* Scoped: partial-owned styles (shared-partial rule, UI_COMPONENTS). */
+    .c3-override { margin: 10px 0; border: 1px dashed #d9c9a8; border-radius: 10px;
+                   background: #fdf9f0; padding: 8px 12px; font-size: 13px; }
+    .c3-override summary { cursor: pointer; font-weight: 600; color: #8a6d1f;
+                           min-height: 32px; display: flex; align-items: center; }
+    .c3-override-body { display: flex; flex-direction: column; gap: 10px; padding: 10px 2px 4px; }
+    .c3-override-check { display: flex; gap: 8px; align-items: flex-start; }
+    .c3-override-check input { width: 18px; height: 18px; margin-top: 2px; }
+    .c3-override-reason { display: flex; flex-direction: column; gap: 4px; }
+    .c3-override-reason span { font-size: 12px; font-weight: 600; color: #6b6357; }
+    .c3-override-reason input { min-height: 40px; border: 1px solid #e2d7bd;
+        border-radius: 8px; padding: 6px 10px; background: #fffdf6;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); }
+</style>
+{% endif %}

@@ -1,3 +1,13 @@
+---
+id: docs-pre-s1-design-addendum
+type: truth-lock
+status: active
+owner: frozen
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Pre-S1 Design Addendum — resolving the 7 MUST items (2026-06-14)
 
 Binding design decisions that close the pre-S1 blockers from [FOUNDATION_DESIGN_CHALLENGE](FOUNDATION_DESIGN_CHALLENGE_2026_06_14.md) §F. **Amends, does not rewrite,** the locked foundation ([REVIEW](PRODUCTION_TRUTH_FOUNDATION_REVIEW.md)/[FINAL](PRODUCTION_TRUTH_FOUNDATION_FINAL.md)/[ROADMAP](PRODUCTION_TRUTH_FOUNDATION_ROADMAP.md)/[LOCKED](PRODUCTION_TRUTH_FOUNDATION_LOCKED.md)). No code, no migrations — architecture only. Each decision is verified against: settlement-first · ADR-0009 cost-truth · Option-B · AddaStageRoleRate roadmap · WorkerStageAllocation roadmap · future Missing-Pieces · future Alter/Rework · auditability · forward-only migration.

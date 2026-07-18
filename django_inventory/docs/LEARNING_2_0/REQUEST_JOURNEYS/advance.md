@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-advance
+type: request-journey
+status: active
+owner: handwritten
+scope: advance (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Advance (give a worker a loan)
 
 ## TL;DR (1 min)

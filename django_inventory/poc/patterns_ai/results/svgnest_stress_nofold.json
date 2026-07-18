@@ -1,0 +1,14 @@
+{
+ "set": "stress: >1m leg + curved sleeve + on-fold half-front",
+ "engine": "SVGnest-core-headless@1248dc2",
+ "spacing_mm": 2,
+ "trials": 201,
+ "timebox_s": 60,
+ "unfolded_onfold_note": false,
+ "pieces_placed": 0,
+ "pieces_total": 6,
+ "marker_length_mm": null,
+ "utilization_pct": null,
+ "wall_clock_s": 1.2,
+ "placements": null
+}

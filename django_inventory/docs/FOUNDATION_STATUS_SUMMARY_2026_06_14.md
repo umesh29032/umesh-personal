@@ -1,3 +1,13 @@
+---
+id: foundation-status-summary-2026-06-14
+type: status-anchor
+status: active
+owner: handwritten
+scope: all — navigation/state
+anchors: —
+verified: 2026-07-13
+---
+
 # Production-Truth Foundation — Status Summary (2026-06-14)
 
 The current production architecture after the S1–S5 foundation + the F1–F4 hostile-review

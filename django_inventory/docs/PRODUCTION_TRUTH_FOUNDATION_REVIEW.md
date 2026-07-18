@@ -1,3 +1,13 @@
+---
+id: docs-production-truth-foundation-review
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Production-Truth Foundation Review (design-first; NO implementation)
 
 **Premise (owner, 2026-06-14):** B-1, A-5, B-3 are symptoms of one missing foundation. Three concepts must stay **separate**: **production truth** (quantity actually done — correct *by construction*), **expected earnings** (operational visibility), **settlement truth** (a later, policy-flexible business decision). Settlement must never compensate for bad production data.

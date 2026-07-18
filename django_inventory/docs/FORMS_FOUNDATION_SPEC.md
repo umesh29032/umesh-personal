@@ -1,3 +1,13 @@
+---
+id: docs-forms-foundation-spec
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # FORMS FOUNDATION SPEC (Foundation 3)
 
 > **Status:** Contract — **DESIGN ONLY. NO CODE, NO commits.** The single-source contract for

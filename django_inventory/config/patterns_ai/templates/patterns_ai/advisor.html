@@ -1,0 +1,216 @@
+{% extends "accounts/base.html" %}
+{# P4 — the Cut Advisor: evidence-backed recommendation + human decision spine #}
+{% block page_title %}Cut Advisor{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-adv .hero { background:#fff; border:2px solid #2e6e4e; border-radius:14px;
+    padding:18px; margin:12px 0; }
+  .pai-adv .hero h2 { margin:0 0 6px; }
+  .pai-adv .chips { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .pai-adv .chip { background:#f4f1e8; border-radius:10px; padding:6px 10px; font-size:13px; }
+  .pai-adv .why li { font-size:14px; margin:3px 0; }
+  .pai-adv .save { background:#e8f4ec; border:1px solid #bfe0cb; border-radius:10px;
+    padding:10px 14px; margin:10px 0; }
+  .pai-adv .nofacts { background:#fdf7e7; border:1px solid #eadfc0; border-radius:10px;
+    padding:12px 14px; }
+  .pai-adv .theory { color:#7a5c10; font-size:12px; font-weight:600; }
+  .pai-adv .panel { background:#fff; border:var(--border-card,1px solid #e5e0d5);
+    border-radius:12px; padding:16px; margin:12px 0; }
+  .pai-adv .decide-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .pai-adv .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:end; margin-bottom:6px; }
+  .pai-adv .hist-outcome { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .pai-adv .o-offered { background:#fdf3d8; color:#7a5c10; }
+  .pai-adv .o-accepted { background:#d9efe1; color:#20603c; }
+  .pai-adv .o-modified { background:#e3ecfa; color:#2a4d86; }
+  .pai-adv .o-rejected { background:#fbe9e7; color:#a33; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-adv">
+  <div class="page-header">
+    <h1>Cut Advisor</h1>
+    <p class="subtitle">Evidence-backed marker/width/ratio advice, derived
+    live from recorded production facts. The Advisor proposes — YOU decide;
+    every proposal and decision is recorded, append-only.</p>
+  </div>
+
+  <form method="get" class="filters">
+    <div class="field"><label>Product</label>
+      <select name="product" onchange="this.form.submit()">
+        {% for p in products %}
+          <option value="{{ p.pk }}" {% if product and p.pk == product.pk %}selected{% endif %}>
+            {{ p.code }} · {{ p.name }}</option>
+        {% endfor %}
+      </select></div>
+    <div class="field"><label>Fabric width mm (optional)</label>
+      <input type="text" inputmode="numeric" name="width_mm"
+             value="{{ width_mm|default:'' }}" style="width:110px;"></div>
+    <button type="submit" class="btn">Advise</button>
+  </form>
+
+  {% if rec %}
+    {% if rec.no_facts %}
+      <div class="nofacts"><strong>No proven facts yet for
+        {{ product.code }}{% if width_mm %} at {{ width_mm }} mm{% endif %}.</strong>
+        The honest answer: record outcomes on real usages to create evidence.
+        {% if rec.untested %}Untested options exist below — trial one to
+        prove it.{% endif %}</div>
+    {% else %}
+    <div class="hero">
+      <h2>Best marker: {{ rec.best.reference }}</h2>
+      <div class="chips">
+        <span class="chip"><strong>{{ rec.best.actual_m_per_100 }}</strong> m/100 recorded</span>
+        <span class="chip">n={{ rec.best.n }}</span>
+        <span class="chip">{{ rec.best.width_mm }} mm ({{ rec.best.width_match }})</span>
+        <span class="chip">{{ rec.best.origin }}</span>
+        {% if rec.confidence %}
+          <span class="chip"><strong>{{ rec.confidence.composite }}</strong>/100 confidence</span>
+        {% endif %}
+      </div>
+      {% if rec.confidence %}
+      <div class="chips">
+        {% for k, v in rec.confidence.components.items %}
+          <span class="chip">{{ k }}: {{ v }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <ul class="why">
+        <li>Recorded reality: {{ rec.best.actual_m_per_100 }} m per 100
+          garments over {{ rec.best.n }} outcome(s); used
+          {{ rec.best.usage_count }}× (last {{ rec.best.last_used_at|date:"Y-m-d"|default:"—" }}).</li>
+        {% if rec.width_fallback_used %}
+          <li class="theory">No marker matches {{ width_mm }} mm exactly —
+            showing all widths, labeled.</li>
+        {% endif %}
+        <li>Geometry era: {{ rec.geometry_trust.confirmed_pieces }} confirmed
+          piece(s) — measured {{ rec.geometry_trust.grade_counts.measured }} ·
+          photo-calibrated {{ rec.geometry_trust.grade_counts.photo_calibrated }} ·
+          uncalibrated {{ rec.geometry_trust.grade_counts.uncalibrated }}.</li>
+      </ul>
+      {% if rec.saving %}
+        {% if rec.saving.already_best %}
+          <div class="save">You already cut with the best-proven marker —
+            no fabric left on the table.</div>
+        {% else %}
+          <div class="save"><strong>Expected saving vs current practice
+            ({{ rec.saving.baseline_reference }}):</strong>
+            {{ rec.saving.delta_m_per_100 }} m per 100 garments
+            ({{ rec.saving.pct }}%). Baseline runs
+            {{ rec.saving.baseline_m_per_100 }} m/100.</div>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if rec.proven|length > 1 or rec.untested %}
+    <div class="panel">
+      <h2>Alternatives</h2>
+      <div class="table-responsive"><table>
+        <thead><tr><th>Marker</th><th>Status</th><th>m/100</th><th>n</th><th>Width</th></tr></thead>
+        <tbody>
+        {% for r in rec.proven %}{% if not forloop.first %}
+          <tr>
+            <td data-label="Marker"><a href="{% url 'patterns_ai:marker-detail' r.reference %}">{{ r.reference }}</a></td>
+            <td data-label="Status">proven</td>
+            <td data-label="m/100">{{ r.actual_m_per_100 }}</td>
+            <td data-label="n">{{ r.n }}</td>
+            <td data-label="Width">{{ r.width_mm }} mm</td>
+          </tr>
+        {% endif %}{% endfor %}
+        {% for r in rec.untested %}
+          <tr>
+            <td data-label="Marker"><a href="{% url 'patterns_ai:marker-detail' r.reference %}">{{ r.reference }}</a></td>
+            <td data-label="Status"><span class="theory">UNTESTED — theory only</span></td>
+            <td data-label="m/100">{% if r.theoretical_m_per_100 %}{{ r.theoretical_m_per_100 }} <span class="theory">(theory)</span>{% else %}— (no facts yet){% endif %}</td>
+            <td data-label="n">0</td>
+            <td data-label="Width">{{ r.width_mm }} mm</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+    {% endif %}
+
+    {% if rec.width_advice %}
+    <div class="panel">
+      <h2>Width advice (proven per band)</h2>
+      <div class="table-responsive"><table>
+        <thead><tr><th>Width band</th><th>Best marker</th><th>m/100</th><th>n</th></tr></thead>
+        <tbody>
+        {% for w in rec.width_advice %}
+          <tr>
+            <td data-label="Width band">~{{ w.width_mm_example }} mm</td>
+            <td data-label="Best marker">{{ w.best_reference }}</td>
+            <td data-label="m/100">{{ w.best_m_per_100 }}</td>
+            <td data-label="n">{{ w.n }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+    </div>
+    {% endif %}
+
+    {% if rec.ratio_evidence %}
+    <div class="panel">
+      <h2>Ratio evidence (what the winners actually ran)</h2>
+      {% for r in rec.ratio_evidence %}
+        <p>{{ r.reference }} — ratio {{ r.ratio_counts }} → {{ r.m_per_100 }} m/100 (n={{ r.n }})</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="panel">
+      <h2>Record this proposal</h2>
+      <p class="muted">Freezes exactly what the Advisor showed (evidence
+      included) as an append-only suggestion — then record your decision.</p>
+      <form method="post" class="decide-bar">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        {% if width_mm %}<input type="hidden" name="width_mm" value="{{ width_mm }}">{% endif %}
+        <input type="hidden" name="action" value="offer">
+        <button type="submit" class="btn btn-primary">Record suggestion</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Suggestion history (append-only decision memory)</h2>
+      {% if history %}
+      <div class="table-responsive"><table>
+        <thead><tr><th>#</th><th>Shown</th><th>Best shown</th><th>Outcome</th><th>Decide</th></tr></thead>
+        <tbody>
+        {% for ev in history %}
+          <tr>
+            <td data-label="#">{{ ev.pk }}</td>
+            <td data-label="Shown">{{ ev.created_at|date:"Y-m-d H:i" }}</td>
+            <td data-label="Best shown">{{ ev.payload.best.reference|default:"— none" }}
+              {% if ev.payload.best.actual_m_per_100 %}· {{ ev.payload.best.actual_m_per_100 }} m/100{% endif %}</td>
+            <td data-label="Outcome">
+              <span class="hist-outcome o-{{ ev.outcome }}">{{ ev.get_outcome_display }}</span>
+              {% if ev.outcome_reason %}<div class="muted">{{ ev.outcome_reason }}</div>{% endif %}
+              {% if ev.decided_by %}<div class="muted">{{ ev.decided_by.get_full_name|default:ev.decided_by }} · {{ ev.decided_at|date:"Y-m-d H:i" }}</div>{% endif %}
+            </td>
+            <td data-label="Decide">
+              {% if ev.outcome == 'offered' %}
+              <form method="post" class="decide-bar">
+                {% csrf_token %}
+                <input type="hidden" name="product" value="{{ product.pk }}">
+                <input type="hidden" name="action" value="decide_{{ ev.pk }}">
+                <select name="outcome">
+                  <option value="accepted">Accept</option>
+                  <option value="modified">Accept w/ changes</option>
+                  <option value="rejected">Reject</option>
+                </select>
+                <input type="text" name="reason" placeholder="reason (req. on reject)" maxlength="200">
+                <button type="submit" class="btn">Save decision</button>
+              </form>
+              {% else %}<span class="muted">decided</span>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% else %}<p class="muted">No suggestions recorded yet for this product.</p>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,3 +1,13 @@
+---
+id: docs-audit-phases-arch-eval-source-prevention-rates-variance
+type: receipt
+status: active
+owner: append-only
+scope: audit
+anchors: —
+verified: 2026-07-18
+---
+
 # Architecture Evaluation — Source-Prevention (B-1), Adda Rate Snapshots (A-5), Settlement Basis & Missing/Alter (B-3)
 
 Decision-support. No implementation. All current-state claims are code-verified (file:line).

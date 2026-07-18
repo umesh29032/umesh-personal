@@ -1,3 +1,13 @@
+---
+id: apps-core-guide
+type: app-guide
+status: active
+owner: handwritten
+scope: core
+anchors: config/core/
+verified: 2026-07-13
+---
+
 # core app — file-by-file GUIDE (shared kernel)
 
 > Business view: [config/core/README.md](../../../config/core/README.md).

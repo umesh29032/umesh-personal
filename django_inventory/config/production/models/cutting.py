@@ -179,9 +179,14 @@ class CuttingPatternRecord(TimeStampedModel):
     # at DB. Service complete-time check enforces video-OR-photo.
     video = models.FileField(upload_to=_cutting_pattern_video_path, blank=True, null=True)
     notes = models.TextField(blank=True)
+    # R8 WP-5 (spec §3): minutes from Layering completion → Pattern Design
+    # completion, stamped at complete. ANALYTICS ONLY — no payment reads it
+    # (standing auto-duration rule 2026-06-03). NULL when layering never
+    # completed (or pre-R8 records).
+    lead_minutes_from_layering = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"CuttingPattern · {self.stage_record.adda.code}"
+        return f"PatternDesign · {self.stage_record.adda.code}"
 
 
 class CuttingPatternPhoto(TimeStampedModel):
@@ -424,7 +429,16 @@ class CuttingBundle(TimeStampedModel):
 
     cutting_record = models.ForeignKey(
         'CuttingRecord', on_delete=models.CASCADE, related_name='bundles',
+        # Streams redesign 2026-07-11: legacy anchor, kept for history.
+        # New bundles anchor on the ADDA (post-join, complete-product);
+        # single-lane data keeps both pointers consistent.
+        null=True, blank=True,
     )
+    # The PR8 intent restored: a bundle is the ADDA's complete-product
+    # container per size, itemized across every cutting lane.
+    adda = models.ForeignKey(
+        Adda, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='bundles')
     size = models.ForeignKey(
         ProductSize, on_delete=models.PROTECT, related_name='+',
     )
@@ -437,7 +451,16 @@ class CuttingBundle(TimeStampedModel):
         # Ek cutting_record + size combo = ek bundle. Multiple bundles per
         # size required ho to bundle_number free-text field use karo (or
         # extend later with subset logic).
+        # Streams redesign: legacy rows keep the old truth (NULLs are
+        # distinct, so adda-anchored rows escape it); post-join bundles
+        # are unique per (adda, size) instead.
         unique_together = [('cutting_record', 'size')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['adda', 'size'],
+                condition=models.Q(cutting_record__isnull=True),
+                name='prod_bundle_unique_adda_size'),
+        ]
         ordering = ['size__display_order', 'size__code']
 
     def __str__(self):

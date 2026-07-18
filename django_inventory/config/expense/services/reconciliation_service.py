@@ -43,11 +43,17 @@ SOFT_FLAGS = frozenset({'unpaid', 'under_allocated'})
 CLEAN_FLAGS = frozenset({'ok', 'grouped', 'unpriced'})
 
 
-def _classify(cost, out_qty, alloc_qty, earnings) -> str:
+def _classify(cost, out_qty, alloc_qty, earnings, method=None) -> str:
     if cost is None:                                  # unpriced stage
         return 'unpriced_paid' if earnings > 0 else 'unpriced'
     if cost == 0:                                     # grouped member (paid at payer)
         return 'grouped_paid' if alloc_qty > 0 else 'grouped'
+    # R8 (V-6 audit): fixed_cost is quantity-INDEPENDENT by design (frozen
+    # cost = rate, out_qty = None) — without this branch every fixed stage
+    # false-flagged 'no_output_qty'. Honest fixed check: paid ≤ the fixed
+    # amount (the WP-4 double-guard makes > impossible; classify truthfully).
+    if method == 'fixed_cost':
+        return 'over_allocated' if earnings > cost else 'ok'
     if out_qty is None:                               # priced but no frozen qty — anomaly
         return 'no_output_qty'
     if alloc_qty == 0:
@@ -87,12 +93,17 @@ def reconcile_stage_pay(*, adda=None) -> list[dict]:
         rows.append({
             'adda': sr.adda.code,
             'stage': sr.workflow_stage.stage.code,
+            # Lanes: one stage code can have N stage records (one per stream) —
+            # consumers needing the exact row (evidence FK) must use the pk,
+            # never the code (OWN-C fix 2026-07-13).
+            'stage_record_id': sr.pk,
             'processing_cost': cost,
             'output_qty': out_qty,
             'allocated_qty': alloc_qty,
             'earnings': earnings,
             'qty_delta': (out_qty - alloc_qty) if out_qty is not None else None,
-            'flag': _classify(cost, out_qty, alloc_qty, earnings),
+            'flag': _classify(cost, out_qty, alloc_qty, earnings,
+                              method=sr.cost_method_snapshot),
         })
     return rows
 

@@ -8,7 +8,7 @@ mixins.py se mirror kiya hai. test_func() False return kare to user ko 403 mileg
 from django.contrib.auth.mixins import UserPassesTestMixin
 
 from accounts.services import (
-    FINANCIAL_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role,
+    PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role,
 )
 
 
@@ -32,13 +32,13 @@ class SuperAdminOnlyMixin(UserPassesTestMixin):
     def test_func(self):
         return user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
 
-
-class FinancialRoleMixin(UserPassesTestMixin):
-    """Finance access — Super Admin / Accountant.
-
-    Future financial views (cost reports, payouts) ke liye reserved.
-    Currently Supplier/Cost form fields gate karne ke liye service-level se hota hai.
-    """
+class ManagementRoleMixin(UserPassesTestMixin):
+    """Management only (super_admin + manager) — roll MASTER-DATA writes
+    (edit/assign) mutate stock + cost truth; the floor works through the
+    layering console, never here (campaign M9 fix, mirrors the M3
+    AddaCreateView remedy)."""
 
     def test_func(self):
-        return user_has_role(self.request.user, FINANCIAL_ROLES)
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        return user_has_role(self.request.user, MANAGEMENT_ROLES)
+

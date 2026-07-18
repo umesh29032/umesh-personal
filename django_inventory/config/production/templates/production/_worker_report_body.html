@@ -15,8 +15,10 @@ No money shown (Option B). No other worker's data (isolation, D8).
       <p>Your work for this stage has been submitted.</p>
       <span class="hero-chip submitted-chip">✓ SUBMITTED · {{ adda.code }}</span>
     {% else %}
-      <p>Report the work you did, then mark it complete.</p>
+      {# Blueprint §1 worker-instruction: Stage.description hint, else generic prompt #}
+      <p>{{ stage_record.workflow_stage.stage.description|default:"Report the work you did, then mark it complete." }}</p>
       <span class="hero-chip">ADDA · {{ adda.code }}</span>
+      {% if machine_code %}<span class="hero-chip">⚙ {{ machine_code }}</span>{% endif %}
     {% endif %}
   </div>
 
@@ -75,6 +77,56 @@ No money shown (Option B). No other worker's data (isolation, D8).
       </div>
     </div>
 
+  {% elif schema.mode == 'checklist' %}
+    {% comment %}R8 (spec §3/§5) — CHECKLIST MODE (Pattern Design): the worker
+    sees ONLY the product's designs + optional photos. No quantities, no
+    analytics, no management data. Schema-driven — no stage names here.{% endcomment %}
+    <form method="post" id="checklist-form" enctype="multipart/form-data"
+          action="{% url 'production:worker-report' adda.code stage_type %}{% if embedded %}?embedded=1{% endif %}">
+      {% csrf_token %}
+      <div class="panel">
+        <div class="panel-head"><div class="panel-num">1</div>
+          <div class="panel-title">Verify each design</div></div>
+        <div class="panel-body">
+          <p class="panel-sub">Tick a design once it is drawn and checked on the layered cloth.</p>
+          {% for item in schema.checklist %}
+          <label class="check-card">
+            <input type="checkbox" name="check-{{ item.assignment_id }}" value="1"
+                   {% if item.verified %}checked{% endif %}>
+            {% if item.image %}<img src="{{ item.image }}" alt="" class="check-thumb">{% endif %}
+            <span class="check-label">{{ item.label }}</span>
+          </label>
+          {% empty %}
+          <p class="panel-sub">No Pattern Designs configured for this product — ask your manager.</p>
+          {% endfor %}
+        </div>
+      </div>
+      {% if schema.allow_photos %}
+      <div class="panel">
+        <div class="panel-head"><div class="panel-num">2</div>
+          <div class="panel-title">Photos (optional)</div></div>
+        <div class="panel-body">
+          <p class="panel-sub">Add photos of the drawn patterns if helpful.</p>
+          <input type="file" name="photos" accept="image/*" multiple class="check-photos">
+        </div>
+      </div>
+      {% endif %}
+      <div class="sticky-actions">
+        <button type="submit" class="btn btn-ghost" name="action" value="draft">Save progress</button>
+        <button type="submit" class="btn btn-primary" name="action" value="submit"
+                onclick="return confirm('Submit? All designs must be verified. You will not be able to edit after this.');">
+          Submit &amp; complete work</button>
+      </div>
+    </form>
+    <style>
+      /* Checklist mode — page-scoped (rule 10), 44px touch targets. */
+      .check-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1.5px solid var(--border-subtle); border-radius: 12px; margin-bottom: 8px; background: var(--cream); cursor: pointer; min-height: 48px; }
+      .check-card input[type=checkbox] { width: 22px; height: 22px; flex-shrink: 0; }
+      .check-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-subtle); }
+      .check-label { font-size: 14px; font-weight: 600; }
+      .check-photos { width: 100%; padding: 10px; background: var(--cream); border: 1.5px dashed var(--border-subtle); border-radius: 10px; min-height: 44px; }
+    </style>
+
   {% else %}
     {# ════ STATE ① — EDITABLE (draft) ════ #}
     <form method="post" id="report-form"
@@ -94,7 +146,7 @@ No money shown (Option B). No other worker's data (isolation, D8).
                 <div class="line-head"><span class="line-no">Line <span data-line-no>{{ forloop.counter }}</span></span>
                   <button type="button" class="line-remove" data-remove title="Remove">&times;</button></div>
                 {% for f in fields %}
-                  <div class="line-field">
+                  <div class="line-field{% if f.kind == 'observation' %} line-field--obs{% endif %}">
                     <span class="fld-label">{{ f.label }}</span>
                     {% if f.kind == 'choice' %}
                       <input type="hidden" data-key="{{ f.key }}" value="{{ f.value|default_if_none:'' }}">
@@ -102,6 +154,9 @@ No money shown (Option B). No other worker's data (isolation, D8).
                         {% for o in f.options %}
                           <button type="button" class="chip{% if o.selected %} selected{% endif %}" data-value="{{ o.value }}">
                             {% if o.swatch %}<span class="swatch" style="background:{{ o.swatch }}"></span>{% endif %}{{ o.label }}</button>
+                        {% empty %}
+                          {# OP-1: a pool stage scopes choices to the worker's allocation — empty = not split yet #}
+                          <span class="fld-hint">Nothing assigned to you yet — ask your manager.</span>
                         {% endfor %}
                       </div>
                     {% else %}
@@ -157,6 +212,8 @@ No money shown (Option B). No other worker's data (isolation, D8).
                 {% for o in f.options %}
                   <button type="button" class="chip" data-value="{{ o.value }}">
                     {% if o.swatch %}<span class="swatch" style="background:{{ o.swatch }}"></span>{% endif %}{{ o.label }}</button>
+                {% empty %}
+                  <span class="fld-hint">Nothing assigned to you yet — ask your manager.</span>
                 {% endfor %}
               </div>
             {% else %}

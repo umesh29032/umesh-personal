@@ -108,20 +108,47 @@ def _acquire_pool_lock(source_sr_id: int, color_id, size_id) -> None:
                     [_POOL_LOCK_CLASS, _objid(source_sr_id, color_id, size_id)])
 
 
-def _upstream_pool_source(consuming_sr):
-    """The nearest preceding stage record in this Adda's flow (by workflow_stage.order)
-    whose stage is a piece-pool participant (allocation_dimensions != NONE). None if there
-    is no upstream pool (e.g. the consuming stage is itself the first piece stage)."""
+# GAP-1 grain (registry #6, mirrors adda_service.FABRIC_GROUPS_PROVIDER):
+# patterns_ai registers mandatory_pattern_ids_for_product(product) -> set[int].
+# None / failure / <2 mandatory patterns ⇒ legacy per-dimension math (fail-open).
+MANDATORY_PATTERNS_PROVIDER = None
+
+
+def _upstream_pool_sources(consuming_sr):
+    """ALL stage records at the nearest preceding pool-participant ORDER — one per
+    cutting lane (GAP-1, frozen lifecycle §2: the ops pool is the Σ-over-streams
+    read; `.first()` used to pick ONE arbitrary lane). Empty list = no upstream."""
     from production.models import AddaStageRecord
-    return (
+    qs = (
         AddaStageRecord.objects
         .filter(adda_id=consuming_sr.adda_id,
                 workflow_stage__order__lt=consuming_sr.workflow_stage.order)
         .exclude(workflow_stage__allocation_dimensions=ALLOC_DIM_NONE)
         .select_related('workflow_stage')
-        .order_by('-workflow_stage__order')
-        .first()
+        .order_by('-workflow_stage__order', 'id')
     )
+    sources = []
+    top_order = None
+    for sr in qs:
+        if top_order is None:
+            top_order = sr.workflow_stage.order
+        if sr.workflow_stage.order != top_order:
+            break
+        sources.append(sr)
+    return sources
+
+
+def _upstream_pool_source(consuming_sr):
+    """Back-compat single-source accessor (panel labels, lock anchor): the first
+    of `_upstream_pool_sources` — deterministic (order, id)."""
+    sources = _upstream_pool_sources(consuming_sr)
+    return sources[0] if sources else None
+
+
+# OP-1: public name for panel/read callers (the underscore original predates
+# external readers; same object — pool_service stays the one pool reader).
+def upstream_pool_source(consuming_sr):
+    return _upstream_pool_source(consuming_sr)
 
 
 def recovered_alter(source_sr, color_id=None, size_id=None) -> Decimal:
@@ -135,14 +162,81 @@ def found_missing(source_sr, color_id=None, size_id=None) -> Decimal:
     return Decimal('0')
 
 
-def _source_good_for(consuming_sr, source_sr, color_id, size_id) -> Decimal:
-    """Source good aggregated DOWN to the consuming stage's grain (monotonicity guarantees
-    grain(consuming) ≤ grain(source), so this only ever coarsens = sum)."""
-    src = pool_good(source_sr)   # {(color_id, size_id): Decimal}
+def _source_good_for(consuming_sr, source_srs, color_id, size_id) -> Decimal:
+    """Σ source good across ALL lane sources (GAP-1), aggregated DOWN to the consuming
+    stage's grain (monotonicity guarantees grain(consuming) ≤ grain(source), so this
+    only ever coarsens = sum). Accepts one SR (legacy callers) or a list."""
+    if not isinstance(source_srs, (list, tuple)):
+        source_srs = [source_srs]
     dim = consuming_sr.workflow_stage.allocation_dimensions
-    if dim == ALLOC_DIM_QUANTITY:
-        return sum(src.values(), Decimal('0'))            # coarsen: Σ over all (c,s)
-    return src.get((color_id, size_id), Decimal('0'))     # COLOR_SIZE: exact dim
+    total = Decimal('0')
+    for source_sr in source_srs:
+        src = pool_good(source_sr)   # {(color_id, size_id): Decimal}
+        if dim == ALLOC_DIM_QUANTITY:
+            total += sum(src.values(), Decimal('0'))       # coarsen: Σ over all (c,s)
+        else:
+            total += src.get((color_id, size_id), Decimal('0'))   # exact dim
+    return total
+
+
+def _mandatory_pattern_needs(adda):
+    """{pattern_id: pieces_per_garment} for the product's MANDATORY Production
+    Components, via the Blueprint provider. {} when the provider is absent, fails,
+    or reports <2 mandatory patterns — callers then use the legacy per-dim math
+    (single-component products are byte-identical by construction: min over one
+    pattern IS its piece count)."""
+    if MANDATORY_PATTERNS_PROVIDER is None:
+        return {}
+    try:
+        mandatory_ids = set(MANDATORY_PATTERNS_PROVIDER(adda.product) or ())
+    except Exception:
+        logger.exception('mandatory-patterns provider failed — legacy pool math')
+        return {}
+    if not mandatory_ids:
+        return {}
+    from production.models import ProductPatternAssignment
+    needs = {
+        a.pattern_id: max(a.pieces_count or 1, 1)
+        for a in ProductPatternAssignment.objects.filter(
+            product=adda.product, pattern_id__in=mandatory_ids)
+    }
+    return needs if len(needs) >= 2 else {}
+
+
+def _garment_sets_remaining(consuming_sr, needs, size_id=None) -> Decimal:
+    """GARMENT-EQUIVALENT capacity (ratified 2026-07-11, BUNDLE review §Q4):
+    per size, min over mandatory components of (Σ cut pieces across ALL lanes ÷
+    pieces-per-garment) — minus Σ active allocations at that size (every colour:
+    a garment spans colours, so sets are SIZE-grain; cloth colour is a component
+    attribute). size_id=None ⇒ Σ over all sizes (QUANTITY-grain consumers).
+    Capacity only — never money (S4 decoupling contract unchanged)."""
+    from django.db.models import Sum
+
+    from production.models import CuttingPieceBreakup, WorkerStageAllocation
+    rows = (CuttingPieceBreakup.objects
+            .filter(cutting_record__stage_record__adda_id=consuming_sr.adda_id,
+                    pattern_id__in=needs)
+            .values('size_id', 'pattern_id')
+            .annotate(n=Sum('count')))
+    per_size = {}
+    for r in rows:
+        per_size.setdefault(r['size_id'], {})[r['pattern_id']] = r['n']
+    def sets_of(sz):
+        cuts = per_size.get(sz, {})
+        return min((cuts.get(pid, 0) // need for pid, need in needs.items()),
+                   default=0)
+    if size_id is not None:
+        sets = Decimal(sets_of(size_id))
+        drawn = (WorkerStageAllocation.objects
+                 .filter(stage_record=consuming_sr, size_id=size_id,
+                         voided_at__isnull=True)
+                 .aggregate(q=Sum('allocated_quantity'))['q'] or Decimal('0'))
+    else:
+        sets = Decimal(sum(sets_of(sz) for sz in per_size))
+        drawn = (WorkerStageAllocation.objects
+                 .filter(stage_record=consuming_sr, voided_at__isnull=True)
+                 .aggregate(q=Sum('allocated_quantity'))['q'] or Decimal('0'))
+    return sets - drawn
 
 
 def _allocated_for(consuming_sr, color_id, size_id) -> Decimal:
@@ -156,15 +250,85 @@ def _allocated_for(consuming_sr, color_id, size_id) -> Decimal:
     return agg['q'] or Decimal('0')
 
 
+def garment_readiness(adda):
+    """GAP-5 approved DERIVE-ONLY panel (BUNDLE review §6): per size — each
+    mandatory Production Component's cut total, sets it supports, the
+    bottleneck flag; complete sets; leftover pieces (count − consumed).
+    Returns None for single-component products (pieces ARE sets — no panel).
+    Reads breakups + assignments + the registry-#6 provider. Stores NOTHING."""
+    needs = _mandatory_pattern_needs(adda)
+    if not needs:
+        return None
+    from django.db.models import Sum
+
+    from production.models import CuttingPieceBreakup, ProductPattern, ProductSize
+    names = {p.pk: p.name for p in ProductPattern.objects.filter(pk__in=needs)}
+    rows = (CuttingPieceBreakup.objects
+            .filter(cutting_record__stage_record__adda=adda,
+                    pattern_id__in=needs)
+            .values('size_id', 'pattern_id')
+            .annotate(cut=Sum('count'), consumed=Sum('consumed_count')))
+    per_size = {}
+    for r in rows:
+        per_size.setdefault(r['size_id'], {})[r['pattern_id']] = r
+    sizes = []
+    total_sets = 0
+    total_pieces = 0
+    for size in ProductSize.objects.filter(product=adda.product).order_by(
+            'display_order'):
+        cuts = per_size.get(size.pk)
+        if not cuts:
+            continue
+        comps = []
+        for pid, need in needs.items():
+            cut = (cuts.get(pid) or {}).get('cut', 0) or 0
+            total_pieces += cut
+            comps.append({'name': names.get(pid, pid), 'cut': cut,
+                          'need': need, 'sets': cut // need})
+        sets = min(c['sets'] for c in comps)
+        def _free_sets(pid, need):
+            row = cuts.get(pid) or {}
+            cut_n = row.get('cut') or 0
+            used_n = row.get('consumed') or 0
+            return (cut_n - used_n) // need
+        unbundled = min(_free_sets(pid, need) for pid, need in needs.items())
+        for c in comps:
+            c['is_min'] = c['sets'] == sets
+        total_sets += sets
+        sizes.append({'size': size, 'sets': sets, 'components': comps,
+                      'blocked': sets == 0, 'unbundled_sets': max(unbundled, 0),
+                      'bottleneck': ' + '.join(c['name'] for c in comps
+                                               if c['is_min'])})
+    leftovers = []
+    for b in (CuttingPieceBreakup.objects
+              .filter(cutting_record__stage_record__adda=adda)
+              .select_related('pattern', 'size')):
+        left = b.count - b.consumed_count
+        if left > 0:
+            leftovers.append({'component': b.pattern.name,
+                              'size': b.size.label, 'count': left})
+    return {'sizes': sizes, 'total_sets': total_sets,
+            'total_pieces': total_pieces, 'leftovers': leftovers}
+
+
 def available(consuming_sr, color_id=None, size_id=None) -> Decimal:
-    """`pool_good(source)↓grain + recovered − Σ non-voided allocations` at the consuming
-    stage's dims. 0 when there is no upstream pool source."""
-    source = _upstream_pool_source(consuming_sr)
-    if source is None:
+    """`Σ pool_good(sources)↓grain + recovered − Σ non-voided allocations` at the
+    consuming stage's dims — sources = EVERY lane at the nearest upstream order
+    (GAP-1). Multi-component products (≥2 mandatory Blueprint patterns) are
+    additionally capped by the GARMENT-EQUIVALENT sets remaining at the SIZE
+    grain — sewing can never be allocated more sets than every mandatory
+    component supports (45 sets ≠ 143 pieces). 0 when no upstream pool."""
+    sources = _upstream_pool_sources(consuming_sr)
+    if not sources:
         return Decimal('0')
-    return (_source_good_for(consuming_sr, source, color_id, size_id)
-            + recovered_alter(source, color_id, size_id)
-            - _allocated_for(consuming_sr, color_id, size_id))
+    per_dim = (_source_good_for(consuming_sr, sources, color_id, size_id)
+               + recovered_alter(sources[0], color_id, size_id)
+               - _allocated_for(consuming_sr, color_id, size_id))
+    needs = _mandatory_pattern_needs(consuming_sr.adda)
+    if not needs:
+        return per_dim
+    sets_left = _garment_sets_remaining(consuming_sr, needs, size_id)
+    return min(per_dim, sets_left)
 
 
 def _validate_dims(consuming_sr, color_id, size_id):
@@ -251,7 +415,8 @@ def preview_bound_violations(adda=None) -> list:
                   .filter(task__stage_record=sr, task__status__in=done)
                   .select_related('task')):
             produced[(c.task.worker_id, c.color_id, c.size_id)] += (
-                c.good_quantity + c.alter_quantity + c.missing_quantity)
+                c.good_quantity + c.alter_quantity + c.missing_quantity
+                + c.damaged_quantity)
         for (worker_id, color_id, size_id), got in produced.items():
             allocated = (WorkerStageAllocation.objects
                          .filter(stage_record=sr, worker_id=worker_id,
@@ -284,7 +449,8 @@ def bound_soft_warning(task):
     reported = defaultdict(lambda: Decimal('0'))
     for c in task.contributions.all():
         reported[(c.color_id, c.size_id)] += (
-            c.good_quantity + c.alter_quantity + c.missing_quantity)
+            c.good_quantity + c.alter_quantity + c.missing_quantity
+                + c.damaged_quantity)
     for (color_id, size_id), got in reported.items():
         if got > worker_allocated(sr, task.worker, color_id, size_id):
             return ("Heads up: reported quantity exceeds what's allocated to this worker for "
@@ -294,7 +460,7 @@ def bound_soft_warning(task):
 
 def check_allocation_bound(task) -> None:
     """Strict complete-time bound (S4/Phase 4, I-5). For each DIMENSION the worker actually
-    REPORTED on a pool-participant stage, refuse if Σ(good+alter+missing) exceeds Σ active
+    REPORTED on a pool-participant stage, refuse if Σ(good+alter+missing+damaged) exceeds Σ active
     allocated for (worker, stage, dims). Evaluated per-reported-dimension and independently:
     an allocated-but-unreported dim is never checked (no need to consume all); a reported-
     but-UNALLOCATED dim has allocated=0 → refused.
@@ -318,7 +484,8 @@ def check_allocation_bound(task) -> None:
     reported = defaultdict(lambda: Decimal('0'))
     for c in task.contributions.all():
         reported[(c.color_id, c.size_id)] += (
-            c.good_quantity + c.alter_quantity + c.missing_quantity)
+            c.good_quantity + c.alter_quantity + c.missing_quantity
+                + c.damaged_quantity)
 
     source = _upstream_pool_source(sr)
     for (color_id, size_id), produced in sorted(
@@ -337,11 +504,19 @@ def check_allocation_bound(task) -> None:
 def void_allocation(wsa, *, actor):
     """Void an allocation (correction) — qty returns to `available`. Management only.
     Append-only (sets voided_at; never deletes). Idempotent. Held under the pool lock so
-    the credit-back serialises with concurrent allocates."""
+    the credit-back serialises with concurrent allocates.
+
+    H-2 (owner-approved 2026-07-06): once the worker has SUBMITTED production
+    against this allocation's dimension, the void is refused unless the remaining
+    allocation still covers the submitted total — an allocation is not a free
+    undo lever after work happened. The explicit correction flow is Report
+    Review (`set_verified_quantity`): correct the report first, then void."""
     from django.utils import timezone
 
     from accounts.services import MANAGEMENT_ROLES, user_has_role
-    from production.models import WorkerStageAllocation
+    from production.models import (
+        WorkerStageAllocation, WorkerStageContribution, WorkerStageTask,
+    )
 
     if not user_has_role(actor, MANAGEMENT_ROLES):
         raise PermissionDenied("Only management can void an allocation.")
@@ -351,6 +526,27 @@ def void_allocation(wsa, *, actor):
     source = _upstream_pool_source(row.stage_record)
     if source is not None:
         _acquire_pool_lock(source.pk, row.color_id, row.size_id)
+    # Submitted production on this (worker, dims): Σ(verified-else-good + alter
+    # + missing) of the worker's completed/verified tasks — verified is the
+    # final business truth (owner 2026-07-06), so a Report-Review correction
+    # genuinely frees allocation for a subsequent void. Must still fit inside
+    # the allocation that would REMAIN after this void.
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    produced = Decimal('0')
+    for c in WorkerStageContribution.objects.filter(
+            task__stage_record=row.stage_record, task__worker_id=row.worker_id,
+            task__status__in=done, color_id=row.color_id, size_id=row.size_id):
+        good = c.verified_quantity if c.verified_quantity is not None else c.good_quantity
+        produced += good + c.alter_quantity + c.missing_quantity + c.damaged_quantity
+    if produced > 0:
+        remaining = worker_allocated(
+            row.stage_record, row.worker, row.color_id, row.size_id,
+        ) - row.allocated_quantity
+        if produced > remaining:
+            raise ValidationError(
+                f"Cannot void: the worker already submitted {produced} for this "
+                f"dimension and only {remaining} allocation would remain. Correct "
+                "the report in Report Review first (verification), or re-allocate.")
     row.voided_at = timezone.now()
     row.save(update_fields=['voided_at', 'updated_at'])
     logger.info("pool.void sr=%s wsa=%s by=%s",

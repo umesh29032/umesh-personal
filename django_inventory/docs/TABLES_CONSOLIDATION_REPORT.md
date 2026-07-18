@@ -1,3 +1,13 @@
+---
+id: docs-tables-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Tables Consolidation Report (Phase E)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase E (Tables).**

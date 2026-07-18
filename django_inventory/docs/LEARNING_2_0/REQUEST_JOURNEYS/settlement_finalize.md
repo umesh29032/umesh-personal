@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-settlement-finalize
+type: request-journey
+status: active
+owner: handwritten
+scope: settlement_finalize (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Settlement Finalize (the money write) — TEMPLATE
 
 > The richest journey. Copy this 16-section shape for every other journey.

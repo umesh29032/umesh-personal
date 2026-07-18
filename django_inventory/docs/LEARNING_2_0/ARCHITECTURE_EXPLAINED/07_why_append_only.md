@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-07-why-append-only
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why append-only was chosen
 
 **Problem:** Paisa ki row ko EDIT/DELETE karna = history mit jaati hai. Kal

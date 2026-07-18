@@ -1,0 +1,76 @@
+{% extends "accounts/base.html" %}
+{# M8 — full-marker tiled TRUE-SCALE print (browser). Same grid + numbering as the PDF. #}
+{% block page_title %}Print · Layout #{{ c.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-print .note { background:#fdf7e7; border:1px solid #eadfc0;
+    border-radius:10px; padding:10px 12px; font-size:13px; margin:10px 0; }
+  .pai-print .sum { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; padding:14px 16px; margin:10px 0; max-width:560px; }
+  .pai-print .sum table { border-collapse:collapse; font-size:13px; width:100%; }
+  .pai-print .sum th { text-align:left; font-size:10px; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--stone); padding:5px 8px 5px 0; width:46%; }
+  .pai-print .sum td { font-weight:600; padding:5px 0; }
+  .pai-print .tile { background:#fff; border:1px dashed #c9bd9e; margin:12px 0;
+    width:190mm; }
+  .pai-print .tile-head { font-size:12px; font-weight:700; padding:2mm 0; }
+  .pai-print .bar { margin:2mm 0 4mm; }
+  @media print {
+    /* only the tiles print — app chrome and screen helpers vanish */
+    body * { visibility:hidden; }
+    .pai-print .printable, .pai-print .printable * { visibility:visible; }
+    .pai-print .tile { border:none; page-break-after:always; margin:0; }
+    .pai-print .sum-page { page-break-after:always; }
+    @page { size:A4 portrait; margin:10mm; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-print">
+  <div class="page-header">
+    <h1>Print tiles · Layout #{{ c.pk }}</h1>
+    <p class="subtitle">{{ product.name }} ({{ product.code }}) —
+    {{ cols }} column(s) × {{ rows }} row(s) = {{ tiles|length }} tile
+    page(s). TRUE SCALE: print at 100%, never "fit to page"; verify any
+    tile's 10 cm bar with a tape; overlap to the dashed match lines
+    (10&nbsp;mm).</p>
+  </div>
+  <div class="note">Assembly: columns left→right (C1, C2…), rows
+    top→bottom (R1, R2…). This page prints the summary first, then every
+    tile on its own sheet.</div>
+  <p><a class="btn btn-primary" href="#" onclick="window.print(); return false;">🖨 Print</a>
+     <a class="btn" href="{% url 'patterns_ai:candidate-detail' c.pk %}">← Layout #{{ c.pk }}</a></p>
+
+  <div class="printable">
+    <div class="sum sum-page">
+      <strong style="font-size:14px;">Production Layout Summary</strong>
+      <table>
+        <tr><th>Product</th><td>{{ summary.product_name }} ({{ summary.product_code }})</td></tr>
+        <tr><th>Layout</th><td>#{{ summary.layout_id }}{% if summary.production %} · ★ production layout{% endif %}</td></tr>
+        <tr><th>Fabric width</th><td>{{ summary.width_mm }} mm</td></tr>
+        <tr><th>Required layer length</th><td>{{ summary.length_mm }} mm</td></tr>
+        <tr><th>Utilization / waste</th><td>{{ summary.utilization_pct }}% / {{ summary.waste_pct }}%</td></tr>
+        <tr><th>Pattern count</th><td>{{ summary.piece_count }} pieces · {{ summary.garments }} garment(s)</td></tr>
+        <tr><th>Size ratio</th><td>{{ summary.ratio }}</td></tr>
+        <tr><th>Exported</th><td>{{ summary.generated_at }} by {{ summary.generated_by }}</td></tr>
+      </table>
+    </div>
+    {% for t in tiles %}
+    <div class="tile">
+      <div class="tile-head">Layout #{{ c.pk }} · tile {{ t.label }}
+        (col {{ t.col }}/{{ cols }}, row {{ t.row }}/{{ rows }}) ·
+        TRUE SCALE — print at 100%</div>
+      {{ t.svg|safe }}
+      {# Gate-1-style honesty bar: 100 mm ruled line #}
+      <svg xmlns="http://www.w3.org/2000/svg" class="bar" width="120mm" height="8mm" viewBox="0 0 120 8">
+        <line x1="0" y1="4" x2="100" y2="4" stroke="#000" stroke-width="0.6"/>
+        <line x1="0" y1="1" x2="0" y2="7" stroke="#000" stroke-width="0.5"/>
+        <line x1="50" y1="1.5" x2="50" y2="6.5" stroke="#000" stroke-width="0.4"/>
+        <line x1="100" y1="1" x2="100" y2="7" stroke="#000" stroke-width="0.5"/>
+        <text x="103" y="6.4" font-size="3">10 cm</text>
+      </svg>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

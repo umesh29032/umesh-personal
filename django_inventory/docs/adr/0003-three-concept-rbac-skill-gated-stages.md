@@ -1,3 +1,13 @@
+---
+id: docs-adr-0003-three-concept-rbac-skill-gated-stages
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0003 — Three-concept RBAC; stages skill-gated; menu + URL co-gated
 
 **Status:** Accepted (CLAUDE.md rule #6)

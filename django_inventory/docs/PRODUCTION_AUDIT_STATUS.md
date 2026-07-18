@@ -1,3 +1,13 @@
+---
+id: production-audit-status
+type: status-anchor
+status: active
+owner: handwritten
+scope: all — navigation/state
+anchors: —
+verified: 2026-07-13
+---
+
 # PRODUCTION_AUDIT_STATUS.md — Single Source of Truth
 
 > **Production Readiness Audit** of Kapil Enterprises Inventory (Django 5.0 + PostgreSQL).

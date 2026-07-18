@@ -1,3 +1,13 @@
+---
+id: docs-implementation-master-plan-v2
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Implementation Master Plan V2 — Kapil Enterprises ERP
 
 **Supersedes** [IMPLEMENTATION_MASTER_PLAN.md](IMPLEMENTATION_MASTER_PLAN.md). Incorporates the accepted risk-review corrections RC-1…RC-8 + mandatory gates MT-1…MT-8 from [IMPLEMENTATION_RISK_REVIEW.md](IMPLEMENTATION_RISK_REVIEW.md). Governing execution plan. **No implementation in this document.**

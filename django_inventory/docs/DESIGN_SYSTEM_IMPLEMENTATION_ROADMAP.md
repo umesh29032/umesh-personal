@@ -1,3 +1,13 @@
+---
+id: docs-design-system-implementation-roadmap
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # DESIGN SYSTEM IMPLEMENTATION ROADMAP
 
 > **Status:** Roadmap — **DESIGN ONLY, NO CODE AUTHORIZED.**

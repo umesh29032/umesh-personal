@@ -1,3 +1,13 @@
+---
+id: html-audit-master
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # HTML_AUDIT_MASTER — Frontend HTML-by-HTML Canonicalization Audit
 
 > **Single source of control** for reusable frontend controls + UI behavior.

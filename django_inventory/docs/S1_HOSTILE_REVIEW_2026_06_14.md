@@ -1,3 +1,13 @@
+---
+id: s1-hostile-review-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # S1 Hostile Architecture Review (2026-06-14)
 
 Adversarial review of the SHIPPED S1 (commit `99ab7935`) — trying to prove it flawed / incomplete / debt-creating, not defend it. Tests assumed incomplete. Verdict in §D.

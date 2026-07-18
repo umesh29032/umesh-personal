@@ -116,7 +116,8 @@ class MyWorkSectionTests(TestCase):
         # cost_billed_at=None: seeded T-SHIRT layering is GROUPED — the F2
         # structural guard rightly forces a grouped member's pay rate to 0,
         # which would freeze expected=0 and hide the ₹ this test asserts.
-        product.workflow_stages.update(cost_rate=Decimal('10'), cost_billed_at=None)
+        product.workflow_stages.update(cost_rate=Decimal('10'), cost_billed_at=None,
+                                       credits_workers=True)   # A360 rule: non-payable freezes 0
         self.adda = create_adda(self.admin, product=product)
         self.url = f'/production/addas/{self.adda.code}/'
         # Assign worker A to layering; report 12 pcs; complete → expected frozen.

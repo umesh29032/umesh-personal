@@ -1,3 +1,13 @@
+---
+id: production-stage-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Production App — Stage Flow & Model Connections
 
 > Focused reference: **what each stage creates** + **how every model wires into the end-to-end flow**.

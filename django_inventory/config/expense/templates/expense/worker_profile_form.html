@@ -18,6 +18,13 @@
     .expense-form .errs { color: #b91c1c; font-size: 12px; margin-top: 4px; }
     .expense-form .hint { font-size: 11px; color: var(--stone); margin-top: 4px; }
     .expense-form .sticky-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-subtle); padding: 14px 0; margin-top: -64px; display: flex; justify-content: flex-end; gap: 10px; }
+    /* R4: pay-basis panel — its own form (separate chokepoint), above the profile form */
+    .expense-form .pay-basis-panel { padding: 20px 22px; margin-bottom: 18px; }
+    .expense-form .pb-current { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; }
+    .expense-form .pb-warn { background: #fffbeb; border: 1.5px solid #f6ce8f; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #92400e; margin: 12px 0; }
+    .expense-form .pb-warn label { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; margin: 10px 0 0; cursor: pointer; }
+    .expense-form .pb-warn input[type=checkbox] { width: 20px; height: 20px; margin-top: 1px; flex-shrink: 0; }
+    .expense-form .pb-actions { margin-top: 14px; }
 </style>
 {% endblock %}
 
@@ -27,6 +34,51 @@
         <h1>Worker Profile</h1>
         <p>{{ viewed_worker.get_full_name|default:viewed_worker.email }} · bank / UPI / opening advance. No totals stored here — those stay derived from the ledger.</p>
     </div>
+    {% comment %}R4 (PDD §27-D4): pay basis — its own form to its own chokepoint
+    (payroll_service.set_pay_basis: super-admin only, audited). Managers see it
+    read-only; the template gate is display-only, the SERVICE re-validates.
+    Owner R4 addendum: unsettled lines ⇒ warning + explicit confirm checkbox
+    (server refuses without it — not a hard block).{% endcomment %}
+    <div class="panel pay-basis-panel">
+        <h2 style="margin-top:0;">Pay Basis</h2>
+        <div class="pb-current">
+            Current:
+            {% if pay_basis == 'monthly' %}
+            <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span>
+            {% else %}
+            <span class="badge badge-active"><span class="badge-dot"></span>Piece Rate</span>
+            {% endif %}
+        </div>
+        {% if is_super_admin %}
+        <form method="post" action="{% url 'expense:worker-pay-basis' viewed_worker.pk %}">
+            {% csrf_token %}
+            <div class="field">
+                <label for="id_pay_basis">Change to</label>
+                <select name="pay_basis" id="id_pay_basis">
+                    {% for value, label in pay_basis_choices %}
+                    <option value="{{ value }}" {% if value == pay_basis %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <div class="hint">Monthly workers keep reporting work (records), but their lines never enter a settlement — salary is paid separately.</div>
+            </div>
+            {% if pay_basis_unsettled %}
+            <div class="pb-warn">
+                ⚠ This worker has <strong>{{ pay_basis_unsettled }} unsettled contribution line{{ pay_basis_unsettled|pluralize }}</strong>.
+                Changing the pay basis changes how those lines settle: switching to Monthly excludes
+                them from settlement; switching to Piece Rate makes them payable at their frozen rates.
+                <label><input type="checkbox" name="confirm_unsettled" value="1">
+                I understand — apply the change to this worker anyway.</label>
+            </div>
+            {% endif %}
+            <div class="pb-actions">
+                <button type="submit" class="btn btn-copper">Change Pay Basis</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="hint">Only a Super Admin can change the pay basis.</div>
+        {% endif %}
+    </div>
+
     <form method="post">
         {% csrf_token %}
         <div class="panel">

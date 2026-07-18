@@ -7,6 +7,8 @@ gap. Honest-NULL: unpriced stages are surfaced, never silently counted as 0.
 from __future__ import annotations
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from decimal import Decimal
+
 from django.db.models import Sum
 from django.views.generic import TemplateView
 
@@ -33,13 +35,27 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             Adda.objects.select_related('product', 'current_stage__stage')
             # Annotate pieces in ONE query — shadows the Adda.total_pieces
             # property so we don't fire a per-Adda aggregate in the loop (N+1).
-            .annotate(pieces=Sum('barcode_batches__total_pieces'))
+            # APSCPB = the canonical cut-piece truth (ops-master §2 rule 6);
+            # barcode batches are optional per flow and read 0 when unused.
+            .annotate(pieces=Sum('size_color_breakdowns__verified_piece_count'))
             .order_by('-started_at')[:200]
         )
         # Total manufacturing cost per Adda (only frozen+priced stage rows).
         cost_map = {
             r['adda']: r['c'] for r in
             AddaStageRecord.objects.filter(processing_cost__isnull=False)
+            .values('adda').annotate(c=Sum('processing_cost'))
+        }
+        # M13 (2026-07-12): variance must compare LIKE with LIKE — settled
+        # labor can only ever cover PAYABLE stages, so the vs-settled variance
+        # uses the payable standard; non-payable priced cost (e.g. layering)
+        # is its own honest column, never mixed into that drift. (GLDN-001
+        # exposed the mix: ₹128.75 'variance' was mostly layering's ₹164.)
+        payable_cost_map = {
+            r['adda']: r['c'] for r in
+            AddaStageRecord.objects.filter(
+                processing_cost__isnull=False,
+                workflow_stage__credits_workers=True)
             .values('adda').annotate(c=Sum('processing_cost'))
         }
         # Unpriced completed stages per Adda — surfaced, never coerced to 0.
@@ -67,17 +83,41 @@ class ProductionCostingView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         grand_cost = 0
         for a in addas:
             cost = cost_map.get(a.pk) or 0
+            payable_cost = payable_cost_map.get(a.pk) or 0
             grand_cost += cost
+            earnings = earn_map.get(a.pk, 0)
             rows.append({
                 'adda': a,
                 'current_stage': a.current_stage.stage.name if a.current_stage else '—',
                 'pieces': a.pieces or 0,   # annotation (see queryset), not the N+1 property
                 'total_cost': cost,
-                'worker_earnings': earn_map.get(a.pk, 0),
+                'payable_cost': payable_cost,
+                'nonpayable_cost': cost - payable_cost,
+                'worker_earnings': earnings,
+                # A360/P-COST: the ADR-0009 duality made explicit — variance =
+                # PAYABLE standard − actual settled labor (like-for-like; the
+                # declared home for this drift).
+                'variance': payable_cost - earnings,
                 'unpriced': unpriced_map.get(a.pk, 0),
                 'unpriced_rolls': unpriced_rolls_map.get(a.pk, 0),
             })
+        # RMX-D (Phase 17, charter = PDD entry 8): the Model-B completion —
+        # Material + Full Cost columns from THE certified Decision-2 assembly
+        # (cost_service.full_costs_for_addas; A360 reads the same function).
+        # The view calculates NOTHING: values pass through; the grand line is
+        # a presentation-sum of the certified per-Adda figures.
+        from production.services.cost_service import full_costs_for_addas
+        fc = full_costs_for_addas([a.pk for a in addas])
+        grand_full = Decimal('0.00')
+        for row in rows:
+            f = fc[row['adda'].pk]
+            row['material_net'] = f['material']['net']
+            row['material_unpriced_rolls'] = f['material']['unpriced_rolls']
+            row['has_material'] = f['material']['has_material']
+            row['full_cost'] = f['full_cost']
+            grand_full += f['full_cost']
         ctx['rows'] = rows
         ctx['grand_cost'] = grand_cost
+        ctx['grand_full_cost'] = grand_full
         ctx['total_unpriced_rolls'] = sum(unpriced_rolls_map.values())
         return ctx

@@ -1,0 +1,129 @@
+{% extends "accounts/base.html" %}
+{% block page_title %}{{ marker.reference }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-md .head-thumb { max-width:280px; border-radius:12px; display:block; margin:8px 0; }
+  .pai-md .panel { max-width:720px; margin-bottom:16px; }
+  .pai-md .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; }
+  .pai-md .stat-card { background:var(--cream,#fdf6ec); border-radius:10px; padding:10px; }
+  .pai-md .tl { list-style:none; padding:0; margin:0; }
+  .pai-md .tl li { padding:8px 0 8px 16px; border-left:3px solid #cde; margin-left:6px; }
+  .pai-md .muted { color:#777; font-size:13px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-md">
+  <div class="page-header">
+    <h1>{{ marker.reference }}
+      <span class="badge">{{ marker.get_status_display }}</span></h1>
+    <p class="subtitle">{{ marker.product.code }} · {{ marker.get_origin_display }}
+      · {{ marker.label|default:"(no floor name)" }}</p>
+    {% if marker.status_reason %}<p class="muted">Reason: {{ marker.status_reason }}</p>{% endif %}
+  </div>
+
+  <div class="panel"><div class="panel-head"><span class="panel-num">1</span>
+    <span class="panel-title">Summary</span></div>
+    <div class="panel-body">
+      {% if marker.photo %}
+        <img class="head-thumb" src="{% url 'patterns_ai:capture-thumb' marker.photo_id %}" alt="chalk layout">
+        <p class="muted">Photo: {{ marker.photo.original_filename }} ·
+          sha {{ marker.photo.sha256|slice:":12" }}… ·
+          {{ marker.photo.get_status_display }}</p>
+      {% endif %}
+      <div class="stat-grid">
+        <div class="stat-card">Width<br><strong>{{ marker.usable_width_mm }} mm</strong></div>
+        <div class="stat-card">Band<br><strong>{{ marker.usable_width_band }}</strong></div>
+        <div class="stat-card">Lay<br><strong>{{ marker.get_construction_display }}</strong></div>
+        <div class="stat-card">Used<br><strong>{{ summary.usage_count }}×</strong></div>
+        <div class="stat-card">Avg m/100
+          <br><strong>{% if summary.avg_meters_per_100 %}{{ summary.avg_meters_per_100 }}{% else %}—{% endif %}</strong>
+          <span class="muted">n={{ summary.n_for_average }}</span></div>
+      </div>
+      {% if marker.ratio.counts %}<p>Ratio:
+        {% for k, v in marker.ratio.counts.items %}<span class="badge">{{ k }}:{{ v }}</span> {% endfor %}</p>{% endif %}
+      {% if marker.notes %}<p>{{ marker.notes }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="panel"><div class="panel-head"><span class="panel-num">2</span>
+    <span class="panel-title">Lineage &amp; benchmarks</span></div>
+    <div class="panel-body">
+      <p>Supersedes:
+        {% for a in lineage.supersedes_chain %}
+          <a href="{% url 'patterns_ai:marker-detail' a.reference %}">{{ a.reference }}</a>{% if not forloop.last %} ← {% endif %}
+        {% empty %}—{% endfor %}</p>
+      <p>Superseded by:
+        {% for a in lineage.superseded_by %}
+          <a href="{% url 'patterns_ai:marker-detail' a.reference %}">{{ a.reference }}</a>
+        {% empty %}—{% endfor %}</p>
+      <p>Benchmarked against:
+        {% if lineage.benchmarked_against %}
+          <a href="{% url 'patterns_ai:marker-detail' lineage.benchmarked_against.reference %}">{{ lineage.benchmarked_against.reference }}</a>
+        {% else %}—{% endif %}</p>
+      <p>Benchmark children:
+        {% for a in lineage.benchmark_children %}
+          <a href="{% url 'patterns_ai:marker-detail' a.reference %}">{{ a.reference }}</a>
+        {% empty %}—{% endfor %}</p>
+    </div>
+  </div>
+
+  <div class="panel"><div class="panel-head"><span class="panel-num">3</span>
+    <span class="panel-title">Biography</span></div>
+    <div class="panel-body">
+      <ul class="tl">
+      {% for e in biography %}
+        <li>
+          <span class="muted">{{ e.at|date:"d M Y H:i" }}</span> —
+          {% if e.kind == 'transition' %}
+            <strong>{{ e.from|default:"created" }} → {{ e.to }}</strong>
+            {% if e.actor %}by {{ e.actor.get_full_name|default:e.actor.email }}{% endif %}
+            {% if e.reason %}<span class="muted">({{ e.reason }})</span>{% endif %}
+          {% elif e.kind == 'usage' %}
+            used on <strong>{{ e.adda.code }}</strong> ({{ e.plies }} plies × {{ e.repeats }})
+            {% if e.voided %}<span class="badge">voided</span>{% endif %}
+          {% elif e.kind == 'usage_void' %}
+            usage voided <span class="muted">({{ e.reason }})</span>
+          {% elif e.kind == 'outcome' %}
+            outcome recorded
+            {% if e.metrics.meters_per_100 %} — {{ e.metrics.meters_per_100 }} m/100{% endif %}
+          {% endif %}
+        </li>
+      {% empty %}<li>No history yet.</li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="panel"><div class="panel-head"><span class="panel-num">4</span>
+    <span class="panel-title">Usage &amp; outcomes</span></div>
+    <div class="panel-body">
+      <p><a class="btn btn-primary"
+            href="{% url 'patterns_ai:usage-new' marker.reference %}">+ Record usage</a></p>
+      {% for row in usage_rows %}
+        <div style="border-top:1px solid #eee; padding:8px 0;">
+          <strong>{{ row.usage.adda.code }}</strong> ·
+          {{ row.usage.plies }} plies × {{ row.usage.repeats }}
+          {% if row.usage.measured_usable_width_mm %} · width {{ row.usage.measured_usable_width_mm }} mm{% endif %}
+          · <span class="muted">{{ row.usage.created_at|date:"d M Y" }}</span>
+          {% if row.usage.voided_at %}
+            <span class="badge">voided</span>
+            <span class="muted">({{ row.usage.void_reason }})</span>
+          {% else %}
+            {% if row.metrics %}
+              — <strong>{% if row.metrics.meters_per_100 %}{{ row.metrics.meters_per_100 }} m/100{% else %}facts recorded, metrics pending (—){% endif %}</strong>
+              {% if row.metrics.leftover_m %} · leftover {{ row.metrics.leftover_m }} m{% endif %}
+            {% else %}
+              — <a href="{% url 'patterns_ai:outcome-new' row.usage.pk %}">record outcome →</a>
+            {% endif %}
+            <form method="post" style="display:inline"
+                  action="{% url 'patterns_ai:usage-void' row.usage.pk %}"
+                  onsubmit="var r=prompt('Void reason?'); if(!r) return false; this.reason.value=r;">
+              {% csrf_token %}<input type="hidden" name="reason">
+              <button type="submit" class="btn" style="font-size:12px;">Void…</button>
+            </form>
+          {% endif %}
+        </div>
+      {% empty %}<p class="muted">No usage recorded yet — the yield story starts with the first lay.</p>{% endfor %}
+    </div>
+  </div>
+  <a class="btn" href="{% url 'patterns_ai:marker-list' %}">← Library</a>
+</div>
+{% endblock %}

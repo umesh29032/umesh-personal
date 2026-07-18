@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-payment
+type: request-journey
+status: active
+owner: handwritten
+scope: payment (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Payment (cash to worker — payment-only)
 
 ## TL;DR (1 min)

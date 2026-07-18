@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-workflow-stage
+type: database-guide
+status: active
+owner: handwritten
+scope: workflow_stage (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: WorkflowStage (+ RoleRate) — per-product stage policy
 
 ## TL;DR

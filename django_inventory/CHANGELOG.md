@@ -1,3 +1,13 @@
+---
+id: root-changelog
+type: status-anchor
+status: active
+owner: handwritten
+scope: all — system-level
+anchors: —
+verified: 2026-07-13
+---
+
 # Changelog — Kapil Enterprises Inventory
 
 All notable changes. Dates are absolute. Branch `new_flask_app` work is

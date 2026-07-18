@@ -1,3 +1,13 @@
+---
+id: docs-frontend-design-system-architecture
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # FRONTEND DESIGN SYSTEM ARCHITECTURE
 
 > **Status:** Architecture spec — **DESIGN ONLY, NO CODE AUTHORIZED.**

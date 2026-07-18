@@ -1,3 +1,13 @@
+---
+id: l2-project-brain-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: navigation index
+anchors: —
+verified: 2026-07-13
+---
+
 # PROJECT BRAIN — the primary navigation layer (humans + AI)
 
 ## TL;DR (1 min)

@@ -1,0 +1,160 @@
+{% extends "accounts/base.html" %}
+{# M2 — the PATTERN DASHBOARD is the 5-STATION RAIL (UI freeze §1/§2.1).
+   One continuous journey, numbered stations, live verdicts:
+   1 Blueprint · 2 Pattern Intelligence Studio (Browse = the Pattern
+   Library shelf) · 3 Digital Cutting Table · 4 Layout Library ·
+   5 Manufacturing. The journey never dead-ends. #}
+{% block page_title %}{% if product %}{{ product.code }} · Pattern Dashboard{% else %}Pattern Dashboard{% endif %}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-dash { max-width: 720px; margin: 0 auto; }
+  .pai-dash .head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin:4px 0 4px; }
+  .pai-dash .head h1 { font-family:'Cormorant Garamond', serif; font-size:26px; color:var(--ink); margin:0; }
+  .pai-dash .sub { font-size:12.5px; color:var(--stone); margin-bottom:16px; }
+  .pai-dash .ready-line { font-size:13px; font-weight:700; margin-bottom:18px; }
+  .pai-dash .ready-line.ok { color:#20603c; }
+  .pai-dash .ready-line.warn { color:#a26a00; }
+  /* workflow step cards — the dashboard's whole content */
+  .pai-dash .step { display:flex; gap:14px; align-items:flex-start;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card);
+    padding:16px 18px; }
+  .pai-dash .step.gated-off { opacity:0.75; border-style:dashed; box-shadow:none; }
+  .pai-dash .step-no { font-family:'Cormorant Garamond', serif; font-size:26px;
+    font-weight:600; color:var(--copper); min-width:44px; line-height:1;
+    padding-top:2px; }
+  .pai-dash .step-body { flex:1; min-width:0; }
+  .pai-dash .step-title { font-size:15.5px; font-weight:800; color:var(--ink); }
+  .pai-dash .step-desc { font-size:12.5px; color:var(--stone); margin:3px 0 10px; }
+  .pai-dash .step-meta { font-size:11.5px; color:var(--stone); margin-top:8px; }
+  .pai-dash .step .btn { min-height:42px; }
+  .pai-dash .flow-arrow { text-align:center; color:var(--stone);
+    font-size:16px; line-height:1; margin:6px 0; }
+  .pai-dash .chooser { display:flex; flex-direction:column; gap:8px; }
+  .pai-dash .chooser a { display:block; padding:14px 16px;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card);
+    color:var(--ink); text-decoration:none; font-size:14px; }
+  @media (max-width:640px) {
+    .pai-dash .step { flex-wrap:wrap; }
+    .pai-dash .step .btn { width:100%; text-align:center; min-height:44px; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-dash">
+{% if not product %}
+  <div class="head"><h1>Pattern Dashboard</h1></div>
+  <p class="sub">Pick a product — everything related to its garment
+    patterns starts here.</p>
+  <div class="chooser">
+    {% for p in all_products %}
+      <a href="?product={{ p.pk }}"><strong>{{ p.code }}</strong> · {{ p.name }}</a>
+    {% empty %}
+      <p class="sub">No active products yet.</p>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="head">
+    <h1>{{ product.name }}</h1>
+    <span class="sub" style="margin:0;">({{ product.code }}) · Pattern Dashboard</span>
+  </div>
+  <p class="sub">Everything related to garment patterns starts here —
+    define the structure, prepare every size, then compose layouts.</p>
+
+  {% if sizes_total %}
+    <div class="ready-line {% if summary.any_size_ready %}ok{% else %}warn{% endif %}">
+      {{ sizes_ready }}/{{ sizes_total }} size{{ sizes_total|pluralize }} Ready for Cutting
+      {% if not summary.any_size_ready %}— finish at least one size to unlock the Digital Cutting Table{% endif %}
+    </div>
+  {% else %}
+    <div class="ready-line warn">No sizes yet — start with Universal, or
+      add real sizes, then prepare their pattern designs.
+      {# Phase-3 D-1 explicit moment: POST to the Manager endpoint #}
+      <form method="post" action="{% url 'patterns_ai:piece-list' %}" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="action" value="start_universal">
+        <button type="submit" class="btn" style="margin-left:8px;">Start with Universal</button>
+      </form>
+    </div>
+  {% endif %}
+
+  {# ── STATION 1 · Pattern Blueprint — "what pieces exist?" ── #}
+  <div class="step">
+    <div class="step-no">1</div>
+    <div class="step-body">
+      <div class="step-title">Pattern Blueprint</div>
+      <div class="step-desc">The garment's DNA — which pieces exist and
+        their rules (count · grain · pair · fold · fabric group ·
+        notches · seam). No geometry here.</div>
+      <a class="btn btn-ghost" href="{% url 'patterns_ai:blueprint' %}?product={{ product.pk }}">Open Blueprint</a>
+      <div class="step-meta">{{ blueprint_pieces }} piece{{ blueprint_pieces|pluralize }} defined</div>
+    </div>
+  </div>
+  <div class="flow-arrow">▼</div>
+
+  {# ── STATION 2 · Pattern Intelligence Studio — "digitize + verify" (Browse = the shelf) ── #}
+  <div class="step">
+    <div class="step-no">2</div>
+    <div class="step-body">
+      <div class="step-title">Pattern Intelligence Studio</div>
+      <div class="step-desc">The Digital Pattern Room — evidence (photo ·
+        DXF · SVG · dimensions) becomes human-verified geometry, once,
+        forever. Browse mode is the Pattern Library shelf.</div>
+      <a class="btn btn-primary" href="{% url 'patterns_ai:studio' %}?product={{ product.pk }}">Open the Studio</a>
+      <div class="step-meta">{{ summary.designs_confirmed }}/{{ summary.designs_total }} designs confirmed
+        · {{ sizes_ready }}/{{ sizes_total }} size{{ sizes_total|pluralize }} Ready · desktop workspace</div>
+    </div>
+  </div>
+  <div class="flow-arrow">▼</div>
+
+  {# ── STATION 3 · Digital Cutting Table (gated: >=1 Ready size, owner-locked law) ── #}
+  <div class="step {% if not summary.any_size_ready %}gated-off{% endif %}">
+    <div class="step-no">3</div>
+    <div class="step-body">
+      <div class="step-title">Digital Cutting Table</div>
+      <div class="step-desc">Compose manufacturing layouts from confirmed
+        Pattern Designs — it consumes them, never edits them.</div>
+      {% if summary.any_size_ready %}
+        <a class="btn btn-primary" href="{% url 'patterns_ai:cutting-table' product.pk %}">🪡 Open Digital Cutting Table</a>
+      {% else %}
+        <a class="btn btn-primary" aria-disabled="true" href="#">🪡 Open Digital Cutting Table</a>
+        <div class="step-meta">disabled — no size is ready yet. Finish the
+          required designs of at least one size.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="flow-arrow">▼</div>
+
+  {# ── STATION 4 · Layout Library — "our manufacturing assets" ── #}
+  <div class="step {% if not layouts_active and not summary.any_size_ready %}gated-off{% endif %}">
+    <div class="step-no">4</div>
+    <div class="step-body">
+      <div class="step-title">Layout Library</div>
+      <div class="step-desc">Approved layouts are permanent manufacturing
+        assets — versioned, immutable, chosen by Addas.</div>
+      {% if summary.any_size_ready %}
+        <a class="btn btn-ghost" href="{% url 'patterns_ai:cutting-table' product.pk %}#library">Open Layout Library</a>
+      {% endif %}
+      <div class="step-meta">{{ layouts_active }} active layout{{ layouts_active|pluralize }}</div>
+    </div>
+  </div>
+  <div class="flow-arrow">▼</div>
+
+  {# ── STATION 5 · Manufacturing — "what are the Addas cutting?" ── #}
+  <div class="step {% if not usages_active %}gated-off{% endif %}">
+    <div class="step-no">5</div>
+    <div class="step-body">
+      <div class="step-title">Manufacturing</div>
+      <div class="step-desc">Addas choose a layout as their cutting
+        contract — the timeline records it forever; the operator's
+        numbers always stand.</div>
+      <a class="btn btn-ghost" href="{% url 'production:adda-list' %}">Open Addas</a>
+      <div class="step-meta">{{ usages_active }} active layout contract{{ usages_active|pluralize }}
+        · choose on each Adda's page</div>
+    </div>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

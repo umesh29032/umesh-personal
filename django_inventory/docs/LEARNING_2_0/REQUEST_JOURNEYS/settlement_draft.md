@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-settlement-draft
+type: request-journey
+status: active
+owner: handwritten
+scope: settlement_draft (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Settlement Draft (open the scratchpad)
 
 ## TL;DR (1 min)

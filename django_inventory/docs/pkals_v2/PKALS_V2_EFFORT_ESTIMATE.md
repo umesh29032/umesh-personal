@@ -1,3 +1,13 @@
+---
+id: docs-pkals-v2-pkals-v2-effort-estimate
+type: topic-canonical
+status: active
+owner: handwritten
+scope: docs
+anchors: —
+verified: 2026-07-18
+---
+
 # PKALS v2 — COST / BENEFIT + EFFORT ESTIMATE (Discovery, design-only)
 
 > **PROPOSAL. Nothing implemented.** Sizing is for a solo dev with AI assistance

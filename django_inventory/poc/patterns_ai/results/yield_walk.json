@@ -1,0 +1,20 @@
+{
+ "adda": "3-PATTI-016",
+ "roll": "CR-000004",
+ "roll_width_inch": 37,
+ "plies": 30,
+ "lay_length_m": 1.5,
+ "fabric_in_linear_m": 45.0,
+ "fabric_in_area_m2_tubeflat": 42.291,
+ "garments_cut_apscpb": 60,
+ "garments_packed": 54.0,
+ "meters_per_garment_cut": 0.75,
+ "meters_per_100_garments": 75.0,
+ "est_garment_area_m2_harness": 0.1612,
+ "est_utilization_pct": 22.9,
+ "honest_notes": [
+  "utilization is an ESTIMATE: garment area from the P0 harness geometry, not captured patterns",
+  "manual chalk marker (no digital marker existed) \u2014 exactly what P1 manual-markers will record",
+  "leftover-roll and end-allowance not modelled here; P1 outcome facts add them"
+ ]
+}

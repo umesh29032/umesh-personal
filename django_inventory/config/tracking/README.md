@@ -1,3 +1,13 @@
+---
+id: app-tracking-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: tracking
+anchors: config/tracking/
+verified: 2026-07-13
+---
+
 # `tracking` app — Identity & History (the append-only memory)
 
 > Dual-register guide. Canonical: [docs/production/TRACKING.md](../../docs/production/TRACKING.md) ·
@@ -13,6 +23,32 @@ Do kaam, dono "yaad rakhna":
 
 R1 boundary (locked): **tracking owns identity + scan history; production
 owns quantity truth.** Tracking imports NO production code (string FKs only).
+
+## 🔒 THE IDENTITY LAW (owner-frozen 2026-07-11 — NEVER violate)
+
+> **Identity is meaning-blind; meaning lives on the lane.**
+> (docs/BARCODE_IDENTITY_REVIEW.md — accepted verbatim)
+
+- A barcode identifies **exactly one physical piece**. It NEVER
+  identifies a garment, a bundle, a worker, a stage, or a production
+  intent (recut / additional / anything).
+- Business meaning ALWAYS comes from derive-at-read over database
+  facts: the Cutting Stream's reason, piece statuses, batch rows,
+  Blueprint, dimensions, reports — never from the printed value.
+- **Identity is permanent**: never reused, never inherited, never
+  renumbered. Sequences are append-only (`Max(end_seq)+1`), forever.
+- A replacement piece gets a NEW identity; the damaged piece's
+  identity is retired by terminal STATUS, never deleted — the row is
+  the death certificate.
+- Status changes are BIOGRAPHY, never identity.
+- Cut pieces are FUNGIBLE within (pattern, size, color): a piece-level
+  "replaces" pointer is false precision the floor cannot truthfully
+  supply — it is permanently rejected.
+- Any future barcode FORMAT evolves only through the
+  `parse_value`/`resolve_value` resolver seam; history stays valid.
+
+A change that violates any line above is an architecture change and
+requires an owner-approved review naming the real factory problem.
 
 ## Models
 

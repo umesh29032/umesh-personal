@@ -1,3 +1,13 @@
+---
+id: docs-implementation-master-plan
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Implementation Master Plan — Kapil Enterprises ERP
 
 **Status:** governing execution plan. Replaces the audit process (Phases A–I complete). Foundation design is **LOCKED** — not re-opened here. No implementation in this document.

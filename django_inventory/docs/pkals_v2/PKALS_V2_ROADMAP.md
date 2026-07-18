@@ -1,3 +1,13 @@
+---
+id: docs-pkals-v2-pkals-v2-roadmap
+type: topic-canonical
+status: active
+owner: handwritten
+scope: docs
+anchors: —
+verified: 2026-07-18
+---
+
 # PKALS v2 — ROADMAP (Discovery, design-only)
 
 > **PROPOSAL. Nothing implemented.** Every idea classified Must / Nice / Not-worth,

@@ -1,3 +1,13 @@
+---
+id: l2-data-flows-advance-flow
+type: data-flow
+status: active
+owner: handwritten
+scope: advance_flow (data-flow)
+anchors: —
+verified: 2026-07-13
+---
+
 # Data flow: Advance (loan)
 
 ## TL;DR

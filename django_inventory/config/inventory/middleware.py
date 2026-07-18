@@ -23,22 +23,21 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve, reverse
 
-from accounts.services import MANAGEMENT_ROLES, can_access_url_name, user_has_role
+from accounts.services import can_access_url_name
 
 # Landing pages — never blocked. The management vs user dashboard split is
 # cosmetic (both @login_required), and exempting them prevents redirect loops
 # (the fallback target below is always one of these).
 _EXEMPT_URL_NAMES = {
-    'inventory:inventory_dashboard',
-    'inventory:user_dashboard',
+    'inventory:my_dashboard',          # THE live personal dashboard (F-1)
+    'inventory:inventory_dashboard',   # legacy twin — now a permanent redirect
+    'inventory:user_dashboard',        # legacy twin — now a permanent redirect
 }
 
 
 def _safe_home(user) -> str:
     """A dashboard the user can always reach (used as the redirect fallback)."""
-    if user_has_role(user, MANAGEMENT_ROLES):
-        return reverse('inventory:inventory_dashboard')
-    return reverse('inventory:user_dashboard')
+    return reverse('inventory:my_dashboard')
 
 
 class SidebarAccessMiddleware:

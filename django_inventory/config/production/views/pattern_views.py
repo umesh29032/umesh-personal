@@ -10,16 +10,17 @@ file admin ko 2 cheez karne deti hai:
      Reusable shape entries: Front Panel, Back Panel, Sleeve, Collar...
      Code (slug), name, description, optional reference image.
 
-  2. PER-PRODUCT ASSIGNMENT (`/production/products/<pk>/patterns/`)
-     Product ke liye kaunse patterns + kitne pieces per Adda.
-     ProductPatternAssignment(product, pattern, pieces_count) row banata.
+  2. PLATFORM ENTRY (`/production/products/<pk>/patterns/`)
+     Phase 1/2: redirects into the patterns_ai platform (Dashboard);
+     per-product structure ab PATTERN BLUEPRINT module mein hai
+     (patterns_ai:blueprint — atomic register_pattern_definition).
 
 VIEW CLASSES:
   ProductPatternListView   → list page (filterable by perms)
   ProductPatternCreateView → naya pattern banana
   ProductPatternUpdateView → edit (code field locked after create)
   ProductPatternDeleteView → delete (refuse if assignments exist)
-  ProductPatternsEditView  → per-product assignment editor (add/remove/update_count)
+  ProductPatternsEntryView / ProductPatternBlueprintRedirectView → platform redirects
 
 RBAC (Django built-in perms — admin role editor mein assignable):
   • List/View      → production.view_productpattern
@@ -38,17 +39,7 @@ from django.views.generic import (
 )
 
 from accounts.services import user_has_perm
-from production.models import Product, ProductPattern, ProductPatternAssignment
-
-
-def _safe_pieces_count(raw) -> int:
-    """PA-05A-4: parse the posted pieces_count without crashing on tampered/
-    non-numeric input. `int('abc')` would raise ValueError → 500; clamp to ≥1
-    and fall back to 1 for blank/garbage."""
-    try:
-        return max(1, int(raw))
-    except (TypeError, ValueError):
-        return 1
+from production.models import ProductPattern
 
 
 class _PatternPermissionRequired(UserPassesTestMixin):
@@ -150,82 +141,35 @@ class ProductPatternDeleteView(LoginRequiredMixin, _PatternPermissionRequired, D
         return super().form_valid(form)
 
 
-# ── Per-product pattern editor ──────────────────────────────────────────────
+# ── Phase-1 platform entry ─────────────────────────────────────────────────
 
 
-class ProductPatternsEditView(LoginRequiredMixin, _PatternPermissionRequired, TemplateView):
-    """Per-product pattern assignment editor.
+class ProductPatternsEntryView(LoginRequiredMixin, TemplateView):
+    """`Patterns` action → the Pattern Dashboard (patterns_ai).
 
-    URL: /production/products/<pk>/patterns/
-
-    YEH PAGE 3 ACTIONS HANDLE KARTA HAI (single endpoint, POST body se action):
-      • action=add          → new ProductPatternAssignment row banana
-      • action=remove       → assignment row delete
-      • action=update_count → existing assignment ka pieces_count change
-
-    Single POST endpoint pattern simpler hai — har action ke liye separate
-    URL nahi banane padte. Django form submit me hidden `action` field se
-    branch chalti hai.
+    Login-only by design (Phase-1 D-2): the dashboard enforces its own
+    management-role gate, and the Blueprint keeps its strict perm below —
+    a perm here would 403 manager-role users the dashboard allows.
+    Redirect by URL name only — no patterns_ai import (ADR-H wall).
     """
 
-    required_perm = 'production.change_productpattern'
-    template_name = 'production/product_patterns_edit.html'
+    def get(self, request, pk):
+        from django.urls import reverse
+        target = reverse('patterns_ai:dashboard') + f'?product={pk}'
+        return redirect(target)
 
-    def get_product(self):
-        return Product.objects.get(pk=self.kwargs['pk'])
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        product = self.get_product()
-        ctx['product'] = product
-        # Current assignments — template iss table mein dikhata hai.
-        # select_related('pattern') = ek JOIN se pattern name fetch (no N+1).
-        ctx['assignments'] = (
-            product.pattern_assignments
-            .select_related('pattern')
-            .order_by('pattern__name')
-        )
-        # Available = jo abhi attached nahi hain. Exclude se duplicate
-        # assignment prevent (unique_together(product, pattern) constraint).
-        assigned_ids = set(product.pattern_assignments.values_list('pattern_id', flat=True))
-        ctx['available_patterns'] = (
-            ProductPattern.active
-            .exclude(pk__in=assigned_ids)
-            .order_by('name')
-        )
-        return ctx
+class ProductPatternBlueprintRedirectView(LoginRequiredMixin, TemplateView):
+    """Phase 2 (owner-approved D-1): the Blueprint module lives in
+    patterns_ai — production only launches the platform. Old URL kept as
+    a redirect so Phase-1 links keep working."""
 
-    def post(self, request, pk):
-        product = self.get_product()
-        action = request.POST.get('action', '')
+    def get(self, request, pk):
+        from django.urls import reverse
+        return redirect(reverse('patterns_ai:blueprint') + f'?product={pk}')
 
-        if action == 'add':
-            pattern_id = request.POST.get('pattern')
-            # max(1, count) = safety — never less than 1 piece per assignment.
-            count = _safe_pieces_count(request.POST.get('pieces_count'))
-            if not pattern_id:
-                messages.error(request, "Pick a pattern.")
-                return redirect('production:product-patterns', pk=pk)
-            # get_or_create = idempotent. Same pattern dobara add → no-op.
-            ProductPatternAssignment.objects.get_or_create(
-                product=product, pattern_id=pattern_id,
-                defaults={'pieces_count': max(1, count)},
-            )
-            messages.success(request, "Pattern added.")
 
-        elif action == 'remove':
-            assign_id = request.POST.get('assignment')
-            # Filter by product too — defense against IDOR (id guessing).
-            ProductPatternAssignment.objects.filter(pk=assign_id, product=product).delete()
-            messages.success(request, "Pattern removed.")
-
-        elif action == 'update_count':
-            assign_id = request.POST.get('assignment')
-            count = _safe_pieces_count(request.POST.get('pieces_count'))
-            ProductPatternAssignment.objects.filter(pk=assign_id, product=product).update(
-                pieces_count=count,
-            )
-            messages.success(request, "Count updated.")
-
-        # Same page pe redirect — Post-Redirect-Get pattern (refresh-safe).
-        return redirect('production:product-patterns', pk=pk)
+# Phase 2 (owner-approved): ProductPatternsEditView retired — the Pattern
+# Blueprint module (patterns_ai:blueprint) is the single structure surface;
+# all its POST actions (add/remove/update_count) moved there behind the
+# atomic register_pattern_definition + single-writer setters.

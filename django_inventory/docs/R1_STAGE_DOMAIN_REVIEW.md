@@ -1,3 +1,13 @@
+---
+id: r1-stage-domain-review
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # R1 — Manufacturing Stage-Domain Architecture Review
 
 **Date:** 2026-06-10 · **Phase:** R1 (review only — no UI design, no code, no migrations) · **Status: 🔒 LOCKED — owner accepted D-R1.1…D-R1.10 in full, 2026-06-10.**

@@ -1,3 +1,13 @@
+---
+id: docs-multiselect-family-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Multiselect Family Consolidation Report (Phase B)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase B (Multiselect).**

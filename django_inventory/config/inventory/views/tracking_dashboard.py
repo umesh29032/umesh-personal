@@ -11,14 +11,15 @@ annotate() + filter pattern:
 from datetime import datetime, time
 
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from accounts.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
+from inventory.views.mixins import ProductionRoleMixin as _ProductionRoleMixin
 from production.models import Adda
 from django.db.models import Sum
 from tracking.models import BarcodeBatch, BatchBarcode
@@ -34,11 +35,6 @@ def _parse_date(s):
     return timezone.make_aware(datetime.combine(d, time.min))
 
 
-class _ProductionRoleMixin(UserPassesTestMixin):
-    def test_func(self):
-        return user_has_role(self.request.user, PRODUCTION_ROLES)
-
-
 class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateView):
     """Dashboard listing every Adda that has barcodes, with status breakdown.
 
@@ -49,6 +45,11 @@ class BarcodeDashboardView(LoginRequiredMixin, _ProductionRoleMixin, TemplateVie
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        # V1.1 Item 3: template hides Export CSV action for non-management.
+        # getattr: PA-13-1 test drives get_context_data with a bare RequestFactory
+        # request (no auth middleware → no .user attribute).
+        _user = getattr(self.request, 'user', None)
+        ctx['is_management'] = bool(_user) and user_has_role(_user, MANAGEMENT_ROLES)
 
         from_dt = _parse_date(self.request.GET.get('from'))
         to_dt = _parse_date(self.request.GET.get('to'))
@@ -135,8 +136,11 @@ def barcode_export_csv(request, adda_code):
       • Pre-completion download (works even if barcode_generation stage
         not yet complete — diagnostic + sanity)
       • Lightweight URL stable for any saved bookmarks
+
+    V1.1 Item 3 (2026-07-12): exports = MANAGEMENT_ROLES only (same source
+    as tracking_exports views) — workers scan barcodes but never export.
     """
-    if not user_has_role(request.user, PRODUCTION_ROLES):
+    if not user_has_role(request.user, MANAGEMENT_ROLES):
         return HttpResponse(status=403)
     adda = get_object_or_404(Adda, code=adda_code)
     # Reuse render-only helper from export service (no manifest row written).

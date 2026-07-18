@@ -1,11 +1,21 @@
+---
+id: production-rbac
+type: topic-canonical
+status: active
+owner: handwritten
+scope: access control — roles, skills, sidebar/URL enforcement, visibility law
+anchors: config/accounts/services/permission_service.py, config/inventory/middleware.py
+verified: 2026-07-13
+---
+
 # RBAC — Production Tracking Roles & Gating
 
-Reuses existing `inventory.services.permission_service` (CLAUDE.md rule #6). No raw `is_superuser` checks anywhere.
+Reuses existing `accounts.services.permission_service` (CLAUDE.md rule #6; auth family consolidated into accounts). No raw `is_superuser` checks anywhere.
 
 ## Role additions
 
 ```python
-# inventory/services/permission_service.py — additive
+# accounts/services/permission_service.py — additive
 ROLE_ACCOUNTANT = 'accountant'
 
 ADMIN_ROLES      = {ROLE_SUPER_ADMIN}
@@ -18,12 +28,19 @@ Super Admin keeps universal visibility — every role set includes `ROLE_SUPER_A
 
 ## What each role can do
 
+> Table rebuilt 2026-07-13 (Phase-7 Q-A8, backlog #6) from the CERTIFIED gate matrix:
+> [MANAGEMENT_ROLE_CERTIFICATION](../MANAGEMENT_ROLE_CERTIFICATION.md) MGT-A/E ·
+> [WORKER_ROLE_CERTIFICATION](../WORKER_ROLE_CERTIFICATION.md) (incl. final meta-audit) ·
+> [OFFICE_SUPPORT_ROLE_CERTIFICATION](../OFFICE_SUPPORT_ROLE_CERTIFICATION.md) OFF-A (D1
+> add-on model). The old table predated the master-data lockdown (product CRUD + roll
+> bulk-add are SuperAdmin-only in code).
+
 | Role | Cloth dashboard | Roll bulk add | Adda CRUD | Stage advance | Supplier / Cost per KG | Product CRUD |
 |---|---|---|---|---|---|---|
-| `super_admin` | view | yes | yes | yes | view + edit | yes |
-| `manager` | view | yes | yes | yes | hidden | yes |
-| `karigar` | view | yes | view + assign rolls | yes (own task) | hidden | view |
-| `accountant` | view (no costs) | no | view | no | view + edit | no |
+| `super_admin` | view | **yes (SA-only)** | yes | yes | view + edit | **yes (SA-only)** |
+| `manager` | view | **no** (SuperAdminOnly, MGT-A) | yes | yes | hidden (service re-gate proven, OFF-C) | **no** (SuperAdminOnlyMixin: add/edit/archive/sizes/flow, MGT-A) |
+| `worker` (was `karigar`) | **no** (sidebar = Main only; mgmt URLs 302/403, worker-cert meta-audit §8) | **no** | **no** — own assigned stage reporting only | yes (own task, single-writer path) | hidden | **no** (management list pages blocked) |
+| `accountant` (ADD-ON role, OFF-A D1) | pure: **dispatch-blocked** from rm pages BY DESIGN; composite (+manager): view | no | pure: no · composite: as manager | no | **capability holder** — functions only where a page-role admits (composite lane view+edit proven) | no |
 
 ## Helpers
 
@@ -104,6 +121,59 @@ class CostReportView(LoginRequiredMixin, RoleRequiredMixin, ListView):
 ```
 
 ## Sidebar menu spec
+
+F-1 polish (2026-07-05): "My Dashboard" is ONE ungated MenuItem for every role
+(`inventory:my_dashboard`, live at `/inventory/my-dashboard/`); the historical
+management/worker URL twins (`inventory_dashboard` / `user_dashboard`) are
+permanent redirects, kept in the registry as `hidden=True` entries so their
+SidebarItemRule rows aren't orphaned (P3.4 drift guard) — `hidden` items render
+for NOBODY, super admin included. Owner may delete those two rules via Sidebar
+Access and then remove the hidden entries.
+
+Stage worker PICKERS (F-4, same date): every stage start/assign form gets its
+options from `production.services.eligible_stage_workers(stage_code)` = active
+users ∩ `Stage.access_by_skill` — the exact population `user_can_access_stage`
+admits, so a picker can never offer a worker the gate would 403.
+
+## Visibility vs Action capability (owner decision V-1, 2026-07-05 — INTENTIONAL split)
+
+Two DIFFERENT questions, two owners, both by design:
+
+1. **VISIBILITY / entry — "may this user see & open this stage surface?"**
+   Owner: `production.services.access_service` reading the LIVE
+   `Stage.access_by_skill` / `access_by_role` rows (Access-Control hub edits
+   apply instantly, no cache). Composed rule for worker-facing surfaces:
+   `user_can_access_stage(user, stage)` **AND** (management OR an active
+   `WorkerStageTask` on that stage record) — exactly `StageViewAccessMixin`.
+   Since the C-2/C-3 freeze closeout this ONE predicate drives: stage panels,
+   the Adda-page tabs (`can_open` → iframe or Restricted/Not-assigned card),
+   every worker-dashboard accordion/board/row, the worker report view, and
+   the assignment pickers. No worker-facing surface may hardcode skill names.
+
+   **Worker sidebar lockdown (H-3/J-4, owner-approved 2026-07-06):** the NON-stage
+   navigation for the `worker` role is stripped to its own world. Migration
+   `accounts/0018_worker_sidebar_lockdown` removes `worker` from the SidebarItemRule
+   rows for the raw-materials suite (`raw_materials:*`), Operations
+   (`production:dashboard`), all-Addas (`production:adda-list`), and Tracking
+   (`tracking:dashboard`). Because `SidebarItemRule` gates the menu link AND the URL
+   together (`SidebarAccessMiddleware` → `can_access_url_name`), a worker can neither
+   see nor open those pages. A worker keeps: My Dashboard (exempt landing), My Earnings
+   (unmanaged, worker-predicate), and their own stage report/workspace URLs (unmanaged
+   action URLs gated by the access ∩ assignment predicate above). Net worker sidebar =
+   the "Main" section only.
+
+2. **ACTION capability — "may this user perform this business action?"**
+   (e.g. *only cutting_master_helper completes a stage*, *≥1 cutting_master
+   must be on a layering roster*.) Owner: the stage SERVICES' explicit guards
+   (`_ensure_can_complete_*`, `_ensure_cutting_skill`, …) — business rules
+   expressed in code, super-admin/management bypass built in. These are
+   **deliberately NOT hub-editable**: editing who can *see* a stage never
+   silently changes who can *complete* it. If action permissions should
+   become configurable, that is its own dedicated phase (post-R10, owner-
+   gated) — a per-stage action-skill config on the Stage model.
+
+Rule of thumb: hub edit = visibility, instantly, everywhere. Code change
+(reviewed) = business capability.
 
 Updated entries for `build_menu_for(user)`:
 

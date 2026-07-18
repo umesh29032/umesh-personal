@@ -27,6 +27,21 @@ class AdvanceForm(forms.Form):
     attachment = forms.FileField(required=False)
 
 
+class FactoryExpenseForm(forms.Form):
+    """R5 (PDD §21): thin entry form — salary⇒worker rule lives in
+    expense_service (single source), the form only carries fields."""
+    from expense.models import FactoryExpense as _FE
+    category = forms.ChoiceField(choices=_FE.Category.choices)
+    amount = forms.DecimalField(max_digits=12, decimal_places=2,
+                                min_value=Decimal('0.01'))
+    expense_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}))
+    # Visible only for category=salary (template JS); service re-validates.
+    worker = forms.ModelChoiceField(queryset=_worker_qs(), required=False)
+    notes = forms.CharField(required=False,
+                            widget=forms.Textarea(attrs={'rows': 2}))
+
+
 class SettlementForm(forms.Form):
     """Header fields of a settlement. amount_paid defaults to full payable
     (set by the view); per-advance recoveries are parsed from POST in the view."""
@@ -38,10 +53,13 @@ class SettlementForm(forms.Form):
 
 
 class WorkerProfileForm(forms.ModelForm):
-    # PA-06-1: opening_advance seeds Advance Outstanding (money) — a negative value
-    # corrupts the recovery math. The model field had no validator/constraint; pin
-    # it >= 0 here (mirrors AdvanceForm.amount). Bank/IFSC/account get blank-tolerant
-    # format validation so malformed payout details can't be saved (PA-06-2).
+    # PA-06-1: opening_advance is a DISPLAYED ₹ figure (WP-A: informational only —
+    # no recovery math reads it; recoverable pre-system advances = dated Advance
+    # rows via record_advance). Pin >= 0 so the display can't show a negative
+    # (mirrors AdvanceForm.amount). Bank/IFSC/account get blank-tolerant format
+    # validation so malformed payout details can't be saved (PA-06-2).
+    # RCP-1A F3 (2026-07-18): the WRITE goes through
+    # payroll_service.update_payout_profile — never a bare form.save() in the view.
     opening_advance = forms.DecimalField(
         max_digits=12, decimal_places=2, min_value=Decimal('0'),
         help_text="Loans given before the system started. Cannot be negative.",
@@ -81,3 +99,22 @@ class WorkerProfileForm(forms.ModelForm):
             raise forms.ValidationError(
                 "Bank account number needs both an IFSC and an account holder name.")
         return cleaned
+
+
+class ExpenseTemplateForm(forms.Form):
+    """MEE-C: thin entry form for recurring-expense templates — fields only.
+    EVERY rule (SA gate, P-1 pair, window order, one-active-salary-per-worker)
+    lives in expense_service.create_expense_template (single source)."""
+    from expense.models import FactoryExpense as _FE
+    label = forms.CharField(max_length=100)
+    category = forms.ChoiceField(choices=_FE.Category.choices)
+    amount = forms.DecimalField(max_digits=12, decimal_places=2,
+                                min_value=Decimal('0.01'))
+    # Visible only for category=salary (template JS); service re-validates.
+    worker = forms.ModelChoiceField(queryset=_worker_qs(), required=False)
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}))
+    end_date = forms.DateField(
+        required=False, widget=forms.DateInput(attrs={'type': 'date'}))
+    notes = forms.CharField(required=False,
+                            widget=forms.Textarea(attrs={'rows': 2}))

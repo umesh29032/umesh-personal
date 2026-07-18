@@ -1,3 +1,13 @@
+---
+id: docs-form-control-consolidation-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Form-Control Consolidation Report (Phase D)
 
 > **Evidence-based synthesis of the HTML-by-HTML audit, Phase D (Form controls + validation).**

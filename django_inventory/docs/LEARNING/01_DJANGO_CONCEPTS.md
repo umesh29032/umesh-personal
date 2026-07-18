@@ -1,3 +1,13 @@
+---
+id: learning-01-django-concepts
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Django concepts — as actually used in this project
 
 ## Models = tables

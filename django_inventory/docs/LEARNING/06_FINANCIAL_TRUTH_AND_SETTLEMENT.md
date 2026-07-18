@@ -1,3 +1,13 @@
+---
+id: learning-06-financial-truth-and-settlement
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Financial truth & settlement — the heart
 
 ## The ledger (WorkerLedgerEntry)

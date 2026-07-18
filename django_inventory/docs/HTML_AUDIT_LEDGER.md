@@ -1,3 +1,13 @@
+---
+id: html-audit-ledger
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # HTML_AUDIT_LEDGER — per-template audit record
 
 Companion to [HTML_AUDIT_MASTER.md](HTML_AUDIT_MASTER.md) (state/ordering),

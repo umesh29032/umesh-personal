@@ -1,0 +1,65 @@
+{% extends "accounts/base.html" %}
+{# Block 3C — stacked-table standard (canon): .table-responsive + td[data-label] for @390 #}
+{% block page_title %}Marker Library{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-lib .thumb { width:56px; height:56px; object-fit:cover; border-radius:8px; background:#eee; }
+  .pai-lib .sort-row { margin: 8px 0 14px; display:flex; gap:8px; flex-wrap:wrap; }
+  .pai-lib .badge { padding:2px 8px; border-radius:10px; background:#eef; font-size:12px; }
+  .pai-lib .pager { margin-top:14px; display:flex; gap:10px; align-items:center; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-lib">
+  <div class="page-header">
+    <h1>Marker Library</h1>
+    <p class="subtitle">Every marker the factory remembers — manual chalk
+    layouts first-class. {{ page.paginator.count }} total.</p>
+  </div>
+  <div class="sort-row">
+    {% for o in orderings %}
+      <a class="badge" {% if o == sort %}style="background:#cde;"{% endif %}
+         href="?sort={{ o }}">{{ o }}</a>
+    {% endfor %}
+    <span style="flex:1;"></span>
+    <a class="btn" href="{% url 'patterns_ai:yield-board' %}">Yield board</a>
+    <a class="btn btn-primary" href="{% url 'patterns_ai:manual-marker-new' %}">+ Record manual marker</a>
+  </div>
+  <div class="card card-clip"><div class="table-responsive">
+    <table>
+      <thead><tr>
+        <th>Photo</th><th>Reference</th><th>Product</th><th>Status</th>
+        <th>Origin</th><th>Width mm</th><th>Band</th><th>Lay</th><th>Created</th>
+      </tr></thead>
+      <tbody>
+      {% for m in page %}
+        <tr>
+          <td data-label="Photo">
+            {% if m.photo %}<img class="thumb" loading="lazy"
+              src="{% url 'patterns_ai:capture-thumb' m.photo_id %}" alt="">
+            {% else %}<span class="badge">no photo</span>{% endif %}
+          </td>
+          <td data-label="Reference">
+            <a href="{% url 'patterns_ai:marker-detail' m.reference %}">{{ m.reference }}</a>
+          </td>
+          <td data-label="Product">{{ m.product.code }}</td>
+          <td data-label="Status"><span class="badge">{{ m.get_status_display }}</span></td>
+          <td data-label="Origin">{{ m.get_origin_display }}</td>
+          <td data-label="Width mm">{{ m.usable_width_mm }}</td>
+          <td data-label="Band">{{ m.usable_width_band }}</td>
+          <td data-label="Lay">{{ m.get_construction_display }}</td>
+          <td data-label="Created">{{ m.created_at|date:"d M Y" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9">No markers yet — record the first chalk layout.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <div class="pager">
+    {% if page.has_previous %}<a class="btn" href="?page={{ page.previous_page_number }}&sort={{ sort }}">← Prev</a>{% endif %}
+    <span>Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn" href="?page={{ page.next_page_number }}&sort={{ sort }}">Next →</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

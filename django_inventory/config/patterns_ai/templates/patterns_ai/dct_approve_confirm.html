@@ -1,0 +1,72 @@
+{% extends "accounts/base.html" %}
+{# Phase 7 — the DCT approve REVIEW step (M7 canon: summary BEFORE the
+   explicit audited human act; rule 8: only a human approves). #}
+{% block page_title %}{{ product.code }} · Approve Layout{% endblock %}
+{% block extra_head %}
+<style>
+  .dcta { max-width: 640px; margin: 0 auto; }
+  .dcta h1 { font-family:'Cormorant Garamond', serif; font-size:24px; color:var(--ink); margin:4px 0 14px; }
+  .dcta .panel { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card); padding:16px 18px; margin-bottom:14px; }
+  .dcta table { width:100%; border-collapse:collapse; font-size:13px; }
+  .dcta td { padding:7px 6px; border-bottom:1px dashed var(--border-subtle); }
+  .dcta td:first-child { color:var(--stone); font-weight:700; font-size:11px;
+    text-transform:uppercase; letter-spacing:0.05em; width:45%; }
+  .dcta .warn { color:#b91c1c; font-weight:700; }
+  .dcta .f { display:flex; flex-direction:column; gap:4px; font-size:11px;
+    text-transform:uppercase; letter-spacing:0.06em; color:var(--stone);
+    font-weight:700; margin-bottom:12px; }
+  .dcta input[type=text], .dcta select { padding:9px 12px; border:1.5px solid var(--border-card);
+    border-radius:8px; background:var(--cream); font-size:13.5px; }
+  .dcta .acts { display:flex; gap:10px; flex-wrap:wrap; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="dcta">
+  <h1>Approve for the Layout Library</h1>
+
+  {% if messages %}{% for m in messages %}
+    <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:12px;">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  <div class="panel">
+    <table>
+      <tr><td>Product</td><td>{{ product.name }} ({{ product.code }})</td></tr>
+      <tr><td>Fabric group</td><td>{{ fabric_group|upper|default:"--" }}</td></tr>
+      <tr><td>Fabric width</td><td>{{ c.run.usable_width_mm }} mm</td></tr>
+      <tr><td>Layer length</td><td>{{ metrics.length_mm }} mm</td></tr>
+      <tr><td>Utilization</td><td>{{ metrics.utilization_pct }}% (derived at read)</td></tr>
+      <tr><td>Pieces</td><td>{{ metrics.piece_count }}</td></tr>
+      <tr><td>Verified</td><td>{% if verified %}✓{% else %}<span class="warn">✗ NOT verified — approval will refuse</span>{% endif %}</td></tr>
+      <tr><td>Saved from</td><td>{% if is_table %}Digital Cutting Table ✓{% else %}<span class="warn">the generator flow — approval will refuse (the ★ designation covers it)</span>{% endif %}</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <p style="font-size:12.5px; color:var(--stone); margin-bottom:12px;">
+      Approving freezes this draft into a <strong>manufacturing asset</strong>:
+      immutable, versioned, auditable. Afterwards only View · Duplicate ·
+      Supersede · Archive exist. Future Adda manufacturing consumes ONLY
+      the library.</p>
+    <form method="post">
+      {% csrf_token %}
+      <label class="f">Layout name (label — the immutable ID is assigned on approval)
+        <input type="text" name="name" maxlength="80"
+               placeholder="e.g. Body marker · S run"></label>
+      {% if actives %}
+      <label class="f">Supersedes (optional — moves that layout to SUPERSEDED, never edits it)
+        <select name="supersedes">
+          <option value="">— none: add alongside —</option>
+          {% for a in actives %}
+            <option value="{{ a.pk }}">{{ a.layout_uid }} · V{{ a.version_no }} · {{ a.fabric_group|upper }}</option>
+          {% endfor %}
+        </select></label>
+      {% endif %}
+      <div class="acts">
+        <a class="btn" href="{% url 'patterns_ai:cutting-table' product.pk %}">Cancel</a>
+        <button type="submit" class="btn btn-primary">★ Approve — freeze as manufacturing layout</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

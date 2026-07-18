@@ -1,0 +1,64 @@
+{% extends "accounts/base.html" %}
+{# P2 Gate-1 overlay — TILED true-scale print (audit-close 2026-07-11): same grid/numbering/match-lines as the layout print; lay assembled sheets over the cardboard, lines must match #}
+{% block page_title %}Gate-1 print — {{ row.size.label }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-print .meta { font-size:12px; color:#555; margin:6px 0; }
+  .pai-print .note { background:#fdf7e7; border:1px solid #eadfc0;
+    border-radius:10px; padding:10px 12px; font-size:13px; margin:10px 0; }
+  .pai-print .tile { background:#fff; border:1px dashed #c9bd9e; margin:12px 0;
+    width:190mm; }
+  .pai-print .tile-head { font-size:12px; font-weight:700; padding:2mm 0; }
+  .pai-print .bar { margin:2mm 0 4mm; }
+  @media print {
+    body * { visibility:hidden; }
+    .pai-print .printable, .pai-print .printable * { visibility:visible; }
+    .pai-print .tile { border:none; page-break-after:always; margin:0; }
+    @page { size:A4 portrait; margin:10mm; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-print">
+  <div class="page-header">
+    <h1>Gate-1 overlay print</h1>
+    <p class="subtitle">{{ cols }} column(s) × {{ rows }} row(s) =
+    {{ tiles|length }} sheet(s). TRUE SCALE: print at 100% — never
+    "fit to page". Verify any sheet's 10 cm bar with a tape, assemble
+    on the dashed match lines (10&nbsp;mm overlap), then lay over the
+    cardboard: boundary lines must sit on the cardboard edge.</p>
+  </div>
+  <div class="meta">
+    {{ row.version.piece.product.code }} · {{ row.version.piece.pattern.name }}
+    · v{{ row.version.version_no }} · size {{ row.size.label }}
+    · {{ w_mm }}×{{ h_mm }} mm · trust {{ row.get_trust_grade_display }}
+    · printed from immutable geometry (read-only)
+  </div>
+  {% if tiles|length > 1 %}
+  <div class="note">Assembly: columns left→right (C1, C2…), rows
+    top→bottom (R1, R2…). Every sheet carries its own scale bar.</div>
+  {% endif %}
+  <p><a class="btn" href="{% url 'patterns_ai:version-detail' row.version_id %}">← back</a>
+     <button class="btn btn-primary" onclick="window.print()">🖨 Print</button></p>
+
+  <div class="printable">
+    {% for t in tiles %}
+    <div class="tile">
+      <div class="tile-head">{{ row.version.piece.pattern.name }} ·
+        {{ row.size.label }} · tile {{ t.label }}
+        (col {{ t.col }}/{{ cols }}, row {{ t.row }}/{{ rows }}) ·
+        TRUE SCALE — print at 100%</div>
+      {{ t.svg|safe }}
+      {# Gate-1 honesty bar: 100 mm ruled line on EVERY sheet #}
+      <svg xmlns="http://www.w3.org/2000/svg" class="bar" width="120mm" height="8mm" viewBox="0 0 120 8">
+        <line x1="0" y1="4" x2="100" y2="4" stroke="#000" stroke-width="0.6"/>
+        <line x1="0" y1="1" x2="0" y2="7" stroke="#000" stroke-width="0.5"/>
+        <line x1="50" y1="1.5" x2="50" y2="6.5" stroke="#000" stroke-width="0.4"/>
+        <line x1="100" y1="1" x2="100" y2="7" stroke="#000" stroke-width="0.5"/>
+        <text x="103" y="6.4" font-size="3">10 cm</text>
+      </svg>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "accounts/base.html" %}
+{# P2 — calibration mat registry (ADR-E): stacked-table canon #}
+{% block page_title %}Calibration Mats{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-mats .status { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .pai-mats .st-active { background:#d9efe1; color:#20603c; }
+  .pai-mats .st-uncommissioned { background:#fdf3d8; color:#7a5c10; }
+  .pai-mats .st-retired { background:#eee; color:#666; }
+  .pai-mats .actions { margin:8px 0 14px; display:flex; gap:8px; flex-wrap:wrap; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-mats">
+  <div class="page-header">
+    <h1>Calibration Mats</h1>
+    <p class="subtitle">Every dimension the system stores traces back to a
+    mat on this page — commission before first use, recheck over its life,
+    retire with a reason (never delete).</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'patterns_ai:home' %}">← Pattern home</a>
+    <span style="flex:1;"></span>
+    <a class="btn btn-primary" href="{% url 'patterns_ai:mat-new' %}">+ Register mat</a>
+  </div>
+  {% if mats %}
+  <div class="card card-clip"><div class="table-responsive">
+    <table>
+      <thead><tr>
+        <th>Mat</th><th>Status</th><th>Commissioned</th><th>Checks</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for m in mats %}
+        <tr>
+          <td data-label="Mat"><strong>{{ m.mat_code }}</strong>
+            {% if m.name %}<div class="muted">{{ m.name }}</div>{% endif %}</td>
+          <td data-label="Status"><span class="status st-{{ m.status }}">{{ m.get_status_display }}</span>
+            {% if m.status_reason %}<div class="muted">{{ m.status_reason }}</div>{% endif %}</td>
+          <td data-label="Commissioned">{% if m.commissioned_at %}{{ m.commissioned_at|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+          <td data-label="Checks">{{ m.checks.count }}</td>
+          <td data-label=""><a class="btn" href="{% url 'patterns_ai:mat-detail' m.pk %}">open →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% else %}
+  <div class="card" style="padding:24px;">
+    <p>No mats registered yet. The ChArUco mat is the metrology anchor —
+    register the physical mat, tape-measure its control distances, then
+    commission it.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

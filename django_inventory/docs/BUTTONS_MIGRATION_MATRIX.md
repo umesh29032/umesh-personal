@@ -1,3 +1,13 @@
+---
+id: docs-buttons-migration-matrix
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # BUTTONS MIGRATION MATRIX
 
 > **Status:** Per-family migration matrix — **DESIGN ONLY. NO CODE. NO CSS. NO token

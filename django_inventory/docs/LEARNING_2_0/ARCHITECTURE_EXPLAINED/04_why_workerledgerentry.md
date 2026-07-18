@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-04-why-workerledgerentry
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why WorkerLedgerEntry exists
 
 **Problem:** "Worker ko abhi kitna dena hai?" — agar yeh ek number kahin STORE

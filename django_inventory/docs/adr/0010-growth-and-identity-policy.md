@@ -1,3 +1,13 @@
+---
+id: docs-adr-0010-growth-and-identity-policy
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR-0010 — Growth & identity policy locks (multi-factory, references, barcode, rework)
 
 Status: **ACCEPTED** (owner, 2026-06-11 — C-1 pre-deploy hardening).

@@ -230,18 +230,49 @@ class LogoutView(View):
         return redirect("accounts:home")
 
 
+@method_decorator(never_cache, name="dispatch")
+class EmailManagementDisabledView(LoginRequiredMixin, View):
+    """S3 fix (2026-07-12): shadow allauth's `account_email` endpoint.
+
+    allauth's EmailView (add / remove / make-primary) let ANY signed-in worker
+    self-service their own login identity: add an arbitrary UNVERIFIED email and
+    promote it to primary, which allauth syncs into `User.email` — the OTP login
+    address. That breaks the 'pre-provisioned users only' invariant (identity is
+    admin-owned, PA-02). Mounted BEFORE `include("allauth.urls")` in the root
+    URLConf so neither GET nor POST reaches allauth's EmailView. Google OAuth,
+    password reset, and confirm-email routes are untouched.
+    LoginRequiredMixin → anonymous hits go to the login page (login_url).
+    """
+    login_url = "/app/"
+
+    def get(self, request):
+        # Neutral bounce: email is an admin-managed field, no self-service page.
+        messages.info(request, "Your email address is managed by your administrator.")
+        return redirect("accounts:home")
+
+    def post(self, request):
+        # Refuse the mutation outright; log the attempt to the security channel.
+        security_logger.warning("email_selfservice_blocked email=%s", request.user.email)
+        messages.error(request, "Your email address is managed by your administrator.")
+        return redirect("accounts:home")
+
+
 # ─── Home (protected redirect) ────────────────────────────────────────────────
 
 @method_decorator(login_required(login_url="/app/"), name="dispatch")
 class HomeView(View):
-    """Protected entry point — ROLE-BASED landing (P1-1): management (super_admin
-    / manager) lands on the Operations dashboard; everyone else on their personal
-    My Dashboard. Fixes owner-lands-on-empty-worker-view (Phase-C C-1)."""
+    """Protected entry point — ROLE-BASED landing (P1-1 + D9): the Owner/Super
+    Admin lands on the Business Operating Dashboard (owner charter D9 override,
+    BOD-E 2026-07-18); managers land on the Operations dashboard (P1-1,
+    unchanged); everyone else on their personal My Dashboard. Auth flow itself
+    untouched — LOGIN_REDIRECT_URL still points here."""
 
     def get(self, request):
+        if user_has_role(request.user, {ROLE_SUPER_ADMIN}):
+            return redirect("bod:dashboard")            # D9: Owner/SA → BOD
         if user_has_role(request.user, MANAGEMENT_ROLES):
-            return redirect("production:dashboard")
-        return redirect("inventory:user_dashboard")
+            return redirect("production:dashboard")     # P1-1, unchanged
+        return redirect("inventory:my_dashboard")
 
 
 # ─── User Management ──────────────────────────────────────────────────────────
@@ -321,9 +352,8 @@ class UserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
             # SignupVerifyView's IntegrityError handling).
             form.add_error("email", "A user with this email already exists.")
             return self.form_invalid(form)
-        # Skills saved by ModelForm.save_m2m → retro-tag onto active layerings
-        # (explicit; replaces the removed m2m_changed signal).
-        user_service.sync_user_skills(self.object)
+        # (C-1 2026-07-05: no retro-tag — creating a user never assigns work;
+        # managers assign explicitly on the stage panels.)
         messages.success(self.request, f"User {self.object.email} created.")
         return response
 
@@ -361,8 +391,8 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
                 return self.form_invalid(form)
 
         response = super().form_valid(form)
-        # Skills may have changed → retro-tag (explicit; replaces the signal).
-        user_service.sync_user_skills(self.object)
+        # (C-1 2026-07-05: no retro-tag on edit — saving a profile never
+        # touches production rosters.)
         if editing_self and form.cleaned_data.get("new_password"):
             update_session_auth_hash(self.request, self.object)
         messages.success(self.request, "User updated successfully.")

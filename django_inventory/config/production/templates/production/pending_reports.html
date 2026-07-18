@@ -56,7 +56,8 @@
             <span class="code">{{ r.adda.code }}</span>
             <dl class="meta">
                 <dt>Stage</dt><dd>{{ r.stage }}</dd>
-                <dt>Worker</dt><dd>{{ r.worker.email }}</dd>
+                {# floor name first — management surfaces show names, not emails #}
+                <dt>Worker</dt><dd>{{ r.worker.get_full_name|default:r.worker.email }}</dd>
                 <dt>Assigned</dt><dd>{{ r.assigned|date:"d M Y, H:i" }}</dd>
             </dl>
             <span class="pill">{{ r.status }}</span>

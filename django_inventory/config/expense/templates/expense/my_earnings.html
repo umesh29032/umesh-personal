@@ -44,12 +44,23 @@
         </div>
         {% comment %}V2-3 PR-C: three NON-OVERLAPPING money views —
         expected (reported, not yet settled) → earned (booked at settlement)
-        → paid (cash). Expected is visibility only, never a balance.{% endcomment %}
+        → paid (cash). Expected is visibility only, never a balance.
+        R4 (PDD §27-D4, owner P-4): MONTHLY worker → the ₹ expectation is
+        suppressed ENTIRELY (never ₹0.00 — reads as unpaid work); quantities
+        stay visible elsewhere on the page (production truth).{% endcomment %}
+        {% if is_monthly %}
+        <div class="stat-card">
+            <div class="label">Pay Basis</div>
+            <div class="value"><span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span></div>
+            <div class="label" style="margin-top:4px;text-transform:none;letter-spacing:0;">work is tracked; salary is paid separately</div>
+        </div>
+        {% else %}
         <div class="stat-card">
             <div class="label">Expected (unsettled)</div>
             <div class="value">{% money unsettled_expected %}</div>
             <div class="label" style="margin-top:4px;text-transform:none;letter-spacing:0;">becomes Earned when the Adda is settled</div>
         </div>
+        {% endif %}
         <div class="stat-card">
             <div class="label">Earned (settled)</div>
             <div class="value">{% money summary.total_earnings %}</div>
@@ -122,7 +133,8 @@
             <div class="line">
                 <div>
                     <div>{{ a.stage_record.adda.code }} · {{ a.stage_record.workflow_stage.stage.name }}</div>
-                    <div class="muted">{{ a.allocated_quantity }} × ₹{{ a.earning_rate_snapshot }}{% if a.size %} · {{ a.size.code|upper }}{% endif %}{% if a.color %} · {{ a.color.name }}{% endif %}</div>
+                    {# floor language: whole pieces + 2dp rate — never 17.00 × ₹1.5000 on a worker phone #}
+                    <div class="muted">{{ a.allocated_quantity|floatformat:"0" }} × ₹{{ a.earning_rate_snapshot|floatformat:"-2" }}{% if a.size %} · {{ a.size.code|upper }}{% endif %}{% if a.color %} · {{ a.color.name }}{% endif %}</div>
                 </div>
                 <div class="amt-credit">{% money a.earning_amount_snapshot %}</div>
             </div>
@@ -132,7 +144,7 @@
     </div>
 
     <div class="panel">
-        <h2>Settlement History</h2>
+        <h2>Payments</h2>
         {% for s in settlements %}
             <div class="line">
                 <div>
@@ -142,7 +154,7 @@
                 <div class="amt-debit">{% money s.amount_paid %}</div>
             </div>
         {% empty %}
-            <div class="empty">No settlements yet — payments appear here on payroll day.</div>
+            <div class="empty">No cash payments yet — they appear here on payroll day.</div>
         {% endfor %}
     </div>
 

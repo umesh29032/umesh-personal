@@ -1,3 +1,13 @@
+---
+id: l2-apps-raw-materials-app-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: raw_materials
+anchors: config/raw_materials/
+verified: 2026-07-13
+---
+
 # raw_materials — business flows (APP_FLOW)
 
 ## TL;DR (1 min)

@@ -1,3 +1,13 @@
+---
+id: documentation-debt-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # Documentation Debt — from /find-canonical audit (2026-06-14)
 
 **Status: LOGGED, NOT EXECUTED.** This file records the canonical-audit findings as deferred

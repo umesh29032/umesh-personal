@@ -15,32 +15,33 @@ from __future__ import annotations
 
 from django import forms
 
-from accounts.models import User
-from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER
-from accounts.services import PRODUCTION_ROLES
-
 
 # Common widget attrs — every input across every stage gets same baseline class
 _BASE = {'class': 'sf-input', 'autocomplete': 'off'}
 
 
-def _worker_queryset():
-    """Generic worker queryset — every production-role user. Used by stages
-    that don't have skill-specific gating (e.g. Cutting).
+def _stage_worker_queryset(stage_code: str):
+    """THE picker population for a stage — delegates to the single source
+    `access_service.eligible_stage_workers` (F-4 polish 2026-07-05): active
+    users holding the stage's access skills, i.e. exactly who the access gate
+    admits. Lazy queryset — safe at form class-definition time.
     """
-    return User.objects.filter(role__code__in=list(PRODUCTION_ROLES)).order_by('email')
+    # Lazy import: forms load early; production.services pulls model modules.
+    from production.services import eligible_stage_workers
+    return eligible_stage_workers(stage_code)
+
+
+def _worker_queryset():
+    """Cutting picker (legacy name kept for callers) — now stage-gated via the
+    shared source instead of the old every-production-role list."""
+    from production.constants import STAGE_CUTTING
+    return _stage_worker_queryset(STAGE_CUTTING)
 
 
 def _layering_worker_queryset():
-    """Layering-specific worker pool — only cutting_master / cutting_master_helper users."""
-    return (
-        User.objects.filter(
-            is_active=True,
-            skills__name__in=[SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER],
-        )
-        .distinct()
-        .order_by('email')
-    )
+    """Layering picker — same shared source (was a local skill filter)."""
+    from production.constants import STAGE_LAYERING
+    return _stage_worker_queryset(STAGE_LAYERING)
 
 
 class _WorkerCheckboxes(forms.CheckboxSelectMultiple):

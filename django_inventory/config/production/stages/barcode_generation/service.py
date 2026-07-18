@@ -144,7 +144,7 @@ def preview_barcode_counts(adda: Adda) -> dict:
     total = 0
     for r in (
         AddaProductSizeColorPieceBreakdown.objects
-        .filter(cutting_record=cr)
+        .filter(adda=adda)          # streams: EVERY lane's frozen breakdown
         .select_related('size', 'color')
         .order_by('size__display_order', 'size__code', 'color__name')
     ):
@@ -279,7 +279,8 @@ def generate_barcodes(*, adda: Adda, user) -> BarcodeGenerationRecord:
 
 
 @transaction.atomic
-def complete_barcode_generation(*, adda: Adda, user) -> BarcodeGenerationRecord:
+def complete_barcode_generation(*, adda: Adda, user,
+                                override_pending_reason: str | None = None) -> BarcodeGenerationRecord:
     """Validate count match + finalize + advance.
 
     Validation:
@@ -325,7 +326,7 @@ def complete_barcode_generation(*, adda: Adda, user) -> BarcodeGenerationRecord:
     cr = _cutting_record_for_adda(adda)
     breakdown_total = sum(
         r.verified_piece_count for r in
-        AddaProductSizeColorPieceBreakdown.objects.filter(cutting_record=cr)
+        AddaProductSizeColorPieceBreakdown.objects.filter(adda=adda)
     ) if cr else 0
 
     if batch_total != breakdown_total:
@@ -343,7 +344,9 @@ def complete_barcode_generation(*, adda: Adda, user) -> BarcodeGenerationRecord:
     sr.completed_by = user
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
 
-    advance_to_next_stage(adda, user)
+    # R3: C3 guard + override live at the funnel (passthrough only).
+    advance_to_next_stage(adda, user,
+                          override_pending_reason=override_pending_reason)
     logger.info(
         "barcode.complete adda=%s sr_id=%s batch_total=%s breakdown_total=%s "
         "from_stage=%s user=%s",

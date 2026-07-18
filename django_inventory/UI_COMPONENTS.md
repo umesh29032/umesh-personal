@@ -1,10 +1,105 @@
+---
+id: ui-components
+type: topic-canonical
+status: active
+owner: handwritten
+scope: UI — THE certified component library (Phase 10): vocabulary, canon owners, tokens, permanent UI-architecture rules
+anchors: config/accounts/templates/accounts/base.html
+verified: 2026-07-16
+---
+
 # UI Components — Kapil Enterprises Inventory
+
+> **🏆 CERTIFIED COMPONENT LIBRARY (Campaign Phase 10, UIL-F 2026-07-16).** This file is the
+> permanent canon: every taxonomy family below has EXACTLY ONE certified owner pattern with
+> its reference page named (evidence + proofs: [docs/UI_COMPONENT_LIBRARY_LOG.md](docs/UI_COMPONENT_LIBRARY_LOG.md)).
+> Certified census basis: 169 templates · 127-token closed registry · duplication register
+> D-UI-01..14 (resolved/retained/deferred split in the log §UIL-F). Owner Design Record
+> UI-D1..UI-D9 ALL ACCEPT + taxonomy amendment A1 (domain-widgets gains `patterns`).
+
+## Certified canon — one owner per family (reference pages named)
+
+| Family | Certified owner | Reference page |
+|---|---|---|
+| layout | base.html shell/`.hero-strip`/`.panel`/sticky + form-shell hero (`--hero-grad-deep`) | `production/stage_form.html` |
+| navigation | base.html sidebar + `_nav_icon`/`_section_icon`; `.tabs` | base.html (any page) |
+| forms 🔒 | DUAL by law: A `.field` = `shared/_form_styles` + `accounts/_user_form_styles` · B `.sf-*` = base.html | A: `production/stage_form.html` · B: `storefront/listing/product_form.html` |
+| inputs/select/date 🔒 | `accounts/_fancy_controls.html` (single owner) | styleguide + any form |
+| tables | `.table-responsive`+`data-label`+`.dt-th`+`initFancyDataTable`+`shared/_datatables_vendor_*` | `accounts/user_list.html` |
+| cards | base.html `.card`/`.kpi`/`.stat-card` | `raw_materials/cloth_dashboard.html` |
+| badges/chips | base.html `.badge*` + `--status-*` tokens; `.chip-pick` | `accounts/user_list.html` |
+| dialogs/confirmations | base.html `.confirm-card` + `confirm()` law; `<details>` disclosure subtype | `inventory/role_confirm_delete.html` |
+| notifications | base.html `.msg`/`.msg-stack` | base.html |
+| filters | `.dt-filter-row` (preferred) · `.filter-card` (base.html-owned core + mobile stack) | `accounts/user_list.html` · `raw_materials/roll_list.html` |
+| pagination / search | DataTables `.dt-bottom` / `.dt-search-row` | any DataTables list |
+| dashboards | base.html `.kpis`/`.stat-grid` | `raw_materials/cloth_dashboard.html` |
+| domain: production | `_stage_panel_*` dispatch + embed-shell protocol + `_workers_widget` + behavior partials | `production/adda_detail.html` |
+| domain: financial 🔒 | money-family (`.hero-strip.copper`, `.stat-card.payable`) | `expense/adda_settlement_detail.html` |
+| domain: stage | worker-report body + `_worker_report_styles` | `production/worker_report_embedded.html` |
+| domain: inventory | `_time_log_styles` + events-accordion pair | `raw_materials/roll_detail.html` |
+| domain: patterns (A1) | `_design_row` atom + SVG workspace vocabulary | `patterns_ai/cutting_table.html` |
+| export/print | `shared/_export_buttons.html` + print-document subtype | tracking dashboard · `tracking/barcode_print_sheet.html` |
+| auth 🔒 | `shared/_auth_shell.html` (`--auth-*` knobs) | `accounts/login.html` |
+
+🔒 = FROZEN family (2026-06-18 lock): owner implementations read-only; changes need the
+design-frozen audit + owner gate.
+
+## Deprecation register (certified UIL-F)
+
+| Pattern | Status | Successor | Occurrences |
+|---|---|---|---|
+| `.ke-toolbar` | **DEPRECATION-NOMINATED** (owner-flagged UIL-B) — do not use in new pages | `.dt-filter-row` (inside-card) | 3 live (migrate via a future owner-selected queue, then mark deprecated) |
+| `.filter-select` | legacy (documented) — FancySelect replaces globally | FancySelect (automatic) | residual styling class only |
+| `signup.html` / `signup_otp.html` pre-shell auth pages | dormant (S2-closed), AUTH-frozen register — not for composition | `shared/_auth_shell.html` | 2 files, register-only |
+
+Deprecation rule (§6.3): a superseded pattern is never deleted while referenced —
+occurrences migrate (INERT), then the pattern is marked deprecated here with its successor
+named; dead CSS removal only after a zero-occurrence re-census.
 
 Component vocabulary for templates. All CSS lives in `config/accounts/templates/accounts/base.html` (single source of truth). Page-specific overrides go in each page's `{% block extra_head %}` scoped under a page-specific class.
 
 **Rule:** Before writing CSS on a page, search this file. If component exists → use it. If 80% match → extend with a modifier. If novel → add to base.html, then add it here.
 
+## Canonical hierarchy (owner ruling Q-0b(1), 2026-07-13)
+
+**THIS file is the LIVE UI vocabulary — the one canonical home for "what component do I
+use".** `docs/DESIGN_SYSTEM_SPEC.md` + `docs/UI_COMPONENTS_CATALOG.md` are the FROZEN-system
+reference pair (historical spec of the 2026-06 design-system close, owner rule 2026-06-18) —
+consult them for why the system froze, never for what to use today. All other
+`DESIGN_SYSTEM_*` / `FRONTEND_DESIGN_SYSTEM_*` / `*_FOUNDATION_SPEC` / `*_MIGRATION_MATRIX`
+working docs are superseded era documents (archived per DOCUMENT_ARCHIVE_REVIEW).
+
+## The 7 permanent UI-architecture rules (owner, 2026-07-05 — materialized here 2026-07-13, Phase-7 Q-A4; source: FE-audit approval, [docs/FRONTEND_AUDIT_2026_07_05.md](docs/FRONTEND_AUDIT_2026_07_05.md))
+
+1. **NEVER redesign independently** — every new page first names its UI REFERENCE page
+   (forms → Stage Form/form-shell · CRUD masters → Skills CRUD · cards/tables/buttons/
+   badges/sticky → the existing families). Never a second implementation.
+2. **Rule of 3 for extraction:** 3+ pages share a pattern ⇒ shared component, never copied
+   HTML/CSS.
+3. **ZERO hardcoded colors/spacing/typography/sizing** — design tokens only.
+4. **Every page answers ONE business question in seconds**; summarize-first, expand-later;
+   never overload mobile.
+5. **Before "FE done": consistency RE-AUDIT** of every touched page (no duplicate
+   buttons/cards/forms/tables, no hardcoded colors, no inline styles, no invented CSS where
+   a component exists — the class-existence check: template classes vs base.html + included
+   partials).
+6. **No new base components unless genuinely reusable** (rule of 3).
+7. **When replacing custom UI, STATE which canonical page/component it now reuses.**
+
 ---
+
+## Owner engineering ruling 2026-07-17 — MOBILE-FIRST UI STANDARD (permanent, all future phases)
+
+Every NEW UI page, dashboard, workflow, screen, modal, component, or feature MUST be
+mobile-first and satisfy ALL of: desktop-friendly · tablet-friendly · mobile-friendly ·
+responsive on all supported breakpoints — in Phase 15 and every later phase, unless an
+explicit owner ruling overrides. Implementation: this certified library + the existing
+design system are the only sources (no duplicate components when an approved one exists);
+responsive by default; no horizontal scrolling; mobile-first layouts; touch-friendly
+spacing; accessibility; visual consistency. **Certification minimum: mobile + tablet +
+desktop layout verification before a feature is complete — a non-responsive page is NOT
+production-ready.** (Strengthens the 2026-06-11 standing rule + CLAUDE.md rule 11; changes
+no product charter and no business logic.)
 
 ## Layout
 
@@ -36,7 +131,7 @@ Component vocabulary for templates. All CSS lives in `config/accounts/templates/
 
 ## Template checklist (new pages + updating old pages) — owner rule 2026-06-12
 
-**NEW page:** extends base · page-class wrapper · page CSS only in extra_head
+**NEW page:** FIRST name its canonical REFERENCE page (forms→Stage Form · CRUD masters→Skills CRUD · panels→layering panel · money→settlement family) · run the CLASS-EXISTENCE check (every class used must exist in base.html or an included partial — the R10 drift bug: invented .page-hero + missing shared/_form_styles ⇒ white inputs/unstyled hero) · extends base · page-class wrapper · page CSS only in extra_head
 under that class · COMPOSE FROM CANONICALS first (`hero-strip copper` for
 money screens — never swap a page's hero variant, that's a re-theme · `.panel`
 · `.stat-grid/.stat-card` · `.sticky-bar` · bare `.btn-copper/-ghost/-danger`,
@@ -93,6 +188,7 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `.tbl-wrap` | Wrapper with rounded corners + horizontal scroll |
 | `td[data-label="X"]` | Required on EVERY `<td>` — turns into stacked card row at ≤600px |
 | `.td-actions` | Add to actions `<td>` — full-width button row on mobile |
+| `.dt-th` | List-page `<th>` header cell (uppercase 11px tracked) — promoted from 14 identical inline styles (UIL-D 2026-07-16); add page extras (e.g. `text-align:right`) inline alongside |
 
 **⚠ Never ship a bare `<table>` (PA-14-1).** Page content sits inside `main.content { overflow-x: hidden }`, so a table wider than the viewport is **clipped with no scroll** — the rightmost columns (often money: "Final payable ₹", "Recovered ₹") become invisible and unreachable on a phone. Wrap EVERY `<table>` in `.table-responsive` AND put `data-label` on every `<td>`. The wrapper gives desktop horizontal-scroll and, at ≤600px, switches to stacked label:value cards. This includes detail/snapshot tables (e.g. settlement detail), not just DataTables lists.
 
@@ -161,9 +257,9 @@ $(document).ready(function () {
 | `.filter-select` | Native-style select with custom arrow (legacy, fancy-select replaces these globally) |
 | `.ke-toolbar` | Standalone filter strip ABOVE card (avoid — prefer `.dt-filter-row` INSIDE card) |
 
-### `.filter-card` — horizontal filter bar (MUST stack on mobile, PA-14-2)
+### `.filter-card` — horizontal filter bar (stacks ≤600px — PA-14-2)
 
-The page-scoped `.filter-card` pattern (`display:flex; flex-wrap:nowrap; overflow-x:auto` with `min-width` fields) lays filters out in a horizontal row on desktop. On a phone that row **scrolls sideways** — fields get cut mid-field and later filters are hidden with no scroll affordance. **Every `.filter-card` MUST add a `@media (max-width: 600px)` rule that stacks it vertically:**
+**Promoted to base.html (UIL-D 2026-07-16):** the core (`display:flex; flex-wrap:nowrap; overflow-x:auto` container + `.filter-field` + label styling) AND the ≤600px vertical-stack rule are now owned by base.html — pages get them for free by using `class="filter-card"`. Pages keep ONLY their tails page-scoped (input/fancy-select sizing, extra mobile widths). Do NOT re-declare the core or the stack rule. Legacy guidance for page-scoped variants (kept for standalone documents only):
 
 ```css
 @media (max-width: 600px) {
@@ -296,10 +392,22 @@ The real `<input type=date>` stays in the DOM (`display:none`, `name` intact) so
 | `.badge-active` / `.badge-inactive` | Status pills |
 | `.badge-planned` / `.badge-wip` / `.badge-completed` / `.badge-cancelled` | Batch lifecycle |
 | `.badge-available` / `.badge-reserved` / `.badge-exhausted` | Stock states |
+| `.badge-monthly` | Monthly-salary worker marker (R4/D4) — shown wherever a piece-rate ₹ expectation is suppressed |
 | `.badge-dot` | Small dot inside badge |
 | `.skill-tag` | Inline skill chip inside table rows (different from `.skill-filter-chip`) |
 
 Use `var(--status-*-bg/text)` tokens for custom badges — they auto-flip in dark mode.
+
+## Confirm cards (delete-confirm canon)
+
+THE delete-confirm composition (reference page: `inventory/role_confirm_delete.html`; CSS owner: base.html). All confirm pages compose this — accounts + storefront re-pointed UIL-D 2026-07-16.
+
+| Class | Purpose |
+|---|---|
+| `.confirm-card` | Centered card (480px, white, cream border) — wrap in a `max-width:500px; margin:80px auto` div |
+| `.confirm-card-head` | Header strip (`h2` title; optional `.confirm-icon.confirm-icon-danger` + trash SVG) |
+| `.confirm-card-body` | Body copy — object name in `<strong>` |
+| `.confirm-card-foot` | Right-aligned actions: `.btn.btn-ghost` Cancel + POST form with `.btn.btn-danger` submit |
 
 ## Empty state
 
@@ -332,6 +440,27 @@ Each app has its own hero variant (`.user-hero`, `.product-form-hero`, etc.). Th
 
 ## Design tokens (CSS vars)
 
+> **CLOSED SET (UI-D7, certified UIL-F 2026-07-16): 127 custom properties defined in
+> base.html** (48 dual-defined light+dark). A new token = owner-gated (frozen system).
+> Full registry by category — values live in base.html `:root` (+ dark override block):
+>
+> - **Brand/colors:** `--ink/-2/-3/-4` · `--copper/-l/-d` · `--cream/-2/-3` · `--stone` · `--smoke` · `--page-bg` · `--white` · `--gray-50..900` (10) · `--primary-blue/-dark/-light`
+> - **Status (auto-flip dark):** `--status-{success,warning,danger,info,neutral}-{bg,text}` (10) + `--success/-bg` · `--warning/-bg` · `--danger/-bg` · `--info/-bg`
+> - **Semantic:** `--text-{primary,secondary,tertiary}` · `--surface/-2/-3/-input/-input-focus` · `--border-{default,subtle,card}` · `--card-bg`
+> - **Typography:** `--font-display/--font-sans` · `--fs-{2xs,xs,sm,base,md,lg,xl,2xl,3xl}` · `--fw-{normal,medium,semibold,bold}` · `--lh-{tight,base}`
+> - **Spacing:** `--space-{1,2,3,4,5,6,8,16}` · **Radius:** `--radius{,-xs,-sm,-md,-lg,-xl,-2xl,-3xl,-pill}`
+> - **Shadows:** `--shadow-card/-hover` · `--shadow-focus` · `--shadow-input-inset`
+> - **Inputs:** `--input-{bg,bg-focus,border,border-focus,focus-ring,padding,radius}` · `--control-h` · `--touch-min`
+> - **Select arrow:** `--select-arrow/{-size,-offset-right}` · `--select-padding-right`
+> - **Chrome:** `--sidebar-{w,bg,border,shadow,text,active}` · `--nav-text/{-hover,-muted}` · `--topbar-{bg,h}`
+> - **Z-scale:** `--z-{base,raised,dropdown,sticky,overlay,modal}` · **Hero:** `--hero-grad-deep` · misc `--filter`/`--form`
+>
+> **CSS breakpoints** (≠ the 3 verification widths): 360 · 480 · 560 · 600 · 768 · 1024 px
+> + `prefers-reduced-motion`. **Verification widths** (rule 11): 360 / 768 / 1280.
+> Motion: 1 keyframe (`slideDown`) · 34 transition rules.
+> Standalone-document token sets (by design, NOT part of this registry): `_auth_shell`
+> (`--auth-*` knobs) · `public_home.html` · chromeless iframe shells.
+
 ### Colors
 
 | Token | Value | Use |
@@ -347,6 +476,7 @@ Each app has its own hero variant (`.user-hero`, `.product-form-hero`, etc.). Th
 | `--border-card` | `#cfc0aa` | **All card/panel borders** |
 | `--shadow-card` | `0 2px 12px rgba(14,11,9,0.10)` | Default card shadow |
 | `--shadow-card-hover` | Bigger shadow | Hover |
+| `--hero-grad-deep` | `linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%)` | **THE deep page-hero gradient** (form-shell + page heroes; owner-granted token, UIL-D 2026-07-16 — never re-declare the literal; deliberately does NOT flip in dark mode) |
 
 ### Status tokens (auto-flip in dark mode)
 - `--status-success-bg/text`

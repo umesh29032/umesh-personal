@@ -170,6 +170,16 @@ class CounterInvariantFixture(TestCase):
             adda=self.adda, size_id=self.s_l.id, color_id=self.red.id,
             pattern_id=self.front.id, count=15, user=self.admin,
         )
+        # GAP-5: bundling is POST-JOIN — stamp the cutting lane complete.
+        from production.models import CuttingRecord as _CR
+        for sr in AddaStageRecord.objects.filter(
+                adda=self.adda, workflow_stage=self.cutting_wf,
+                completed_at__isnull=True):
+            _CR.objects.get_or_create(stage_record=sr,
+                                      defaults={'pieces_cut': 0})
+            sr.completed_at = timezone.now()
+            sr.completed_by = self.admin
+            sr.save(update_fields=['completed_at', 'completed_by'])
 
 
 class BundleTotalPiecesInvariantTests(CounterInvariantFixture):

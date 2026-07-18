@@ -1,3 +1,13 @@
+---
+id: docs-audit-phases-phase-i-edge-cases-integrity
+type: receipt
+status: active
+owner: append-only
+scope: audit
+anchors: —
+verified: 2026-07-18
+---
+
 # Phase I — Edge Cases, Concurrency & Data Integrity
 
 **Deep integrity review** (not UI, not features). Goal: find paths where the system can go inconsistent / financially wrong / production-truth wrong / race-prone / partially-saved / double-processed / un-reconcilable. Grounded in actual code + execution paths. Built on A–H + the locked foundation.

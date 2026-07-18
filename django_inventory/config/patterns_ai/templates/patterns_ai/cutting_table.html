@@ -1,0 +1,535 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% comment %}Phase 4 shell (owner amendments 1-7 frozen) + M4
+MANUFACTURING PLANNER: Marker Plan session opener / IMPORT QUEUE
+(18-c rename) / size-index colors / live estimates / "Suggest Better
+Layout" explained verdict (R5/R6) / plan persists with Save Draft.
+Engine JS = static dct.js (18-f).{% endcomment %}
+{% block page_title %}{{ product.code }} · Digital Cutting Table{% endblock %}
+{% block extra_head %}
+<style>
+  .dct { max-width: 1400px; margin: 0 auto; }
+  .dct .head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:4px 0 10px; }
+  .dct .head h1 { font-family:'Cormorant Garamond', serif; font-size:24px; margin:0; color:var(--ink); }
+  .dct .head .sub { font-size:12px; color:var(--stone); }
+  /* toolbar — FROZEN order (amendment 5) */
+  .dct .toolbar { display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card); padding:8px 12px; margin-bottom:12px; }
+  .dct .tb { padding:8px 12px; font-size:12px; border-radius:8px;
+    border:1px solid var(--border-subtle); background:#fff; color:var(--ink); }
+  .dct .tb[aria-disabled="true"] { opacity:0.45; cursor:not-allowed; }
+  .dct .tb-live { border-color:var(--copper); color:var(--copper); font-weight:700; text-decoration:none; }
+  .dct .tb-sep { width:1px; height:22px; background:var(--border-subtle); }
+  /* 3-column workspace (amendments 1-3) */
+  .dct .grid { display:grid; grid-template-columns: 300px 1fr 260px; gap:12px; align-items:start; }
+  .dct .panel { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card); padding:12px 14px; }
+  .dct .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:0.07em;
+    color:var(--stone); font-weight:800; margin:0 0 10px; }
+  /* Pattern Library (left) */
+  .dct .grp-head { font-size:12px; font-weight:800; letter-spacing:0.08em;
+    text-transform:uppercase; color:var(--copper); margin:12px 0 6px;
+    border-bottom:1px solid var(--border-subtle); padding-bottom:3px; }
+  .dct .grp-head:first-of-type { margin-top:0; }
+  .dct .sz-head { font-size:11.5px; font-weight:700; color:var(--ink); margin:8px 0 4px; }
+  .dct .design-row { display:flex; gap:8px; align-items:center;
+    border:1px solid var(--border-subtle); border-radius:10px;
+    padding:6px 8px; margin-bottom:6px; background:#fff; }
+  .dct .dr-previews { display:flex; gap:4px; }
+  .dct .dr-shape, .dct .dr-ref { width:44px; height:44px; border-radius:8px;
+    border:1px solid var(--border-subtle); background:#fff;
+    display:flex; align-items:center; justify-content:center; padding:1px; }
+  .dct .dr-shape svg { width:100%; height:100%; }
+  .dct .dr-ref img { width:100%; height:100%; object-fit:cover; border-radius:7px; }
+  .dct .dr-ghost { border-style:dashed; color:var(--stone); font-size:13px; }
+  .dct .dr-reftag { display:none; }
+  .dct .dr-facts { flex:1; min-width:0; font-size:11.5px; }
+  .dct .dr-line1 { display:flex; gap:4px; flex-wrap:wrap; align-items:baseline; font-size:12px; }
+  .dct .dr-size { color:var(--stone); }
+  .dct .dr-badge { font-size:9px; padding:0 5px; border-radius:999px; background:#eee; color:#555; }
+  .dct .dr-fold { background:#fdeeee; color:#b91c1c; }
+  .dct .dr-chip { font-size:9.5px; padding:1px 6px; border-radius:999px; }
+  .dct .dr-chip.ok { background:#d9efe1; color:#20603c; }
+  .dct .dr-line3 { font-size:10.5px; color:var(--ink); }
+  .dct .dr-measured { color:#20603c; } .dct .dr-unverified { color:#a26a00; }
+  .dct .dr-meta { font-size:10px; color:var(--stone); }
+  .dct .notready { font-size:11.5px; color:var(--stone); font-style:italic; margin-top:10px; }
+  /* Digital Fabric Workspace (center, amendment 2) */
+  .dct .ws-meta { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; margin-bottom:8px; }
+  .dct .ws-meta b { color:var(--ink); }
+  .dct .fabric { position:relative; border:1.5px solid var(--copper);
+    border-radius:6px; min-height:420px; overflow:hidden;
+    background-color:#fdfbf6;
+    background-image:
+      linear-gradient(rgba(184,115,51,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(184,115,51,0.07) 1px, transparent 1px);
+    background-size:24px 24px; }
+  .dct .ruler { position:absolute; top:6px; left:8px; right:8px;
+    border-top:1px solid var(--stone); font-size:10px; color:var(--stone);
+    padding-top:2px; display:flex; justify-content:space-between; }
+  .dct .ws-empty { position:absolute; inset:0; display:flex;
+    flex-direction:column; align-items:center; justify-content:center;
+    gap:6px; color:var(--stone); text-align:center; padding:20px; }
+  .dct .ws-empty .big { font-size:15px; font-weight:700; color:var(--ink); }
+  /* Phase 5 — session pieces */
+  .dct .ws-hint { min-height:16px; font-size:11.5px; color:#b91c1c; margin:2px 0 6px; }
+  .dct g.piece polygon { fill:#ecdfc8; stroke:#7a5c34; stroke-width:3;
+    vector-effect:non-scaling-stroke; cursor:grab; }
+  .dct g.piece.sel polygon { stroke:var(--copper); stroke-width:5;
+    stroke-dasharray:14 8; fill:#f3e3c3; }
+  .dct g.piece text { font-size:34px; fill:#5a4630; text-anchor:middle;
+    pointer-events:none; user-select:none; }
+  /* 6A physics paint: collision (red) · spacing violation (amber) · locked */
+  .dct g.piece.col-hard polygon { stroke:#b91c1c; fill:#f8dede; }
+  .dct g.piece.col-space polygon { stroke:#a26a00; fill:#f8eed3; }
+  .dct g.piece.locked polygon { stroke:#5a6472; fill:#e7e9ec; cursor:default; }
+  /* 6B: off-fabric = boundary violation (constraint layer 1) */
+  .dct g.piece.col-bound polygon { stroke:#6d28d9; fill:#ece4f8; }
+  /* M4.5: fold placement off its crease / rotated — its own channel */
+  .dct g.piece.col-fold polygon { stroke:#0d9488; stroke-dasharray:10 6; fill:#dcecea; }
+  .dct line.fabric-fold { stroke:#0d9488; stroke-width:3; stroke-dasharray:18 10;
+    vector-effect:non-scaling-stroke; }
+  .dct text.fabric-fold { font-size:30px; fill:#0d9488; font-weight:700;
+    letter-spacing:0.2em; }
+  .dct .q-chip.q-fold { background:#dcecea; color:#0d9488; }
+  /* Phase 7: library rows + read-only banner */
+  .dct .lib-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    border:1px solid var(--border-subtle); border-radius:10px;
+    padding:8px 10px; margin-bottom:6px; font-size:12px; }
+  .dct .lib-row.dim { opacity:0.6; }
+  .dct .lib-uid { font-family:monospace; font-weight:700; color:var(--ink); }
+  .dct .lib-name { color:var(--stone); }
+  .dct .lib-status { font-size:10px; padding:1px 7px; border-radius:999px;
+    text-transform:uppercase; letter-spacing:0.05em; }
+  .dct .lib-status.s-active { background:#d9efe1; color:#20603c; }
+  .dct .lib-status.s-superseded { background:#eee; color:#555; }
+  .dct .lib-status.s-archived { background:#fdeeee; color:#7a5c10; }
+  .dct .lib-stale { font-size:10.5px; font-weight:800; color:#b91c1c; }
+  /* M5 — library polish: thumbnail + facts line */
+  .dct .lib-thumb { width:64px; height:44px; flex:none; border:1px solid var(--border-subtle);
+    border-radius:8px; background:#fff; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .dct .lib-thumb img { max-width:100%; max-height:100%; }
+  .dct .lib-sub { font-size:11px; color:var(--stone); margin-top:3px; }
+  .dct .ro-banner { background:#eef4ff; border:1px solid #b6c8ee;
+    color:#1e3a8a; border-radius:10px; padding:8px 12px;
+    font-size:12.5px; margin-bottom:10px; }
+  .dct #selbar { display:none; align-items:center; }
+  .dct .tb[aria-disabled="true"].tb { pointer-events:auto; }
+  /* Layout Information (right, amendment 3 — permanent slots) */
+  .dct .li-row { display:flex; justify-content:space-between; gap:8px;
+    font-size:12px; padding:5px 0; border-bottom:1px dashed var(--border-subtle); }
+  .dct .li-row b { color:var(--stone); font-weight:700; font-size:11px;
+    text-transform:uppercase; letter-spacing:0.05em; }
+  /* Approved Layout Library (amendment 7) */
+  .dct .liblayouts { margin-top:12px; }
+  /* status bar (amendment 4) */
+  .dct .status { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card);
+    padding:10px 16px; font-size:12px; }
+  .dct .status b { color:var(--stone); font-size:10.5px;
+    text-transform:uppercase; letter-spacing:0.05em; margin-right:5px; }
+  /* M4 — Import Queue + Marker Plan + suggestion verdict */
+  .dct .q-size { font-size:11.5px; font-weight:800; color:var(--ink);
+    margin:10px 0 4px; display:flex; align-items:center; gap:6px; }
+  .dct .q-dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .dct .q-row { display:flex; gap:6px; align-items:center;
+    border:1px solid var(--border-subtle); border-radius:10px;
+    padding:6px 8px; margin-bottom:5px; background:#fff; }
+  .dct .q-row.done { opacity:0.55; }
+  .dct .q-main { flex:1; min-width:0; font-size:12px; }
+  .dct .q-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:2px; }
+  .dct .q-chip { font-size:9.5px; padding:1px 6px; border-radius:999px;
+    background:#f1ece1; color:#5a4630; }
+  .dct .q-chip.q-warn { background:#fdeeee; color:#b91c1c; }
+  .dct .q-chip.q-x2 { background:#e3ecfb; color:#1e40af; }
+  .dct .q-ok { color:#20603c; font-weight:800; }
+  .dct #plan-chips { display:flex; gap:5px; flex-wrap:wrap;
+    align-items:center; margin-bottom:8px; }
+  .dct #ai-verdict { display:none; background:#eef7f0;
+    border:1px solid #bcd9c4; color:#1c4a2e; border-radius:10px;
+    padding:8px 12px; font-size:12.5px; margin:0 0 8px; }
+  .dct .plan-overlay { display:none; position:fixed; inset:0;
+    background:rgba(30,25,18,0.45); z-index:60;
+    align-items:center; justify-content:center; padding:16px; }
+  .dct .plan-card { background:var(--card-bg); border-radius:14px;
+    box-shadow:0 12px 40px rgba(0,0,0,0.25); max-width:560px; width:100%;
+    max-height:92vh; overflow:auto; padding:18px 20px; }
+  .dct .plan-card h2 { font-size:14px; margin:0 0 10px; color:var(--ink); }
+  .dct .plan-card label.f { display:block; font-size:12px; font-weight:700;
+    color:var(--ink); margin:8px 0 2px; }
+  .dct .plan-card select, .dct .plan-card input[type=number],
+  .dct .plan-card input[type=text], .dct .plan-card textarea {
+    width:100%; font-size:12.5px; padding:8px; border-radius:8px;
+    border:1px solid var(--border-card); background:var(--input-bg, #fbf6ea);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06); }
+  .dct .plan-sizes { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+  .dct .plan-sizes .ps { display:flex; align-items:center; gap:4px;
+    font-size:12px; }
+  .dct .plan-sizes input[type=number] { width:52px; }
+  .dct #plan-pieces { display:flex; flex-direction:column; gap:4px;
+    margin-top:4px; font-size:12.5px; }
+  .dct #plan-pieces em { color:var(--stone); font-size:11px; }
+  .dct #plan-nap { font-size:11px; color:#b91c1c; min-height:14px; }
+  .dct .plan-actions { display:flex; gap:8px; margin-top:14px;
+    flex-wrap:wrap; align-items:center; }
+  .dct .plan-actions .go { background:var(--copper); color:#fff;
+    border:none; font-weight:800; padding:10px 16px; border-radius:8px;
+    cursor:pointer; }
+  @media (max-width: 1000px) { .dct .grid { grid-template-columns: 260px 1fr; }
+    .dct .panel.li { grid-column: 1 / -1; } }
+  @media (max-width: 700px) {
+    .dct .grid { grid-template-columns: 1fr; }
+    .dct .panel.li { grid-column: auto; }
+    .dct .fabric { min-height:280px; }
+    .dct .tb { min-height:40px; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="dct">
+  <div class="head">
+    <a class="btn" href="{% url 'patterns_ai:dashboard' %}?product={{ product.pk }}">← Dashboard</a>
+    <h1>{{ product.name }} <span class="sub">({{ product.code }})</span></h1>
+    <span style="flex:1;"></span>
+    <span class="sub">Digital Cutting Table</span>
+  </div>
+
+  {# base.html renders django messages — no second loop here (dupe fix) #}
+
+  {% if view_mode %}
+    <div class="ro-banner">👁 Viewing <strong>{{ loaded_uid }}</strong> —
+      an approved manufacturing layout. READ-ONLY: nothing here can be
+      edited (rule 4). Use <a href="?duplicate={{ request.GET.view }}">Duplicate</a>
+      to start a new draft from it.</div>
+  {% elif loaded_uid %}
+    <div class="ro-banner">📄 Duplicated from <strong>{{ loaded_uid }}</strong>
+      — this is a NEW draft; the approved layout is untouched.</div>
+  {% endif %}
+
+  {# ── TOOLBAR — frozen order forever (amendment 5) ── #}
+  <div class="toolbar" role="toolbar" aria-label="cutting table tools">
+    <span class="tb" aria-disabled="true" title="Import — Phase 5">Import</span>
+    <span class="tb" aria-disabled="true" title="Select — Phase 5">Select</span>
+    <span class="tb" aria-disabled="true" title="Rotate — Phase 5">Rotate</span>
+    <span class="tb" aria-disabled="true" title="Mirror — Phase 5">Mirror</span>
+    {# 6B: Zoom goes LIVE — CAMERA only, never world coordinates #}
+    <button type="button" class="tb" id="tb-zoom"
+            title="Zoom in · Shift-click = out · wheel on canvas · 0 = reset">Zoom</button>
+    {# 6A: Grid snap goes LIVE (its phase arrived); snap size internal (10mm) #}
+    <button type="button" class="tb" id="tb-grid" aria-pressed="false"
+            title="Grid snap (10 mm)">Grid</button>
+    <span class="tb-sep"></span>
+    {# 6C engine · M4 R5 wording: AI PROPOSES, the human accepts #}
+    <button type="button" class="tb" id="tb-ai"
+            title="Searches for a better layout and EXPLAINS it — you accept or keep yours; locked pieces never move">Suggest Better Layout</button>
+    {# Phase 7: Approve goes LIVE after a Save Draft (rule 2: save ≠ approve) #}
+    <a class="tb" id="tb-approve" aria-disabled="true" href="#"
+       title="save a draft first — then approve">Approve Layout</a>
+    {# Phase 7 rule 7: exports consume APPROVED layouts only, never the session #}
+    {% if view_mode %}
+      <a class="tb tb-live" href="{{ export_pdf_url }}" id="tb-export">Export PDF</a>
+    {% else %}
+      <span class="tb" aria-disabled="true" id="tb-export"
+            title="exports consume Approved Layouts — open one from the library">Export</span>
+    {% endif %}
+    <span style="flex:1;"></span>
+    {# M4 18-d: legacy Generate link RETIRED from navigation (pages stay live) #}
+  </div>
+
+  <div class="grid">
+    {# IMPORT QUEUE (M4 5/18-c): Blueprint x Marker Plan work queue, rules visible (R4) #}
+    <div class="panel">
+      <h2>Import Queue</h2>
+      <div id="plan-chips"></div>
+      <div id="queue-body">
+        <p class="notready">Open the Marker Plan to build the queue.</p>
+      </div>
+      {% for sec in not_ready %}
+        <div class="notready">{{ sec.size.label }} — not ready
+          ({{ sec.confirmed }}/{{ sec.total }} · finish required designs)</div>
+      {% endfor %}
+    </div>
+
+    {# ── DIGITAL FABRIC WORKSPACE (amendment 2 · Phase 5 interactive) ── #}
+    <div class="panel">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h2 style="margin:0;">Digital Fabric Workspace</h2>
+        <span style="flex:1;"></span>
+        {# Phase 5: selection actions — visible only with a selection #}
+        <span id="selbar" style="display:none; gap:6px;">
+          <button type="button" class="tb" id="act-rotate" title="Rotate (R)">⟳ Rotate</button>
+          <button type="button" class="tb" id="act-mirror" title="Mirror (M)">⇋ Mirror</button>
+          <button type="button" class="tb" id="act-lock" title="Lock (L)">🔒 Lock</button>
+          <button type="button" class="tb" id="act-delete" title="Delete (Del)">✕ Delete</button>
+        </span>
+        {# 6B: Compact = manual ASSIST (gap removal), never an optimizer #}
+        <button type="button" class="tb" id="act-compact"
+                title="Compact — remove gaps (locks · grain · spacing · boundary respected)">⇤ Compact</button>
+        {# 6C rule 1: Auto Place = fast DETERMINISTIC first-fit — never search, never AI #}
+        <button type="button" class="tb" id="act-autoplace"
+                title="Auto Place — deterministic first-fit of unlocked pieces (no search, same output every time)">⇓ Auto Place</button>
+        <button type="button" class="tb" id="act-undo" title="Undo (Ctrl+Z)" aria-disabled="true">↶ Undo</button>
+        {# Phase 7 rule 2: Save = store a Draft. NEVER approve. #}
+        <button type="button" class="tb" id="act-save"
+                title="Save Draft — verify + store as an immutable draft (approval is a separate human act)">💾 Save Draft</button>
+      </div>
+      <div class="ws-meta" style="margin-top:8px;">
+        <span><b>Fabric Width:</b> <span class="c-fabricw">{% if fabric_width_mm %}{{ fabric_width_mm }} mm{% else %}--{% endif %}</span></span>
+        <span><b>Fabric Group:</b> <span id="ws-group">--</span></span>
+        <span><b>Ratio:</b> <span class="c-ratio">--</span></span>
+        <span><b>Layout:</b> <span id="ws-layout">Empty</span></span>
+        <span><b>Collisions:</b> <span id="ws-collisions">0</span></span>
+        <span><b>Spacing:</b> {{ spacing_mm }} mm</span>
+        {# M4 R2 — live estimates the cutting master cares about #}
+        <span><b>Expected Pieces:</b> <span class="c-expected">--</span></span>
+        <span><b>Waste:</b> <span class="c-waste">--</span></span>
+      </div>
+      <div id="ws-hint" class="ws-hint" role="status"></div>
+      {# M4 R6 — the explained suggestion verdict (Accept / Keep) #}
+      <div id="ai-verdict"></div>
+      <div class="fabric">
+        <div class="ruler"><span>0</span><span id="ruler-w">{% if fabric_width_mm %}{{ fabric_width_mm }} mm{% else %}width --{% endif %}</span></div>
+        <svg id="ws-svg" viewBox="0 0 {{ fabric_width_mm|default:1500 }} 2200"
+             preserveAspectRatio="xMidYMin meet"
+             style="position:absolute; inset:0; width:100%; height:100%; touch-action:none;">
+          <g id="pieces-layer"></g>
+        </svg>
+        <div class="ws-empty" id="ws-empty">
+          <span class="big">Import patterns from the library</span>
+          <span>click a piece to select · drag to move · R rotate · M mirror</span>
+        </div>
+      </div>
+    </div>
+
+    {# ── LAYOUT INFORMATION (amendment 3 — permanent slots, never redesigned) ── #}
+    <div class="panel li">
+      <h2>Layout Information</h2>
+      <div class="li-row"><b>Product</b><span>{{ product.code }}</span></div>
+      <div class="li-row"><b>Fabric Group</b><span class="li-group">--</span></div>
+      <div class="li-row"><b>Fabric Width</b><span>{% if fabric_width_mm %}{{ fabric_width_mm }} mm{% else %}--{% endif %}</span></div>
+      <div class="li-row"><b>Cut Plan</b><span class="c-ratio">--</span></div>
+      <div class="li-row"><b>Ratio</b><span class="c-ratio">--</span></div>
+      <div class="li-row"><b>Imported Pieces</b><span class="c-imported">0</span></div>
+      <div class="li-row"><b>Placed Pieces</b><span class="c-placed">0</span></div>
+      <div class="li-row"><b>Remaining</b><span class="c-remaining">{{ confirmed_total }}</span></div>
+      <div class="li-row"><b>Utilization</b><span class="c-util">--</span></div>
+      <div class="li-row"><b>Approval Status</b><span>--</span></div>
+      <div class="li-row"><b>History</b><span>--</span></div>
+      <div class="dr-meta" style="margin-top:8px;">{{ confirmed_total }} confirmed design{{ confirmed_total|pluralize }} available ·
+        {{ summary.designs_confirmed }}/{{ summary.designs_total }} product-wide</div>
+    </div>
+  </div>
+
+  {# APPROVED LAYOUT LIBRARY (amendment 7 / Phase 7 truth / M5 polish: thumbs, plan facts, notes, lineage, live search) #}
+  <div class="panel liblayouts">
+    <h2>Approved Layout Library
+      {% if drafts_count %}<small style="font-weight:400; text-transform:none; letter-spacing:0;">
+        · {{ drafts_count }} saved draft{{ drafts_count|pluralize }} awaiting approval</small>{% endif %}</h2>
+    {% if library_rows %}
+      <input type="search" id="lib-search" placeholder="Search markers — uid · name · recipe · group · lay…"
+             style="width:100%;max-width:420px;margin-bottom:10px;font-size:12.5px;padding:8px 10px;border-radius:8px;border:1px solid var(--border-card);background:var(--input-bg,#fbf6ea);box-shadow:inset 0 1px 2px rgba(0,0,0,0.06);">
+    {% endif %}
+    {% for row in library_rows %}
+      <div class="lib-row {% if row.lay.status != 'active' %}dim{% endif %}"
+           data-search="{{ row.lay.layout_uid|lower }} {{ row.lay.name|lower }} {{ row.recipe|lower }} {{ row.lay.fabric_group }} {{ row.layering_type }} {{ row.lay.status }}">
+        <span class="lib-thumb"><img src="{{ row.svg_url }}" loading="lazy" alt=""></span>
+        <div style="flex:1;min-width:220px;">
+          <div>
+            <span class="lib-uid">{{ row.lay.layout_uid }}</span>
+            <span class="lib-name">{{ row.lay.name }}</span>
+            <span class="dr-badge">V{{ row.lay.version_no }}</span>
+            <span class="dr-badge">{{ row.lay.fabric_group|upper }}</span>
+            <span class="dr-badge">{{ row.lay.candidate.run.usable_width_mm }} mm</span>
+            <span class="dr-badge">{{ row.metrics.length_mm }} mm · {{ row.metrics.utilization_pct }}%</span>
+            {% if row.layering_type %}<span class="dr-badge">{{ row.layering_type }} lay</span>{% endif %}
+            {% if row.recipe %}<span class="dr-badge" title="Marker Recipe that produced this asset">📋 {{ row.recipe }}</span>{% endif %}
+            <span class="lib-status s-{{ row.lay.status }}">{{ row.lay.get_status_display }}</span>
+            {% if row.stale %}<span class="lib-stale" title="a frozen geometry version is no longer the confirmed truth (LAW 11) — supersede with a fresh layout before manufacturing">⚠ STALE</span>{% endif %}
+          </div>
+          <div class="lib-sub">
+            {% if row.notes %}📝 {{ row.notes }} · {% endif %}
+            {% if row.roll_label %}planned on {{ row.roll_label }} · {% endif %}
+            {% if row.supersedes_uid %}supersedes {{ row.supersedes_uid }} · {% endif %}
+            approved {{ row.lay.approved_at|date:"d M H:i" }}{% if row.lay.approved_by %} by {{ row.lay.approved_by.email }}{% endif %}
+          </div>
+        </div>
+        <span style="display:flex;gap:4px;flex-wrap:wrap;">
+          <a class="btn-mini" href="?view={{ row.lay.pk }}">View</a>
+          <a class="btn-mini" href="?duplicate={{ row.lay.pk }}">Duplicate</a>
+          <a class="btn-mini" href="{{ row.pdf_url }}">PDF</a>
+          <a class="btn-mini" href="{{ row.print_url }}">Print</a>
+          {% if row.lay.status == 'active' %}
+          <form method="post" action="{% url 'patterns_ai:table-layout-archive' product.pk row.lay.pk %}"
+                onsubmit="return confirm('Archive {{ row.lay.layout_uid }}? History is kept — never deleted.');"
+                style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn-mini">Archive</button>
+          </form>
+          {% endif %}
+        </span>
+      </div>
+    {% empty %}
+      <p class="notready">No approved layouts yet — save a draft, then
+        approve it (a human act) to create the first manufacturing asset.</p>
+    {% endfor %}
+    <p id="lib-noresults" class="notready" style="display:none;">No markers match your search.</p>
+
+    {# M5 — MARKER RECIPES (saved manufacturing knowledge) management #}
+    {% if plan_config.recipes %}
+      <h2 style="margin-top:14px;">Marker Recipes</h2>
+      <div id="recipe-list">
+        {% for r in plan_config.recipes %}
+          <div class="lib-row" data-recipe-id="{{ r.id }}">
+            <span class="lib-name">📋 {{ r.name }}</span>
+            <span class="dr-badge">{{ r.fabric_group|upper }}</span>
+            <span class="dr-badge">{{ r.layering_type }} lay</span>
+            {% if r.notes %}<span class="lib-sub" style="margin:0;">{{ r.notes }}</span>{% endif %}
+            <span style="flex:1;"></span>
+            <button type="button" class="btn-mini recipe-deactivate" data-recipe-id="{{ r.id }}"
+                    title="Recipes are knowledge — deactivated, never deleted">Deactivate</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <p class="dr-meta" style="margin-top:8px;">The library is
+      manufacturing truth — the workspace never is. Approved layouts are
+      immutable: View · Duplicate · Supersede (at approval) · Archive only.</p>
+  </div>
+
+  {# M5 — library search + recipe management (page glue; engine stays in dct.js) #}
+  <script>
+  (function () {
+    'use strict';
+    var q = document.getElementById('lib-search');
+    if (q) q.addEventListener('input', function () {
+      var needle = q.value.trim().toLowerCase();
+      var any = false;
+      Array.prototype.forEach.call(
+        document.querySelectorAll('.lib-row[data-search]'),
+        function (row) {
+          var hit = !needle || row.dataset.search.indexOf(needle) !== -1;
+          row.style.display = hit ? '' : 'none';
+          if (hit) any = true;
+        });
+      var empty = document.getElementById('lib-noresults');
+      if (empty) empty.style.display = any ? 'none' : '';
+    });
+    function cookie(name) {
+      var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? m.pop() : '';
+    }
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('.recipe-deactivate');
+      if (!b) return;
+      if (!confirm('Deactivate this recipe? It leaves the Marker Plan ' +
+                   'list — knowledge is kept, never deleted.')) return;
+      fetch('{% url "patterns_ai:table-recipe" product.pk %}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': cookie('csrftoken') },
+        body: JSON.stringify({ action: 'deactivate',
+                               recipe_id: b.dataset.recipeId })
+      }).then(function (r) { return r.json(); }).then(function (res) {
+        if (res.ok) {
+          var row = b.closest('.lib-row');
+          if (row) row.remove();
+        } else { alert('refused: ' + res.error); }
+      });
+    });
+  })();
+  </script>
+
+  {# ── STATUS (amendment 4) ── #}
+  <div class="status">
+    <span><b>Imported</b> <span class="c-imported">0</span></span>
+    <span><b>Placed</b> <span class="c-placed">0</span></span>
+    <span><b>Remaining</b> <span class="c-remaining">{{ confirmed_total }}</span></span>
+    <span><b>Fabric Width</b> <span class="c-fabricw">{% if fabric_width_mm %}{{ fabric_width_mm }} mm{% else %}--{% endif %}</span></span>
+    <span><b>Canvas Length</b> <span class="c-length">--</span></span>
+    <span><b>Utilization</b> <span class="c-util">--</span></span>
+    <span><b>Waste</b> <span class="c-waste">--</span></span>
+    <span><b>Expected Pieces</b> <span class="c-expected">--</span></span>
+  </div>
+
+  {# MARKER PLAN (M4 2/3): session opener; persists ONLY inside Save Draft #}
+  {% if not view_mode %}
+  <div class="plan-overlay" id="plan-dialog">
+    <div class="plan-card">
+      <h2>Marker Plan · {{ product.name }}</h2>
+      <label class="f">Marker Recipe (saved knowledge — optional)</label>
+      <select id="plan-recipe">
+        <option value="">— blank session —</option>
+        {% for r in plan_config.recipes %}
+          <option value="{{ r.id }}">{{ r.name }}</option>
+        {% endfor %}
+      </select>
+      <label class="f">Fabric group (LAW 12 — one marker, one group)</label>
+      <select id="plan-group">
+        {% for group, sizes in groups %}
+          <option value="{{ group }}">{{ group|title }}</option>
+        {% endfor %}
+      </select>
+      <label class="f">Roll (optional — prefills the usable width)</label>
+      <select id="plan-roll">
+        <option value="">— no roll picked —</option>
+        {% for r in plan_config.rolls %}
+          <option value="{{ r.id }}">{{ r.label }}{% if r.usable_width_mm %} · usable {{ r.usable_width_mm }} mm{% endif %}</option>
+        {% endfor %}
+      </select>
+      <div id="plan-nap"></div>
+      <label class="f">Usable width (mm) — human-confirmed, never trusted
+        from nominal inches</label>
+      <input type="number" id="plan-width" min="100" max="4000"
+             value="{{ fabric_width_mm|default:1500 }}">
+      <label class="f">Lay type</label>
+      <div class="plan-sizes">
+        <label class="ps"><input type="radio" name="plan-lay" value="single" checked> Single</label>
+        <label class="ps"><input type="radio" name="plan-lay" value="double_open"> Double — open</label>
+        <label class="ps"><input type="radio" name="plan-lay" value="double_folded"> Double — folded</label>
+        <label class="ps"><input type="radio" name="plan-lay" value="tubular"> Tubular</label>
+        <span style="font-size:11px;color:var(--stone);">doubled lays cut 2
+          per placement · folded/tubular offer a CREASE — on-fold pieces
+          sit on it and open to one full piece per layer</span>
+      </div>
+      <label class="f">Sizes × garments per lay</label>
+      <div class="plan-sizes">
+        {% for s in plan_config.sizes %}
+          <label class="ps"><input type="checkbox" id="plan-size-{{ s.id }}" checked>
+            {{ s.label }} × <input type="number" id="plan-n-{{ s.id }}" min="1" value="1"></label>
+        {% endfor %}
+      </div>
+      <label class="f">Pieces this marker covers</label>
+      <div id="plan-pieces"></div>
+      <label class="f">Layout notes (ride the saved layout — R3)</label>
+      <textarea id="plan-notes" rows="2"
+        placeholder="e.g. works only on 42&quot; · pocket after body"></textarea>
+      <div class="plan-actions">
+        <button type="button" class="go" id="plan-start">Start composing</button>
+        <input type="text" id="plan-recipe-name" placeholder="recipe name…"
+               style="flex:1;min-width:140px;">
+        <button type="button" class="tb" id="plan-save-recipe">Save as recipe</button>
+        <button type="button" class="tb" id="plan-close">Close</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{{ workspace_payload|json_script:"ws-payload" }}
+{{ initial_placements|json_script:"ws-initial" }}
+{# M4 18-f: engine = static dct.js; the template hands over DATA ONLY #}
+<script type="application/json" id="ws-config">{
+  "fabric_width_mm": {{ fabric_width_mm|default:1500 }},
+  "spacing_mm": {{ spacing_mm }},
+  "view_only": {{ view_mode|yesno:"true,false" }},
+  "sizes": {{ plan_config.sizes_json|safe }},
+  "rolls": {{ plan_config.rolls_json|safe }},
+  "recipes": {{ plan_config.recipes_json|safe }},
+  "urls": {"optimize": "{% url 'patterns_ai:cutting-table-optimize' product.pk %}",
+           "save": "{% url 'patterns_ai:table-save' product.pk %}",
+           "recipe": "{% url 'patterns_ai:table-recipe' product.pk %}"}
+}</script>
+<script src="{% static 'patterns_ai/dct.js' %}" defer></script>
+{% endblock %}

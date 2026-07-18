@@ -1,0 +1,41 @@
+{# F-3 bounce: embedded post-complete landing. NO stage/adda data on purpose #}
+{# (login-only, gate-free — the completing worker must never 403 here). #}
+{# Inside the iframe the postMessage makes the parent Adda page reload, so #}
+{# this page is visible for a blink at most; direct hits get the fallback UI. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage complete</title>
+  <style>
+    /* FE-4: standalone doc (no base.html) — canon token VALUES mirrored as
+       local vars (--page-bg / --ink-soft / --copper from the design system). */
+    :root{--page-bg:#f7f3ee;--stone:#7a6a58;--copper:#b87333;}
+    body{font-family:system-ui,-apple-system,sans-serif;background:var(--page-bg);
+         display:flex;align-items:center;justify-content:center;min-height:60vh;margin:0;}
+    .bounce{text-align:center;color:var(--stone);padding:24px;}
+    .bounce .tick{font-size:2rem;line-height:1;}
+    .bounce a{color:var(--copper);font-weight:600;}
+  </style>
+</head>
+<body>
+  <div class="bounce">
+    <div class="tick">✅</div>
+    <p>Stage complete — updating the page…</p>
+    <p><a href="{% url 'production:adda-detail' code %}">Back to Adda {{ code }}</a></p>
+  </div>
+  <script>
+    (function () {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({type: 'stage-advanced', code: '{{ code|escapejs }}'}, '*');
+        } else {
+          // Standalone hit (no iframe) — go straight to the Adda page.
+          window.location.replace("{% url 'production:adda-detail' code %}");
+        }
+      } catch (e) { /* non-fatal — fallback link above */ }
+    })();
+  </script>
+</body>
+</html>

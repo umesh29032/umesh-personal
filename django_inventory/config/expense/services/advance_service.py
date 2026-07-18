@@ -26,6 +26,18 @@ def record_advance(*, user, worker, amount, advance_date=None, notes='',
     """Record an immutable advance (a loan to the worker). No ledger debit —
     advances are recovered at settlement, not netted against earnings here."""
     _ensure_management(user)
+    # ⚠ TEMPORARY business rule (owner, hostile-review M-2, 2026-07-05):
+    # monthly workers cannot take advances — BOTH recovery paths are
+    # unreachable for them (settlement recovery needs settlement lines they
+    # never have; cash recovery needs payable > 0, theirs is always 0), so
+    # the money would sit outstanding until F&F write-off. Revisit when the
+    # monthly-salary workflow grows a salary-deduction recovery path.
+    from expense.services.payroll_service import is_monthly
+    if is_monthly(worker):
+        raise ValidationError(
+            "Advances are not available for monthly-salary workers yet — "
+            "there is no recovery path (their pay never flows through "
+            "settlement). Handle any loan through their salary for now.")
     amt = Decimal(str(amount))
     if amt <= 0:
         raise ValidationError("Advance amount must be greater than 0.")

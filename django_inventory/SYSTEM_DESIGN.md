@@ -1,3 +1,13 @@
+---
+id: root-system-design
+type: topic-canonical
+status: active
+owner: handwritten
+scope: all — system-level
+anchors: —
+verified: 2026-07-13
+---
+
 # Kapil Enterprises Inventory — System Design & Architecture
 
 > **Single source of truth for the CURRENTLY-BUILT system.** Generated 2026-06-01 by deep code dig.

@@ -1,3 +1,13 @@
+---
+id: docs-design-system-spec
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # DESIGN SYSTEM SPECIFICATION
 
 > **Status:** Permanent frontend contract — **DESIGN ONLY. NO CODE. NO TOKEN CREATION YET.**

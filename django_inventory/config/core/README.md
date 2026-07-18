@@ -1,3 +1,13 @@
+---
+id: app-core-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: core
+anchors: config/core/
+verified: 2026-07-13
+---
+
 # `core` app — Shared Foundations (no tables)
 
 > The bottom of the import pyramid. Foundation-purity is CI-enforced

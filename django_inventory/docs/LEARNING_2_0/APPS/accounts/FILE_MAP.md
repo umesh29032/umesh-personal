@@ -1,3 +1,13 @@
+---
+id: l2-apps-accounts-file-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: accounts
+anchors: config/accounts/
+verified: 2026-07-13
+---
+
 # accounts — FILE_MAP
 
 ## TL;DR (1 min)

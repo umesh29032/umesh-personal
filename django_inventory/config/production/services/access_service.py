@@ -92,3 +92,26 @@ def stage_access_map(user, stage_codes: Iterable[str]) -> dict[str, bool]:
             continue
         out[code] = bool({r.id for r in stage.access_by_role.all()} & user_roles)
     return out
+
+
+def eligible_stage_workers(stage_code: str):
+    """THE shared worker-picker population for a stage (F-4 polish 2026-07-05).
+
+    Active users holding any of the stage's `access_by_skill` skills — i.e.
+    exactly the workers `user_can_access_stage` will later admit, so an
+    assignment picker can never offer someone the access gate would 403.
+    Pure lazy queryset (no DB hit until evaluated) so forms may build it at
+    class-definition time. DB-driven via Stage.access_by_skill: a new stage's
+    picker follows its Access-Control config with zero picker code.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    return (
+        User.objects.filter(
+            is_active=True,
+            skills__accessible_stages__code=stage_code,
+            skills__accessible_stages__is_active=True,
+        )
+        .distinct()
+        .order_by('email')
+    )

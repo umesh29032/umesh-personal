@@ -3,7 +3,7 @@
     .form-shell { max-width: 880px; margin: 0 auto; padding-bottom: 120px; }
 
     .form-shell .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: var(--radius-2xl); padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position: relative; overflow: hidden;
@@ -65,12 +65,18 @@
     .field-error { color: var(--danger); font-size: var(--fs-sm); margin-top: 2px; }
     .form-shell input,
     .form-shell select,
+    /* PA-14-3: FancySelect/FancyDate replace the control with a BUTTON trigger —
+       tag rules miss it. Style the triggers with the same cream-input look so
+       every form-shell select/date matches its sibling inputs (FE-1 2026-07-05). */
+    .form-shell .fancy-select-trigger,
+    .form-shell .fancy-date-trigger,
     .form-shell textarea {
         width:100%; padding: var(--input-padding);
         background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: var(--input-radius);
         box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
         font-size: var(--fs-md); color: var(--ink);
         font-family: inherit;
+        text-align: left;
         transition: border-color 0.15s, box-shadow 0.15s;
     }
     .form-shell input:focus,

@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-settlement-reverse
+type: request-journey
+status: active
+owner: handwritten
+scope: settlement_reverse (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Settlement Reverse / Supersede (fix a finalized settlement)
 
 ## TL;DR (1 min)

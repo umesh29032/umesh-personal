@@ -1,3 +1,13 @@
+---
+id: r1-execution-plan
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # R1 EXECUTION PLAN — Navigation, Visibility & F1 Guard
 
 > Phase R1 of [IMPLEMENTATION_ROADMAP_PDD_V1.md](IMPLEMENTATION_ROADMAP_PDD_V1.md),

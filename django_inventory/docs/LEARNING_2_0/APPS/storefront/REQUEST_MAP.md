@@ -1,3 +1,13 @@
+---
+id: l2-apps-storefront-request-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: storefront
+anchors: config/storefront/
+verified: 2026-07-13
+---
+
 # storefront — REQUEST_MAP (`/`, `/storefront/`)
 
 ## TL;DR (1 min)

@@ -62,7 +62,7 @@ def _admin(email='ad@brk.test'):
 
 
 class _WorkspaceCuttingFixture(TestCase):
-    """T-SHIRT product at cutting stage with pattern allocations + bundles."""
+    """T-SHIRT product at cutting stage with pattern allocations + breakups."""
 
     @classmethod
     def setUpTestData(cls):
@@ -166,28 +166,9 @@ class _WorkspaceCuttingFixture(TestCase):
             pattern_id=self.front.id, count=5, user=self.admin,
         )
 
-        # Build bundles + consume pieces.
-        bundle_m = create_bundle(
-            adda=self.adda, size_id=self.s_m.id, user=self.admin,
-        )
-        add_pieces_to_bundle(
-            adda=self.adda, bundle_id=bundle_m.id,
-            selections=[
-                {'breakup_id': self.b_front_m.id, 'take_count': 10},
-                {'breakup_id': self.b_back_m.id, 'take_count': 10},
-            ],
-            user=self.admin,
-        )
-        bundle_l = create_bundle(
-            adda=self.adda, size_id=self.s_l.id, user=self.admin,
-        )
-        add_pieces_to_bundle(
-            adda=self.adda, bundle_id=bundle_l.id,
-            selections=[
-                {'breakup_id': self.b_front_l.id, 'take_count': 5},
-            ],
-            user=self.admin,
-        )
+        # GAP-5: bundles are POST-JOIN containers — materialization +
+        # inline barcodes read the BREAKUP rows (owner cutting spec); no
+        # pre-complete bundling exists anymore.
 
 
 class WorkspaceMaterializationTests(_WorkspaceCuttingFixture):
@@ -210,10 +191,16 @@ class WorkspaceMaterializationTests(_WorkspaceCuttingFixture):
         self.assertEqual(size_m_row.color_id, self.red.id)
 
     def test_breakdown_bundle_fk_populated(self):
+        # Streams redesign conscious update: breakup rows are the first-
+        # class actual — breakdown rows carry NO bundle FK in breakup
+        # mode (bundles are post-join containers now). Dimension truth
+        # (size/color) is the pin that matters.
         complete_cutting(adda=self.adda, user=self.admin)
-        for r in AddaProductSizeColorPieceBreakdown.objects.filter(adda=self.adda):
-            self.assertIsNotNone(r.bundle_id)
-            self.assertEqual(r.bundle.size_id, r.size_id)
+        rows = list(AddaProductSizeColorPieceBreakdown.objects.filter(adda=self.adda))
+        self.assertTrue(rows)
+        for r in rows:
+            self.assertIsNotNone(r.size_id)
+            self.assertIsNotNone(r.color_id)
 
     def test_breakdown_total_matches_cutting_record(self):
         complete_cutting(adda=self.adda, user=self.admin)

@@ -55,6 +55,13 @@ class AllocationTests(TestCase):
             bundle=bundle, pattern=pattern, color=color, count=10,
         )
 
+
+    def _join(self):
+        # GAP-5: bundle EDITS are post-join — stamp the lane complete so the
+        # delete tests hit the allocation guard, not the join gate.
+        self.cutting_sr.completed_at = timezone.now()
+        self.cutting_sr.save(update_fields=['completed_at'])
+
     def test_allocate_by_item_derives_dims_and_credits(self):
         a = allocate_stage_work(
             user=self.mgr, stage_record=self.cutting_sr, worker=self.worker,
@@ -161,6 +168,7 @@ class AllocationTests(TestCase):
         self.adda.save(update_fields=['current_stage'])
         allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,
                             worker=self.worker, bundle_item=self.item, allocated_quantity=4)
+        self._join()
         with self.assertRaisesMessage(ValidationError, 'audit trail is permanent'):
             delete_bundle_item(adda=self.adda, item_id=self.item.pk, user=self.mgr)
         self.assertTrue(CuttingBundleItem.objects.filter(pk=self.item.pk).exists())
@@ -175,6 +183,7 @@ class AllocationTests(TestCase):
         a = allocate_stage_work(user=self.mgr, stage_record=self.cutting_sr,
                                 worker=self.worker, bundle_item=self.item, allocated_quantity=4)
         void_allocation(a, user=self.mgr)
+        self._join()
         with self.assertRaisesMessage(ValidationError, "audit trail is permanent"):
             delete_bundle_item(adda=self.adda, item_id=self.item.pk, user=self.mgr)
         self.assertTrue(CuttingBundleItem.objects.filter(pk=self.item.pk).exists())

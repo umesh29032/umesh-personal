@@ -8,7 +8,7 @@
 
     /* Hero greeting — soft dark gradient, matches form-shell elsewhere. */
     .user-dash .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position: relative; overflow: hidden;
@@ -219,6 +219,34 @@
     {% endif %}
 
     {% comment %}
+    R5 (PDD §21/§23 + ADR-0011): this-month factory-expense digest, management
+    only (expense_month is None for workers — no data even reaches the page).
+    Factory-LEVEL costs: deliberately NOT part of any Adda's manufacturing cost.
+    {% endcomment %}
+    {% if is_admin_view and expense_month %}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header">
+            <div class="card-title">Expenses · {{ expense_month.month_value }}</div>
+            <a href="{% url 'expense:factory-expense-list' %}" style="font-size:12px;">View / record →</a>
+        </div>
+        <div class="card-body">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div style="background:var(--cream);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 14px;min-width:120px;">
+                    <div style="font-size:17px;font-weight:800;">₹{{ expense_month.total }}</div>
+                    <div style="font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;">This month</div>
+                </div>
+                {% for cat in expense_month.by_category.values %}
+                <div style="background:var(--cream);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 14px;min-width:120px;">
+                    <div style="font-size:17px;font-weight:800;">₹{{ cat.total }}</div>
+                    <div style="font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;">{{ cat.label }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% comment %}
     Active Addas list — shown to everyone.
     Skilled users (cutting_master / cutting_master_helper / management) → accordion
       with iframe to the live stage panel (can attach/detach rolls inline).
@@ -241,11 +269,20 @@
                             started {{ a.started_at|date:"d M H:i" }}
                         </div>
                     </div>
+                    {% if is_admin_view or not a.current_focus %}
                     <div class="adda-pipeline">
                         {% for p in a.pipeline %}
                             <span class="pipe-pill pipe-{{ p.state }}">{% if p.state == 'done' %}✓ {% elif p.state == 'current' %}▸ {% endif %}{{ p.label }}</span>
                         {% endfor %}
                     </div>
+                    {% else %}
+                    {# R10-B worker lens: current-operation focus — prev ✔ / NOW / next; never the full pipeline #}
+                    <div class="adda-pipeline">
+                        {% if a.current_focus.prev %}<span class="pipe-pill pipe-done">✓ {{ a.current_focus.prev }}</span>{% endif %}
+                        <span class="pipe-pill pipe-current">▸ {{ a.current_focus.current }}</span>
+                        {% if a.current_focus.next %}<span class="pipe-pill pipe-pending">{{ a.current_focus.next }}</span>{% endif %}
+                    </div>
+                    {% endif %}
                     {% comment %}Per-Adda Layering snapshot — confidential (roll/layer/leftover counts).
                     Restricted to skilled users (Cutting Master / Helper) + management. Other roles
                     must not see internal production metrics.{% endcomment %}
@@ -274,8 +311,10 @@
                                 </div>
                             </details>
                         {% endfor %}
-                        {% if a.current_stage %}
-                        {% comment %}Accordion: tap to expand inline iframe of the current stage panel.{% endcomment %}
+                        {% if a.current_stage and a.current_can_open %}
+                        {% comment %}C-2: workspace accordion renders ONLY when the panel gate would
+                        admit this viewer (live Stage Access AND assignment) — never an iframe the
+                        user can't open. Pipeline chips above stay as the status summary.{% endcomment %}
                         <details class="adda-stage-acc">
                             <summary>▸ Open {{ a.current_stage.get_stage_type_display }} workspace</summary>
                             <div class="iframe-wrap">
@@ -298,7 +337,8 @@
     </div>
     {% endif %}
 
-    {% comment %}Helper section — only rendered for users with cutting_master_helper skill. Spec: helpers see every active Layering across the factory, plus their stats.{% endcomment %}
+    {% comment %}Layering board — gated by LIVE layering Stage Access (C-2; was a hardcoded
+    helper-skill check). Non-management see only layerings they're assigned to.{% endcomment %}
     {% if helper_data %}
     <div class="stats-grid">
         <div class="stat-card stat-card--serif">
@@ -381,7 +421,8 @@
     {% else %}
     <div class="empty">
         <h2>No active tasks</h2>
-        <p>When a manager assigns you to a Layering or Cutting stage, it'll appear here.</p>
+        {# post-OP-1 copy: workers get assigned to ANY operation, not just layering/cutting #}
+        <p>Jab manager aapko kaam dega, woh yahan dikhega. (Your assigned work will appear here.)</p>
     </div>
     {% endif %}
 

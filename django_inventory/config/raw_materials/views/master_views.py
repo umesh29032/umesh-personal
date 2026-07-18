@@ -20,7 +20,7 @@ from raw_materials.forms import ClothColorForm, ClothTypeForm, StorageLocationFo
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import archive_master, hard_delete_master, restore_master
 
-from .mixins import ProductionRoleMixin
+from .mixins import ManagementRoleMixin, ProductionRoleMixin
 
 
 # ── Shared base ──────────────────────────────────────────────────────────────
@@ -56,7 +56,12 @@ class _MasterListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
         return ctx
 
 
-class _MasterCreateView(LoginRequiredMixin, ProductionRoleMixin, CreateView):
+# Phase-E cert (2026-07-12): master WRITES = management acts — the old
+# ProductionRoleMixin let any worker create/edit/archive/delete cloth
+# types/colors/locations (same name-trap class as the M9 roll-edit fix).
+# Lists stay ProductionRole (read-only; SidebarItemRule additionally
+# blocks workers at the middleware).
+class _MasterCreateView(LoginRequiredMixin, ManagementRoleMixin, CreateView):
     template_name = 'raw_materials/master_form.html'
     title = ''
     list_url_name = ''
@@ -77,7 +82,7 @@ class _MasterCreateView(LoginRequiredMixin, ProductionRoleMixin, CreateView):
         return ctx
 
 
-class _MasterUpdateView(LoginRequiredMixin, ProductionRoleMixin, UpdateView):
+class _MasterUpdateView(LoginRequiredMixin, ManagementRoleMixin, UpdateView):
     template_name = 'raw_materials/master_form.html'
     title = ''
     list_url_name = ''
@@ -98,7 +103,7 @@ class _MasterUpdateView(LoginRequiredMixin, ProductionRoleMixin, UpdateView):
         return ctx
 
 
-class _MasterArchiveView(LoginRequiredMixin, ProductionRoleMixin, View):
+class _MasterArchiveView(LoginRequiredMixin, ManagementRoleMixin, View):
     """POST-only soft-archive endpoint (sets is_active=False).
 
     GET renders a confirmation page; POST flips the flag via service.
@@ -128,7 +133,7 @@ class _MasterArchiveView(LoginRequiredMixin, ProductionRoleMixin, View):
         return redirect(self.list_url_name)
 
 
-class _MasterDeleteView(LoginRequiredMixin, ProductionRoleMixin, DeleteView):
+class _MasterDeleteView(LoginRequiredMixin, ManagementRoleMixin, DeleteView):
     """Hard delete. Service raises ValidationError if FK references exist."""
     model = None
     title = ''
@@ -137,6 +142,16 @@ class _MasterDeleteView(LoginRequiredMixin, ProductionRoleMixin, DeleteView):
 
     def get_success_url(self):
         return reverse_lazy(self.list_url_name)
+
+    # DEPLOYMENT_BACKLOG #5 (fixed MGT-E 2026-07-12): Django DeleteView ka
+    # default context sirf object+form deta hai — template ko title +
+    # list_url_name chahiye (Cancel link `{% url list_url_name %}`), warna
+    # confirm GET NoReverseMatch 500. Archive view yehi explicitly pass karta hai.
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = self.title
+        ctx['list_url_name'] = self.list_url_name
+        return ctx
 
     def form_valid(self, form):
         try:

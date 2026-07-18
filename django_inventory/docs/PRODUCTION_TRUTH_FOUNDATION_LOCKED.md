@@ -1,3 +1,13 @@
+---
+id: docs-production-truth-foundation-locked
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # 🔒 Production-Truth Foundation — LOCKED Architecture Direction
 
 **Status: LOCKED 2026-06-14** (owner-approved). Design & roadmap frozen. **No implementation yet** — this records the agreed direction that governs the build when it starts. Supersedes nothing; it finalizes [REVIEW](PRODUCTION_TRUTH_FOUNDATION_REVIEW.md) + [FINAL](PRODUCTION_TRUTH_FOUNDATION_FINAL.md) + [ROADMAP](PRODUCTION_TRUTH_FOUNDATION_ROADMAP.md) with two final decisions.

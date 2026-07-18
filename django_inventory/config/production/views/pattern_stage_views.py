@@ -35,6 +35,8 @@ SHARED CONTEXT BUILDER:
 """
 from __future__ import annotations
 
+import logging
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -63,22 +65,30 @@ from production.services import (
     unverify_pattern, verify_pattern,
 )
 
-from .mixins import ProductionRoleMixin, StageViewAccessMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin, embedded_advance_redirect, get_adda
 
 
-def _get_adda(code: str) -> Adda:
-    return get_object_or_404(Adda, code=code)
+_get_adda = get_adda   # shared lookup (views.mixins) — local alias keeps call sites stable
 
+
+
+logger = logging.getLogger(__name__)
 
 def _get_pattern_workflow_stage(adda: Adda) -> WorkflowStage | None:
     return adda.product.workflow_stages.filter(stage__code=STAGE_CUTTING_PATTERN).first()
 
 
-def _get_pattern_stage_record(adda: Adda) -> AddaStageRecord | None:
+def _get_pattern_stage_record(adda: Adda, request=None) -> AddaStageRecord | None:
     wf = _get_pattern_workflow_stage(adda)
     if wf is None:
         return None
-    return AddaStageRecord.objects.filter(adda=adda, workflow_stage=wf).first()
+    qs = AddaStageRecord.objects.filter(adda=adda, workflow_stage=wf)
+    if request is not None:
+        raw = request.GET.get('stream') or request.POST.get('stream')
+        if raw:
+            from django.db.models import Q
+            qs = qs.filter(Q(stream_id=int(raw)) | Q(stream__isnull=True))
+    return qs.order_by('stream_id').first()
 
 
 class PatternStartForm(forms.Form):
@@ -97,17 +107,10 @@ class PatternStartForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # get_user_model() = lazy User reference; settings.AUTH_USER_MODEL ko
-        # honor karta hai (custom User model project me hai).
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        # Eligible workers = cutting_master ya cutting_master_helper skill
-        # wale users. distinct() M2M JOIN ke duplicates remove karta hai.
-        self.fields['workers'].queryset = (
-            User.objects.filter(
-                skills__name__in=[SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]
-            ).distinct().order_by('email')
-        )
+        # F-4: THE shared picker source — active users with this stage's access
+        # skills (Stage.access_by_skill), so picker == access gate, always.
+        from production.services import eligible_stage_workers
+        self.fields['workers'].queryset = eligible_stage_workers(STAGE_CUTTING_PATTERN)
 
 
 def _build_pattern_context(request, adda: Adda) -> dict:
@@ -127,7 +130,7 @@ def _build_pattern_context(request, adda: Adda) -> dict:
       • start_form                          → Section 02 form (management only)
     """
     user = request.user
-    sr = _get_pattern_stage_record(adda)
+    sr = _get_pattern_stage_record(adda, request)
     wf = _get_pattern_workflow_stage(adda)
     record = getattr(sr, 'cutting_pattern', None) if sr else None
     photos = list(record.photos.select_related('uploaded_by').all()) if record else []
@@ -216,7 +219,22 @@ def _build_pattern_context(request, adda: Adda) -> dict:
         'start_form': PatternStartForm(initial={
             'workers': list(sr.active_worker_tasks().values_list('worker_id', flat=True)) if sr else [],
         }) if can_assign else None,
+        # Phase 8B: the Manufacturing Layout contract (dependency inversion
+        # — plain dict from the registered provider; NEVER breaks the page)
+        'layout_panel': _layout_panel(adda) if is_management else None,
     }
+
+
+def _layout_panel(adda):
+    from production.stages.cutting_pattern import handler as _cp
+    if _cp.LAYOUT_PROVIDER is None:
+        return None
+    try:
+        return _cp.LAYOUT_PROVIDER(adda)
+    except Exception:                                   # noqa: BLE001
+        logger.exception('layout panel provider failed for adda %s',
+                         adda.pk)
+        return None
 
 
 class PatternWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
@@ -226,7 +244,14 @@ class PatternWorkspaceView(LoginRequiredMixin, ProductionRoleMixin,
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx.update(_build_pattern_context(self.request, _get_adda(self.kwargs['code'])))
+        adda = _get_adda(self.kwargs['code'])
+        ctx.update(_build_pattern_context(self.request, adda))
+        # R8 generic snapshot: management sees the previous stage's (Layering)
+        # reference here too; WORKERS NEVER get the ctx (spec §4/§5).
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        if user_has_role(self.request.user, MANAGEMENT_ROLES):
+            from production.views.stage_views import prev_admin_snapshot
+            ctx['prev_admin_snapshot'] = prev_admin_snapshot(adda, 'cutting_pattern')
         return ctx
 
 
@@ -278,7 +303,7 @@ class PatternStartView(_PatternActionBase):
                 adda=adda,
                 worker_ids=[u.pk for u in form.cleaned_data['workers']],
                 user=request.user,
-            )
+                stream=(request.POST.get('stream') or request.GET.get('stream')))
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
@@ -302,7 +327,7 @@ class PatternSaveVideoView(_PatternActionBase):
             messages.error(request, "Pick a video file or write notes.")
             return redirect(self.workspace_url(code, request))
         try:
-            save_pattern_record(adda=adda, video_file=video, notes=notes, user=request.user)
+            save_pattern_record(adda=adda, video_file=video, notes=notes, user=request.user, stream=(request.POST.get('stream') or request.GET.get('stream')))
         except (PermissionDenied, ValidationError) as exc:
             if is_ajax:
                 return HttpResponse(self._service_error(exc), status=400)
@@ -326,7 +351,7 @@ class PatternAddPhotoView(_PatternActionBase):
         # photo attach has a parent FK target.
         from production.services import get_or_create_pattern_stage_record
         try:
-            sr = get_or_create_pattern_stage_record(adda, request.user)
+            sr = get_or_create_pattern_stage_record(adda, request.user, stream=(request.POST.get('stream') or request.GET.get('stream')))
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
@@ -413,7 +438,7 @@ class PatternVerifyView(_PatternActionBase):
     def post(self, request, code):
         adda = _get_adda(code)
         try:
-            sr = get_or_create_pattern_stage_record(adda, request.user)
+            sr = get_or_create_pattern_stage_record(adda, request.user, stream=(request.POST.get('stream') or request.GET.get('stream')))
             record = ensure_pattern_record(stage_record=sr, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
@@ -446,7 +471,7 @@ class PatternUnverifyView(_PatternActionBase):
 
     def post(self, request, code):
         adda = _get_adda(code)
-        sr = _get_pattern_stage_record(adda)
+        sr = _get_pattern_stage_record(adda, request)
         if sr is None:
             messages.error(request, "Stage not started.")
             return redirect(self.workspace_url(code, request))
@@ -491,7 +516,7 @@ class PatternSetSizesView(_PatternActionBase):
     def post(self, request, code):
         adda = _get_adda(code)
         try:
-            sr = get_or_create_pattern_stage_record(adda, request.user)
+            sr = get_or_create_pattern_stage_record(adda, request.user, stream=(request.POST.get('stream') or request.GET.get('stream')))
             record = ensure_pattern_record(stage_record=sr, user=request.user)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
@@ -543,8 +568,13 @@ class PatternCompleteView(_PatternActionBase):
 
     def post(self, request, code):
         adda = _get_adda(code)
+        # R3 (PDD §27-C3): super-admin override forwarding — validated in service.
+        override_reason = (request.POST.get('override_reason', '').strip() or None
+                           if request.POST.get('override_pending') else None)
         try:
-            complete_pattern_stage(adda=adda, user=request.user)
+            complete_pattern_stage(adda=adda, user=request.user,
+                                   override_pending_reason=override_reason,
+                stream=(request.POST.get('stream') or request.GET.get('stream')))
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
@@ -555,14 +585,9 @@ class PatternCompleteView(_PatternActionBase):
         )
         messages.success(request, f"Pattern stage complete. Advanced to {next_label}.")
 
-        # Same iframe-safe redirect pattern as Layering: if embedded, route to
-        # the new current stage's embedded panel with ?advanced=1 so the
-        # embedded JS pings parent to reload.
-        if request.POST.get('embedded') == '1' and adda.current_stage is not None:
-            return redirect(
-                reverse('production:stage-panel', kwargs={
-                    'code': adda.code,
-                    'stage_type': adda.current_stage.stage_type,
-                }) + '?embedded=1&advanced=1'
-            )
+        # Same iframe-safe redirect pattern as Layering. F-3: the COMPLETED
+        # stage's own panel (viewer-safe for the completing worker); its
+        # ?advanced=1 JS makes the parent reload to the fresh flow state.
+        if request.POST.get('embedded') == '1':
+            return embedded_advance_redirect(adda)
         return redirect('production:adda-detail', code=adda.code)

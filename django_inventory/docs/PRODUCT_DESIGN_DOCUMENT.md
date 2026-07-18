@@ -1,3 +1,13 @@
+---
+id: docs-product-design-document
+type: truth-lock
+status: active
+owner: frozen
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # PRODUCT DESIGN DOCUMENT — Kapil Enterprises Manufacturing ERP
 
 > **STATUS: 🔒 PDD v1.0 (FROZEN) — approved by owner 2026-07-04.**
@@ -8,6 +18,113 @@
 > architecture validation §31 passed same day; owner decisions §27 resolved
 > same day. Implementation roadmap derived from this document:
 > [IMPLEMENTATION_ROADMAP_PDD_V1.md](IMPLEMENTATION_ROADMAP_PDD_V1.md).
+>
+> **AMENDMENTS REGISTER (owner-approved, per the change-control rule above —
+> the PDD body below is unmodified v1.0 text; these documents govern where
+> they extend/override it):**
+> 1. [ADR-0011](adr/0011-monthly-salary-factory-level.md) (2026-07-05) —
+>    monthly salary = factory-level FactoryExpense, NEVER per-Adda-allocated.
+> 2. [STAGE_TRIO_SPEC_IMPACT_2026_07_05.md](STAGE_TRIO_SPEC_IMPACT_2026_07_05.md)
+>    (2026-07-05) — the §15/§16 amendment: "Cutting Pattern" → **Pattern
+>    Design** (display; code frozen), Pattern Design = verification checklist
+>    + FIXED-per-Adda pay, Layering = production-input-only (non-payable),
+>    generic stage-snapshot architecture, 3-PATTI-only testing rule.
+> 3. R3 transitional C3 scope (owner "B now + A later", 2026-07-04) — the
+>    completion guard blocks IN_PROGRESS only until the explicit-assignment
+>    migration (gated backlog); recorded in
+>    [R3_EXECUTION_PLAN.md](R3_EXECUTION_PLAN.md). PDD §16 remains the target.
+> 5. R10 production architecture (2026-07-05, owner-approved+frozen) —
+>    **operation-as-stage is the permanent production model**, superseding
+>    §25's "minimal" machine scope:
+>    [R10_MACHINE_STAGES_ARCHITECTURE_2026_07_05.md](R10_MACHINE_STAGES_ARCHITECTURE_2026_07_05.md)
+>    governs. Every business OPERATION is a Stage; PROCESSES (Stitching,
+>    Finishing) are StageCategories (display/reporting metadata — the engine,
+>    money and access never read them). Every Stage declares Work Type
+>    (Manual|Machine; Machine ⇒ MachineType mandatory, Manual ⇒ forbidden —
+>    ONE DB CheckConstraint enforces). MachineTypes are reusable across
+>    operations; physical Machines are runtime assets possessed via
+>    MachineAssignment windows and never own workflow/costing/reporting/
+>    settlement. Single owners unchanged: WST = work lifecycle, WSC =
+>    quantities, settlement = the only money move. Future operations =
+>    CONFIGURATION through the generic engine (no stage-specific architecture
+>    when the engine suffices); foundation-affecting changes require an
+>    explicit owner-approved amendment.
+> 4. Freeze closeout (2026-07-05, owner) — **"Manager assignment is the ONLY
+>    source of truth for worker rosters"** is now a permanent business rule:
+>    both automatic-assignment halves are REMOVED (create_adda auto-populate
+>    in the pre-R10 polish F-2; the skill→layering retro-tag
+>    `sync_layering_workers_for_skill` in C-1 — see
+>    [RETRO_TAG_SYNC_AUDIT_2026_07_05.md](RETRO_TAG_SYNC_AUDIT_2026_07_05.md)).
+>    Stage VISIBILITY resolves through the single live access predicate
+>    (`access_service` — C-2/C-3); ACTION capability stays a code-level
+>    business rule by owner decision V-1 (see
+>    [production/RBAC.md](production/RBAC.md) "Visibility vs Action
+>    capability"). The strict-C3 flip (amendment 3) remains owner-gated
+>    pending manual business testing.
+> 6. **Business Operating Dashboard product charter (2026-07-17, owner-approved
+>    verbatim — "BOD-D1 APPROVED"; Campaign Phase 15 BOD-D1):** the Owner's
+>    command center — *"whenever I log into my ERP, I should understand the
+>    health of my complete business within a few seconds"*; **window, never
+>    engine** (reads certified truths only; one source of truth per KPI; no
+>    duplicate logic/pages/reporting; no editing; every card drills DOWN into
+>    its owning module; **specialized module dashboards continue to exist and
+>    own their workflows — the BOD consumes high-level summaries and links
+>    into them**). V1 = Owner/SA only; section order Attention → Production →
+>    Materials/Warehouses → Workers → Financial → Machines; **the BOD becomes
+>    the Owner/SA default landing page** (all other roles' landings
+>    unchanged); financial focus = upcoming commitments already owned by the
+>    ERP (expected payouts · monthly salary obligations · factory expenses ·
+>    outstanding payments/advances). **Deferred by owner ruling:** revenue/
+>    full P&L (the ERP owns no revenue entity yet), delay/threshold rules,
+>    manager/accountant tiers, analytics/trends/AI, the future dedicated
+>    Expense Financial Dashboard (roadmap: the BOD later consumes its
+>    summaries). Full charter of record:
+>    [BOD_BUILD_LOG.md](BOD_BUILD_LOG.md) §BOD-D1.
+> 7. **Monthly Expense Engine product charter (2026-07-18, owner-approved —
+>    "The MEE-0 Design Review is approved… Approve the refined MEE-D1
+>    charter"; Campaign Phase 16 MEE-D1):** the ERP's permanent
+>    template-driven recurring-expense engine, extending §21 — the owner
+>    never re-types a recurring cost; generated rows = ORDINARY
+>    FactoryExpense records through the existing certified writer
+>    (`expense_service.record_expense`), append-only, SA void lever
+>    unchanged, ADR-0011 walls intact (factory-level only; salary worker FK
+>    audit-only; no per-Adda allocation; no payroll/FnF/settlement math —
+>    Final Settlement stays a Payroll responsibility). **V1 = MONTHLY
+>    frequency only**; the schema is frequency-general (frequency enum +
+>    frequency-agnostic period coverage) so approved future frequencies are
+>    additions, never redesigns — **every new frequency enters via this
+>    register**. Amounts = fixed, typed on the template (`User.salary` stays
+>    informational per L-3 + the F4 never-derive law); template identity
+>    stable with amount changes historically traceable (owner ruling
+>    2026-07-18); already-generated months never change; worker-inactive ⇒
+>    salary generation stops automatically (generation-time check). Preview
+>    → confirm → atomic, idempotent, (template, period) constraint-backed;
+>    void → regenerate = explicit, reasoned, supersession-chained. Deferred
+>    by owner ruling: all non-monthly frequencies · one-time · variable
+>    amounts · supplier/warehouse/raw-material linkage · FY/quarter
+>    definitions · report pages · BOD widgets (Phase-15 ladder handoff).
+>    Full charter of record:
+>    [MONTHLY_EXPENSE_ENGINE_LOG.md](MONTHLY_EXPENSE_ENGINE_LOG.md) §0.12/§MEE-A.
+> 8. **Raw Material → Expense Cost Integration charter (2026-07-18,
+>    owner-approved — "PHASE 17 CHARTER APPROVAL… The architecture review is
+>    APPROVED"; Campaign Phase 17 RMX-D1/D2/D9):** a COMPLETION and
+>    INTEGRATION phase on the existing costing architecture — NOT a rebuild.
+>    **Models A + B-completion, read-only:** period material aggregation
+>    (expense-side Material Spend window) + full-Adda-cost completion on the
+>    Manufacturing Costing surface via ONE shared assembly (the live A360
+>    Decision-2 implementation extracted INERT). **Model C REFUSED: no
+>    materialized tables, no snapshots, no persistence — everything read-path
+>    derived.** **Permission policy (PERMANENT project rule): factory-wide
+>    AGGREGATE material values MAY be management-visible; per-roll pricing,
+>    supplier pricing, and individual roll economics stay behind the certified
+>    FINANCIAL_ROLES 4-layer wall (re-proven in-phase; never weakened).**
+>    Period bases: BOTH clearly-labelled views — consumption-in-period
+>    (primary) + purchases-in-period (secondary); **holdings/inventory/stock
+>    valuation = future work, NOT built.** Damaged rolls: excluded from
+>    consumption, honest in purchases; NULL prices always honest (never ₹0;
+>    the incomplete-material statement mandatory). ADR-0009/0011 preserved;
+>    Money-Write census unchanged (no writers). Full charter of record:
+>    [RM_EXPENSE_INTEGRATION_LOG.md](RM_EXPENSE_INTEGRATION_LOG.md) §RMX-0.
 >
 > **Layering of truth (who wins on conflict):**
 > - **Business intent** → THIS document wins.

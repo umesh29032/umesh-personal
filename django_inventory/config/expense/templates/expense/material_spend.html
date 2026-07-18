@@ -1,0 +1,79 @@
+{% extends "accounts/base.html" %}
+{% load finance %}
+
+{% block page_title %}Material Spend{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Page-scoped (rule 10) — composed from the factory_expense_list canon. */
+    .material-spend .month-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .material-spend .month-nav .label { font-weight: 700; font-size: 15px; }
+    .material-spend h2 { font-size: 15px; margin: 18px 0 4px; }
+    .material-spend .basis { font-size: 12px; color: var(--stone); margin: 0 0 10px; }
+    .material-spend .totals { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .material-spend .tot { background: var(--cream); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 10px 14px; min-width: 120px; }
+    .material-spend .tot .v { font-size: 17px; font-weight: 800; }
+    .material-spend .tot .l { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .05em; }
+    .material-spend .warn-banner { background: #fef2f2; border: 1.5px solid #fca5a5; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #b91c1c; font-weight: 600; margin-bottom: 12px; }
+    .material-spend .empty { font-size: 13px; color: var(--stone); padding: 8px 0 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="material-spend">
+    <div class="hero-strip copper">
+        <h1>Material Spend</h1>
+        <p>Cloth money, straight from the roll truth — every figure derives live from purchase prices (ADR-0009: one source, never copied, never re-priced). Aggregates only; per-roll pricing stays behind the financial wall.</p>
+    </div>
+
+    <div class="month-nav">
+        {% if month == 1 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"-1" }}-12">‹ Prev</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 11 %}0{% endif %}{{ month|add:"-1" }}">‹ Prev</a>
+        {% endif %}
+        <span class="label">{{ month_value }}</span>
+        {% if month == 12 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"1" }}-01">Next ›</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 9 %}0{% endif %}{{ month|add:"1" }}">Next ›</a>
+        {% endif %}
+        {# ADR-0011: factory expenses are a SIBLING page — material and factory money never blend into one total #}
+        <a class="btn btn-ghost" href="{% url 'expense:factory-expense-list' %}?month={{ month_value }}">Factory expenses →</a>
+        <a class="btn btn-ghost" href="{% url 'production:costing' %}">Manufacturing costing →</a>
+    </div>
+
+    <h2>Consumption during {{ month_value }}</h2>
+    <p class="basis">Cloth value USED by production this month — rolls laid, minus leftovers returned to stock, plus stored leftovers reused; every value at the source roll's purchase price.</p>
+    {% if consumption.unpriced_events %}
+    <div class="warn-banner">⚠ {{ consumption.unpriced_events }} consumption event{{ consumption.unpriced_events|pluralize }} without a purchase price — material costing is incomplete for this month (unknown is never counted as ₹0).</div>
+    {% endif %}
+    {% if consumption.total or consumption.consumed or consumption.unpriced_events %}
+    <div class="totals">
+        <div class="tot"><div class="v">{% money consumption.total %}</div><div class="l">Net consumption</div></div>
+        <div class="tot"><div class="v">{% money consumption.consumed %}</div><div class="l">Consumed</div></div>
+        <div class="tot"><div class="v">{% money consumption.remnant_returned %}</div><div class="l">Returned as leftovers</div></div>
+        <div class="tot"><div class="v">{% money consumption.leftover_in %}</div><div class="l">Leftovers reused</div></div>
+    </div>
+    {% else %}
+    <div class="empty">No production consumption recorded for {{ month_value }}.</div>
+    {% endif %}
+
+    <h2>Purchases during {{ month_value }}</h2>
+    <p class="basis">Cloth BOUGHT this month at purchase price — includes rolls later damaged (they were bought); unpriced rolls are counted, never valued at ₹0.</p>
+    {% if purchases.unpriced_rolls %}
+    <div class="warn-banner">⚠ {{ purchases.unpriced_rolls }} roll{{ purchases.unpriced_rolls|pluralize }} purchased without a price — the purchase total is incomplete (unknown is never counted as ₹0).</div>
+    {% endif %}
+    {% if purchases.priced_rolls or purchases.unpriced_rolls %}
+    <div class="totals">
+        <div class="tot"><div class="v">{% money purchases.total %}</div><div class="l">Purchase total</div></div>
+        <div class="tot"><div class="v">{{ purchases.priced_rolls }}</div><div class="l">Rolls priced</div></div>
+        <div class="tot"><div class="v">{{ purchases.unpriced_rolls }}</div><div class="l">Rolls unpriced</div></div>
+        <div class="tot"><div class="v">{{ purchases.total_weight_kg }} kg</div><div class="l">Weight</div></div>
+        <div class="tot"><div class="v">{{ purchases.damaged_rolls }}</div><div class="l">Later damaged</div></div>
+    </div>
+    {% else %}
+    <div class="empty">No purchases recorded for {{ month_value }}.</div>
+    {% endif %}
+</div>
+{% endblock %}

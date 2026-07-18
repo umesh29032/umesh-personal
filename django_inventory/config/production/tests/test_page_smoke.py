@@ -54,11 +54,13 @@ class PageSmokeTests(TestCase):
 
     def _ok(self, name, **kw):
         resp = self.client.get(reverse(name, kwargs=kw) if kw else reverse(name))
-        self.assertIn(resp.status_code, (200, 302), f"{name} → {resp.status_code}")
+        # 301 = the F-1 legacy dashboard URLs (permanent redirects to my_dashboard)
+        self.assertIn(resp.status_code, (200, 301, 302), f"{name} → {resp.status_code}")
         return resp
 
     def test_core_pages_render(self):
         for name in [
+            'inventory:my_dashboard',
             'inventory:inventory_dashboard', 'inventory:user_dashboard',
             'production:dashboard', 'production:costing',
             'production:adda-list', 'production:product-list',

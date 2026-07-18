@@ -6,7 +6,7 @@
 <style>
     .scan-detail { max-width: 600px; margin: 0 auto; }
     .scan-detail .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position:relative; overflow:hidden;
@@ -50,6 +50,18 @@
                     <dt>Batch range</dt><dd><code>{{ batch.start_value }}</code> – <code>{{ batch.end_value }}</code> ({{ batch.total_pieces }} pieces)</dd>
                 {% endif %}
                 <dt>Status</dt><dd>{{ barcode.get_status_display }}</dd>
+                <dt>Set status</dt>
+                <dd>
+                  {# one-tap floor act (M8): thin wire to the mark_status single writer #}
+                  <form method="post" action="{% url 'tracking:scan-status' barcode.value %}"
+                        style="display:flex;flex-wrap:wrap;gap:8px;">
+                    {% csrf_token %}
+                    <button type="submit" name="status" value="pending" class="btn{% if barcode.status == 'pending' %} btn-primary{% else %} btn-ghost{% endif %}" style="min-height:44px;min-width:104px;">Pending</button>
+                    <button type="submit" name="status" value="packed" class="btn{% if barcode.status == 'packed' %} btn-primary{% else %} btn-ghost{% endif %}" style="min-height:44px;min-width:104px;">Packed</button>
+                    <button type="submit" name="status" value="dispatched" class="btn{% if barcode.status == 'dispatched' %} btn-primary{% else %} btn-ghost{% endif %}" style="min-height:44px;min-width:104px;">Dispatched</button>
+                    <button type="submit" name="status" value="missing" class="btn{% if barcode.status == 'missing' %} btn-primary{% else %} btn-ghost{% endif %}" style="min-height:44px;min-width:104px;">Missing</button>
+                  </form>
+                </dd>
                 <dt>First scan</dt><dd>{{ barcode.last_scanned_at|date:"d M Y H:i" }}</dd>
                 <dt>Scanned by</dt><dd>{{ barcode.last_scanned_by.email }}</dd>
             </dl>

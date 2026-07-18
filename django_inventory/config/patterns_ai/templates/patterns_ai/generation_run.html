@@ -1,0 +1,51 @@
+{% extends "accounts/base.html" %}
+{# P3 — run result: candidate comparison, every number derived at read #}
+{% block page_title %}Layout options — run #{{ run.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-run .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:14px; }
+  .pai-run .cand { background:#fff; border:var(--border-card, 1px solid #e5e0d5); border-radius:12px; padding:16px; }
+  .pai-run .best { outline:2px solid #2e6e4e; }
+  .pai-run .stat { display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
+  .pai-run .v-ok { color:#20603c; font-weight:600; }
+  .pai-run .v-bad { color:#a33; font-weight:600; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-run">
+  <div class="page-header">
+    <h1>Layout options · run #{{ run.pk }}</h1>
+    <p class="subtitle">{{ run.product.code }} · width {{ run.usable_width_mm }} mm ·
+      ratio {{ ratio_labels|join:" · " }} ·
+      utilization/waste derived at read, never stored.</p>
+  </div>
+  <p><a class="btn" href="{% url 'patterns_ai:generate' %}?product={{ run.product.pk }}">← Generate</a></p>
+  {% if run.errors %}
+    <div class="card" style="padding:12px 16px; margin-bottom:14px;">
+      <strong>Some methods could not produce a layout (recorded):</strong>
+      {% for k, v in run.errors.items %}<div class="muted">{{ k }}: {{ v }}</div>{% endfor %}
+    </div>
+  {% endif %}
+  <div class="cards">
+    {% for card in cards %}
+    <div class="cand {% if forloop.first %}best{% endif %}">
+      <h3>Option {{ forloop.counter }} {% if forloop.first %}· shortest{% endif %}</h3>
+      <div class="stat"><span>Marker length</span><strong>{{ card.metrics.length_mm }} mm</strong></div>
+      <div class="stat"><span>Utilization</span><strong>{{ card.metrics.utilization_pct }}%</strong></div>
+      <div class="stat"><span>Waste</span><span>{{ card.metrics.waste_pct }}%</span></div>
+      <div class="stat"><span>Per garment</span><span>{{ card.metrics.per_garment_m }} m</span></div>
+      <div class="stat"><span>Theoretical m/100</span><span>{{ card.metrics.theoretical_m_per_100 }}</span></div>
+      <div class="stat"><span>Pieces placed</span><span>{{ card.metrics.piece_count }}</span></div>
+      <div class="stat"><span>Independent verify</span>
+        <span class="{% if card.metrics.verified %}v-ok{% else %}v-bad{% endif %}">
+          {% if card.metrics.verified %}PASS{% else %}FAIL{% endif %}</span></div>
+      {% if card.promoted %}
+        <p class="muted">promoted → {{ card.promoted.reference }}</p>
+      {% endif %}
+      <p style="margin-top:10px;"><a class="btn btn-primary"
+        href="{% url 'patterns_ai:candidate-detail' card.c.pk %}">open →</a></p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

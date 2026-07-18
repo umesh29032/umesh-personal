@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-cloth-roll
+type: database-guide
+status: active
+owner: handwritten
+scope: cloth_roll (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: ClothRoll (+ RemainingCloth) — cloth stock
 
 ## TL;DR

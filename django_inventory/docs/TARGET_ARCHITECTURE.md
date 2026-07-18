@@ -1,3 +1,13 @@
+---
+id: docs-target-architecture
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Target Architecture — Kapil Enterprises ERP
 
 > Companion to [REMEDIATION_PLAN.md](REMEDIATION_PLAN.md). Describes the **end-state** the

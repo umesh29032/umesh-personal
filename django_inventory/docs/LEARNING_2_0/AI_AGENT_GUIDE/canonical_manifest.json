@@ -1,6 +1,7 @@
 {
   "_comment": "Machine-readable canonical routing for AI agents. Read THIS ONE file to route a task to its single canonical doc, instead of scanning the repo or reading several prose index files. Every path is repo-root-relative and is validated by core.tests.PkalsNavigationGuardTests (a dead path fails the build). Human-readable companion: README.md in this folder.",
-  "version": "2026-06-13",
+  "version": "2026-07-13",
+  "_refresh_note": "2026-07-13 Phase-7 DOCCLEAN-E: re-routed data-model/two-truths/eras/backlog canonicals to their truth-homes (F-B-01/02/03); added 8 topics machines/patterns_ai/product-truth/operations/current-state/deployment/doc-standards/campaign (F-B-04). entry/never_modify/hard_rules unchanged. Transitional-active residuals (foundation-chain, pkals_v2, roadmap-review) are NOT hidden — simply not routed as canonical.",
   "how_to_use": "1) match your task to a topics[].match term; 2) open that topic's canonical (ONE file); 3) open also[] only if you need depth. Do NOT grep the repo first. For writes, obey never_modify[] (CI gates enforce).",
   "entry": {
     "front_door": "docs/START_HERE.md",
@@ -22,13 +23,13 @@
     },
     {
       "match": ["two truths", "production vs financial truth", "why expected is not money", "Option B"],
-      "canonical": "docs/LEARNING_2_0/ARCHITECTURE_EXPLAINED/06_why_two_truths.md",
-      "also": ["docs/adr/0005-production-truth-vs-financial-truth-option-b.md"]
+      "canonical": "docs/adr/0005-production-truth-vs-financial-truth-option-b.md",
+      "also": ["docs/LEARNING_2_0/ARCHITECTURE_EXPLAINED/06_why_two_truths.md"]
     },
     {
       "match": ["ledger credit timing", "eras", "era-A", "era-B", "LEDGER_CREDIT_AT_ALLOCATION", "no ledger until settlement", "rollback lever"],
-      "canonical": "docs/LEARNING_2_0/ARCHITECTURE_EXPLAINED/10_why_eras.md",
-      "also": ["docs/adr/0007-allocation-era-ledger-cutover.md", "docs/LEARNING_2_0/CHOKEPOINTS/allocation_service.md"]
+      "canonical": "docs/adr/0007-allocation-era-ledger-cutover.md",
+      "also": ["docs/LEARNING_2_0/ARCHITECTURE_EXPLAINED/10_why_eras.md", "docs/LEARNING_2_0/CHOKEPOINTS/allocation_service.md"]
     },
     {
       "match": ["ledger", "WorkerLedgerEntry", "balance", "payment", "advance recovery", "append-only money"],
@@ -68,8 +69,8 @@
     },
     {
       "match": ["data model", "how rows save", "ER", "model relationships", "fields"],
-      "canonical": "docs/LEARNING/02_DATABASE_RELATIONSHIPS.md",
-      "also": ["docs/PROJECT_KNOWLEDGE_MAP.md"]
+      "canonical": "docs/LEARNING_2_0/DATABASE_GUIDE/README.md",
+      "also": ["docs/LEARNING/02_DATABASE_RELATIONSHIPS.md", "docs/PROJECT_KNOWLEDGE_MAP.md"]
     },
     {
       "match": ["chokepoint services", "single-writer services", "which services own writes"],
@@ -88,14 +89,54 @@
       "also": ["docs/LEARNING_2_0/LIVING_DOCUMENTATION_SYSTEM/OWNERSHIP_MATRIX.md"]
     },
     {
-      "match": ["what is still to build", "backlog", "open items"],
+      "match": ["what is still to build", "backlog", "open items", "engineering backlog"],
       "canonical": "docs/PENDING_BACKLOG.md",
-      "also": ["docs/ROADMAP_REVIEW_POST_C1_2026_06_11.md"]
+      "also": ["docs/DEPLOYMENT_BACKLOG.md"]
     },
     {
       "match": ["working rules", "conventions", "docs-sync", "mobile-first"],
       "canonical": "CLAUDE.md",
       "also": []
+    },
+    {
+      "match": ["current state", "what is built now", "manufacturing freeze", "what is frozen", "engine state"],
+      "canonical": "docs/MANUFACTURING_V1_FREEZE.md",
+      "also": ["docs/DEPLOYMENT_CAMPAIGN_STATUS.md"]
+    },
+    {
+      "match": ["product truth", "product intent", "PDD", "business requirement", "what the product should do"],
+      "canonical": "docs/PRODUCT_DESIGN_DOCUMENT.md",
+      "also": []
+    },
+    {
+      "match": ["operations", "factory operations", "stage operations", "rates", "owner rulings", "settled journeys"],
+      "canonical": "docs/FACTORY_OPERATIONS_MASTER.md",
+      "also": ["docs/MANUFACTURING_V1_FREEZE.md"]
+    },
+    {
+      "match": ["machines", "machine assets", "operator possession", "machine assignment"],
+      "canonical": "config/machines/README.md",
+      "also": ["docs/apps/machines/GUIDE.md"]
+    },
+    {
+      "match": ["patterns", "patterns_ai", "pattern layout tool", "marker", "photo to geometry"],
+      "canonical": "docs/AI_PATTERN_INTELLIGENCE/PRODUCT_VISION_V2.md",
+      "also": ["docs/AI_PATTERN_INTELLIGENCE/PLATFORM_STATUS.md", "docs/apps/patterns_ai/GUIDE.md"]
+    },
+    {
+      "match": ["deployment", "deploy", "runbook", "go live", "production deploy"],
+      "canonical": "deploy/README.md",
+      "also": []
+    },
+    {
+      "match": ["documentation rules", "doc standards", "how to write docs", "metadata", "frontmatter", "KOS"],
+      "canonical": "docs/DOC_STANDARDS.md",
+      "also": []
+    },
+    {
+      "match": ["campaign", "deployment campaign", "resume", "what phase are we in", "campaign status"],
+      "canonical": "docs/DEPLOYMENT_CAMPAIGN_STATUS.md",
+      "also": ["docs/campaign_contracts/README.md"]
     }
   ],
   "never_modify": [

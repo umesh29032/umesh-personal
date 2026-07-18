@@ -59,6 +59,16 @@ def _parse_lines(post, schema):
                     row[f['key']] = int(raw)
                 except (TypeError, ValueError):
                     raise ValidationError(f"Invalid value for {f['label']}.")
+                # C-2 (owner-approved 2026-07-06): the value must be one of the
+                # schema's OWN options. The worker-scoped schema limits choices to
+                # that worker's active allocation, so a forged POST carrying any
+                # other PK (unallocated dim — or an unallocated worker, whose
+                # option list is empty) is refused HERE at parse time,
+                # independent of ENFORCE_ALLOCATION_BOUND.
+                if row[f['key']] not in {o['value'] for o in f.get('options', ())}:
+                    raise ValidationError(
+                        f"{f['label']} is not in your assigned work — "
+                        "ask your manager if something is missing.")
             else:
                 row[f['key']] = raw
                 if f['key'] in qty_keys:
@@ -122,6 +132,28 @@ def _form_lines(task, schema):
     return out
 
 
+def _initial_form_lines(schema):
+    """J-2 (owner-approved 2026-07-06): when the worker has NO saved draft yet,
+    pre-render one editable row per `schema['initial_lines']` entry (one per
+    allocated colour+size pair on a pool stage — the handler owns that list).
+    Same spec shape as `_form_lines`, choice values pre-selected, quantities
+    empty. Stages without initial_lines keep today's single blank JS row."""
+    out = []
+    for line in schema.get('initial_lines', []):
+        fields = []
+        for f in schema['fields']:
+            value = line.get(f['key'])
+            spec = {'key': f['key'], 'kind': f['kind'], 'label': f['label'],
+                    'required': f.get('required', False),
+                    'unit': f.get('unit', ''), 'value': value}
+            if f['kind'] == 'choice':
+                spec['options'] = [dict(o, selected=(str(o['value']) == str(value)))
+                                   for o in f.get('options', [])]
+            fields.append(spec)
+        out.append(fields)
+    return out
+
+
 class WorkerReportView(LoginRequiredMixin, View):
     """GET = render the worker's report form (editable or locked); POST = save
     draft / submit & complete. Object-level isolation: resolves the requesting
@@ -146,10 +178,21 @@ class WorkerReportView(LoginRequiredMixin, View):
             # Isolation rule (V2-1c-iv): skill alone is not enough — you report
             # only on stages you are actively assigned to.
             raise PermissionDenied("You are not assigned to this stage.")
+        # C-3 (freeze closeout 2026-07-05): assignment alone is not enough
+        # either — the LIVE Stage-Access predicate must also admit. Revoking a
+        # stage's access in the Access hub closes the report path immediately,
+        # even for workers assigned before the revocation. (Management passes
+        # inside user_can_access_stage; the existing task truth is untouched.)
+        from production.services import user_can_access_stage
+        if not user_can_access_stage(request.user, stage_type):
+            raise PermissionDenied(
+                "Access to this stage has been revoked. Ask your administrator.")
         if not registry.has(stage_type):
             raise PermissionDenied(f"No handler registered for stage '{stage_type}'.")
         handler = registry.get(stage_type)
-        schema = handler.contribution_schema(adda)
+        # OP-1: worker-scoped schema — a pool stage limits choice options to THIS
+        # worker's allocated dims (blind reporting; labels only, no quantities).
+        schema = handler.contribution_schema(adda, worker=request.user)
         return adda, sr, task, schema
 
     def _report_url(self, request, code, stage_type):
@@ -168,14 +211,20 @@ class WorkerReportView(LoginRequiredMixin, View):
         embedded = request.GET.get('embedded') == '1'
         template = ('production/worker_report_embedded.html' if embedded
                     else 'production/worker_report.html')
+        # Pre-Phase-3 B (owner: worker sees their machine): display-only resolve
+        # of the worker's open machine assignment — same helper that stamps it.
+        from production.services.worker_task_service import _resolve_machine_code
         return render(request, template, {
             'adda': adda, 'stage_record': sr, 'task': task,
+            'machine_code': _resolve_machine_code(task),
             'stage_name': sr.workflow_stage.stage.name,
             'stage_type': stage_type,
             'schema': schema,
             'locked': locked,
             'saved_lines': saved,
-            'form_lines': [] if locked else _form_lines(task, schema),
+            # J-2: saved draft wins; otherwise prefill one row per allocated pair.
+            'form_lines': [] if locked else (_form_lines(task, schema)
+                                             or _initial_form_lines(schema)),
             'total_quantity': sum((l['quantity'] for l in saved), start=0),
             'embedded': embedded,
         })
@@ -187,6 +236,24 @@ class WorkerReportView(LoginRequiredMixin, View):
         try:
             if action not in ('draft', 'submit'):
                 raise ValidationError("Unknown action.")
+            # R8 (spec §3): checklist-mode stages dispatch to the HANDLER —
+            # still schema-driven (no stage names here). The handler syncs its
+            # verification truth + reports via the same single-writer services.
+            if schema.get('mode') == 'checklist':
+                handler = registry.get(stage_type)
+                # PA-13 lesson: never int() raw key material — tampered
+                # 'check-abc' must not 500.
+                checked = {int(k[6:]) for k in request.POST
+                           if k.startswith('check-') and k[6:].isdigit()}
+                handler.checklist_submit(
+                    task=task, checked_ids=checked,
+                    photos=request.FILES.getlist('photos'),
+                    actor=request.user, action=action)
+                messages.success(
+                    request,
+                    "Work report submitted — thank you!" if action == 'submit'
+                    else "Progress saved. Submit once every design is verified.")
+                return redirect(self._report_url(request, code, stage_type))
             lines = _parse_lines(request.POST, schema)
             if action == 'submit' and not lines:
                 raise ValidationError("Add at least one line before submitting.")
@@ -228,7 +295,8 @@ class AddaReportReviewView(LoginRequiredMixin, View):
                     task__stage_record__workflow_stage__credits_workers=True,
                     task__status__in=(WorkerStageTask.Status.COMPLETED,
                                       WorkerStageTask.Status.VERIFIED))
-            .select_related('task__worker', 'color', 'size', 'settlement_line',
+            .select_related('task__worker', 'color', 'size',
+                            'settlement_line__adda_settlement',
                             'task__stage_record__workflow_stage__stage')
             .order_by('task__worker_id', 'pk')
         )
@@ -240,9 +308,32 @@ class AddaReportReviewView(LoginRequiredMixin, View):
                       {'adda': adda, 'rows': self._rows(adda)})
 
     def post(self, request, code):
-        from production.services.worker_task_service import set_verified_quantity
+        from production.services.worker_task_service import (
+            set_verified_quantity, void_submitted_report,
+        )
         self._gate(request)
         adda = get_object_or_404(Adda, code=code)
+        # Pre-Phase-3 D: audited void of a whole submitted report (the explicit
+        # path when the TRUE number is HIGHER than submitted — verification only
+        # ever confirms/reduces). One action per POST; reason mandatory.
+        if request.POST.get('action') == 'void_report':
+            from production.models import WorkerStageTask
+            try:
+                task = get_object_or_404(
+                    WorkerStageTask, pk=int(request.POST.get('task_id', 0)),
+                    stage_record__adda=adda)
+                new_task = void_submitted_report(
+                    task, actor=request.user,
+                    reason=request.POST.get('reason', ''))
+                messages.success(
+                    request,
+                    f"Report voided — {new_task.worker.get_full_name() or new_task.worker.email} "
+                    "can now submit the correct numbers.")
+            except (ValidationError, PermissionDenied) as exc:
+                messages.error(request, '; '.join(getattr(exc, 'messages', [str(exc)])))
+            except (TypeError, ValueError):
+                messages.error(request, "Invalid report reference.")
+            return redirect(request.path)
         changed = 0
         try:
             for c in self._rows(adda):

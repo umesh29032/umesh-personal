@@ -1,3 +1,13 @@
+---
+id: docs-adr-0001-service-layer-owns-writes-no-signals
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0001 — Service layer owns all multi-row writes; no Django signals
 
 **Status:** Accepted (CLAUDE.md rule #4)
@@ -20,5 +30,7 @@ side effects that fire invisibly and make control flow impossible to trace.
 ## Consequences
 - One obvious place to read/lock/audit each transition; grep finds every writer.
 - The old `accounts/signals.py` skill→layering retro-tag became the explicit
-  `user_service.sync_user_skills` call (invoked from the views + admin `save_related`).
+  `user_service.sync_user_skills` call (invoked from the views + admin `save_related`)
+  — and was then REMOVED entirely in the freeze closeout (C-1, 2026-07-05):
+  manager assignment is the only roster source; accounts writes nothing into production.
 - Slightly more boilerplate than signals — accepted for traceability.

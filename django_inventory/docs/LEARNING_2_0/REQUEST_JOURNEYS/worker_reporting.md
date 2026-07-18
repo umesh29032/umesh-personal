@@ -1,6 +1,16 @@
+---
+id: l2-request-journeys-worker-reporting
+type: request-journey
+status: active
+owner: handwritten
+scope: worker_reporting (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
 Worker phone reports color/size/qty → WSC (reported_quantity IMMUTABLE). Submit
-freezes expected_* (visibility, not money). Assignment-gated; skill alone NOT enough.
+freezes expected_* (visibility, not money). Gated by assignment AND live Stage Access (C-3); skill alone NOT enough.
 
 # Journey: Worker Reporting (production truth is born)
 
@@ -34,7 +44,7 @@ Chokepoint: [../CHOKEPOINTS/worker_task_service.md](../CHOKEPOINTS/worker_task_s
 - **First breakpoint:** `_resolve` (403 source) or `worker_task_service.report_contributions`.
 - **First query:** `SELECT id,status,reported_quantity,verified_quantity FROM production_workerstagecontribution WHERE task_id=<id>;`
 - **First log:** `worker_task.report` / `worker_task.complete`.
-- **Failure modes:** 403 = worker has no active WST on this SR (assignment, not skill); "report needed" badge stuck = task still assigned/in_progress; lines vanished = stage completed → F3 auto-cancel.
+- **Failure modes:** 403 = no active WST on this SR (assignment) OR stage access revoked in the hub (C-3 freeze closeout — live `user_can_access_stage` check); "report needed" badge stuck = task still assigned/in_progress; lines vanished = stage completed → F3 auto-cancel.
 - **Expected DB state:** after submit, WST.status=completed + each WSC has frozen expected_rate/earning.
 - **Recovery path:** wrong report → management `set_verified_quantity` (reported stays); stage wrongly completed → reopen (if not settled).
 

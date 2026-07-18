@@ -30,15 +30,17 @@ class RollListReportingTests(TestCase):
             cloth_type=self.ct, cloth_color=self.cc, storage_location=self.sl)
 
     # ── PA-13-2: non-numeric id filter must not 500 ──────────────────────────
+    # (H-3 2026-07-06: worker role is sidebar-locked out of raw-materials pages —
+    # these filter/chip pins exercise the VIEW, so they run as admin now.)
     def test_non_numeric_id_filters_do_not_500(self):
-        self.client.force_login(self.worker)
+        self.client.force_login(self.admin)
         for qs in ('cloth_type=abc', 'color=xyz', 'location=!!', 'cloth_type=1; DROP'):
             resp = self.client.get(reverse('raw_materials:roll-list') + '?' + qs)
             self.assertEqual(resp.status_code, 200, f"500 on ?{qs}")
 
     # ── PA-13-5: invalid status → no misleading chip, full list ──────────────
     def test_garbage_status_shows_no_status_chip(self):
-        self.client.force_login(self.worker)
+        self.client.force_login(self.admin)
         resp = self.client.get(reverse('raw_materials:roll-list') + '?status=garbage')
         self.assertEqual(resp.status_code, 200)
         chips = resp.context['active_filter_chips']

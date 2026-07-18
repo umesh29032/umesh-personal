@@ -54,6 +54,9 @@ class SidebarOrderTests(TestCase):
         self._assert_core_order(labels)
 
     def test_worker_order(self):
+        # H-3 lockdown (owner 2026-07-06): a worker's sidebar is ONLY their own
+        # world — Main (My Dashboard / My Earnings). No Production / Raw
+        # Materials / Tracking sections.
         labels = _labels(_user('so-w@test', 'worker'))
-        self.assertIn('Production', labels)
+        self.assertEqual(labels, ['Main'])
         self._assert_core_order(labels)

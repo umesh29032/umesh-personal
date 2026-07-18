@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-06-why-two-truths
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why production truth ≠ financial truth (Option B)
 
 > **CANONICAL** for the "two truths" concept (binding: ADR-0005). Other docs give

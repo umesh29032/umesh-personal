@@ -115,6 +115,12 @@ class ClothRoll(TimeStampedModel):
         # TextChoices = Django ka enum pattern. DB mein 'not_used'/'used' string store hota hai.
         NOT_USED = 'not_used', 'Not Used'
         USED = 'used', 'Used'
+        # V1.1 item-1 (2026-07-12): a WHOLE unusable roll (water/supplier/
+        # fungus/transport damage) must leave available stock honestly. Every
+        # "available" read filters NOT_USED, so DAMAGED self-excludes from
+        # pickers, guards and counts. Partial damage stays what it always
+        # was: an audited weight correction + the lay's verified truth.
+        DAMAGED = 'damaged', 'Damaged'
 
     # editable=False → admin form mein bhi nahi dikhega (sequence-generated)
     roll_id = models.CharField(max_length=20, unique=True, editable=False)
@@ -129,6 +135,19 @@ class ClothRoll(TimeStampedModel):
     width_inch = models.IntegerField(choices=WIDTH_CHOICES, null=True, blank=True)
     # DecimalField financial-grade precision (Decimal, not Float — rounding errors avoid)
     weight_kg = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    # ── M4 G4 (Manufacturing Planner, additive): marker-planning facts.
+    # usable width = human-CONFIRMED lay width — marker plan prefills from
+    # here, kabhi nominal width_inch pe blind trust nahi (legacy Marker law)
+    usable_width_mm = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Human-confirmed usable lay width (mm) for marker planning.')
+    STRETCH_CHOICES = [('none', 'No stretch'), ('two_way', '2-way'),
+                       ('four_way', '4-way')]
+    stretch_class = models.CharField(max_length=10, choices=STRETCH_CHOICES,
+                                     null=True, blank=True)
+    # one-way nap/print ⇒ pieces flip nahi kar sakte (180°) is fabric pe
+    is_one_way_nap = models.BooleanField(default=False)
+    selvedge_note = models.CharField(max_length=120, blank=True)
     # Role-gated fields — form pop kar deta hai non-finance users ke liye (defence in depth)
     supplier = models.CharField(max_length=200, blank=True)
     # ADR-0009 §5: PURCHASE price — ek FACT (corrections only), market/replacement

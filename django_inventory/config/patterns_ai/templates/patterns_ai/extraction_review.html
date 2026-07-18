@@ -1,0 +1,92 @@
+{% extends "accounts/base.html" %}
+{# P2 — the annotator: photo vs proposal, gate verdict, component confidence, HUMAN decision #}
+{% block page_title %}Review extraction #{{ x.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-review .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:760px){ .pai-review .duo { grid-template-columns:1fr; } }
+  .pai-review .pane { background:#fff; border:var(--border-card, 1px solid #e5e0d5);
+    border-radius:12px; padding:14px; }
+  .pai-review .pane img, .pai-review .pane svg { width:100%; height:auto; }
+  .pai-review .gate-fail { background:#fbe9e7; border:1px solid #eac4bd;
+    border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .pai-review .gate-pass { background:#e8f4ec; border:1px solid #bfe0cb;
+    border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .pai-review .conf { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
+  .pai-review .conf .c { background:#f4f1e8; border-radius:10px; padding:6px 10px; font-size:13px; }
+  .pai-review .decide { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-review">
+  <div class="page-header">
+    <h1>Extraction #{{ x.pk }} · {{ piece.pattern.name }} · {{ x.size.label }}</h1>
+    <p class="subtitle">{{ piece.product.code }} · backend {{ x.backend }} ·
+      pipeline {{ x.pipeline_version }} · status {{ x.get_status_display }}.
+      Confidence is display-only — nothing auto-accepts.</p>
+  </div>
+
+  {% if x.gate.passed %}
+    <div class="gate-pass"><strong>Quality gate: PASSED.</strong>
+      {{ x.result.metrics.corners_found }}/{{ x.result.metrics.corners_total }} corners ·
+      residual p95 {{ x.result.metrics.residual_p95_mm }} mm ·
+      tilt {{ x.result.metrics.tilt_metric }}</div>
+  {% else %}
+    <div class="gate-fail"><strong>Quality gate: REFUSED (recorded).</strong>
+      <ul>{% for r in x.gate.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+      Retake the photo — this proposal cannot be accepted.</div>
+  {% endif %}
+
+  {% if x.confidence.components %}
+  <div class="conf">
+    <span class="c"><strong>{{ x.confidence.composite }}</strong>/100 (weakest component)</span>
+    {% for k, v in x.confidence.components.items %}
+      <span class="c">{{ k }}: {{ v }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="duo">
+    <div class="pane">
+      <h3>Photo (immutable original — rendition)</h3>
+      <img src="{% url 'patterns_ai:capture-thumb' capture.pk %}" alt="capture rendition">
+      <p class="muted">capture #{{ capture.pk }} · mat {{ capture.mat.mat_code }} ·
+        sha {{ capture.sha256|slice:":12" }}…</p>
+    </div>
+    <div class="pane">
+      <h3>Proposed geometry (derived, mm-true)</h3>
+      {% if svg %}{{ svg|safe }}
+        <p class="muted">{{ x.result.segmentation.vertices }} vertices ·
+          {{ x.result.segmentation.mask_area_mm2 }} mm² ·
+          chord tolerance {{ x.params.chord_tolerance_um }} µm</p>
+      {% else %}<p class="muted">No geometry — the gate refused this capture.</p>{% endif %}
+    </div>
+  </div>
+
+  {% if x.status == 'proposed' %}
+  <div class="decide">
+    {% if x.gate.passed %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="action" value="accept">
+      <button type="submit" class="btn btn-primary">Accept into draft</button>
+    </form>
+    {% endif %}
+    <form method="post"
+          onsubmit="return this.reason.value.trim() !== '' || (alert('reason required'), false);"
+          style="display:flex; gap:8px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject">
+      <input type="text" name="reason" placeholder="reject reason (mandatory)" maxlength="200">
+      <button type="submit" class="btn btn-danger">Reject</button>
+    </form>
+    <a class="btn" href="{% url 'patterns_ai:pattern-capture' piece.pk %}">Retake photo</a>
+  </div>
+  {% else %}
+    <p class="muted">Decision recorded: {{ x.get_status_display }}
+      {% if x.status_reason %}— {{ x.status_reason }}{% endif %}
+      by {{ x.reviewed_by.get_full_name|default:x.reviewed_by }} at
+      {{ x.reviewed_at|date:"Y-m-d H:i" }}. Review is one-shot.</p>
+  {% endif %}
+  <p style="margin-top:14px;"><a class="btn" href="{% url 'patterns_ai:piece-detail' piece.pk %}">← Piece</a></p>
+</div>
+{% endblock %}

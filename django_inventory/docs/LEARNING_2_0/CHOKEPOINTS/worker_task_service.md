@@ -1,4 +1,31 @@
+---
+id: l2-chokepoints-worker-task-service
+type: chokepoint
+status: active
+owner: handwritten
+scope: worker_task_service (chokepoint)
+anchors: config/production/services/worker_task_service.py
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
+**PRE-PHASE-3 (2026-07-06, owner-approved, gate 885):** (A) `damaged_quantity` = 4th
+immutable observation on WSC (scrap, beyond repair) — pays nothing, never enters the
+downstream pool, counts as CAPACITY in every bound/void sum (constraint now
+`wsc_gamd_nonneg_sum_positive`; a good=0 line is legal when an observation is positive).
+(B) `machine_code` CharField snapshot stamped by `report_contributions` from the worker's
+open MachineAssignment of the stage's machine type (`_resolve_machine_code`; '' when
+manual/unresolved — string not FK: layering stays machines→production only). (C)
+`WorkerStageTask.first_report_at` = passive worker-time stamp at first draft/report
+(started_at is stage-time parity, NOT worker time). (D) `void_submitted_report(task,
+actor, reason)` — manager-only, mandatory reason, refused after stage-complete (pool
+frozen — reopen first) or on settled lines (money armor); sets the COMPLETED task to
+CANCELLED (its WSC rows stay as inert history — every truth surface reads
+completed/verified tasks only), creates a fresh active task via `add_stage_worker`, and
+writes AddaHistory `REPORT_VOIDED` with the full line snapshot. **THE audited path for
+upward corrections — verification (H-1) only ever confirms/reduces.**
+
+
 Sole writer of production truth (WST + WSC). Manager assigns (set_stage_workers,
 roster full-replace, cancel-not-delete) → worker reports (report_contributions)
 → submit freezes expected_* (complete_worker_task) → management can correct
@@ -34,7 +61,7 @@ expected_*, refuses once actively settled, and writes an append-only
 `RateCorrectionAudit`. Full lock order: task → AddaStageRoleRate → WorkerStageContribution
 (disjoint from the settlement lock domain — no deadlock).
 **S4/Phase 4:** `complete` calls `pool_service.check_allocation_bound(task)` BEFORE any freeze
-(refused → freezes nothing) — Strict bound `Σ(good+alter+missing) ≤ Σ active allocated` per
+(refused → freezes nothing) — Strict bound `Σ(good+alter+missing+damaged) ≤ Σ active allocated` per
 reported dim on pool-participant stages, gated by `ENFORCE_ALLOCATION_BOUND` (default False).
 Production-capacity only (no verified/settlement/rate/cost read).
 
@@ -55,7 +82,10 @@ final money boundary (a settled stage can't reopen).
 `select_for_update` on active tasks) · `report_contributions` · `complete_worker_task`
 (freezes expected_*; **locks the task row + re-checks DB status — race-safe vs a
 concurrent stage-complete cancel, P0-5**) · `set_verified_quantity` (settled lines
-REFUSE → reverse first) · `resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
+REFUSE → reverse first; **R6/F6 2026-07-05: every real change emits a DB-resident
+`VERIFIED_QTY_CORRECTED` AddaHistory event via log_adda — who/old/new/worker/
+stage/reported, clear logs new=None, no-ops log nothing; same atomic txn**) ·
+`resolve_stage_tasks_on_complete` (F3 auto-cancel unreported).
 
 **PA-10-2 (completed-task protection):** `set_stage_workers`' cancel loop NEVER cancels a
 COMPLETED/VERIFIED task. `complete_worker_task` does not stamp `stage_record.completed_at`,
@@ -110,6 +140,13 @@ Source: `config/production/services/worker_task_service.py`. Two real paths:
 @transaction.atomic WSC.select_for_update(of=('self',)) lock (of=self: nullable settlement_line join)
  refuse if task not completed/verified; refuse if settled line (reverse first) c.save(verified_quantity) UPDATE — reported untouched
 ```
+**H-1 ceilings (owner-approved 2026-07-06) — verification REDUCES or CONFIRMS, never
+CREATES (flag-independent; this is a post-complete money path `ENFORCE_ALLOCATION_BOUND`
+never sees):** (1) `verified ≤ good_quantity` always; (2) on a pool stage where the worker
+holds an allocation for the dim, `verified + Σ(other lines' verified-else-good on the dim)
+≤ Σ active allocated`. If `allocated == 0` (stage ran un-split during the rollout phase),
+only ceiling (1) applies — otherwise verification would be unusable exactly where
+corrections are needed. Downstream pool + settlement both read this verified number.
 
 **Models touched:** WorkerStageTask, WorkerStageContribution. **Tx boundary:**
 each public fn is atomic (set_stage_workers requires the caller's atomic — see call contract). **Before→after:** assign → WST(assigned); report →

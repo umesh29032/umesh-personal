@@ -1,3 +1,13 @@
+---
+id: l2-apps-storefront-app-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: storefront
+anchors: config/storefront/
+verified: 2026-07-13
+---
+
 # storefront — business flows (APP_FLOW)
 
 ## TL;DR (1 min)

@@ -1,3 +1,13 @@
+---
+id: l2-apps-expense-app-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: expense
+anchors: config/expense/
+verified: 2026-07-13
+---
+
 # expense — business flows (APP_FLOW)
 
 ## TL;DR (1 min)

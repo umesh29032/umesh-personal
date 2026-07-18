@@ -69,7 +69,7 @@ class UserDashboardHelperTests(TestCase):
     def test_non_helper_user_has_no_helper_data(self):
         karigar = _make_user('k@dash.test', role_code='worker')
         self.client.force_login(karigar)
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         self.assertEqual(resp.status_code, 200)
         self.assertIsNone(resp.context.get('helper_data'))
 
@@ -77,17 +77,23 @@ class UserDashboardHelperTests(TestCase):
         helper = _make_user('h@dash.test', role_code='worker',
                             skill_names=['cutting_master_helper'])
         self.client.force_login(helper)
-        # Spin up an active layering elsewhere — helper not assigned, but should still see it.
-        _start_layering_on_new_adda(self.admin)  # returns (adda, sr, entry) — unused
+        # C-2 (freeze closeout): the board is access-gated AND assignment-
+        # scoped for non-management — an UNASSIGNED helper sees the board
+        # section but ZERO rows (was: every active layering factory-wide).
+        adda, sr, _entry = _start_layering_on_new_adda(self.admin)
 
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         self.assertEqual(resp.status_code, 200)
         data = resp.context['helper_data']
         self.assertIsNotNone(data)
-        # Spec: helper sees ALL active Layering, even if not assigned to this one.
-        self.assertEqual(len(data['active_layering']), 1)
-        self.assertEqual(data['active_assigned_count'], 0)
+        self.assertEqual(len(data['active_layering']), 0)
         self.assertEqual(data['completed_count'], 0)
+        # Assign them → the row appears (manager assignment = the only source).
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, [helper.pk])
+        data2 = self.client.get(reverse('inventory:my_dashboard')).context['helper_data']
+        self.assertEqual(len(data2['active_layering']), 1)
+        self.assertEqual(data2['active_assigned_count'], 1)
 
     def test_helper_stats_update_after_completion(self):
         helper = _make_user('h2@dash.test', role_code='worker',
@@ -106,7 +112,7 @@ class UserDashboardHelperTests(TestCase):
             notes='', user=helper,
         )
         self.client.force_login(helper)
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         data = resp.context['helper_data']
         self.assertEqual(data['completed_count'], 1)
         self.assertEqual(data['total_layers'], 4)
@@ -192,3 +198,83 @@ class RoleDeleteGuardTests(TestCase):
         role = Role.objects.create(name='Disposable', code='disposable')
         self._delete(role)
         self.assertFalse(Role.objects.filter(pk=role.pk).exists())
+
+
+class RolePermissionCurationTests(TestCase):
+    """OWN-D carry-in fix (2026-07-13): the RoleForm.permissions field queryset
+    is the form's VALIDATION gate — only pks in it can be POSTed. It must equal
+    the CURATED editor allowlist (ROLE_EDITOR_SECTIONS content types), not the
+    whole app (ROLE_EDITABLE_APPS). The app-level filter let a hand-crafted POST
+    persist a grant on a service-only model the editor never renders (e.g.
+    production.change_machinetype), and live view gates (user_has_perm) honored it."""
+
+    def setUp(self):
+        self.admin = _make_user('rpc-admin@t.com', role_code='super_admin', is_super=True)
+        self.client.force_login(self.admin)
+
+    def test_queryset_equals_curated_allowlist(self):
+        from django.contrib.auth.models import Permission
+        from accounts.services.permission_service import permissions_qs_by_app
+        from inventory.forms import RoleForm
+        offered = set(RoleForm().fields['permissions'].queryset.values_list('pk', flat=True))
+        curated = {p.pk for p in permissions_qs_by_app()}
+        self.assertEqual(offered, curated)
+        # an in-app-but-non-curated perm (service-only model) must NOT be offered
+        mt = Permission.objects.get(content_type__app_label='production', codename='change_machinetype')
+        self.assertNotIn(mt.pk, offered)
+
+    def test_handcrafted_noncurated_perm_rejected(self):
+        from django.contrib.auth.models import Permission
+        role = Role.objects.create(name='Carry In', code='carry_in')
+        view_stage = Permission.objects.get(content_type__app_label='production', codename='view_stage')
+        mt = Permission.objects.get(content_type__app_label='production', codename='change_machinetype')
+        resp = self.client.post(reverse('inventory:role_edit', args=[role.pk]), {
+            'name': role.name, 'code': role.code, 'description': '',
+            'permissions': [view_stage.pk, mt.pk],  # mt is offered by app but not curated
+        })
+        self.assertEqual(resp.status_code, 200)  # form re-renders with an error
+        self.assertIn('permissions', resp.context['form'].errors)
+        self.assertFalse(role.permissions.filter(pk=mt.pk).exists())  # nothing persisted
+
+
+class SidebarAccessSaveTests(TestCase):
+    """RCP-1A F1: the sidebar-access save is SERVICE-owned (Law 4 — the view only
+    parses POST into primitives). Behaviour preserved: checkbox lists update the
+    M2Ms, super_admin is NEVER persisted even if posted, an un-posted rule clears."""
+
+    def setUp(self):
+        self.admin = _make_user('sb-admin@test.test', role_code='super_admin', is_super=True)
+        self.manager = _make_user('sb-mgr@test.test', role_code='manager')
+        from accounts.models import SidebarItemRule
+        self.rule = SidebarItemRule.objects.create(
+            url_name='inventory:my_dashboard', section='Main', label='Dashboard')
+
+    def test_post_updates_roles_and_excludes_super_admin(self):
+        from accounts.models import SidebarItemRule
+        sa_role = Role.objects.get(code='super_admin')
+        mgr_role = Role.objects.get(code='manager')
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse('inventory:sidebar-access'), {
+            f'roles_{self.rule.id}': [str(mgr_role.id), str(sa_role.id)],
+        })
+        self.assertEqual(resp.status_code, 302)
+        rule = SidebarItemRule.objects.get(pk=self.rule.pk)
+        codes = set(rule.allowed_roles.values_list('code', flat=True))
+        self.assertEqual(codes, {'manager'})  # SA posted but excluded at write
+
+    def test_unposted_rule_is_cleared(self):
+        from accounts.models import SidebarItemRule
+        self.rule.allowed_roles.set([Role.objects.get(code='manager')])
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse('inventory:sidebar-access'), {})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            SidebarItemRule.objects.get(pk=self.rule.pk).allowed_roles.count(), 0)
+
+    def test_service_is_the_writer(self):
+        # Law-4 pin: the view module performs no M2M writes itself.
+        import inspect
+        from inventory.views import sidebar_access_views as v
+        src = inspect.getsource(v.SidebarAccessListView.post)
+        self.assertIn('save_sidebar_rules', src)
+        self.assertNotIn('.set(', src)

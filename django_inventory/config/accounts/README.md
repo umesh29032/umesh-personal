@@ -1,3 +1,13 @@
+---
+id: config-accounts-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: accounts
+anchors: config/accounts/
+verified: 2026-07-18
+---
+
 # accounts app — Developer Guide
 
 Internal auth + user-management app for Kapil Enterprises Inventory ERP.
@@ -49,7 +59,7 @@ config/accounts/
 ├── urls.py             # URL patterns (app_name = "accounts")
 ├── utils.py            # OTP generation, hashing, session helpers, email send
 ├── throttle.py         # Cache-backed rate limiter (no external deps)
-├── allauth_adapters.py # Restricts Google sign-in to pre-provisioned users only
+├── allauth_adapters.py # Pre-provisioned-only gate: Google sign-in (social) + /accounts/signup/ closed (S2 fix 2026-07-12)
 ├── decorators.py       # login_required_view (function-view decorator)
 ├── admin.py            # Django admin registration for User + Skill
 ├── apps.py             # AppConfig
@@ -139,6 +149,18 @@ created by a Super Admin (`/app/users/add/`) or by a pre-provisioned Google
 address linking on first OAuth. The `SignupView/SignupVerifyView/SignupForm`
 classes remain (unrouted) so signup can be re-enabled deliberately if
 invite/allowlist onboarding is ever scoped — restore the routes + imports.
+
+**S2 fix (worker-cert Phase H, 2026-07-12): the allauth half is closed too.**
+PA-02 only removed the native routes; the allauth mount at `/accounts/`
+(needed for Google OAuth) still exposed `account_signup` with allauth's
+default adapter — an anonymous email+password POST to `/accounts/signup/`
+created a live, active User (proven in browser, H2B). Fixed by
+`RestrictedAccountAdapter.is_open_for_signup() → False`
+(`allauth_adapters.py`, wired via `ACCOUNT_ADAPTER` in settings/base.py):
+GET **and** POST now render allauth's "Sign Up Closed" page, no form is ever
+processed. Pins: `SignupDisabledTests.test_allauth_signup_*` +
+`AllauthAdapterTests` (both adapters closed; Google pre-provisioned
+auto-link + stranger refusal).
 
 The (now-unrouted) flow is kept below for reference:
 Two-step: fill form → verify email OTP → account created.

@@ -1,0 +1,80 @@
+{% extends "accounts/base.html" %}
+{# P2 — piece hub: versions timeline + capture entry + extraction history #}
+{% block page_title %}{{ piece.pattern.name }} · {{ piece.product.code }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-piece .panel { margin-bottom:18px; }
+  .pai-piece .vbadge { padding:2px 8px; border-radius:10px; font-size:12px; }
+  .pai-piece .v-confirmed { background:#d9efe1; color:#20603c; }
+  .pai-piece .v-draft { background:#fdf3d8; color:#7a5c10; }
+  .pai-piece .v-superseded, .pai-piece .v-rejected { background:#eee; color:#666; }
+  .pai-piece .actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 14px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-piece">
+  <div class="page-header">
+    <h1>{{ piece.pattern.name }}</h1>
+    <p class="subtitle">{{ piece.product.code }} · {{ piece.get_fabric_group_display }}
+      {% if piece.is_pair %} · mirrored pair{% endif %}
+      {% if piece.on_fold %} · on fold{% endif %}</p>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'patterns_ai:piece-list' %}?product={{ piece.product.pk }}">← Library</a>
+    <span style="flex:1;"></span>
+    <a class="btn" href="{% url 'patterns_ai:dxf-import' piece.pk %}">Import DXF</a>
+    <form method="post" action="{% url 'patterns_ai:version-next' piece.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn">New version (copy-forward)</button>
+    </form>
+    <a class="btn btn-primary" href="{% url 'patterns_ai:pattern-capture' piece.pk %}">📷 Capture</a>
+  </div>
+
+  <div class="card panel" style="padding:20px;">
+    <h2>Versions</h2>
+    {% if versions %}
+    <div class="table-responsive"><table>
+      <thead><tr><th>v</th><th>Status</th><th>Sizes</th><th>Confirmed</th><th></th></tr></thead>
+      <tbody>
+      {% for v in versions %}
+        <tr>
+          <td data-label="v"><strong>v{{ v.version_no }}</strong>
+            {% if v.set_label %}<div class="muted">{{ v.set_label.code }}</div>{% endif %}</td>
+          <td data-label="Status"><span class="vbadge v-{{ v.status }}">{{ v.get_status_display }}</span>
+            {% if v.status_reason %}<div class="muted">{{ v.status_reason }}</div>{% endif %}</td>
+          <td data-label="Sizes">
+            {% for g in v.size_geometries.all %}{{ g.size.code }}{% if not forloop.last %} · {% endif %}{% empty %}—{% endfor %}</td>
+          <td data-label="Confirmed">{% if v.confirmed_at %}{{ v.confirmed_by.get_full_name|default:v.confirmed_by }} · {{ v.confirmed_at|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+          <td data-label=""><a class="btn" href="{% url 'patterns_ai:version-detail' v.pk %}">open →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}
+    <p class="muted">No versions yet — capture the first size or import a DXF;
+    a draft version appears automatically.</p>
+    {% endif %}
+  </div>
+
+  <div class="card panel" style="padding:20px;">
+    <h2>Recent extractions (append-only)</h2>
+    {% if extractions %}
+    <div class="table-responsive"><table>
+      <thead><tr><th>#</th><th>Size</th><th>Gate</th><th>Confidence</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for e in extractions %}
+        <tr>
+          <td data-label="#">{{ e.pk }}</td>
+          <td data-label="Size">{{ e.size.code }}</td>
+          <td data-label="Gate">{% if e.gate.passed %}PASS{% else %}REFUSED{% endif %}</td>
+          <td data-label="Confidence">{{ e.confidence.composite|default:"—" }}</td>
+          <td data-label="Status">{{ e.get_status_display }}</td>
+          <td data-label=""><a class="btn" href="{% url 'patterns_ai:extraction-review' e.pk %}">review →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="muted">No extractions yet.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

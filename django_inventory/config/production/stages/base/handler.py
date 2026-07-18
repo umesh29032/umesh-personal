@@ -87,6 +87,24 @@ class StageHandler(ABC):
         """Lightweight, request-free stage state (drives the Adda overview tiles +
         embedded mini-panels). Mirrors the service get_*_snapshot."""
 
+    def admin_snapshot(self, adda):
+        """R8 (owner spec 2026-07-05) — the GENERIC stage-snapshot architecture.
+
+        A management-only, READ-ONLY reference view of this stage's output,
+        automatically shown on the NEXT stage's panel (StagePanelView injects
+        the nearest previous stage's admin_snapshot) and reusable by Adda-360.
+        LIVE reads of existing business data ONLY — never a frozen copy, never
+        a new table (owner constraint).
+
+        Default None = stage exposes nothing. Future stages (bundling, sewing,
+        checking, packing, …) just override — zero view/template work; the ONE
+        shared partial `production/_stage_admin_snapshot.html` renders the shape:
+
+            {'title': str,
+             'sections': [{'label': str, 'rows': [(name, value), …]}, …]}
+        """
+        return None
+
     @abstractmethod
     def panel_context(self, request, adda, record) -> dict:
         """Full render context for the stage's standalone/embedded panel
@@ -122,9 +140,14 @@ class StageHandler(ABC):
         no quantity is available (unpriced) — NOT 0, so processing_cost stays NULL
         (NULL = unpriced; 0.00 = priced-zero / grouped). See cost_service."""
 
-    def contribution_schema(self, adda) -> dict:
+    def contribution_schema(self, adda, worker=None) -> dict:
         """Declare the fields a WORKER reports for this stage's contribution lines —
         the open-closed seam that keeps the worker report form stage-agnostic.
+
+        `worker` (OP-1, optional): the reporting worker, so a pool-participant
+        stage can scope its choice options to THAT worker's allocated dimensions
+        (blind reporting — labels only, never pool quantities). None = unscoped
+        (rollup/summary callers). Handlers that ignore it stay valid.
 
         Default = a single quantity. A stage OVERRIDES to add dimensions/measures
         (Cutting adds colour + size). The report view + template render + parse
@@ -151,6 +174,15 @@ class StageHandler(ABC):
             ],
         }
 
+    def checklist_submit(self, *, task, checked_ids, photos, actor, action):
+        """R8 (spec §3): the CHECKLIST report path — only meaningful for stages
+        whose contribution_schema sets `mode='checklist'` (Pattern Design).
+        The worker report view dispatches here instead of the line parser; the
+        handler syncs its stage's verification truth and reports through the
+        SAME C-TM chokepoint. Default: refuse (stage has no checklist)."""
+        from django.core.exceptions import ValidationError
+        raise ValidationError("This stage does not use a checklist report.")
+
     # ── Piece-pool source (S4 / D2-D3, Option B) — handler-dispatched, no stage-name
     # conditionals in the allocation services. Cutting OVERRIDES both (its pool source
     # is AddaProductSizeColorPieceBreakdown, never duplicated into StagePoolSnapshot).
@@ -167,10 +199,16 @@ class StageHandler(ABC):
 
     def materialize_pool(self, stage_record) -> int:
         """Write-once freeze of this stage's pool good into StagePoolSnapshot = Σ
-        WorkerStageContribution.good_quantity at the stage's grain. Only for non-NONE
-        grain; idempotent (skips if already materialised). Cutting overrides to a no-op
-        (APSCPB is its snapshot). Returns rows written. Caller is atomic."""
+        verified-else-good per WorkerStageContribution at the stage's grain (owner
+        decision 2026-07-06: verification is the final business truth — downstream
+        operations consume the manager-corrected number, same resolver rule as
+        settlement). Only for non-NONE grain; idempotent (skips if already
+        materialised). Cutting overrides to a no-op (APSCPB is its snapshot).
+        Returns rows written. Caller is atomic."""
+        # Coalesce = SQL-level verified-else-good, mirroring settlement_resolver
+        # without importing money code into the pool (concerns stay independent).
         from django.db.models import Sum
+        from django.db.models.functions import Coalesce
 
         from production.constants import ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE
         from production.models import (
@@ -184,13 +222,14 @@ class StageHandler(ABC):
         done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
         qs = WorkerStageContribution.objects.filter(
             task__stage_record=stage_record, task__status__in=done)
+        effective = Coalesce('verified_quantity', 'good_quantity')
         if dim == ALLOC_DIM_COLOR_SIZE:
-            grouped = qs.values('color_id', 'size_id').annotate(g=Sum('good_quantity'))
+            grouped = qs.values('color_id', 'size_id').annotate(g=Sum(effective))
             rows = [StagePoolSnapshot(stage_record=stage_record, color_id=r['color_id'],
                                       size_id=r['size_id'], good=r['g']) for r in grouped]
         else:   # QUANTITY (scalar; dims NULL)
             from decimal import Decimal
-            total = qs.aggregate(g=Sum('good_quantity'))['g'] or Decimal('0')
+            total = qs.aggregate(g=Sum(effective))['g'] or Decimal('0')
             rows = [StagePoolSnapshot(stage_record=stage_record, color=None, size=None, good=total)]
         StagePoolSnapshot.objects.bulk_create(rows)
         return len(rows)

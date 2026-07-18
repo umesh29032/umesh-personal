@@ -9,7 +9,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 2
 PY=env/bin
 SETTINGS=config.settings.local
-APPS="accounts core raw_materials production tracking expense storefront inventory"
+APPS="accounts core raw_materials production tracking expense storefront inventory machines"
 COVERAGE_FLOOR=65          # baseline 67% (2026-06-09); ratchet up as coverage grows
 fail=0
 
@@ -73,9 +73,18 @@ fi
 #   the two services), or (b) gate 4c is upgraded to model-aware matching
 #   (e.g. match `StageWorkAssignment` within N lines of `.voided_at =`) —
 #   the better long-term fix, which makes this exclusion obsolete.
+# ── expense_service.py exclusion (R5, 2026-07-05) ────────────────────────────
+# WHY CORRECT: its only `.voided_at =` match voids `FactoryExpense` (R5,
+#   PDD §21 append-only cost record) — NOT StageWorkAssignment. expense_service
+#   is FactoryExpense's designed sole writer (create/void, no edit).
+# WHY SAFE: ADR-0011 locks expense_service as ledger/settlement/costing-free —
+#   it imports no SWA/ledger model; a test pins zero ledger interaction
+#   (test_adr_0011_zero_ledger_interaction). An SWA write appearing there
+#   would violate ADR-0011 before it violated this gate.
+# REVISIT WHEN: same (a)/(b) as pool_service above.
 echo "[4c/4] StageWorkAssignment two-writer (V2-3: writes only in allocation_service + adda_settlement_service)"
 strays3=$(grep -rn "StageWorkAssignment.objects.create(\|\.voided_at = " config --include=*.py \
-  | grep -vE "allocation_service\.py|adda_settlement_service\.py|pool_service\.py" | grep -vE "/tests/|/migrations/")
+  | grep -vE "allocation_service\.py|adda_settlement_service\.py|pool_service\.py|expense_service\.py" | grep -vE "/tests/|/migrations/")
 if [ -z "$strays3" ]; then
   echo "  ✓ allocation_service + adda_settlement_service are the sole SWA writers"
 else

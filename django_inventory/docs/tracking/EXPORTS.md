@@ -1,12 +1,48 @@
+---
+id: tracking-exports
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Barcode Exports
 
-Shipped: PR-D, 2026-05-29.
+Shipped: PR-D, 2026-05-29. Permissions tightened: V1.1 Item 3, 2026-07-12.
+
+---
+
+## Permissions (V1.1 Item 3, 2026-07-12)
+
+Exports are **MANAGEMENT_ROLES only** (super_admin / manager) — ONE
+permission source, enforced at BOTH layers:
+
+- **Views** — every export view (list, csv, xlsx, pdf, re-download in
+  `inventory/views/tracking_exports.py` + legacy quick-CSV
+  `barcode_export_csv` in `tracking_dashboard.py`) gates via
+  `ManagerOrAdminMixin` / `MANAGEMENT_ROLES` → workers get **403**.
+- **Service backstop** — `export_service._ensure_management_role(user)`
+  runs first in `generate_csv` / `generate_xlsx` / `generate_pdf_summary` /
+  `regenerate_for_export(batch, user)` and raises `PermissionDenied`
+  (defense-in-depth for any future caller).
+- **Templates** — export buttons/links hidden for non-management
+  (`is_management` flag): `barcode_list.html`, `barcode_dashboard.html`,
+  `_stage_panel_barcode_gen.html` Section 06.
+
+Barcode **list / print / scan stay PRODUCTION_ROLES** — workers legitimately
+scan; they just never export production data.
+
+Why: browser-proven HIGH — a worker could `GET /tracking/exports/` (200) and
+`POST .../csv/` (200 + real CSV). Root cause: gates mirrored `barcode_list`'s
+PRODUCTION_ROLES, which includes workers.
 
 ---
 
 ## Purpose
 
-After Barcode Generation stage completes, Cutting Master (or Super Admin)
+After Barcode Generation stage completes, management (Manager / Super Admin)
 generates exportable files for:
 
 - **Vendor label printing** — CSV / XLSX rows that vendor's printer software consumes
@@ -85,7 +121,8 @@ PDF is **NOT per-piece**. PDF renders the manifest:
 
 ## Gate Rules
 
-Export refused if:
+Role gate first: non-management caller → `PermissionDenied` (HTTP 403).
+Then export refused if:
 
 1. Adda's product workflow has no `barcode_generation` stage
 2. Stage record missing (never started)
@@ -108,8 +145,9 @@ GET   /tracking/exports/<export_code>/download/  export-download (re-download)
 ```
 
 Legacy `/tracking/barcodes/<adda_code>/export/` still works as a quick CSV
-download (no manifest row). Useful pre-completion for diagnostics. The new
-manifest-tracked path is preferred for production exports.
+download (no manifest row) — **also management-only** (V1.1 Item 3). Useful
+pre-completion for diagnostics. The new manifest-tracked path is preferred
+for production exports.
 
 ---
 
@@ -136,8 +174,8 @@ Index: `(adda, -created_at)` + `(-created_at)` for global list.
 
 | File | Role |
 |------|------|
-| `config/tracking/services/barcode_export_service.py` | CSV / XLSX / PDF renderers + manifest write + sequencer |
-| `config/tracking/views/export_views.py` | 5 views (3 triggers + redownload + list) |
+| `config/production/stages/barcode_generation/export_service.py` | CSV / XLSX / PDF renderers + manifest write + sequencer + management-role backstop (moved P4.2 2026-06-11) |
+| `config/inventory/views/tracking_exports.py` | 5 views (3 triggers + redownload + list), `ManagerOrAdminMixin` (moved P4.2 2026-06-11) |
 | `config/tracking/templates/tracking/export_list.html` | Global recent exports table |
 | `config/production/templates/production/_stage_panel_barcode_gen.html` | Section 06 — export buttons inside stage panel |
 

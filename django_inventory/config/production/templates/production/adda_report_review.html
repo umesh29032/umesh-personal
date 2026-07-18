@@ -47,6 +47,10 @@
                         <input type="number" inputmode="decimal" step="0.01" min="0" name="verified_{{ c.pk }}"
                                value="{{ c.verified_quantity|default_if_none:'' }}" placeholder="—">
                     </label>
+                    {# Pre-Phase-3 D: verification never INCREASES — a too-low submit is fixed by voiding the report (audited) so the worker re-reports #}
+                    <button type="button" class="btn btn-ghost" style="font-size:11px;padding:4px 8px;"
+                            data-void-task="{{ c.task_id }}"
+                            data-void-worker="{{ c.task.worker.get_full_name|default:c.task.worker.email }}">Void report…</button>
                 {% endif %}
             </div>
             {% empty %}
@@ -59,5 +63,25 @@
             {% if rows %}<button type="submit" class="btn btn-copper btn-lg">Save corrections</button>{% endif %}
         </div>
     </form>
+
+    {# Pre-Phase-3 D: separate one-action form — void a whole submitted report (audited, reason mandatory). #}
+    <form method="post" id="void-form" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="void_report">
+        <input type="hidden" name="task_id" id="void-task-id">
+        <input type="hidden" name="reason" id="void-reason">
+    </form>
+    <script>
+    document.querySelectorAll('[data-void-task]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var reason = prompt('Void ' + btn.dataset.voidWorker + "'s submitted report?\n\nThe worker will re-enter their numbers. Reason (required):");
+            if (reason === null) return;
+            if (!reason.trim()) { alert('A reason is required.'); return; }
+            document.getElementById('void-task-id').value = btn.dataset.voidTask;
+            document.getElementById('void-reason').value = reason.trim();
+            document.getElementById('void-form').submit();
+        });
+    });
+    </script>
 </div>
 {% endblock %}

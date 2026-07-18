@@ -10,7 +10,7 @@
 
     /* Hero — Adda code + status + product line */
     .adda-detail .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position: relative; overflow: hidden;
@@ -60,6 +60,8 @@
     .adda-detail .mw-lines li { padding: 2px 0; }
     .adda-detail .mw-total { font-size: 13px; font-weight: 700; border-top: 1px dashed #e2dbcd; padding-top: 8px; }
     .adda-detail .mw-empty { font-size: 13px; color: #8a8071; font-style: italic; }
+    .adda-detail .mw-checked { font-size: 12px; color: #20603c; white-space: nowrap; }
+    .adda-detail .mw-checked-diff { color: #a5702a; font-weight: 700; }
     .adda-detail .my-work-footer { margin-top: 12px; font-size: 14px; }
     @media (max-width: 600px) {
         .adda-detail .my-work-grid { grid-template-columns: 1fr; }  /* stack cards on phones */
@@ -84,6 +86,14 @@
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 10px;
     }
+    .adda-detail .so-cat { border: 1px solid var(--border-subtle); border-radius: 12px;
+        margin-bottom: 10px; background: var(--cream); }
+    .adda-detail .so-cat > summary { list-style: none; cursor: pointer; display: flex;
+        justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px;
+        font-weight: 700; letter-spacing: 0.06em; font-size: 12px; color: var(--ink); }
+    .adda-detail .so-cat > summary::-webkit-details-marker { display: none; }
+    .adda-detail .so-cat-count { color: var(--stone); font-weight: 600; }
+    .adda-detail .so-cat .stages-overview-grid { padding: 0 12px 12px; }
     .adda-detail .so-tile {
         background: var(--cream); border: 1px solid var(--border-subtle);
         border-radius: 12px; padding: 12px 14px;
@@ -522,6 +532,9 @@
         </div>
     </div>
 
+    {# A360 (plan v2): per-Adda management overview — ctx is management-gated; renders nothing for workers #}
+    {% include 'production/_a360.html' %}
+
     {% comment %}
     R1 (PDD §27-D7): MY WORK — the viewing user's own tasks on THIS Adda.
     PRESENTATION-ONLY: display quantities + own expected earning; no submit,
@@ -531,7 +544,7 @@
     {% endcomment %}
     {% if my_tasks %}
     <div class="my-work">
-        <div class="my-work-title">My Work on this Adda</div>
+        <div class="my-work-title">My Work on this Adda{% if viewer_is_monthly %} <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span>{% endif %}</div>
         <div class="my-work-grid">
             {% for t in my_tasks %}
             <div class="my-work-card">
@@ -543,12 +556,15 @@
                 <ul class="mw-lines">
                     {% for c in t.contributions.all %}
                     <li>
-                        {% if c.color %}{{ c.color.name }} · {% endif %}{% if c.size %}{{ c.size.label }} · {% endif %}{{ c.good_quantity|floatformat:"-2" }} pcs
+                        {% if c.color %}{{ c.color.name }} · {% endif %}{% if c.size %}{{ c.size.label }} · {% endif %}{{ c.good_quantity|floatformat:"-2" }} {{ t.unit_label }}
+                        {# M10 transparency: verified_quantity = management check result (reported stays immutable) — worker must see WHY settlement pays a different count #}
+                        {% if c.verified_quantity != None %}{% if c.verified_quantity != c.good_quantity %}<span class="mw-checked mw-checked-diff">checked: {{ c.verified_quantity|floatformat:"-2" }} passed</span>{% else %}<span class="mw-checked">checked ✓</span>{% endif %}{% endif %}
                     </li>
                     {% endfor %}
                 </ul>
+                {# R4/P-4: monthly viewer → qty only, ₹ suppressed entirely (no ₹0.00) #}
                 <div class="mw-total">
-                    Qty {{ t.my_qty|floatformat:"-2" }}{% if t.my_expected > 0 %} · Expected ₹{{ t.my_expected }}{% endif %}
+                    Qty {{ t.my_qty|floatformat:"-2" }}{% if not viewer_is_monthly and t.my_expected > 0 %} · Expected ₹{{ t.my_expected }}{% endif %}
                 </div>
                 {% else %}
                 <div class="mw-empty">No lines reported yet</div>
@@ -556,7 +572,9 @@
             </div>
             {% endfor %}
         </div>
-        {% if my_expected_total > 0 %}
+        {% if viewer_is_monthly %}
+        <div class="my-work-footer">Work is tracked for records — salary is paid monthly, separately.</div>
+        {% elif my_expected_total > 0 %}
         <div class="my-work-footer">Total expected on this Adda: <strong>₹{{ my_expected_total }}</strong></div>
         {% endif %}
     </div>
@@ -575,45 +593,112 @@
       • in_progress → copper pulse + "Currently active"
       • pending → muted "Pending"
     {% endcomment %}
-    {% if is_management or has_layering_access %}
+    {# OP-1 L2 (blind rule, owner 2026-07-05): overview totals = factory numbers - #}
+    {# management ONLY. Workers navigate via the stage tabs (their assigned panels). #}
+    {% if is_management and show_lanes or is_management and can_add_lane %}
+    {# Streams redesign: PRE-PRODUCTION LANES — one card per fabric lane. #}
+    {# Single-lane products render NO cards (zero chrome law) — only the #}
+    {# management "＋ Add lane" entry (GAP-4: recuts on single-lane products #}
+    {# are the primary declared-lane use). #}
+    <div class="stages-overview lane-cards">
+        {% if show_lanes %}
+        <div class="stages-overview-title">Pre-production — cutting lanes</div>
+        {% endif %}
+        {% if show_lanes %}{% for c in lane_cards %}
+        {% if c.cancelled %}
+        {# GAP-4 / lifecycle §7: cancelled lanes render GREYED with their reason — never hidden. #}
+        <div class="lane-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px dashed var(--border-card);border-radius:10px;margin:6px 0;opacity:0.55;">
+            <strong style="min-width:130px;text-decoration:line-through;">{{ c.lane.label|title }}</strong>
+            <span style="font-size:11px;font-weight:700;color:var(--stone);text-transform:uppercase;">Cancelled</span>
+            <span style="font-size:11px;color:var(--stone);">({{ c.lane.cancel_reason }})</span>
+        </div>
+        {% else %}
+        <div class="lane-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border-card);border-radius:10px;margin:6px 0;">
+            <strong style="min-width:130px;">{% if c.blocking %}●{% else %}○{% endif %} {{ c.lane.label|title }}</strong>
+            {% for s in c.steps %}
+            <span style="font-size:12px;{% if s.state == 'done' %}color:#20603c;{% elif s.state == 'open' %}color:#a5702a;{% else %}color:var(--stone);{% endif %}">
+                {{ s.name }} {% if s.state == 'done' %}✓{% elif s.state == 'open' %}⏳{% else %}—{% endif %}
+            </span>{% if not forloop.last %}<span style="color:var(--stone);">·</span>{% endif %}
+            {% endfor %}
+            {% if c.lane.reason %}<span style="font-size:11px;color:var(--stone);">({{ c.lane.reason }})</span>{% endif %}
+            {% if c.can_cancel %}
+            <form method="post" action="{% url 'production:adda-cancel-lane' code=adda.code %}" style="margin:0;margin-left:auto;"
+                  onsubmit="var r=prompt('Reason for cancelling this empty lane?'); if(!r){return false;} this.reason.value=r; return true;">
+                {% csrf_token %}
+                <input type="hidden" name="stream" value="{{ c.lane.pk }}">
+                <input type="hidden" name="reason" value="">
+                <button type="submit" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;color:var(--danger);">Cancel lane</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}{% endif %}
+        {% if can_add_lane %}
+        <div style="margin-top:6px;">
+            <a href="{% url 'production:adda-add-lane' code=adda.code %}" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;">＋ Add lane</a>
+        </div>
+        {% endif %}
+        {% if not preproduction_joined %}
+        <div style="font-size:12px;color:var(--stone);margin-top:4px;">🔒 Bundling &amp; barcodes unlock when every blocking lane is cut.</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# GAP-5 GARMENT READINESS — DERIVE-ONLY (pool_service.garment_readiness): #}
+    {# cut truth × Blueprint per size; bottleneck component flagged; one-tap slip #}
+    {# bundles the complete unbundled sets. Management + post-join + multi-component. #}
+    {% if garment_readiness %}
+    <div class="stages-overview garment-readiness">
+        <div class="stages-overview-title">Garment readiness — {{ garment_readiness.total_sets }} complete set{{ garment_readiness.total_sets|pluralize }} of {{ garment_readiness.total_pieces }} cut pieces</div>
+        {% for row in garment_readiness.sizes %}
+        <div class="gr-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border-card);border-radius:10px;margin:6px 0;">
+            <strong style="min-width:64px;">Size {{ row.size.label }}</strong>
+            {% for c in row.components %}
+            <span style="font-size:12px;{% if c.is_min %}color:#a5702a;font-weight:700;{% else %}color:#20603c;{% endif %}">
+                {{ c.name }} {{ c.cut }}{% if c.need > 1 %}÷{{ c.need }}{% endif %}{% if c.is_min %} ▲{% endif %}
+            </span>{% if not forloop.last %}<span style="color:var(--stone);">·</span>{% endif %}
+            {% endfor %}
+            <span style="margin-left:auto;font-weight:700;{% if row.blocked %}color:#a33;{% endif %}">→ {{ row.sets }} set{{ row.sets|pluralize }}</span>
+            {% if row.unbundled_sets > 0 %}
+            <form method="post" action="{% url 'production:adda-bundle-sets' code=adda.code %}" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="size_id" value="{{ row.size.pk }}">
+                <button type="submit" class="btn btn-sm">Bundle {{ row.unbundled_sets }} set{{ row.unbundled_sets|pluralize }}</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if garment_readiness.leftovers %}
+        <div style="font-size:12px;color:var(--stone);margin-top:4px;">
+            Leftover pieces (waiting on the ▲ component):
+            {% for l in garment_readiness.leftovers %}{{ l.component }} {{ l.size }} +{{ l.count }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if is_management %}
     <div class="stages-overview">
         <div class="stages-overview-title">Stages Overview</div>
+        {% if overview_grouped %}
+        {# R10-B UI philosophy: category rollup — summary-first, collapsible; the active category opens. #}
+        {% for g in overview_groups %}
+        <details class="so-cat"{% if g.open %} open{% endif %}>
+            <summary class="so-cat-summary"><span>{{ g.label|upper }}</span>
+                <span class="so-cat-count">{{ g.done }} / {{ g.total }} complete</span></summary>
+            <div class="stages-overview-grid">
+            {% for so in g.items %}
+                {% include 'production/_so_tile.html' %}
+            {% endfor %}
+            </div>
+        </details>
+        {% endfor %}
+        {% else %}
         <div class="stages-overview-grid">
             {% for so in stages_overview %}
-            <div class="so-tile so-{{ so.state }}">
-                <div class="so-tile-head">
-                    <span class="so-tile-state">
-                        {% if so.state == 'completed' %}✓{% elif so.state == 'in_progress' %}▸{% else %}•{% endif %}
-                    </span>
-                    <span class="so-tile-label">{{ so.label }}</span>
-                </div>
-                {% if so.state == 'completed' %}
-                    {% if so.stage_type == 'layering' and so.snap.record %}
-                        <div class="so-tile-meta">
-                            <span>Lay count <strong>{{ so.snap.lay_count }}</strong></span>
-                            <span>Length <strong>{{ so.snap.layer_length }} m</strong></span>
-                            <span>Duration <strong>{{ so.snap.duration_min }} min</strong></span>
-                            <span>Rolls <strong>{{ so.snap.rolls_count }}</strong></span>
-                        </div>
-                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
-                    {% elif so.stage_type == 'cutting_pattern' and so.snap.record %}
-                        <div class="so-tile-meta">
-                            <span>Photos <strong>{{ so.snap.photo_count }}</strong></span>
-                            <span>Video <strong>{% if so.snap.record.video %}✓{% else %}—{% endif %}</strong></span>
-                        </div>
-                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
-                    {% else %}
-                        <div class="so-tile-meta"><span>Completed</span></div>
-                    {% endif %}
-                {% elif so.state == 'in_progress' %}
-                    <div class="so-tile-meta"><span>Currently active</span></div>
-                {% else %}
-                    <div class="so-tile-meta"><span style="color:var(--stone);">Pending</span></div>
-                {% endif %}
-                <button type="button" class="so-tile-jump" data-tab="{{ so.stage_type }}">Open tab →</button>
-            </div>
+            {% include 'production/_so_tile.html' %}
             {% endfor %}
         </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -691,7 +776,8 @@
         <section class="tabpane" id="tab-{{ s.stage_type }}"
                  role="tabpanel" aria-labelledby="btn-{{ s.stage_type }}"
                  {% if default_tab != s.stage_type %}hidden{% endif %}>
-            {% if s.has_access %}
+            {# C-2: iframe only when the panel gate would ADMIT (access ∩ assignment) — never render a workspace the viewer can't open #}
+            {% if s.can_open %}
                 <div class="tab-toolbar">
                     <a href="{% url 'production:stage-panel' adda.code s.stage_type %}" target="_blank" rel="noopener" class="open-new">
                         Open in new window ↗
@@ -710,8 +796,8 @@
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                         </svg>
                     </div>
-                    <h3>{{ s.get_stage_type_display }} — Restricted</h3>
-                    <p>You don't have the skill or role required to view this stage. Track progress via the pipeline above.</p>
+                    <h3>{{ s.get_stage_type_display }} — {% if s.has_access %}Not assigned{% else %}Restricted{% endif %}</h3>
+                    <p>{% if s.has_access %}You're not assigned to this stage on this Adda — ask your manager if you should be.{% else %}You don't have the skill or role required to view this stage.{% endif %} Track progress via the pipeline above.</p>
                 </div>
             {% endif %}
         </section>
@@ -760,6 +846,14 @@
     <div style="margin: 18px 0;">
         <a href="{% url 'production:adda-list' %}" class="btn btn-ghost">← Back to Addas</a>
         <a href="{% url 'tracking:adda-history' adda.code %}" class="btn btn-ghost">View Full History</a>
+        {% if is_management %}
+        {# P5 Pattern-Intelligence entry — LINKS ONLY (ADR-H: project-level url composition exactly like the expense:/tracking: links above; production python never imports patterns_ai). #}
+        <a href="{% url 'patterns_ai:advisor' %}?product={{ adda.product_id }}" class="btn btn-ghost">🧠 Cut Advisor</a>
+        <a href="{% url 'patterns_ai:yield-board' %}?product={{ adda.product_id }}" class="btn btn-ghost">Yield Board</a>
+        <a href="{% url 'patterns_ai:piece-list' %}?product={{ adda.product_id }}" class="btn btn-ghost">Pattern Library</a>
+        {# Phase 8B: the manufacturing contract chooser (rule 9 — library-only) #}
+        <a href="{% url 'patterns_ai:choose-layout' adda.pk %}" class="btn btn-ghost">★ Manufacturing Layouts</a>
+        {% endif %}
     </div>
 </div>
 

@@ -1,3 +1,13 @@
+---
+id: docs-adr-0008-commerce-manufacturing-boundary
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0008 — Commerce↔Manufacturing Boundary (future-safe ownership model)
 
 **Status: 🔒 ACCEPTED 2026-06-11 — owner locked all points incl. the MTS/MTO clause and gap registry G1-G7.** Seams-not-features (ADR

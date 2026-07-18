@@ -1,3 +1,13 @@
+---
+id: docs-buttons-audit-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # BUTTONS AUDIT REPORT
 
 > **Status:** Evidence/inventory — **DESIGN ONLY. NO CODE. NO CSS. NO token consumption. NO commits.**

@@ -1,10 +1,9 @@
-"""Phase 4 tests — auto-populated Layering, retro-tag signal, activity timeline.
+"""Phase 4 tests — Layering stage-record creation + activity timeline.
 
-Covers:
-  • create_adda auto-creates Layering stage_record + auto-populates workers M2M
+Covers (F-2 polish 2026-07-05: creation NO LONGER auto-assigns workers):
+  • create_adda auto-creates Layering stage_record with an EMPTY roster;
+    assignment is explicit via set_stage_workers (manager panel form)
   • create_adda raises ValidationError when no skilled users exist
-  • Retro-tag: User.skills.add(cutting_master_helper) → user added to active Layerings
-  • Retro-tag does NOT touch completed Adda stage_records
   • Layering worker queryset returns only skilled users
   • adda_activity returns sorted, filtered events
   • user_activity_across_addas honors user filter
@@ -20,8 +19,7 @@ from inventory.models import Role
 from production.forms._shared import _layering_worker_queryset
 from production.models import WorkerStageTask, AddaStageRecord, Product
 from production.services import (
-    adda_activity, attach_roll_to_layering, complete_layering,
-    create_adda, record_remaining_cloth, sync_layering_workers_for_skill,
+    adda_activity, attach_roll_to_layering, create_adda,
     user_activity_across_addas,
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
@@ -40,7 +38,8 @@ def _user(email, *, role_code='super_admin', is_super=True, skills=()):
 
 
 class CreateAddaAutoTagTests(TestCase):
-    def test_creates_layering_stage_record_with_skilled_workers(self):
+    def test_creates_layering_stage_record_with_empty_roster(self):
+        """F-2: creation seeds the stage record + rate snapshot, NEVER workers."""
         admin = _user('adm@p4.test', skills=['cutting_master'])
         helper = _user('helper@p4.test', role_code='worker', is_super=False,
                        skills=['cutting_master_helper'])
@@ -51,8 +50,11 @@ class CreateAddaAutoTagTests(TestCase):
         )
         self.assertIsNotNone(sr.started_at)
         self.assertIsNone(sr.completed_at)
-        worker_pks = {u.pk for u in sr.active_workers}
-        self.assertEqual(worker_pks, {admin.pk, helper.pk})
+        self.assertEqual(WorkerStageTask.objects.filter(stage_record=sr).count(), 0)
+        # Explicit assignment (the manager panel path) still works as before.
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, [helper.pk])
+        self.assertEqual({u.pk for u in sr.active_workers}, {helper.pk})
 
     def test_rejects_create_adda_when_no_skilled_users(self):
         # Admin with NO cutting_master skill — pool is empty
@@ -70,78 +72,8 @@ class CreateAddaAutoTagTests(TestCase):
             create_adda(admin, product=product)
 
 
-class RetroTagTests(TestCase):
-    def test_new_skill_user_retro_tagged_to_active_layering(self):
-        admin = _user('adm@retro.test', skills=['cutting_master'])
-        adda = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
-        sr = AddaStageRecord.objects.get(
-            adda=adda,
-            workflow_stage__stage__code='layering',
-        )
-        # New helper user added AFTER adda exists.
-        late = _user('late@retro.test', role_code='worker', is_super=False)
-        self.assertFalse(sr.is_worker_assigned(late))
-        late.skills.add(Skill.objects.get(name='cutting_master_helper'))
-        # No signal anymore (CLAUDE.md rule #4) — retro-tag is an EXPLICIT call,
-        # made by the user-management service after skills change.
-        sync_layering_workers_for_skill(late)
-        self.assertTrue(sr.is_worker_assigned(late))
-
-    def test_retro_tag_skips_completed_stage_records(self):
-        admin = _user('adm@retro2.test',
-                      skills=['cutting_master', 'cutting_master_helper'])
-        # Complete a layering on adda1
-        adda1 = create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
-        cotton = ClothType.objects.get(name='Cotton')
-        red = ClothColor.objects.get(name='Red')
-        loc = StorageLocation.objects.get(code='ROHINI')
-        rolls = bulk_create_rolls(
-            user=admin, cloth_type=cotton, storage_location=loc,
-            purchased_date=date.today(),
-            breakup=[{'color': red, 'qty': 1}],
-        )
-        sr1 = AddaStageRecord.objects.get(
-            adda=adda1, workflow_stage__stage__code='layering',
-        )
-        entry = attach_roll_to_layering(
-            stage_record=sr1, roll=rolls[0],
-            width_verified_inch=42, weight_verified_kg=Decimal('25'),
-            user=admin,
-        )
-        record_remaining_cloth(
-            entry=entry, remaining_weight_kg=Decimal('0'),
-            remaining_length_meters=Decimal('0'), user=admin,
-        )
-        complete_layering(
-            adda=adda1, duration_minutes=10,
-            layer_length_meters=Decimal('1.5'),
-            per_entry_layers={entry.pk: 3},
-            notes='', user=admin,
-        )
-        sr1.refresh_from_db()
-        self.assertIsNotNone(sr1.completed_at)
-
-        # Even when the retro-tag sync runs, it must NOT add them to the
-        # COMPLETED adda1's stage_record (only active layerings get tagged).
-        late = _user('late@retro2.test', role_code='worker', is_super=False)
-        late.skills.add(Skill.objects.get(name='cutting_master_helper'))
-        sync_layering_workers_for_skill(late)
-        self.assertFalse(sr1.is_worker_assigned(late))
-
-    def test_sync_helper_callable_directly(self):
-        admin = _user('adm@dir.test', skills=['cutting_master'])
-        create_adda(admin, product=Product.objects.get(code='T-SHIRT'))
-        u = _user('dir@dir.test', role_code='worker', is_super=False,
-                  skills=['cutting_master_helper'])
-        # First explicit sync tags them onto the active layering; a SECOND sync
-        # must be idempotent (no double-add).
-        sync_layering_workers_for_skill(u)
-        before = WorkerStageTask.objects.filter(worker=u).exclude(
-            status=WorkerStageTask.Status.CANCELLED).count()
-        sync_layering_workers_for_skill(u)
-        after = WorkerStageTask.objects.filter(worker=u).exclude(
-            status=WorkerStageTask.Status.CANCELLED).count()
-        self.assertEqual(before, after)
+# (C-1 2026-07-05: RetroTagTests removed with sync_layering_workers_for_skill —
+#  manager assignment is the only roster source; pins live in test_freeze_closeout.)
 
 
 class LayeringWorkerQuerysetTests(TestCase):

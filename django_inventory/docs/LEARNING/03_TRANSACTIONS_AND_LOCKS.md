@@ -1,3 +1,13 @@
+---
+id: learning-03-transactions-and-locks
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Transactions & locks — why money code looks the way it does
 
 ## transaction.atomic

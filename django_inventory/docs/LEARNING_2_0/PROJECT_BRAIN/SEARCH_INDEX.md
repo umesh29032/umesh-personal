@@ -1,3 +1,13 @@
+---
+id: l2-project-brain-search-index
+type: topic-canonical
+status: active
+owner: handwritten
+scope: navigation index
+anchors: —
+verified: 2026-07-13
+---
+
 # SEARCH INDEX — keyword/symbol → file + doc
 
 ## TL;DR

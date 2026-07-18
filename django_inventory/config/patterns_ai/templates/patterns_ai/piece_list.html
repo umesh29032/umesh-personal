@@ -1,0 +1,237 @@
+{% extends "accounts/base.html" %}
+{# PDM W2R — the PRODUCT PATTERN MANAGER (locked workflow 2026-07-08).
+   SIZES ONLY: what sizes exist · which are Ready for Cutting · open one
+   size's Pattern Design Library · gated Cutting-Table entry.
+   NO design rows here. GET derived-only; POST = frozen writers. #}
+{% block page_title %}{% if product %}{{ product.code }} · Pattern Manager{% else %}Pattern Manager{% endif %}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-pm { max-width: 760px; margin: 0 auto; }
+  .pai-pm .head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;
+    margin: 4px 0 16px; }
+  .pai-pm .head h1 { font-family:'Cormorant Garamond', serif; font-size:26px;
+    color:var(--ink); margin:0; }
+  .pai-pm .head .pct { font-size:13px; color:var(--stone); font-weight:600; }
+  .pai-pm .sect-label { font-size:11px; text-transform:uppercase;
+    letter-spacing:0.08em; color:var(--stone); font-weight:700; margin:18px 0 8px; }
+  /* size verdict cards — the page's whole content */
+  .pai-pm .szcard { display:flex; align-items:center; gap:14px;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card);
+    padding:16px 18px; margin-bottom:10px; }
+  .pai-pm .szcard .letter { font-family:'Cormorant Garamond', serif;
+    font-size:30px; font-weight:600; min-width:52px; color:var(--ink); }
+  .pai-pm .szcard .verdict { flex:1; min-width:0; }
+  .pai-pm .v-line { font-size:15px; font-weight:800; }
+  .pai-pm .v-line.ok { color:#20603c; }
+  .pai-pm .v-line.warn { color:#a26a00; }
+  .pai-pm .v-line.bad { color:#b91c1c; }
+  .pai-pm .szcard.bad .progress i { background:#b91c1c; }
+  .pai-pm .v-sub { font-size:12.5px; color:var(--stone); margin-top:2px; }
+  .pai-pm .v-missing { font-size:12.5px; color:#a26a00; margin-top:2px; }
+  .pai-pm .progress { height:6px; border-radius:999px; background:#eee;
+    margin-top:8px; overflow:hidden; max-width:220px; }
+  .pai-pm .progress i { display:block; height:100%; background:#2c8a52; }
+  .pai-pm .szcard.warn .progress i { background:#d99a06; }
+  .pai-pm .manage-btn { white-space:nowrap; min-height:44px; }
+  /* cutting table gate */
+  .pai-pm .gate { margin-top:18px; background:var(--card-bg);
+    border:1px solid var(--border-card); border-radius:14px;
+    box-shadow:var(--shadow-card); padding:16px 18px; display:flex;
+    gap:12px; align-items:center; flex-wrap:wrap; }
+  .pai-pm .gate .why { font-size:12.5px; color:var(--stone); flex:1; min-width:200px; }
+  .pai-pm .btn[aria-disabled="true"] { opacity:0.45; pointer-events:none; }
+  /* settings sheet */
+  .pai-pm details.sheet { margin-top:14px; }
+  .pai-pm details.sheet summary { cursor:pointer; font-size:13px; color:var(--copper); }
+  .pai-pm .sheet-body { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; padding:14px 16px; margin-top:8px; }
+  .pai-pm .chk { display:flex; gap:8px; font-size:13px; align-items:baseline; }
+  .pai-pm .chk .mark { font-weight:800; }
+  .pai-pm .chk.ok .mark { color:#20603c; } .pai-pm .chk.blocker .mark { color:#b91c1c; }
+  .pai-pm .chk.warn .mark { color:#a26a00; }
+  .pai-pm .checklist { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:6px 14px; margin-bottom:10px; }
+  .pai-pm .issue-list { margin:4px 0; padding-left:16px; font-size:13px; }
+  .pai-pm .prof-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px 14px; }
+  .pai-pm .prof-grid label { display:block; font-size:10px; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--stone); font-weight:700; margin-bottom:3px; }
+  .pai-pm .prof-grid input { width:100%; padding:8px 12px;
+    border:1.5px solid var(--border-card); border-radius:8px; background:var(--cream); }
+  /* matrix overlay (power lens) */
+  .pai-pm-matrix { position:fixed; inset:0; background:rgba(10,16,28,0.55);
+    display:none; align-items:flex-start; justify-content:center; z-index:1000; padding:4vh 12px; }
+  .pai-pm-matrix.open { display:flex; }
+  .pai-pm-matrix .inner { background:var(--card-bg); border-radius:14px; padding:16px;
+    max-width:900px; width:100%; max-height:88vh; overflow:auto; }
+  .pai-pm .rm-table { border-collapse:collapse; font-size:13px; min-width:420px; }
+  .pai-pm .rm-table th, .pai-pm .rm-table td { padding:7px 9px; border-bottom:1px solid var(--border-subtle); text-align:center; }
+  .pai-pm .rm-table th { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--stone); }
+  .pai-pm .rm-piece { text-align:left; font-weight:600; white-space:nowrap; }
+  .pai-pm .rm-ok { color:#20603c; background:#eef7f0; }
+  .pai-pm .rm-draft { color:#a26a00; background:#fdf6e3; }
+  .pai-pm .rm-missing { color:#b91c1c; background:#fdeeee; }
+  .pai-pm .rm-opt, .pai-pm .rm-fold { margin-left:6px; font-size:10px; padding:1px 7px;
+    border-radius:999px; background:#eee; color:#555; text-transform:uppercase; }
+  .pai-pm .rm-fold { background:#fdeeee; color:#b91c1c; }
+  .pai-pm .chooser { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+  .pai-pm .chooser a { display:block; padding:14px; border:1px solid var(--border-card);
+    border-radius:12px; background:var(--card-bg); text-decoration:none; color:var(--ink); }
+  @media (max-width:640px) {
+    .pai-pm .szcard { flex-wrap:wrap; }
+    .pai-pm .manage-btn { width:100%; text-align:center; }
+    .pai-pm .gate .btn { width:100%; text-align:center; min-height:44px; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-pm">
+{% if not product %}
+  <div class="page-header"><h1>Product Pattern Manager</h1>
+    <p class="subtitle">Pick a product — prepare its sizes for cutting.</p></div>
+  <div class="chooser">
+    {% for p in all_products %}
+      <a href="?product={{ p.pk }}"><strong>{{ p.code }}</strong><br><small>{{ p.name }}</small></a>
+    {% empty %}<div class="sheet-body">No active products.</div>{% endfor %}
+  </div>
+{% else %}
+  <div class="head">
+    {# Phase 1: the Manager is STEP 2 inside the Pattern Dashboard #}
+    <a class="btn" href="{% url 'patterns_ai:dashboard' %}?product={{ product.pk }}">← Dashboard</a>
+    <h1>{{ product.name }}</h1>
+    <span class="pct">{{ product.code }} · {{ summary.designs_confirmed }}/{{ summary.designs_total }} designs confirmed</span>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn" id="openmatrix">matrix</button>
+  </div>
+
+  {% if messages %}{% for m in messages %}
+    <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:12px;">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  <div class="sect-label">Sizes</div>
+
+  {% for sec in library.sections %}
+  <div class="szcard {% if sec.tier == 'attention' %}warn{% elif sec.tier == 'missing' %}bad{% endif %}">
+    <div class="letter">{{ sec.size.label }}</div>
+    <div class="verdict">
+      {% if sec.tier == 'ready' %}
+        <div class="v-line ok">🟢 Ready for Cutting ✓</div>
+        <div class="v-sub">{{ sec.confirmed }}/{{ sec.total }} Pattern Designs</div>
+      {% elif sec.tier == 'attention' %}
+        <div class="v-line warn">🟡 Needs Attention</div>
+        <div class="v-sub">{{ sec.confirmed }}/{{ sec.total }} Pattern Designs</div>
+        <div class="v-missing">Missing: {{ sec.required_missing|join:", " }}</div>
+      {% else %}
+        <div class="v-line bad">🔴 Missing Designs</div>
+        <div class="v-sub">{{ sec.confirmed }}/{{ sec.total }} Pattern Designs</div>
+        {% if sec.required_missing %}
+          <div class="v-missing">Missing: {{ sec.required_missing|join:", " }}</div>
+        {% endif %}
+      {% endif %}
+      <div class="progress"><i style="width:{% widthratio sec.confirmed sec.total 100 %}%;"></i></div>
+    </div>
+    <a class="btn btn-primary manage-btn"
+       href="?product={{ product.pk }}&size={{ sec.size.code }}">Manage Pattern Designs</a>
+  </div>
+  {% empty %}
+  <div class="szcard warn">
+    <div class="verdict">
+      <div class="v-line warn">This product has no sizes yet</div>
+      <div class="v-sub">Start with the Universal size, or add real
+        sizes — every size gets its own Pattern Design Library.</div>
+    </div>
+    {# Phase-3 D-1 explicit moment: POST-only, honest label (Rule I) #}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="product" value="{{ product.pk }}">
+      <input type="hidden" name="action" value="start_universal">
+      <button type="submit" class="btn btn-primary manage-btn">Start with Universal</button>
+    </form>
+  </div>
+  {% endfor %}
+
+  <a class="btn" href="{% url 'production:product-sizes' product.pk %}">+ Add Size
+    <small style="color:var(--stone);">(opens Product Sizes)</small></a>
+
+  {# ── the Cutting-Table gate: enabled at ≥1 Ready size (owner-locked) ── #}
+  <div class="gate">
+    {% if summary.any_size_ready %}
+      {# Phase 4: the DCT button opens the DCT (shell); generator linked inside #}
+      <a class="btn btn-primary" style="min-height:44px;"
+         href="{% url 'patterns_ai:cutting-table' product.pk %}">🪡 Open Digital Cutting Table</a>
+      <span class="why">consumes the confirmed Pattern Designs — it never
+        edits them.</span>
+    {% else %}
+      <a class="btn btn-primary" aria-disabled="true" href="#">🪡 Open Digital Cutting Table</a>
+      <span class="why">disabled — no size is ready yet. Finish the
+        required designs of at least one size.</span>
+    {% endif %}
+  </div>
+
+  <details class="sheet">
+    <summary>product details — readiness checklist · warnings · fabric defaults</summary>
+    <div class="sheet-body">
+      <div class="checklist">
+        {% for label, ok, detail, hard in summary.checklist %}
+          <div class="chk {% if ok %}ok{% elif hard %}blocker{% else %}warn{% endif %}">
+            <span class="mark">{% if ok %}✓{% elif hard %}✗{% else %}⚠{% endif %}</span>
+            <span>{{ label }}<br><small class="muted">{{ detail }}</small></span></div>
+        {% endfor %}
+      </div>
+      {% if summary.blockers %}
+        <strong style="color:#b91c1c; font-size:13px;">✗ Blocks generation</strong>
+        <ul class="issue-list">{% for b in summary.blockers %}<li>{{ b }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if summary.warnings %}
+        <strong style="color:#a26a00; font-size:13px;">⚠ Warnings (never block)</strong>
+        <ul class="issue-list">{% for w in summary.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+      {% endif %}
+      <form method="post" style="margin-top:10px;">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="action" value="save_profile">
+        <div class="prof-grid">
+          <div><label>Default width (mm)</label>
+            <input type="text" inputmode="numeric" name="default_width_mm" value="{{ summary.profile.default_width_mm|default_if_none:'' }}"></div>
+          <div><label>Default layer length (mm)</label>
+            <input type="text" inputmode="numeric" name="default_length_mm" value="{{ summary.profile.default_length_mm|default_if_none:'' }}"></div>
+          <div><label>Default spacing (mm)</label>
+            <input type="text" inputmode="decimal" name="default_spacing_mm" value="{{ summary.profile.default_spacing_mm|default_if_none:'' }}"></div>
+          <div><label>Fabric type</label>
+            <input type="text" name="fabric_type" value="{{ summary.profile.fabric_type|default:'' }}"></div>
+          <div><label>GSM</label>
+            <input type="text" inputmode="numeric" name="gsm" value="{{ summary.profile.gsm|default_if_none:'' }}"></div>
+          <div><label>Lay mode</label>
+            <input type="text" name="lay_mode" value="{{ summary.profile.lay_mode|default:'' }}"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:8px;">Save defaults</button>
+        <small class="muted"> — prefill NEW generations only.</small>
+      </form>
+      <p style="margin-top:10px;"><a class="btn" href="{% url 'patterns_ai:mat-list' %}">Calibration mats</a></p>
+    </div>
+  </details>
+
+  <div class="pai-pm-matrix" id="matrixov">
+    <div class="inner">
+      <div style="display:flex; align-items:center; margin-bottom:8px;">
+        <strong>Readiness matrix — pieces × sizes</strong>
+        <span style="flex:1;"></span>
+        <button type="button" class="btn" id="closematrix">close</button>
+      </div>
+      {% include 'patterns_ai/_readiness_matrix.html' %}
+    </div>
+  </div>
+  <script>
+  (function(){
+    var mov = document.getElementById('matrixov');
+    document.getElementById('openmatrix').addEventListener('click',
+      function(){ mov.classList.add('open'); });
+    document.getElementById('closematrix').addEventListener('click',
+      function(){ mov.classList.remove('open'); });
+    mov.addEventListener('click', function(e){
+      if (!e.target.closest('.inner')) mov.classList.remove('open');
+    });
+  })();
+  </script>
+{% endif %}
+</div>
+{% endblock %}

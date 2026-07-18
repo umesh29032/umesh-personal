@@ -1,3 +1,13 @@
+---
+id: docs-b2-geometry-b-proof-plan
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # B-2 — GEOMETRY-B INVENTORY + PIXEL-IDENTICAL PROOF PLAN
 
 > **Status:** DESIGN + EVIDENCE only — **NO CODE, NO CSS, NO commits.** Pre-B-2 gate.

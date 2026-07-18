@@ -60,6 +60,11 @@ class WorkerStageTask(TimeStampedModel):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    # Pre-Phase-3 C (owner-approved 2026-07-06): when the WORKER first reported —
+    # started_at is prefilled from the stage record (parity with backfill), so it
+    # is stage time, not worker time. first_report_at → completed_at is the
+    # honest per-task work window. PASSIVE metadata: nothing reads it yet.
+    first_report_at = models.DateTimeField(null=True, blank=True)
     # null=True (DB) but NOT blank — required at form level, matches created_by posture.
     verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
@@ -91,6 +96,8 @@ class WorkerStageTask(TimeStampedModel):
         indexes = [
             models.Index(fields=['stage_record']),
             models.Index(fields=['worker', 'status']),
+            # pending-reports digest/list: status-scoped scan ordered by age
+            models.Index(fields=['status', 'created_at']),
         ]
         ordering = ['stage_record', 'worker']
 
@@ -152,6 +159,17 @@ class WorkerStageContribution(TimeStampedModel):
     good_quantity = models.DecimalField(max_digits=12, decimal_places=2)
     alter_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     missing_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Pre-Phase-3 A (owner-approved 2026-07-06): scrap — damaged beyond repair,
+    # found AT this operation. 4th immutable observation: pays nothing, feeds no
+    # pool, terminal. Distinct from Alter (reworkable) and Missing (lost) so the
+    # theft/loss signal stays clean.
+    damaged_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Pre-Phase-3 B (owner-approved 2026-07-06): machine identity SNAPSHOT at
+    # report time. Machine.code is F1-immutable-once-assigned, so the string is
+    # a stable identifier; a string (not FK) keeps the acyclic layering —
+    # machines FKs INTO production, never the reverse. '' = manual stage / no
+    # open assignment resolved. Passive metadata: no engine/money reads.
+    machine_code = models.CharField(max_length=32, blank=True, default='')
     # Manager/supervisor/super_admin only; null until reviewed.
     verified_quantity = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True,
@@ -193,20 +211,22 @@ class WorkerStageContribution(TimeStampedModel):
         indexes = [models.Index(fields=['task'])]
         ordering = ['task', 'pk']
         constraints = [
-            # Foundation S3 (RC-3): good/alter/missing each ≥ 0 AND the contribution
-            # observes SOMETHING (sum > 0). Replaces wsc_reported_quantity_positive — a
-            # fully-alter/missing row has good=0 (legal here, illegal under reported>0),
-            # so the legacy check is dropped in the SAME migration as this add.
+            # Foundation S3 (RC-3), extended pre-Phase-3 A: good/alter/missing/damaged
+            # each ≥ 0 AND the contribution observes SOMETHING (sum > 0). Replaced
+            # wsc_gam_nonneg_sum_positive when damaged_quantity joined the observation
+            # set (migration 0048).
             models.CheckConstraint(
                 check=(
                     (models.Q(good_quantity__gte=0)
                      & models.Q(alter_quantity__gte=0)
-                     & models.Q(missing_quantity__gte=0))
+                     & models.Q(missing_quantity__gte=0)
+                     & models.Q(damaged_quantity__gte=0))
                     & (models.Q(good_quantity__gt=0)
                        | models.Q(alter_quantity__gt=0)
-                       | models.Q(missing_quantity__gt=0))
+                       | models.Q(missing_quantity__gt=0)
+                       | models.Q(damaged_quantity__gt=0))
                 ),
-                name='wsc_gam_nonneg_sum_positive',
+                name='wsc_gamd_nonneg_sum_positive',
             ),
             # nullable money/qty snapshots are non-negative WHEN set.
             models.CheckConstraint(

@@ -127,6 +127,10 @@
             --border-card:        #cfc0aa;             /* card/section border — use on all panels */
             --shadow-card:        0 2px 12px rgba(14,11,9,0.10); /* card shadow */
             --shadow-card-hover:  0 6px 20px -2px rgba(14,11,9,0.14);
+            /* Deep hero gradient — owner-granted token (UIL-D Q-C1 2026-07-16): the exact
+               form-shell/page hero value, extracted from 22 duplicated declarations.
+               Deliberately NOT flipped in dark mode (pages never flipped it). */
+            --hero-grad-deep: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
 
             /* ── Input foundation tokens (F-1) — canonical owner; defaults = the .field/forms skin.
                Per-context skins set only what differs (.sf-input storefront r9; filter/DataTables r8).
@@ -838,6 +842,9 @@
         }
         .dataTables_paginate .paginate_button.disabled { opacity: 0.4; cursor: not-allowed; }
         .dataTables_length { display: none; }
+        /* List-page header cell — promoted from 14 identical inline th styles across the
+           3 accounts DataTables lists (UIL-D D-UI-03, §9 3+-promotion; declarations exact). */
+        .dt-th { padding: 14px 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); }
         table.dataTable thead th, table.dataTable thead td {
             border-bottom: 2px solid var(--border-default) !important;
         }
@@ -1498,6 +1505,10 @@
         .badge-active   { background: #f0fdf4; color: #15803d; }
         .badge-active .badge-dot   { background: var(--success); }
         .badge-inactive { background: #f9fafb; color: #6b7280; }
+        /* R4 (PDD §27-D4): monthly-salary worker marker — informational blue,
+           shown wherever a piece-rate ₹ expectation is suppressed. */
+        .badge-monthly  { background: #eff6ff; color: #1d4ed8; }
+        .badge-monthly .badge-dot  { background: #3b82f6; }
 
         /* Financial settlement-status pill — canonical owner for AddaSettlement.status chips. */
         .status-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
@@ -1727,6 +1738,29 @@
 
         .tab-panel { display: none; }
         .tab-panel.active { display: block; }
+
+        /* ── Filter bar (horizontal, stacks ≤600px — PA-14-2) ───────────
+           Promoted from 5 byte-identical page-scoped copies (UIL-D D-UI-09:
+           barcode_dashboard · roll_list · cloth_dashboard · adda_list · adda_dashboard).
+           Page tails (input/fancy-select sizing) stay page-scoped. */
+        .filter-card {
+            display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
+            padding: 14px 18px; background: var(--card-bg);
+            border: 1px solid var(--border-card); border-radius: 14px;
+            box-shadow: var(--shadow-card); margin-bottom: 18px;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+        }
+        .filter-card > * { flex-shrink: 0; }
+        .filter-card .filter-field { display: flex; flex-direction: column; gap: 4px; }
+        .filter-card label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: var(--stone);
+        }
+        @media (max-width: 600px) {
+            /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
+            .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+            .filter-card .filter-field { width: 100%; }
+        }
 
         /* ── Confirm / delete cards ─────────────────────────────────── */
         .confirm-card {

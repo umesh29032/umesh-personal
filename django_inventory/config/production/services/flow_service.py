@@ -278,6 +278,7 @@ def _validate_cost_grouping(ws: WorkflowStage, method: str, rate, billed_at) -> 
 def set_stage_cost(
     *, user, workflow_stage: WorkflowStage,
     cost_method: str, cost_rate, cost_billed_at_id=None,
+    credits_workers=None,
 ) -> WorkflowStage:
     """Set the binding cost config for a WorkflowStage (R1 mandatory rate + R3
     grouping). Parses + validates, then writes only the cost columns.
@@ -285,6 +286,12 @@ def set_stage_cost(
     cost_rate: '', None, or a numeric string/Decimal. Empty → NULL (only valid
     for a grouped member). cost_billed_at_id: pk of the payer WorkflowStage, or
     falsy for self-paid.
+
+    credits_workers (roadmap R2, PDD §6/§17): does completing this stage PAY
+    workers? None = leave unchanged (back-compat for callers not sending it);
+    True/False = set. Payability is the SOURCE config the PAY-2 guard reads —
+    enabling it makes worker reporting mandatory before the stage completes
+    (owner-confirmed P-4).
     """
     _ensure_can_manage(user)
 
@@ -313,7 +320,12 @@ def set_stage_cost(
     # A grouped member's own rate is irrelevant — null it to avoid confusion.
     workflow_stage.cost_rate = None if billed_at is not None else rate
     workflow_stage.cost_billed_at = billed_at
-    workflow_stage.save(update_fields=[
-        'cost_method', 'cost_rate', 'cost_billed_at', 'updated_at',
-    ])
+    fields = ['cost_method', 'cost_rate', 'cost_billed_at', 'updated_at']
+    if credits_workers is not None:
+        # R2: payability set alongside cost (one form, one save). A grouped
+        # member may still be flagged payable in config — harmless: F2
+        # structurally zeroes a grouped member's rate at every money boundary.
+        workflow_stage.credits_workers = bool(credits_workers)
+        fields.append('credits_workers')
+    workflow_stage.save(update_fields=fields)
     return workflow_stage

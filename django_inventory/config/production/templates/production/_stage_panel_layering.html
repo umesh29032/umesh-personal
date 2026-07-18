@@ -1,3 +1,43 @@
+{% if needs_lane_choice %}
+{# GAP-3: bare multi-lane URL (deep link / A360 embedded tab) — pick a lane, never a 500. #}
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">Choose a cutting lane</div></div>
+    <div class="panel-body">
+        <p class="panel-sub">{{ adda.code }} has {{ lanes|length }} cutting lanes — this console works one lane at a time.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for l in lanes %}
+            <a href="?stream={{ l.pk }}{% if request.GET.embedded %}&embedded=1{% endif %}"
+               style="font-size:14px;font-weight:700;padding:10px 16px;border-radius:10px;border:1px solid var(--border-card);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;">
+                {{ l.label|title }}{% if l.reason %} <span style="font-weight:400;color:var(--stone);font-size:12px;">&nbsp;— {{ l.reason|truncatechars:40 }}</span>{% endif %}
+            </a>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+{% if active_lane %}
+{# streams: every POST in this panel carries its lane #}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form').forEach(function (f) {
+    if (!f.querySelector('input[name=stream]')) {
+      var h = document.createElement('input');
+      h.type = 'hidden'; h.name = 'stream'; h.value = '{{ active_lane.pk }}';
+      f.appendChild(h);
+    }
+  });
+});
+</script>
+{% endif %}
+{% if show_lane_switcher %}
+<div class="lane-switcher" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;">
+  {% for l in lanes %}
+  <a href="?stream={{ l.pk }}{% if request.GET.embedded %}&embedded=1{% endif %}"
+     style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--border-card);text-decoration:none;{% if l.pk == active_lane.pk %}background:#a5702a;color:#fff;{% else %}color:var(--stone);{% endif %}">
+    {{ l.label|title }}</a>
+  {% endfor %}
+</div>
+{% endif %}
 {% comment %}
 Layering stage panel — worker-first, accordion sections (2026-06-03).
 
@@ -107,6 +147,39 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
 </div>
 
 {% comment %} ── ② ADD CLOTH ROLL (always visible → selects fancify in correct position) ── {% endcomment %}
+{# V1.1 item-2: LEFTOVER RE-ISSUE — management picks a weighed piece from an #}
+{# earlier Adda; one tap, source-priced forever (consume_leftover owns guards). #}
+{% if is_management and available_leftovers %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-num">♻</div><div class="panel-title">Leftover cloth available</div></div>
+  <div class="panel-body">
+    <p class="panel-sub">Weighed pieces left over from earlier Addas — using one moves its cloth (at the original roll's price) into this Adda. Whole piece only.</p>
+    {% for lo in available_leftovers %}
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border-card);border-radius:10px;margin:6px 0;">
+      <strong>{{ lo.remaining_weight_kg|default:"?" }} kg</strong>
+      <span style="font-size:12px;color:var(--stone);">{{ lo.roll.roll_id }} · {{ lo.roll.cloth_color.name }}{% if lo.remaining_length_meters %} · {{ lo.remaining_length_meters }} m{% endif %} · from {{ lo.source_adda.code }}</span>
+      <form method="post" action="{% url 'production:layering-use-leftover' adda.code %}" style="margin:0;margin-left:auto;"
+            onsubmit="return confirm('Use this leftover piece in {{ adda.code }}? Its cost follows the original roll.');">
+        {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        <input type="hidden" name="leftover" value="{{ lo.pk }}">
+        <button type="submit" class="btn btn-ghost" style="min-height:44px;">Use this leftover</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% if used_leftovers %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-num">♻</div><div class="panel-title">Leftovers used in this Adda</div></div>
+  <div class="panel-body">
+    {% for lo in used_leftovers %}
+    <div class="sub" style="padding:4px 0;">{{ lo.remaining_weight_kg|default:"?" }} kg · {{ lo.roll.roll_id }} · from {{ lo.source_adda.code }} · {{ lo.consumed_at|date:"d M H:i" }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if can_attach %}
 <div class="panel">
   <div class="panel-head"><div class="panel-num">＋</div><div class="panel-title">Add cloth roll</div></div>
@@ -191,6 +264,16 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
   <div class="panel">
     <div class="panel-head"><div class="panel-num">4</div><div class="panel-title">Summary</div></div>
     <div class="panel-body">
+      {# M6 — ADVISORY layout recommendation (the operator's number always stands) #}
+      {% if layout_recommendation %}
+        <div class="leftover-line" style="color:#0d6b4f;font-weight:600;">
+          {% for g in layout_recommendation.groups %}
+            📐 Recommended layer length: {{ g.length_mm|floatformat:0 }} mm —
+            from {{ g.uid }} ({{ g.group|upper }}, {{ g.layering_type }} lay).
+            Advisory only — your measured length stands.<br>
+          {% endfor %}
+        </div>
+      {% endif %}
       {% if can_draft %}<div class="layer-field"><label>Layer length (metres)</label>{{ complete_form.layer_length_meters }}</div>{% endif %}
       <div class="sgrid">
         <div class="stat"><div class="l">Rolls</div><div class="v">{{ entries|length }}</div></div>
@@ -200,11 +283,12 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
       </div>
       <div class="leftover-line">⏱ Time is recorded automatically when you complete.</div>
       {% if can_draft %}
+      {% include "production/_completion_override.html" %}
       <div class="actions">
         <span data-autosave-status class="autosave-pill"></span>
         <button type="submit" name="action" value="draft" class="lybtn lybtn-ghost">💾 Save draft</button>
         {% if can_complete %}<button type="submit" name="action" value="complete" class="lybtn lybtn-primary"
-            onclick="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete layering?');">✓ Complete layering → {{ next_stage.get_stage_type_display|default:"Cutting" }}</button>
+            onclick="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completion will be BLOCKED unless a Super Admin overrides with a reason (R3).\n\n{% endif %}{% endwith %}Complete layering?');">✓ Complete layering → {{ next_stage.get_stage_type_display|default:"Cutting" }}</button>
         {% else %}<p class="sub" style="margin:0;text-align:center;">A cutting-master-helper completes this stage.</p>{% endif %}
       </div>
       {% endif %}
@@ -238,3 +322,5 @@ has_filter_active, filtered_rolls_count, total_weight, distinct_colors_count, em
 
 {% include "production/_stage_panel_collapse.html" %}
 {% include "production/_autosave.html" %}
+
+{% endif %}{# /needs_lane_choice #}

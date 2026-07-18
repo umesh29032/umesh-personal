@@ -244,7 +244,8 @@ class LifecycleServiceTest(TestCase):
         self.product = Product.objects.create(code='LC', name='LC Product')
         self.stage = Stage.objects.create(code='lc_stage', name='LC Stage')
         self.ws = WorkflowStage.objects.create(
-            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'),
+            credits_workers=True)   # A360 rule: non-payable freezes 0 — this fixture means PAYABLE
         self.adda = Adda.objects.create(code='LC-001', product=self.product)
         self.sr = AddaStageRecord.objects.create(
             adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
@@ -318,7 +319,8 @@ class DraftTest(TestCase):
         self.product = Product.objects.create(code='DR', name='DR Product')
         self.stage = Stage.objects.create(code='dr_stage', name='DR Stage')
         self.ws = WorkflowStage.objects.create(
-            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'),
+            credits_workers=True)   # A360 rule: non-payable freezes 0 — this fixture means PAYABLE
         self.adda = Adda.objects.create(code='DR-001', product=self.product)
         self.sr = AddaStageRecord.objects.create(
             adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())

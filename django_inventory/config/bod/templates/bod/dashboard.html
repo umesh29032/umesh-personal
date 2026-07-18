@@ -1,0 +1,150 @@
+{% extends "accounts/base.html" %}
+{% load finance %}
+{# BOD shell (Phase 15) — Owner command center. Window-never-engine: yeh page #}
+{# sirf padhta hai, kabhi likhta nahi. Money display = {% money %} tag ONLY   #}
+{# (core.finance — single owner of currency rendering). Mobile-first (owner   #}
+{# permanent ruling 2026-07-17): single column phone pe, grid tablet/desktop. #}
+
+{% block title %}Business Operating Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Page-scoped (CLAUDE rule 10) — sab tokens base.html se (rule: tokens-only). */
+  .bod-dashboard { max-width: 1280px; margin: 0 auto; }
+  .bod-dashboard .bod-asof {
+    display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+    margin: .25rem 0 1rem; color: var(--text-muted, #6b7280); font-size: .85rem;
+  }
+  .bod-dashboard .bod-refresh {
+    min-height: 44px; display: inline-flex; align-items: center;  /* touch target */
+    padding: 0 1rem; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--border-card, #e5e7eb); background: #fff;
+  }
+  .bod-dashboard .bod-section { margin-bottom: 1.25rem; }
+  .bod-dashboard .bod-section h2 {
+    font-size: 1rem; margin: 0 0 .5rem; letter-spacing: .01em;
+  }
+  .bod-dashboard .bod-grid {
+    display: grid; gap: .75rem;
+    grid-template-columns: 1fr;                     /* mobile-first: single column */
+  }
+  @media (min-width: 768px)  { .bod-dashboard .bod-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1280px) { .bod-dashboard .bod-grid { grid-template-columns: repeat(3, 1fr); } }
+  .bod-dashboard .bod-empty {
+    border: 1px dashed var(--border-card, #e5e7eb); border-radius: 12px;
+    padding: 1rem; color: var(--text-muted, #6b7280); font-size: .9rem;
+    background: var(--surface-muted, #fafafa);
+  }
+  /* Tile = pura card clickable (touch-first); canon card tokens */
+  .bod-dashboard .bod-tile {
+    display: block; min-height: 88px; padding: .9rem 1rem;
+    border: 1px solid var(--border-card, #e5e7eb); border-radius: 12px;
+    background: #fff; box-shadow: var(--shadow-card, 0 1px 2px rgba(0,0,0,.05));
+    text-decoration: none; color: inherit;
+  }
+  .bod-dashboard .bod-tile-title {
+    font-size: .8rem; color: var(--text-muted, #6b7280); letter-spacing: .02em;
+  }
+  .bod-dashboard .bod-tile-value {
+    font-size: 1.75rem; font-weight: 700; line-height: 1.2; margin-top: .15rem;
+  }
+  .bod-dashboard .bod-tile-sub {
+    display: flex; justify-content: space-between; gap: .5rem;
+    font-size: .8rem; color: var(--text-muted, #6b7280); margin-top: .2rem;
+  }
+  .bod-dashboard .bod-tile--error {
+    border-style: dashed; background: var(--surface-muted, #fafafa);
+  }
+  .bod-dashboard .bod-tile-note { font-size: .85rem; margin: .3rem 0; }
+  .bod-dashboard .bod-tile-link { font-size: .85rem; }
+  /* Chips variant (P5) — stage chips wrap on phone, no table needed */
+  .bod-dashboard .bod-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .45rem; }
+  .bod-dashboard .bod-chip {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .2rem .6rem; border-radius: 999px; font-size: .8rem;
+    border: 1px solid var(--border-card, #e5e7eb); background: var(--surface-muted, #fafafa);
+  }
+  .bod-dashboard .bod-chip strong { font-size: .85rem; }
+  /* Section 7 nav cards — pure links, koi count nahi (owner ruling) */
+  .bod-dashboard .bod-nav-desc { font-size: .8rem; color: var(--text-muted, #6b7280); margin-top: .2rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bod-dashboard">
+  <h1>Business Operating Dashboard</h1>
+
+  {# BOD-D5: current-at-load + manual refresh + visible "Last Updated" — koi polling nahi #}
+  <div class="bod-asof">
+    <span>Last Updated: {{ as_of|date:"d M Y, H:i" }}</span>
+    <a class="bod-refresh" href="{% url 'bod:dashboard' %}">↻ Refresh</a>
+  </div>
+
+  {% for section in sections %}
+    <section class="bod-section" id="bod-{{ section.key }}">
+      <h2>{{ section.label }}</h2>
+      <div class="bod-grid">
+        {% if section.widgets %}
+          {% for entry in section.widgets %}
+            {% if entry.error %}
+              {# Fail-soft: owner-call fail hua to error tile — page kabhi 500 nahi #}
+              <div class="bod-tile bod-tile--error">
+                <div class="bod-tile-title">{{ entry.widget.title }}</div>
+                <div class="bod-tile-note">Unavailable right now — open the module directly.</div>
+                <a class="bod-tile-link" href="{% url entry.widget.drill_down %}">Open module →</a>
+              </div>
+            {% elif entry.tile.kind == 'chips' %}
+              {# Chips tile (P5): sub pairs chip-row ki tarah render hote hain #}
+              <a class="bod-tile" href="{% url entry.widget.drill_down %}">
+                <div class="bod-tile-title">{{ entry.widget.title }}</div>
+                {% if entry.tile.sub %}
+                  <div class="bod-chips">
+                    {% for label, val in entry.tile.sub %}
+                      <span class="bod-chip">{{ label }} <strong>{{ val }}</strong></span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="bod-tile-note">No stages with active work.</div>
+                {% endif %}
+              </a>
+            {% else %}
+              <a class="bod-tile" href="{% url entry.widget.drill_down %}">
+                <div class="bod-tile-title">{{ entry.widget.title }}</div>
+                {% if entry.tile.value is not None %}
+                  {# Money value = {% money %} tag ONLY — core.finance owns ₹ rendering #}
+                  <div class="bod-tile-value">{% if entry.tile.money %}{% money entry.tile.value %}{% else %}{{ entry.tile.value }}{% endif %}</div>
+                {% endif %}
+                {% for label, val in entry.tile.money_sub %}
+                  <div class="bod-tile-sub"><span>{{ label }}</span><strong>{% money val %}</strong></div>
+                {% endfor %}
+                {% for label, val in entry.tile.sub %}
+                  <div class="bod-tile-sub"><span>{{ label }}</span><strong>{{ val }}</strong></div>
+                {% endfor %}
+                {% if entry.tile.note %}<div class="bod-tile-note">{{ entry.tile.note }}</div>{% endif %}
+              </a>
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          <div class="bod-empty">
+            No widgets in this section yet.
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endfor %}
+
+  {# Section 7 "Other Business Modules" — navigation cards ONLY, no counts (owner ruling 2026-07-18) #}
+  <section class="bod-section" id="bod-other">
+    <h2>Other Business Modules</h2>
+    <div class="bod-grid">
+      {% for title, url_name, desc in nav_cards %}
+        <a class="bod-tile" href="{% url url_name %}">
+          <div class="bod-tile-title">{{ title }}</div>
+          <div class="bod-nav-desc">{{ desc }}</div>
+          <div class="bod-tile-link">Open →</div>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

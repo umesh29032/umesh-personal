@@ -3,21 +3,7 @@
 {% block page_title %}Cloth Rolls{% endblock %}
 
 {% block extra_head %}
-<style>
-    .roll-list .filter-card {
-        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
-        padding: 14px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card); margin-bottom: 18px;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .roll-list .filter-card > * { flex-shrink: 0; }
-    .roll-list .filter-card .filter-field { display: flex; flex-direction: column; gap: 4px; }
-    .roll-list .filter-card label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--stone);
-    }
-    /* F-Select A: chrome from canonical .select-field--form. Filters fancify → width on
+<style>    /* F-Select A: chrome from canonical .select-field--form. Filters fancify → width on
        the .fancy-select wrap (visible control), tokens on the trigger; the native
        <select> is hidden and no longer drives layout. */
     .roll-list .filter-card select,
@@ -69,9 +55,6 @@
     @media (max-width: 600px) {
         .roll-list .filter-info { padding: 10px 12px; }
         .roll-list .filter-info .clear-all { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
-        /* Mobile: stack filters vertically instead of horizontal-scroll (fields were cut off-screen). */
-        .roll-list .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
-        .roll-list .filter-card .filter-field { width: 100%; }
         .roll-list .filter-card select,
         .roll-list .filter-card .fancy-select { width: 100%; min-width: 0; }
     }

@@ -1,4 +1,20 @@
+---
+id: audit-system-map
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # AUDIT_SYSTEM_MAP — Production Readiness Audit · Phase 01 (System Mapping)
+
+> **⚠️ DATED SNAPSHOT (2026-06-14)** — historical audit artifact, NOT a living
+> map. The system has moved since (PDD stream R1→A360, pre-R10 polish, freeze
+> closeout C-1..C-3 2026-07-05: retro-tag removed, single My-Dashboard, live
+> access predicate everywhere). Current truth: [PROJECT_KNOWLEDGE_MAP.md](PROJECT_KNOWLEDGE_MAP.md)
+> + app GUIDEs. Kept for the audit record only.
 
 **Generated:** 2026-06-14 · **Branch:** new_flask_app · **Scope:** complete inventory of sidebar items, URLs, pages, actions, forms, workflows, handlers, services.
 
@@ -64,7 +80,7 @@ Plus: `core` (abstract base models, no tables), `storefront.public_home` mounted
 | HomeView | LoginRequiredMixin View | accounts/views.py | Protected entry point with role-based landing: management (super_admin/manager) → Operations dashboard, others → My Dashboard. |
 | PasswordLoginView | DjangoLoginView subclass | accounts/views.py | Fallback password-based login; throttled per IP+email; prefills email on reset success. |
 | UserListView | ListView (Super Admin only) | accounts/views.py | List all users with search (name/email) and skill filtering; includes KPI counts (total/active/inactive); no server-side pagination due to PostgreSQL MVCC volatility. |
-| UserCreateView | CreateView (Super Admin only) | accounts/views.py | Super Admin creates new user with full profile, role, and skills; calls sync_user_skills for layering retro-tag. |
+| UserCreateView | CreateView (Super Admin only) | accounts/views.py | Super Admin creates new user with full profile, role, and skills; no production side-effects (C-1 2026-07-05: retro-tag removed). |
 | UserUpdateView | UpdateView (Super Admin only) | accounts/views.py | Edit user profile; enforces self-edit blockers (no self-demotion/deactivation); syncs skills; updates session if editing self with new password. |
 | UserDeleteView | DeleteView (Super Admin only) | accounts/views.py | Delete user via user_service.delete_user; enforces self-delete and last-admin invariants with advisory lock. |
 | SignupView | FormView | accounts/views.py | Public self-registration step 1: email+password; signs password with SECRET_KEY before session storage (not plain text); throttled. |
@@ -85,7 +101,7 @@ Plus: `core` (abstract base models, no tables), `storefront.public_home` mounted
 
 - **`auth_service`** — OTP issuance for all login/signup/password-reset flows; centralizes generate→store→email logic to prevent copy-paste drift.  
   _Key:_ issue_otp(request, *, email, prefix, subject) → bool: Generate 6-digit OTP, hash+store in session, email to recipient; returns True on success (email send failure returns False for caller to handle).
-- **`user_service`** — Single home for write-side User invariants: self-edit blocking, last-admin deletion protection (race-safe with PG advisory lock), and cross-app skill→layering retro-tagging.  
+- **`user_service`** — Single home for write-side User invariants: self-edit blocking, last-admin deletion protection (race-safe with PG advisory lock), (C-1 2026-07-05: retro-tag removed; accounts has zero production edges).  
   _Key:_ delete_user(user_to_delete, *, actor) → None: Delete user with self-delete + last-admin checks; race-safe via pg_advisory_xact_lock; raises ValidationError on refusal.; self_edit_blockers(actor, *, new_is_superuser, new_is_active, new_role) → list[str]: Pure function; returns list of blocked actions (empty=allowed) for a Super Admin editing their own profile.; count_active_admins(*, exclude_pk=None) → int: Count active Super Admins (is_superuser OR role.code==super_admin); used by delete_user.; sync_user_skills(user) → int: Retro-tag user onto active Layering rosters for their current skills (replaces old m2m_changed signal); lazy-imports production.services to avoid circular imports.
 - **`permission_service`** — RBAC core: role-based access control, permission helpers, sidebar menu registry + visibility rules, and role editor sections.  
   _Key:_ user_role_code(user) → str \| None: Return user's primary role code (is_superuser → ROLE_SUPER_ADMIN, else user.role.code).; user_role_codes(user) → set[str]: Return all role codes for user (primary + extra_roles).; user_has_role(user, codes: Iterable[str]) → bool: True if any of user's roles is in codes.; user_has_perm(user, perm_codename) → bool: Full permission check: is_superuser/ROLE_SUPER_ADMIN bypass → role-perm lookup → Django default.; user_can_view_financials(user) → bool: Gate for reading Supplier + Cost Per KG fields.; user_can_edit_financials(user) → bool: Gate for writing Supplier + Cost Per KG fields.; user_principal(user) → dict: Request-cached {role_ids, skill_ids} for the user (computed once per request).; build_menu_for(user, current_path) → list[dict]: Return sidebar sections filtered to user's visible items; applies 3-layer visibility (Super Admin bypass → SidebarItemRule DB → in-code predicate); picks single 'is_active' item by longest match.; can_access_url_name(user, url_name) → bool: Check if user can open page; mirrors sidebar visibility logic (same SidebarItemRule rules).; explain_visibility(user, url_name) → str: Diagnostic explanation of why user can/can't see an item.; permissions_qs_by_app(app_labels) → list: Return Permission queryset restricted to ROLE_EDITABLE_CONTENT_TYPES (curated allowlist).; permissions_sectioned_for_role_editor() → list: Return [(section_label, section_desc, [(model_label, [perm, ...]), ...]), ...].

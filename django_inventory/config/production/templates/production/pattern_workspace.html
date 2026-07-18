@@ -1,6 +1,6 @@
 {% extends "accounts/base.html" %}
 
-{% block page_title %}{{ adda.code }} · Cutting Pattern{% endblock %}
+{% block page_title %}{{ adda.code }} · Pattern Design{% endblock %}
 
 {% block extra_head %}
     {% include "shared/_form_styles.html" %}
@@ -23,12 +23,14 @@
 
 {% block content %}
 <div style="max-width:1100px; margin:0 auto;">
-    <div style="background:linear-gradient(135deg,#0a1628 0%,#1a2840 50%,#2a1f0e 85%,#b87333 130%); color:#fff; border-radius:16px; padding:22px 26px; margin-bottom:18px;">
+    <div style="background:var(--hero-grad-deep); color:#fff; border-radius:16px; padding:22px 26px; margin-bottom:18px;">
         <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.7);">{{ adda.product.name }}</div>
-        <h1 style="font-family:'Cormorant Garamond',Georgia,serif; font-size:28px; font-weight:600; margin:6px 0 4px; color:#fff;">{{ adda.code }} · Cutting Pattern</h1>
+        <h1 style="font-family:'Cormorant Garamond',Georgia,serif; font-size:28px; font-weight:600; margin:6px 0 4px; color:#fff;">{{ adda.code }} · Pattern Design</h1>
         <p style="margin:0; font-size:13px; color:rgba(255,255,255,0.72);">Draw the pattern on the layered cloth, record video + photos, advance to cutting.</p>
     </div>
 
+    {# R8: generic prev-stage admin snapshot — ctx management-gated; workers get nothing #}
+    {% include 'production/_stage_admin_snapshot.html' %}
     {% include "production/_stage_panel_cutting_pattern.html" %}
 
     <div style="margin-top: 18px;">

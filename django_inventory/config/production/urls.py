@@ -49,8 +49,13 @@ urlpatterns = [
     path('products/<int:pk>/archive/',    views.ProductArchiveView.as_view(),  name='product-archive'),
     # Per-product flow editor (workflow stages add/remove/reorder).
     path('products/<int:pk>/flow/',       views.ProductFlowEditView.as_view(), name='product-flow'),
-    # Per-product pattern assignment editor — pieces_count per pattern.
-    path('products/<int:pk>/patterns/',   views.ProductPatternsEditView.as_view(), name='product-patterns'),
+    # Phase-1 platform entry: Patterns action → Pattern Dashboard (patterns_ai).
+    # Old URL kept as redirect so every existing link keeps working.
+    path('products/<int:pk>/patterns/',   views.ProductPatternsEntryView.as_view(), name='product-patterns'),
+    # Phase 2 (D-1): the Blueprint module lives in patterns_ai — redirect.
+    path('products/<int:pk>/patterns/blueprint/',
+         views.ProductPatternBlueprintRedirectView.as_view(),
+         name='product-pattern-blueprint'),
     # Per-product size chart editor (PR5 2026-05-28).
     path('products/<int:pk>/sizes/',      views.ProductSizesEditView.as_view(),    name='product-sizes'),
 
@@ -64,6 +69,15 @@ urlpatterns = [
     path('addas/',                  views.AddaListView.as_view(),    name='adda-list'),
     path('addas/start/',            views.AddaCreateView.as_view(),  name='adda-create'),
     path('addas/<str:code>/',       views.AddaDetailView.as_view(),  name='adda-detail'),
+    # GAP-5: one-tap "bundle ready sets" from the Garment Readiness panel
+    # (POST-only, management; service enforces the post-join gate).
+    path('addas/<str:code>/bundles/create-sets/',
+         views.AddaBundleSetsView.as_view(), name='adda-bundle-sets'),
+    # GAP-4: the Add-lane lifecycle (§1–§9) + cancel-if-empty escape (§9.4).
+    path('addas/<str:code>/lanes/add/',
+         views.AddaAddLaneView.as_view(), name='adda-add-lane'),
+    path('addas/<str:code>/lanes/cancel/',
+         views.AddaCancelLaneView.as_view(), name='adda-cancel-lane'),
 
     # Stage role-rate correction (S1.1, super-admin only): list + correct.
     path('addas/<str:code>/stage-rates/', views.StageRateListView.as_view(), name='stage-rates'),
@@ -73,6 +87,18 @@ urlpatterns = [
     # Per-stage panel — canonical URL for both standalone view and iframe embed.
     # ?embedded=1 strips hero/nav so the panel fits inside iframe / accordion.
     path('addas/<str:code>/stage/<str:stage_type>/',    views.StagePanelView.as_view(),         name='stage-panel'),
+
+    # F-3: data-free post-complete bounce (embedded) — pings parent to reload.
+    path('addas/<str:code>/stage-advanced/',            views.StageAdvancedBounceView.as_view(), name='stage-advanced'),
+
+    # R10-B: ONE parameterized action set for EVERY config-only operation —
+    # new stages never add endpoints (frozen rule 11).
+    path('addas/<str:code>/stage/<str:stage_type>/start/',    views.GenericStageStartView.as_view(),    name='generic-stage-start'),
+    path('addas/<str:code>/stage/<str:stage_type>/complete/', views.GenericStageCompleteView.as_view(), name='generic-stage-complete'),
+    path('addas/<str:code>/stage/<str:stage_type>/reopen/',   views.GenericStageReopenView.as_view(),   name='generic-stage-reopen'),
+    # OP-1: pool split — manager allocates upstream dims to workers / voids.
+    path('addas/<str:code>/stage/<str:stage_type>/allocate/',   views.GenericStageAllocateView.as_view(),       name='generic-stage-allocate'),
+    path('addas/<str:code>/stage/<str:stage_type>/alloc-void/', views.GenericStageAllocationVoidView.as_view(), name='generic-stage-alloc-void'),
 
     # V2-1c-iii pt.2b — worker self-report (schema-driven; own-task only).
     # Same ?embedded=1 convention as stage-panel for the dashboard iframe route.
@@ -84,11 +110,10 @@ urlpatterns = [
     path('addas/<str:code>/layering/',                  views.LayeringWorkspaceView.as_view(),  name='layering-workspace'),
     path('addas/<str:code>/layering/start/',            views.LayeringStartView.as_view(),      name='layering-start'),
     path('addas/<str:code>/layering/attach-roll/',      views.LayeringAttachRollView.as_view(), name='layering-attach-roll'),
+    # V1.1 item-2: re-issue a leftover piece into this Adda (management).
+    path('addas/<str:code>/layering/use-leftover/',      views.LayeringConsumeLeftoverView.as_view(), name='layering-use-leftover'),
     path('addas/<str:code>/layering/quick-create-roll/', views.LayeringQuickCreateAndAttachView.as_view(), name='layering-quick-create-roll'),
-    path('addas/<str:code>/layering/full-create-roll/',  views.LayeringFullCreateAndAttachView.as_view(),  name='layering-full-create-roll'),
-    path('addas/<str:code>/layering/entries/<int:pk>/', views.LayeringEntryUpdateView.as_view(), name='layering-entry-update'),
     path('addas/<str:code>/layering/entries/<int:pk>/remove/', views.LayeringEntryRemoveView.as_view(), name='layering-entry-remove'),
-    path('addas/<str:code>/layering/remaining/<int:pk>/remove/', views.LayeringRemoveRemainingClothView.as_view(), name='layering-remove-remaining'),
     path('addas/<str:code>/layering/complete/',         views.LayeringCompleteView.as_view(),   name='layering-complete'),
     # Admin-only reopen — completed Layering ko unlock karke correction allow.
     path('addas/<str:code>/layering/reopen/',           views.LayeringReopenView.as_view(),     name='layering-reopen'),
@@ -120,10 +145,8 @@ urlpatterns = [
     # Actual Cutting Bundles (PR8 schema + PR9 two-step flow)
     # Bundle = per-size header; item = pattern × color × count inside.
     path('addas/<str:code>/cutting/bundle/create/',              views.CuttingBundleCreateView.as_view(),     name='cutting-bundle-create'),
-    path('addas/<str:code>/cutting/bundle/<int:pk>/add-item/',   views.CuttingBundleAddItemView.as_view(),    name='cutting-bundle-add-item'),
     # PR10: multi-select consume from breakup rows into bundle.
     path('addas/<str:code>/cutting/bundle/<int:pk>/add-pieces/', views.CuttingBundleAddPiecesView.as_view(),  name='cutting-bundle-add-pieces'),
-    path('addas/<str:code>/cutting/bundle/item/save/',           views.CuttingBundleItemSaveView.as_view(),   name='cutting-bundle-item-save'),
     path('addas/<str:code>/cutting/bundle/item/<int:pk>/delete/', views.CuttingBundleItemDeleteView.as_view(), name='cutting-bundle-item-delete'),
     path('addas/<str:code>/cutting/bundle/<int:pk>/delete/',     views.CuttingBundleDeleteView.as_view(),     name='cutting-bundle-delete'),
     path('addas/<str:code>/cutting/bundle/item/<int:pk>/allocate/', views.CuttingBundleItemAllocateView.as_view(), name='cutting-item-allocate'),
@@ -145,6 +168,13 @@ urlpatterns = [
     # Stage library CRUD (Super Admin only). Replaces old /stage-access/ page —
     # access controls now live on the Stage model itself.
     path('stages/',                views.StageListView.as_view(),   name='stage-list'),
+    # R10-C data-driven masters (owner rule: classifications = rows, not code)
+    path('stage-categories/',              views.StageCategoryListView.as_view(),   name='stage-category-list'),
+    path('stage-categories/add/',          views.StageCategoryCreateView.as_view(), name='stage-category-add'),
+    path('stage-categories/<int:pk>/edit/', views.StageCategoryUpdateView.as_view(), name='stage-category-edit'),
+    path('machine-types/',                 views.MachineTypeListView.as_view(),     name='machine-type-list'),
+    path('machine-types/add/',             views.MachineTypeCreateView.as_view(),   name='machine-type-add'),
+    path('machine-types/<int:pk>/edit/',   views.MachineTypeUpdateView.as_view(),   name='machine-type-edit'),
     path('stages/add/',            views.StageCreateView.as_view(), name='stage-add'),
     path('stages/<int:pk>/edit/',  views.StageUpdateView.as_view(), name='stage-edit'),
     path('stages/<int:pk>/delete/', views.StageDeleteView.as_view(), name='stage-delete'),

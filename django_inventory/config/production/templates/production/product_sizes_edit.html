@@ -6,7 +6,7 @@
 <style>
     .ps-edit { max-width: 880px; margin: 0 auto; }
     .ps-edit .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px;
         padding: 22px 26px; margin-bottom: 18px;
     }
@@ -51,7 +51,7 @@
 <div class="ps-edit">
     <div class="hero">
         <h1>{{ product.name }} · Size Chart</h1>
-        <p>Define which sizes this product comes in. Used by Cutting Pattern (per-size proportions) + Cutting Stage (per-size piece breakup).</p>
+        <p>Define which sizes this product comes in. Used by Pattern Design (per-size proportions) + Cutting Stage (per-size piece breakup).</p>
     </div>
 
     {% if messages %}{% for m in messages %}
@@ -82,7 +82,7 @@
                     </td>
                     <td data-label="Order">{{ s.display_order }}</td>
                     <td data-label="Actions" class="td-actions">
-                        <form method="post" onsubmit="return confirm('Archive size {{ s.code|upper }}? It will hide from Cutting Pattern + Cutting selectors.');">
+                        <form method="post" onsubmit="return confirm('Archive size {{ s.code|upper }}? It will hide from Pattern Design + Cutting selectors.');">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="archive">
                             <input type="hidden" name="size_id" value="{{ s.pk }}">

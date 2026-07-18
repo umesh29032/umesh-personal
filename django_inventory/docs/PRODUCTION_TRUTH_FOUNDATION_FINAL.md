@@ -1,3 +1,13 @@
+---
+id: docs-production-truth-foundation-final
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Production-Truth Foundation — FINAL Factory-Floor Review & Lock Decisions
 
 Companion to [PRODUCTION_TRUTH_FOUNDATION_REVIEW.md](PRODUCTION_TRUTH_FOUNDATION_REVIEW.md). Resolves the 4 factory-floor questions and states the lockable design. **No implementation.**

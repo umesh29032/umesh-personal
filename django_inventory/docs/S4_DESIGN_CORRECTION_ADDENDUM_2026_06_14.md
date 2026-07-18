@@ -1,3 +1,13 @@
+---
+id: docs-s4-design-correction-addendum-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # S4 Design Correction Addendum (2026-06-14)
 
 Resolves the blockers from the [M-1…M-4 re-review](M1_M4_REVIEW_2026_06_14.md) **before**

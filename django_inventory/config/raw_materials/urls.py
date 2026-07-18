@@ -24,6 +24,8 @@ urlpatterns = [
     path('rolls/bulk-add/',       views.RollBulkCreateView.as_view(),   name='roll-bulk-create'),
     path('rolls/<int:pk>/',       views.RollDetailView.as_view(),       name='roll-detail'),
     path('rolls/<int:pk>/edit/',  views.RollUpdateView.as_view(),       name='roll-edit'),
+    # V1.1 item-1: damage lifecycle (mark/restore, POST-only, management).
+    path('rolls/<int:pk>/damage/', views.RollDamageView.as_view(),      name='roll-damage'),
     path('rolls/<int:pk>/assign/', views.RollAssignView.as_view(),      name='roll-assign'),
 
     # Cloth Types

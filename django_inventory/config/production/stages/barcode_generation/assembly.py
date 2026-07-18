@@ -196,3 +196,100 @@ def generate_from_breakdown(barcode_gen_record) -> int:
     if batches:
         BarcodeBatch.objects.bulk_create(batches)
     return next_seq - 1
+
+def generate_for_adda(adda) -> int:
+    """Streams redesign (2026-07-11): inline generation at THE JOIN — one
+    pass over EVERY lane's frozen AddaProductSizeColorPieceBreakdown rows
+    (the complete product exists only now). Same batch/sequence semantics
+    as generate_for_cutting; same one-shot guard."""
+    if BarcodeBatch.objects.filter(adda=adda).exists():
+        raise IntegrityError(f"barcode batches already generated for {adda.code}")
+    from production.models import AddaProductSizeColorPieceBreakdown
+    rows = list(
+        AddaProductSizeColorPieceBreakdown.objects
+        .filter(adda=adda)
+        .select_related('size', 'color'))
+    agg = defaultdict(int)
+    ref = {}
+    bundle_by_key = {}
+    for r in rows:
+        if not r.verified_piece_count:
+            continue
+        key = (r.size_id, r.color_id)
+        agg[key] += r.verified_piece_count
+        ref.setdefault(key, (r.size, r.color))
+        bundle_by_key.setdefault(key, r.bundle_id)
+    if not agg:
+        return 0
+    sorted_keys = sorted(agg.keys(), key=lambda k: _allocation_key(*ref[k]))
+    batches = []
+    next_seq = 1
+    for key in sorted_keys:
+        count = agg[key]
+        batches.append(BarcodeBatch(
+            adda=adda, product=adda.product,
+            bundle_id=bundle_by_key[key],
+            size_id=key[0], color_id=key[1],
+            start_seq=next_seq, end_seq=next_seq + count - 1,
+            total_pieces=count))
+        next_seq += count
+    BarcodeBatch.objects.bulk_create(batches)
+    return next_seq - 1
+
+def append_uncovered_batches(adda):
+    """IDENTITY-LAW append (owner-approved readiness 2026-07-11): cover
+    breakdown truth that arrived AFTER generation — a late Cutting
+    Stream (recut / shortfall / added production). Per (size, color):
+    deficit = Σ frozen breakdown − Σ already-batched; new batches start
+    at Max(end_seq)+1. Sequences append forever, never renumber;
+    existing identities and printed labels untouched.
+
+    Returns (appended_total, lane_notes). Raises ValidationError when
+    every cut piece already has an identity ("nothing new to cover").
+    """
+    from django.core.exceptions import ValidationError
+    from django.db.models import Max, Sum
+    from production.models import AddaProductSizeColorPieceBreakdown
+
+    covered = defaultdict(int)
+    for b in BarcodeBatch.objects.filter(adda=adda):
+        covered[(b.size_id, b.color_id)] += b.total_pieces
+
+    produced = defaultdict(int)
+    ref = {}
+    lane_notes = set()
+    rows = (AddaProductSizeColorPieceBreakdown.objects
+            .filter(adda=adda)
+            .select_related('size', 'color',
+                            'cutting_record__stage_record__stream'))
+    for r in rows:
+        key = (r.size_id, r.color_id)
+        produced[key] += (r.verified_piece_count or 0)
+        ref.setdefault(key, (r.size, r.color))
+        stream = r.cutting_record.stage_record.stream
+        if stream is not None:
+            note = stream.label
+            if stream.reason:
+                note += f' ({stream.reason})'
+            lane_notes.add(note)
+
+    deficits = {k: produced[k] - covered.get(k, 0)
+                for k in produced if produced[k] > covered.get(k, 0)}
+    if not deficits:
+        raise ValidationError(
+            'Nothing new to cover — every cut piece already has an '
+            'identity.')
+
+    next_seq = (BarcodeBatch.objects.filter(adda=adda)
+                .aggregate(m=Max('end_seq'))['m'] or 0) + 1
+    batches = []
+    for key in sorted(deficits, key=lambda k: _allocation_key(*ref[k])):
+        count = deficits[key]
+        batches.append(BarcodeBatch(
+            adda=adda, product=adda.product, bundle=None,
+            size_id=key[0], color_id=key[1],
+            start_seq=next_seq, end_seq=next_seq + count - 1,
+            total_pieces=count))
+        next_seq += count
+    BarcodeBatch.objects.bulk_create(batches)
+    return next_seq - batches[0].start_seq if batches else 0, sorted(lane_notes)

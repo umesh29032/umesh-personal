@@ -1,3 +1,13 @@
+---
+id: learning-09-sql-beginner-to-advanced
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # SQL — beginner se advanced tak, ISI project ke real tables pe
 
 > Har example Kapil ERP ke asli PostgreSQL tables use karta hai, taaki seekha

@@ -1,3 +1,13 @@
+---
+id: s1-s4-hostile-review-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # S1–S4 Foundation Hostile Review — Findings + Fix Plan (2026-06-14)
 
 Full adversarial review of the shipped S1–S4 production-truth foundation (44 agents:

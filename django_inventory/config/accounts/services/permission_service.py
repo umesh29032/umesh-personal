@@ -209,6 +209,10 @@ class MenuItem:
     icon: str = ''                    # SVG markup (raw) — kept in template for clarity
     predicate: Callable[[object], bool] = lambda u: True
     match: tuple[str, ...] = ()       # path substrings that mark this item 'active'
+    hidden: bool = False              # F-1: registry-only entry — NEVER rendered
+                                      # (for anyone, incl. super admin). Keeps a
+                                      # legacy url_name valid for SidebarItemRule
+                                      # rows until the owner deletes them.
 
     def resolved_url(self) -> str | None:
         try:
@@ -248,17 +252,28 @@ SIDEBAR: tuple[MenuSection, ...] = (
     MenuSection(
         label='Main',
         items=(
-            # Personal "My Dashboard" — same template + content for everyone.
-            # Management role → inventory_dashboard URL; others → user_dashboard URL
-            # (identical content; both kept for bookmark compatibility). Labelled
+            # Personal "My Dashboard" — ONE item, ONE live URL for every role
+            # (F-1 polish 2026-07-05; the old role-split URL twins now redirect
+            # here). Ungated on purpose, like My Earnings: it's the personal
+            # landing every authenticated user must always reach. Labelled
             # "My Dashboard" to disambiguate from the management "Operations"
             # landing in the Production section (P1-1 sidebar dedupe / C-3).
+            MenuItem('My Dashboard', 'inventory:my_dashboard',
+                     match=('my-dashboard', 'inventory/dashboard')),
+            # Phase-15 BOD (owner charter D1.5: a PRIMARY navigation item;
+            # v1 Owner/SA only — code predicate; the owner may additionally
+            # manage it via a SidebarItemRule row through Access Control).
+            # String url_name only — no import of bod (layering stays clean).
+            MenuItem('Business Operating Dashboard', 'bod:dashboard',
+                     predicate=_any_role(ROLE_SUPER_ADMIN), match=('bod',)),
+            # Registry-only legacy twins (hidden=True → never rendered): the
+            # url_names stay valid so existing SidebarItemRule rows aren't
+            # orphaned (P3.4 drift guard). Both URLs 301 to my_dashboard.
+            # Owner may delete their rules via Sidebar Access, then remove these.
             MenuItem('My Dashboard', 'inventory:inventory_dashboard',
-                     predicate=_any_role(ROLE_SUPER_ADMIN, ROLE_MANAGER),
-                     match=('inventory/dashboard',)),
+                     hidden=True, match=()),
             MenuItem('My Dashboard', 'inventory:user_dashboard',
-                     predicate=lambda u: u and u.is_authenticated and not user_has_role(u, [ROLE_SUPER_ADMIN, ROLE_MANAGER]),
-                     match=('my-dashboard',)),
+                     hidden=True, match=()),
             # Every worker's own earnings page lives in Main, NOT the Payroll
             # section — workers never see the management payroll tools. Ungated
             # on purpose (self-scoped view): payroll is critical, no role gate.
@@ -275,6 +290,14 @@ SIDEBAR: tuple[MenuSection, ...] = (
         predicate=_any_role(*PRODUCTION_ROLES),
         items=(
             MenuItem('Operations', 'production:dashboard', match=('production/',)),
+            # R10-A: the machine register (assets + operator windows) — ops,
+            # management-only (frozen architecture rule 6).
+            MenuItem('Machines', 'machines:list', match=('machines/',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            # P1 Block 1: AI Pattern Intelligence landing (patterns_ai app) —
+            # management-only; same wiring class as the machines entry above.
+            MenuItem('Pattern Intelligence', 'patterns_ai:home', match=('patterns/',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Manufacturing Costing', 'production:costing', match=('production/costing',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Addas', 'production:adda-list', match=('production/addas',)),
@@ -325,6 +348,16 @@ SIDEBAR: tuple[MenuSection, ...] = (
                      match=('expense/settlements',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
             MenuItem('Record Advance', 'expense:advance-add', match=('expense/advances',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            # R5 (PDD §21 / ADR-0011): factory-level running costs (incl.
+            # monthly salaries) — a cost record, never a ledger.
+            MenuItem('Factory Expenses', 'expense:factory-expense-list',
+                     match=('expense/expenses',),
+                     predicate=_any_role(*MANAGEMENT_ROLES)),
+            # MEE-C (Phase 16): recurring templates + monthly generation —
+            # same module extension, gated like Factory Expenses.
+            MenuItem('Recurring Expenses', 'expense:expense-template-list',
+                     match=('expense/templates', 'expense/generate'),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
         ),
     ),
@@ -438,6 +471,10 @@ def build_menu_for(user, current_path: str = '') -> list[dict]:
     for section in SIDEBAR:
         items: list[dict] = []
         for item in section.items:
+            # Registry-only entries (F-1 legacy twins) render for NOBODY —
+            # checked BEFORE the super-admin bypass on purpose.
+            if item.hidden:
+                continue
             # Skip items that don't resolve (typo, removed URL) — sidebar must
             # never crash on a missing reverse().
             url = item.resolved_url()

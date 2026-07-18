@@ -28,7 +28,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView
@@ -45,11 +45,10 @@ from production.services import (
     preview_barcode_counts, reopen_barcode_generation, start_barcode_generation,
 )
 
-from .mixins import ProductionRoleMixin, StageViewAccessMixin
+from .mixins import ProductionRoleMixin, StageViewAccessMixin, embedded_advance_redirect, get_adda
 
 
-def _get_adda(code: str) -> Adda:
-    return get_object_or_404(Adda, code=code)
+_get_adda = get_adda   # shared lookup (views.mixins) — local alias keeps call sites stable
 
 
 def _bg_workflow_stage(adda: Adda) -> WorkflowStage | None:
@@ -75,13 +74,10 @@ class BarcodeGenStartForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        self.fields['workers'].queryset = (
-            User.objects.filter(
-                skills__name__in=[SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]
-            ).distinct().order_by('email')
-        )
+        # F-4: THE shared picker source — active users with this stage's access
+        # skills (Stage.access_by_skill), so picker == access gate, always.
+        from production.services import eligible_stage_workers
+        self.fields['workers'].queryset = eligible_stage_workers(STAGE_BARCODE_GENERATION)
 
 
 def _build_barcode_gen_context(request, adda: Adda) -> dict:
@@ -229,8 +225,12 @@ class BarcodeGenCompleteView(_BarcodeGenActionBase):
 
     def post(self, request, code):
         adda = _get_adda(code)
+        # R3 (PDD §27-C3): super-admin override forwarding — validated in service.
+        override_reason = (request.POST.get('override_reason', '').strip() or None
+                           if request.POST.get('override_pending') else None)
         try:
-            complete_barcode_generation(adda=adda, user=request.user)
+            complete_barcode_generation(adda=adda, user=request.user,
+                                        override_pending_reason=override_reason)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, self._service_error(exc))
             return redirect(self.workspace_url(code, request))
@@ -243,13 +243,9 @@ class BarcodeGenCompleteView(_BarcodeGenActionBase):
             request, f"Barcode Generation complete. Advanced to {next_label}.",
         )
 
-        if request.POST.get('embedded') == '1' and adda.current_stage is not None:
-            return redirect(
-                reverse('production:stage-panel', kwargs={
-                    'code': adda.code,
-                    'stage_type': adda.current_stage.stage_type,
-                }) + '?embedded=1&advanced=1'
-            )
+        # F-3: gate-free bounce — never the next stage's panel (worker 403).
+        if request.POST.get('embedded') == '1':
+            return embedded_advance_redirect(adda)
         return redirect('production:adda-detail', code=adda.code)
 
 

@@ -36,10 +36,13 @@ from django.views.generic import TemplateView, View
 from django.views.generic.edit import FormView
 
 from accounts.services import MANAGEMENT_ROLES, user_has_role
-from expense.forms import AdvanceForm, SettlementForm, WorkerProfileForm
+from expense.forms import (
+    AdvanceForm, FactoryExpenseForm, SettlementForm, WorkerProfileForm,
+)
 from expense.models import StageWorkAssignment, WorkerLedgerEntry, WorkerProfile
 from expense.services import (
-    can_view_worker, create_settlement, outstanding_advances, record_advance,
+    can_view_worker, create_settlement, is_monthly, outstanding_advances,
+    record_advance, set_pay_basis, unsettled_contribution_count,
     unsettled_expected,
     worker_adda_earnings, worker_advances, worker_assignments, worker_ledger,
     worker_production_stats, worker_settlements, worker_stage_earnings,
@@ -57,6 +60,12 @@ _ZERO = Decimal('0.00')
 class _ManagementOnly(UserPassesTestMixin):
     def test_func(self):
         return user_has_role(self.request.user, MANAGEMENT_ROLES)
+
+
+class _WorkerFromPk:
+    """Shared `pk → worker` lookup for the per-worker management pages."""
+    def _worker(self):
+        return get_object_or_404(User, pk=self.kwargs['pk'])
 
 
 def _month_start():
@@ -80,6 +89,9 @@ class MyEarningsView(LoginRequiredMixin, TemplateView):
         ctx['advances'] = worker_advances(worker, limit=10)
         ctx['is_self'] = True
         ctx['viewed_worker'] = worker
+        # R4 (PDD §27-D4 clause 3): monthly worker sees quantities but NO ₹
+        # expectation (suppressed entirely, not ₹0.00 — owner P-4).
+        ctx['is_monthly'] = is_monthly(worker)
         return ctx
 
 
@@ -107,6 +119,11 @@ class WorkerPayrollDetailView(LoginRequiredMixin, TemplateView):
         ctx['viewed_worker'] = worker
         ctx['is_self'] = (self.request.user.pk == worker.pk)
         ctx['is_management'] = is_management
+        ctx['is_monthly'] = is_monthly(worker)          # R4 — same P-4 rule
+        # R7: F&F entry — button gated to super-admin (service re-validates).
+        from accounts.services import ROLE_SUPER_ADMIN
+        ctx['is_super_admin'] = user_has_role(self.request.user,
+                                              [ROLE_SUPER_ADMIN])
         return ctx
 
 
@@ -152,7 +169,17 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             StageWorkAssignment.objects.filter(voided_at__isnull=True)
             .values('worker').annotate(pieces=Sum('allocated_quantity'))
         }
-        worker_ids = set(ledger) | set(given_map) | set(recovered_map)
+        # M-4 (hostile review 2026-07-05): MONTHLY workers are payroll-relevant
+        # even with zero money history — management must always see who is on
+        # a monthly basis. Roster = money-history workers ∪ monthly workers;
+        # each row carries is_monthly for the badge (and to hide Settle —
+        # their pay never flows through settlement, ADR-0011/R4).
+        monthly_ids = set(
+            WorkerProfile.objects
+            .filter(pay_basis=WorkerProfile.PayBasis.MONTHLY,
+                    user__is_active=True)
+            .values_list('user_id', flat=True))
+        worker_ids = set(ledger) | set(given_map) | set(recovered_map) | monthly_ids
         users = {
             u.pk: u for u in
             User.objects.filter(pk__in=worker_ids).select_related('role')
@@ -172,6 +199,7 @@ class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
             workers.append({
                 'worker': u,
                 'role': u.role if u else None,
+                'is_monthly': wid in monthly_ids,
                 'pieces': pieces_map.get(wid, 0),
                 # PA-12-C: net of earning reversals only (matches worker_summary), not
                 # all-credits − all-reversals.
@@ -207,7 +235,7 @@ class AdvanceCreateView(LoginRequiredMixin, _ManagementOnly, FormView):
         return super().form_valid(form)
 
 
-class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, _WorkerFromPk, TemplateView):
     """Owner settles one worker, any time (the 'Start Settlement' flow).
 
     GET  → show pending payable + a table of outstanding advances; cash defaults
@@ -217,8 +245,6 @@ class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, TemplateView):
     """
     template_name = 'expense/settlement_form.html'
 
-    def _worker(self):
-        return get_object_or_404(User, pk=self.kwargs['pk'])
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -266,13 +292,11 @@ class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         return redirect(reverse('expense:worker-detail', args=[worker.pk]))
 
 
-class WorkerProfileEditView(LoginRequiredMixin, _ManagementOnly, FormView):
+class WorkerProfileEditView(LoginRequiredMixin, _ManagementOnly, _WorkerFromPk, FormView):
     """Management edits a worker's payroll profile (bank/UPI/opening advance)."""
     template_name = 'expense/worker_profile_form.html'
     form_class = WorkerProfileForm
 
-    def _worker(self):
-        return get_object_or_404(User, pk=self.kwargs['pk'])
 
     def get_form_kwargs(self):
         kw = super().get_form_kwargs()
@@ -282,13 +306,373 @@ class WorkerProfileEditView(LoginRequiredMixin, _ManagementOnly, FormView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['viewed_worker'] = self._worker()
+        worker = self._worker()
+        ctx['viewed_worker'] = worker
+        # R4: the pay-basis control — visible read-only to managers, editable
+        # only by super-admin (owner P-2); server re-validates in the service.
+        from accounts.services import ROLE_SUPER_ADMIN
+        profile, _ = WorkerProfile.objects.get_or_create(user=worker)
+        ctx['pay_basis'] = profile.pay_basis
+        ctx['pay_basis_choices'] = WorkerProfile.PayBasis.choices
+        ctx['is_super_admin'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
+        # Owner R4 addendum: unsettled lines ⇒ the change needs an explicit
+        # confirmation — surface the count so the warning can be concrete.
+        ctx['pay_basis_unsettled'] = unsettled_contribution_count(worker)
         return ctx
 
     def form_valid(self, form):
-        form.save()
+        # RCP-1A F3: opening_advance is a displayed ₹ figure (WP-A informational)
+        # — the write still goes through THE payroll_service chokepoint
+        # (guards + audit log), never a bare form.save().
+        try:
+            payroll_service.update_payout_profile(
+                self._worker(), actor=self.request.user, **form.cleaned_data)
+        except ValidationError as exc:
+            messages.error(self.request, getattr(exc, 'message', str(exc)))
+            return self.render_to_response(self.get_context_data(form=form))
         messages.success(self.request, "Worker profile saved.")
         return redirect(reverse('expense:worker-detail', args=[self._worker().pk]))
+
+
+class WorkerPayBasisUpdateView(LoginRequiredMixin, _ManagementOnly, View):
+    """R4 (PDD §27-D4): change a worker's pay basis. Parse POST → delegate to
+    `payroll_service.set_pay_basis`, which owns EVERY guard (super-admin P-2,
+    unsettled-lines confirmation, audit row) — never trust the form."""
+
+    def post(self, request, pk):
+        worker = get_object_or_404(User, pk=pk)
+        basis = request.POST.get('pay_basis', '')
+        confirmed = bool(request.POST.get('confirm_unsettled'))
+        try:
+            profile = set_pay_basis(worker, basis, actor=request.user,
+                                    confirmed=confirmed)
+            messages.success(
+                request,
+                f"Pay basis for {worker.get_full_name() or worker.email} "
+                f"changed to {profile.get_pay_basis_display()}.")
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+        return redirect(reverse('expense:worker-profile', args=[worker.pk]))
+
+
+# ─── R7 (PDD §20 / §27-D5): Full & Final settlement — orchestration UI ───────
+
+class WorkerFnFView(LoginRequiredMixin, _ManagementOnly, _WorkerFromPk, TemplateView):
+    """Guided exit flow: checklist (GET) + execute (POST). The view renders
+    and parses ONLY — fnf_service owns every guard (super-admin P-4, open-task
+    and draft-gate refusals, write-off reason). No new money writer: fnf
+    orchestrates the existing settlement/payment/PSI chokepoints."""
+    template_name = 'expense/worker_fnf.html'
+
+
+    def get_context_data(self, **kwargs):
+        from expense.services import fnf_preview
+        from accounts.services import ROLE_SUPER_ADMIN
+        ctx = super().get_context_data(**kwargs)
+        worker = self._worker()
+        ctx['viewed_worker'] = worker
+        ctx['is_super_admin'] = user_has_role(self.request.user,
+                                              [ROLE_SUPER_ADMIN])
+        if ctx['is_super_admin']:
+            ctx['pv'] = fnf_preview(worker, user=self.request.user)
+        return ctx
+
+    def post(self, request, pk):
+        from expense.services import fnf_execute
+        worker = self._worker()
+        try:
+            receipt = fnf_execute(
+                worker, user=request.user,
+                write_off_reason=request.POST.get('write_off_reason', ''))
+            messages.success(
+                request,
+                f"Full & Final complete for "
+                f"{worker.get_full_name() or worker.email}: "
+                f"{len(receipt['settlements'])} settlement(s), "
+                f"₹{receipt['paid']} paid, "
+                f"{receipt['write_offs']} advance write-off(s). "
+                "Account deactivated — history preserved.")
+            return redirect(reverse('expense:worker-detail', args=[worker.pk]))
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+            return redirect(reverse('expense:worker-fnf', args=[worker.pk]))
+
+
+# ─── R5 (PDD §21 / ADR-0011): Factory expenses — factory-level cost records ──
+# NOT a ledger: these views/services never touch WorkerLedgerEntry or costing.
+
+def _parse_month(request):
+    """?month=YYYY-MM, strict parse, garbage → current month (never 500).
+    MEE-C: promoted from FactoryExpenseListView._month (INERT — same code) so
+    the recurring-expense pages reuse THE one parser instead of a copy."""
+    raw = request.GET.get('month', '')
+    try:
+        year, month = int(raw[:4]), int(raw[5:7])
+        if raw[4] != '-' or not 1 <= month <= 12:
+            raise ValueError
+        return year, month
+    except (ValueError, IndexError):
+        today = timezone.now().date()
+        return today.year, today.month
+
+
+class FactoryExpenseListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Month-scoped list + per-category totals. POST = void (super-admin +
+    mandatory reason — enforced by expense_service, never trusted to the UI).
+    Voided rows stay visible (struck-through) — nothing disappears."""
+    template_name = 'expense/factory_expense_list.html'
+
+    def _month(self):
+        return _parse_month(self.request)
+
+    def get_context_data(self, **kwargs):
+        from expense.models import FactoryExpense
+        from expense.services import expense_service
+        from accounts.services import ROLE_SUPER_ADMIN
+        ctx = super().get_context_data(**kwargs)
+        year, month = self._month()
+        ctx['year'], ctx['month'] = year, month
+        ctx['month_value'] = f"{year:04d}-{month:02d}"
+        ctx['expenses'] = (
+            FactoryExpense.objects
+            .filter(expense_date__year=year, expense_date__month=month)
+            .select_related('entered_by', 'worker', 'voided_by')
+        )
+        ctx['totals'] = expense_service.monthly_totals(year, month)
+        ctx['is_super_admin'] = user_has_role(self.request.user,
+                                              [ROLE_SUPER_ADMIN])
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from expense.models import FactoryExpense
+        from expense.services import void_expense
+        expense = get_object_or_404(FactoryExpense,
+                                    pk=request.POST.get('expense_id'))
+        try:
+            void_expense(expense, actor=request.user,
+                         reason=request.POST.get('void_reason', ''))
+            messages.success(request, "Expense voided.")
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+        month = request.POST.get('month', '')
+        url = reverse('expense:factory-expense-list')
+        return redirect(f"{url}?month={month}" if month else url)
+
+
+class FactoryExpenseCreateView(LoginRequiredMixin, _ManagementOnly, FormView):
+    """Entry form (mobile-first). Delegates to expense_service.record_expense
+    — the salary⇒worker rule and every other guard live there."""
+    template_name = 'expense/factory_expense_form.html'
+    form_class = FactoryExpenseForm
+    success_url = reverse_lazy('expense:factory-expense-list')
+
+    def form_valid(self, form):
+        from expense.services import record_expense
+        cd = form.cleaned_data
+        try:
+            record_expense(
+                category=cd['category'], amount=cd['amount'],
+                expense_date=cd['expense_date'], notes=cd.get('notes', ''),
+                worker=cd.get('worker'), actor=self.request.user,
+                confirmed_duplicate=bool(
+                    self.request.POST.get('confirm_duplicate')))
+        except (ValidationError, PermissionDenied) as exc:
+            # M-3: the duplicate-salary refusal re-renders WITH the confirm
+            # checkbox — warn-and-confirm, the service stays the enforcer.
+            if getattr(exc, 'code', None) == 'duplicate_salary':
+                self.duplicate_warning = getattr(exc, 'message', str(exc))
+            messages.error(self.request, getattr(exc, 'message', str(exc)))
+            return self.form_invalid(form)
+        messages.success(self.request, "Expense recorded.")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['duplicate_warning'] = getattr(self, 'duplicate_warning', None)
+        # L-3 (hostile review): accounts.User.salary = the agreed reference
+        # salary (informational field on the user forms, no money-code
+        # consumers). Repurposed as a CONVENIENCE prefill for salary entries —
+        # display-only sugar; the recorded amount is whatever is submitted.
+        # Management-only page, same audience as the user edit form (no leak).
+        ctx['worker_salaries'] = {
+            str(pk): str(sal) for pk, sal in
+            User.objects.filter(is_active=True, salary__isnull=False)
+                        .values_list('pk', 'salary')
+        }
+        return ctx
+
+
+# ─── MEE-C: Monthly Expense Engine surfaces (management-only) ────────────────
+# THIN by contract: every write goes through the MEE-B expense_service
+# functions (census ADDENDUM 1); these views parse inputs, call ONE service,
+# message + redirect. View gates management; the SERVICE enforces SA on the
+# levers (the pay-basis/void house pattern).
+
+class ExpenseTemplateListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Template register + each template's CURRENT-period status (straight
+    from the SAME preview path generation uses — no second status logic).
+    POST actions (SA, service-enforced): deactivate · change_amount."""
+    template_name = 'expense/expense_template_list.html'
+
+    def get_context_data(self, **kwargs):
+        from expense.models import ExpenseTemplate
+        from expense.services.expense_service import generate_monthly_expenses
+        from accounts.services import ROLE_SUPER_ADMIN
+        ctx = super().get_context_data(**kwargs)
+        year, month = _parse_month(self.request)
+        ctx['year'], ctx['month'] = year, month
+        ctx['month_value'] = f"{year:04d}-{month:02d}"
+        # Status per template = the preview receipt (confirm=False = pure read).
+        receipt = generate_monthly_expenses(year, month,
+                                            actor=self.request.user)
+        status = {row['template'].pk: "Pending generation"
+                  for row in receipt['to_create']}
+        status.update({t.pk: why for t, why in receipt['skipped']})
+        templates = list(ExpenseTemplate.objects
+                         .select_related('worker', 'created_by')
+                         .order_by('-is_active', 'category', 'label'))
+        ctx['rows'] = [{'t': t, 'status': status.get(t.pk, "—")}
+                       for t in templates]
+        ctx['is_super_admin'] = user_has_role(self.request.user,
+                                              [ROLE_SUPER_ADMIN])
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from expense.models import ExpenseTemplate
+        from expense.services.expense_service import (
+            change_template_amount, deactivate_expense_template)
+        template = get_object_or_404(ExpenseTemplate,
+                                     pk=request.POST.get('template_id'))
+        action = request.POST.get('action')
+        try:
+            if action == 'deactivate':
+                deactivate_expense_template(template, actor=request.user)
+                messages.success(request, f"Template “{template.label}” deactivated.")
+            elif action == 'change_amount':
+                change_template_amount(
+                    template, new_amount=request.POST.get('new_amount', ''),
+                    reason=request.POST.get('reason', ''), actor=request.user)
+                messages.success(request, f"Amount updated for “{template.label}” (audited).")
+            else:
+                messages.error(request, "Unknown action.")
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+        month = request.POST.get('month', '')
+        url = reverse('expense:expense-template-list')
+        return redirect(f"{url}?month={month}" if month else url)
+
+
+class ExpenseTemplateCreateView(LoginRequiredMixin, _ManagementOnly, FormView):
+    """Template entry (mobile-first, form-shell canon). Delegates to
+    expense_service.create_expense_template — SA gate + every rule live there."""
+    template_name = 'expense/expense_template_form.html'
+    form_class = None  # set in get_form_class (lazy import, house style)
+    success_url = reverse_lazy('expense:expense-template-list')
+
+    def get_form_class(self):
+        from expense.forms import ExpenseTemplateForm
+        return ExpenseTemplateForm
+
+    def form_valid(self, form):
+        from expense.services.expense_service import create_expense_template
+        cd = form.cleaned_data
+        try:
+            create_expense_template(
+                label=cd['label'], category=cd['category'],
+                amount=cd['amount'], worker=cd.get('worker'),
+                start_date=cd['start_date'], end_date=cd.get('end_date'),
+                notes=cd.get('notes', ''), actor=self.request.user)
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(self.request, getattr(exc, 'message', str(exc)))
+            return self.form_invalid(form)
+        messages.success(self.request, "Recurring template created.")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Same L-3 prefill sugar as the manual expense form (one audience).
+        ctx['worker_salaries'] = {
+            str(pk): str(sal) for pk, sal in
+            User.objects.filter(is_active=True, salary__isnull=False)
+                        .values_list('pk', 'salary')
+        }
+        return ctx
+
+
+class GenerateExpensesView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Preview → confirm for one month (THE single service path both ways:
+    GET renders confirm=False; POST confirm runs confirm=True). SA-only
+    regenerate action for voided-covered periods (service-enforced)."""
+    template_name = 'expense/generate_expenses.html'
+
+    def get_context_data(self, **kwargs):
+        from expense.services.expense_service import generate_monthly_expenses
+        ctx = super().get_context_data(**kwargs)
+        year, month = _parse_month(self.request)
+        ctx['year'], ctx['month'] = year, month
+        ctx['month_value'] = f"{year:04d}-{month:02d}"
+        receipt = generate_monthly_expenses(year, month,
+                                            actor=self.request.user)
+        ctx['receipt'] = receipt
+        # Presentation only: which skipped rows carry the voided-regenerate hint.
+        ctx['skipped_rows'] = [
+            {'t': t, 'why': why, 'regen': 'regenerate explicitly' in why}
+            for t, why in receipt['skipped']]
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        from expense.models import ExpenseTemplate
+        from expense.services.expense_service import (
+            generate_monthly_expenses, regenerate_period)
+        year, month = _parse_month(self.request)
+        month_value = f"{year:04d}-{month:02d}"
+        try:
+            if request.POST.get('action') == 'regenerate':
+                template = get_object_or_404(
+                    ExpenseTemplate, pk=request.POST.get('template_id'))
+                regenerate_period(template, year=year, month=month,
+                                  reason=request.POST.get('reason', ''),
+                                  actor=request.user)
+                messages.success(
+                    request, f"Regenerated “{template.label}” for {month_value}.")
+            else:
+                receipt = generate_monthly_expenses(
+                    year, month, actor=request.user, confirm=True)
+                messages.success(
+                    request,
+                    f"Generated {len(receipt['created'])} expense(s) for "
+                    f"{month_value}; skipped {len(receipt['skipped'])}.")
+                return redirect(
+                    f"{reverse('expense:factory-expense-list')}?month={month_value}")
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, 'message', str(exc)))
+        return redirect(
+            f"{reverse('expense:expense-generate')}?month={month_value}")
+
+
+# ─── RMX-D (Phase 17): Material Spend — the read-only WINDOW over the
+# certified RMX-C period reads (charter = PDD entry 8; D2 permanent rule:
+# aggregates management-visible; per-roll economics stay walled elsewhere).
+# THIN by contract: parse month → TWO service calls → context. Zero math,
+# zero ORM, zero writes, zero POST routes.
+
+class MaterialSpendView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+    """Consumption (PRIMARY) + Purchases (secondary), both basis-labelled;
+    honest-NULL banners; never blended with FactoryExpense (sibling link only
+    — ADR-0011)."""
+    template_name = 'expense/material_spend.html'
+    http_method_names = ['get', 'head', 'options']   # read-only by shape
+
+    def get_context_data(self, **kwargs):
+        from production.services.cost_service import material_consumption_in_period
+        from raw_materials.services.roll_service import material_purchases_in_period
+        ctx = super().get_context_data(**kwargs)
+        year, month = _parse_month(self.request)
+        ctx['year'], ctx['month'] = year, month
+        ctx['month_value'] = f"{year:04d}-{month:02d}"
+        ctx['consumption'] = material_consumption_in_period(year, month)
+        ctx['purchases'] = material_purchases_in_period(year, month)
+        return ctx
 
 
 # ─── V2-2 PR-D: Adda Settlement screens (management-only) ────────────────────
@@ -340,8 +724,9 @@ class AddaSettlementStartView(LoginRequiredMixin, _ManagementOnly, View):
 
 
 class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView):
-    """Draft: labeled preview (settleable / era-A skipped / era-B skipped) +
-    variance + per-advance recovery inputs + Finalize/Discard. Finalized:
+    """Draft: labeled preview (settleable / era-A skipped / era-B skipped /
+    monthly excluded, R4) + variance + per-advance recovery inputs +
+    Finalize/Discard. Finalized:
     frozen snapshot + Reverse / Reverse&Supersede. Reversed/Superseded:
     read-only snapshot + chain links."""
     template_name = 'expense/adda_settlement_detail.html'
@@ -391,7 +776,7 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
         from accounts.services import ROLE_SUPER_ADMIN, user_has_role
         ctx['is_super_admin'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
         if s.status == AddaSettlement.Status.DRAFT:
-            lines, skip_a, skip_b = adst.preview_lines(s)
+            lines, skip_a, skip_b, skip_monthly = adst.preview_lines(s)
             by_worker = {}
             for c in lines:
                 w = by_worker.setdefault(c.task.worker_id, {
@@ -411,6 +796,9 @@ class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView
                 (w['expected'] for w in by_worker.values()), _ZERO)
             ctx['skip_a'] = [self._line_dict(c) for c in skip_a]
             ctx['skip_b'] = [self._line_dict(c) for c in skip_b]
+            # R4: monthly workers' lines — excluded from settlement (D4);
+            # labeled so the admin SEES what won't pay before finalizing.
+            ctx['skip_monthly'] = [self._line_dict(c) for c in skip_monthly]
         else:
             ctx['items'] = s.items.select_related('worker').order_by('worker_id')
             ctx['recoveries'] = (s.recovery_lines

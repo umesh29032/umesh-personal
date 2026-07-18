@@ -1,3 +1,13 @@
+---
+id: s4-phase3-receipt-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # S4 Phase 3 Design Receipt — WorkerStageAllocation + pool draw-down (2026-06-14)
 
 Governed by [S4_DESIGN_CORRECTION_ADDENDUM](S4_DESIGN_CORRECTION_ADDENDUM_2026_06_14.md)

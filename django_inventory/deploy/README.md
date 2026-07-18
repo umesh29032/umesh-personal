@@ -1,3 +1,13 @@
+---
+id: deploy-readme
+type: topic-canonical
+status: active
+owner: handwritten
+scope: deployment
+anchors: deploy/
+verified: 2026-07-13
+---
+
 # Deploy & Operations Runbook — single-VPS Docker Compose (direction C)
 
 Owner-approved 2026-06-11. This file is the ops runbook the architecture

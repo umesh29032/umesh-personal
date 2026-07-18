@@ -1,3 +1,13 @@
+---
+id: docs-html-fix-history
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # HTML_FIX_HISTORY — chronological fix log
 
 Companion to [HTML_AUDIT_MASTER.md](HTML_AUDIT_MASTER.md). One row per committed fix,

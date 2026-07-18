@@ -1,3 +1,13 @@
+---
+id: l2-ai-agent-guide-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system
+anchors: —
+verified: 2026-07-13
+---
+
 # AI AGENT GUIDE — zero-context entry for a future Claude
 
 ## TL;DR (the cheapest path — read ONE file to route)

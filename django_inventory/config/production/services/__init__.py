@@ -31,8 +31,8 @@ from production.stages.layering.service import (
     save_layering_breakup,
     save_layering_draft,
     start_layering,
-    sync_layering_workers_for_skill,
     update_layering_roll_entry,
+    worker_layer_reconciliation,
 )
 from production.stages.cutting.service import (
     add_bundle_item,
@@ -78,7 +78,7 @@ from production.stages.barcode_generation.service import (
 )
 from .cost_service import clear_stage_cost
 from .activity_service import adda_activity, user_activity_across_addas
-from .access_service import user_can_access_stage, stage_access_map
+from .access_service import eligible_stage_workers, stage_access_map, user_can_access_stage
 from .flow_service import (
     add_stage_to_product_flow,
     move_stage_in_product_flow,
@@ -115,7 +115,6 @@ __all__ = [
     'reactivate_product_size',
     # Layering stage
     'start_layering',
-    'sync_layering_workers_for_skill',
     'attach_roll_to_layering',
     'update_layering_roll_entry',
     'detach_roll_from_layering',
@@ -124,6 +123,7 @@ __all__ = [
     'record_remaining_cloth',
     'remove_remaining_cloth',
     'complete_layering',
+    'worker_layer_reconciliation',
     'reopen_layering',
     'get_layering_snapshot',
     'attach_layering_snapshots',
@@ -173,6 +173,7 @@ __all__ = [
     'user_activity_across_addas',
     # Stage access control (DB-driven)
     'user_can_access_stage',
+    'eligible_stage_workers',
     'stage_access_map',
     # Product flow management
     'add_stage_to_product_flow',

@@ -68,13 +68,14 @@ def _ensure_can_complete_layering(user):
 # ── Shared stage-reopen skeleton (Template Method) ───────────────────────────
 
 def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
-                        guard=None, teardown=None) -> AddaStageRecord:
+                        guard=None, teardown=None,
+                        stream=None) -> AddaStageRecord:
     """Common skeleton for every per-stage `reopen_*` service (layering / cutting /
     cutting_pattern / barcode_generation). Owns the invariant ALL reopens share;
     each stage passes its OWN `guard` + `teardown` so the stage-specific logic
     stays local + visible at the call site (no hidden framework).
 
-    Skeleton (in order):
+    Skeleton (in order, stream=None):
       1. management-role gate
       2. find this product's WorkflowStage(stage_code)   → ValidationError if absent
       3. select_for_update its AddaStageRecord           → ValidationError if absent
@@ -105,9 +106,17 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     try:
         # Hinglish: SR row lock — reopen aur settlement-finalize dono isi row
         # ko lock karte hain, isliye yeh check finalize se race nahi kar sakta.
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=wf,
-        )
+        from production.services.adda_service import (
+            PRE_PRODUCTION_STAGE_CODES, lane_stage_record, resolve_stream)
+        if stage_code in PRE_PRODUCTION_STAGE_CODES:
+            lane = resolve_stream(adda, stream)
+            sr = lane_stage_record(adda, wf, lane, for_update=True)
+            if sr is None:
+                raise AddaStageRecord.DoesNotExist
+        else:
+            sr = AddaStageRecord.objects.select_for_update().get(
+                adda=adda, workflow_stage=wf,
+            )
     except AddaStageRecord.DoesNotExist:
         raise ValidationError(f"{stage_label} stage has never been started.")
     if sr.completed_at is None:

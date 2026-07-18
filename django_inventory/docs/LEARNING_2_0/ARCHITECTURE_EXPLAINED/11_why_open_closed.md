@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-11-why-open-closed
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why the stage engine is open-closed
 
 **Problem:** Har naya production stage (Layering, Cutting, future Overlock/

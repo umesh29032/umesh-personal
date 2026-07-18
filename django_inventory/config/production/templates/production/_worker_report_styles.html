@@ -4,7 +4,7 @@ shell mirror the approved mockup docs/mockups/worker_report.html, which itself
 mirrors shared/_form_styles.html + stage_panel_embedded :root.{% endcomment %}
 <style>
   .worker-report.form-shell{max-width:760px; margin:0 auto; padding-bottom:120px;}
-  .worker-report .hero{background:linear-gradient(135deg,#0a1628 0%,#1a2840 50%,#2a1f0e 85%,#b87333 130%);
+  .worker-report .hero{background:var(--hero-grad-deep);
         color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
         box-shadow:0 8px 32px rgba(14,11,9,.20); position:relative; overflow:hidden;}
   .worker-report .hero::before{content:''; position:absolute; right:-100px; top:-100px; width:280px; height:280px;
@@ -45,6 +45,7 @@ mirrors shared/_form_styles.html + stage_panel_embedded :root.{% endcomment %}
         color:var(--stone,#6e6259); display:block; margin-bottom:7px;}
 
   .worker-report .chip-row{display:flex; flex-wrap:wrap; gap:8px;}
+  .worker-report .fld-hint{font-size:13px; color:var(--stone,#6e6259); font-style:italic;}
   .worker-report .chip{display:inline-flex; align-items:center; gap:7px; padding:8px 13px; cursor:pointer;
         background:var(--cream,#faf7f2); border:1.5px solid var(--border-card,#cfc0aa); border-radius:999px;
         font-size:13px; color:var(--ink,#1c1c1e); transition:background .15s,border-color .15s; font-family:inherit;}
@@ -107,4 +108,8 @@ mirrors shared/_form_styles.html + stage_panel_embedded :root.{% endcomment %}
     .worker-report .sticky-actions{bottom:8px; flex-direction:column-reverse;}
     .worker-report .sticky-actions .btn{width:100%;}
   }
+  /* FE-4: Alter/Missing are OBSERVATIONS — visually quieter than the payable
+     Good field (owner D2: only good pays; keep the worker's eye on it). */
+  .line-field--obs .fld-label{color:var(--stone,#7a6a58);font-weight:500;}
+  .line-field--obs .qty-input{background:var(--cream-2,#ede3d4);}
 </style>

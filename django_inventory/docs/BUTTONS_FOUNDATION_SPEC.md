@@ -1,3 +1,13 @@
+---
+id: docs-buttons-foundation-spec
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # BUTTONS FOUNDATION SPEC
 
 > **Status:** Foundation contract — **DESIGN ONLY. NO CODE. NO CSS. NO token consumption.

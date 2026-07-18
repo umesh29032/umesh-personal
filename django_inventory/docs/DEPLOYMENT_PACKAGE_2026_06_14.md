@@ -1,3 +1,13 @@
+---
+id: deployment-package-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # Staging Deployment Package — 2026-06-14
 
 Companion to [STAGING_READINESS_2026_06_14](STAGING_READINESS_2026_06_14.md). Planning only — no code, no migrations, no foundation work. The staging bundle (P0-1…5, P1-1, P1-2, G-AUTH-1, H-2A+B, F-3) is complete; suite 537/537 green; `check --deploy` clean.

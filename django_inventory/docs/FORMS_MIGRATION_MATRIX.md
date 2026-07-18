@@ -1,3 +1,13 @@
+---
+id: docs-forms-migration-matrix
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # FORMS MIGRATION MATRIX (Foundation 3)
 
 > **Status:** Per-target plan — **DESIGN ONLY. NO CODE, NO commits.** Evidence: [FORMS_AUDIT_REPORT.md](FORMS_AUDIT_REPORT.md) ·

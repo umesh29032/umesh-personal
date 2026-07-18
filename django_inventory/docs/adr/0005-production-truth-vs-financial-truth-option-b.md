@@ -1,6 +1,16 @@
+---
+id: docs-adr-0005-production-truth-vs-financial-truth-option-b
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0005 — Production truth ≠ financial truth; ledger only at settlement (Option B)
 
-**Status:** Accepted for the model; **settlement build (V2 §11) pending** — see
+**Status:** Accepted; **settlement layer BUILT (V2-2/V2-3, 2026-06-11)** — settlement-first is the shipped default (`LEDGER_CREDIT_AT_ALLOCATION=False`; cutover = ADR-0007). Original note: see
 [docs/ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md) §11 (🔒LOCKED) + [docs/archive/reviews/V2_1_REVIEW.md](../archive/reviews/V2_1_REVIEW.md).
 
 ## Context
@@ -18,7 +28,7 @@ timing tangled, and bakes provisional numbers into the ledger.
 - On task complete, `expected_rate`/`expected_earning` are **frozen as visibility only** —
   **no `WorkerLedgerEntry` is written**. This is **Option B**: no ledger until settlement.
 
-## Decision (the settlement layer — DESIGN-ONLY / LOCKED, not built)
+## Decision (the settlement layer — LOCKED at design time; BUILT 2026-06-11 as designed)
 - An **Adda-centric `AddaSettlement`** event books earnings + advance recovery at settlement.
   **Settlement ≠ payment**; recovery is owner-controlled per-advance (not auto-FIFO).
 - Today (pre-§11) earnings still credit at allocation via `expense` — the documented gap.

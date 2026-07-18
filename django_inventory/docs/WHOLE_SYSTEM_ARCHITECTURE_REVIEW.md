@@ -1,3 +1,13 @@
+---
+id: docs-whole-system-architecture-review
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Whole-System Frontend Architecture Review (post-audit)
 
 > **The one-time architecture decision pass.** Evaluated ONLY from the FROZEN audit evidence (Families A-G:

@@ -1,3 +1,13 @@
+---
+id: s5-design-receipt-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # S5 Design Receipt — M-6 finalize BLOCK + allocation-bound rollout safety (2026-06-14)
 
 Governed by [MASTER_PLAN_V2 (S5)](IMPLEMENTATION_MASTER_PLAN_V2.md) + the

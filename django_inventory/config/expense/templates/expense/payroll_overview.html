@@ -66,6 +66,7 @@
                             <a class="worker" href="{% url 'expense:worker-detail' w.worker.pk %}">
                                 {{ w.worker.get_full_name|default:w.worker.email }}
                             </a>
+                            {% if w.is_monthly %}<span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span>{% endif %}
                         </td>
                         <td data-label="Role">{{ w.role.name|default:"—" }}</td>
                         <td class="num" data-label="Pieces">{{ w.pieces|floatformat:0 }}</td>
@@ -74,7 +75,12 @@
                         <td class="num" data-label="Settled">{% money w.total_settled %}</td>
                         <td class="num payable" data-label="Payable">{% money w.payable %}</td>
                         <td class="num" data-label="">
+                            {% if w.is_monthly %}
+                            {# ADR-0011: monthly pay never flows through settlement #}
+                            <a class="worker" href="{% url 'expense:factory-expense-add' %}">Salary →</a>
+                            {% else %}
                             <a class="worker" href="{% url 'expense:settlement-create' w.worker.pk %}">Settle</a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% empty %}

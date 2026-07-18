@@ -1,3 +1,13 @@
+---
+id: learning-path
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — ordered route
+anchors: —
+verified: 2026-07-13
+---
+
 # LEARNING PATH — from zero to productive (developer or owner)
 
 > Order matters. Each step: what to read + what to DO on the dev server.

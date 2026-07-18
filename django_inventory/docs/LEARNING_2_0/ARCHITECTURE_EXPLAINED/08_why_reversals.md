@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-08-why-reversals
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why reversals exist
 
 **Problem:** Append-only me row edit/delete nahi kar sakte. To galti kaise

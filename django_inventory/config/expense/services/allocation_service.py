@@ -60,6 +60,16 @@ def allocate_stage_work(*, user, stage_record, worker, allocated_quantity,
     """
     _ensure_management(user)
 
+    # 🔒 ADR-0011 (hostile-review H-1 fix, 2026-07-05): a MONTHLY worker must
+    # NEVER receive piece-rate earnings from ANY code path — this legacy path
+    # included, REGARDLESS of the rollback lever below. Checked FIRST so the
+    # invariant holds even when the lever is ON.
+    from expense.services.payroll_service import is_monthly
+    if is_monthly(worker):
+        raise ValidationError(
+            "This worker is on a monthly salary — they never receive "
+            "piece-rate credits. Salary is recorded under Factory Expenses.")
+
     # V2-2 cutover lever (ADR-0007): with the flag OFF, earnings book ONLY at
     # Adda settlement — the allocation-credit path refuses outright.
     # Fallback is False (settlement-first) — matches base.py default + stage_views,

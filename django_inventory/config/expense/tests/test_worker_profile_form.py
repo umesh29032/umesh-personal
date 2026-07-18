@@ -50,3 +50,56 @@ class WorkerProfileFormValidationTests(TestCase):
         f = self._form(bank_account_name='Asha Devi', bank_account_number='123456789012',
                        bank_ifsc='HDFC0001234')
         self.assertTrue(f.is_valid(), f.errors)
+
+
+class WorkerProfileServiceWriteTests(TestCase):
+    """RCP-1A F3: the profile save goes through payroll_service.update_payout_profile
+    (chokepoint — opening_advance is a displayed ₹ figure, WP-A informational).
+    Behaviour preserved; opening_advance changes are audit-logged old→new + actor."""
+
+    def setUp(self):
+        from accounts.models import User
+        from inventory.models import Role
+        self.mgr = User.objects.create_user(email='wp-mgr@test.test', password='x')
+        self.mgr.role = Role.objects.get(code='manager')
+        self.mgr.save()
+        self.worker = User.objects.create_user(email='wp-worker@test.test', password='x')
+        self.worker.role = Role.objects.get(code='worker')
+        self.worker.save()
+
+    def test_view_saves_via_service(self):
+        from django.urls import reverse
+        from expense.models import WorkerProfile
+        self.client.force_login(self.mgr)
+        resp = self.client.post(
+            reverse('expense:worker-profile', args=[self.worker.pk]),
+            {'opening_advance': '750.00'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            str(WorkerProfile.objects.get(user=self.worker).opening_advance),
+            '750.00')
+
+    def test_service_rejects_negative(self):
+        from decimal import Decimal
+        from django.core.exceptions import ValidationError
+        from expense.services.payroll_service import update_payout_profile
+        with self.assertRaises(ValidationError):
+            update_payout_profile(self.worker, actor=self.mgr,
+                                  opening_advance=Decimal('-1'))
+
+    def test_opening_advance_change_is_logged(self):
+        from decimal import Decimal
+        from expense.services.payroll_service import update_payout_profile
+        with self.assertLogs('expense.services.payroll_service', level='INFO') as logs:
+            update_payout_profile(self.worker, actor=self.mgr,
+                                  opening_advance=Decimal('100.00'))
+        self.assertTrue(any('opening_advance.change' in l for l in logs.output))
+
+    def test_view_no_longer_calls_form_save(self):
+        # Law-4 pin: the money field is never written by a bare form.save().
+        import inspect
+        from expense import views as v
+        src = inspect.getsource(v.WorkerProfileEditView.form_valid)
+        code_lines = [l for l in src.splitlines() if not l.strip().startswith('#')]
+        self.assertNotIn('form.save()', '\n'.join(code_lines))
+        self.assertIn('update_payout_profile', src)

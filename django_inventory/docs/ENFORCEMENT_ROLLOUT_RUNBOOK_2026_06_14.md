@@ -1,3 +1,13 @@
+---
+id: enforcement-rollout-runbook-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: campaign/audit evidence
+anchors: —
+verified: 2026-07-13
+---
+
 # Enforcement Rollout Runbook — allocation bound + settlement reconciliation (2026-06-14)
 
 Two foundation enforcement gates ship **OFF** and are enabled later, after evidence. This is

@@ -1,3 +1,13 @@
+---
+id: l2-apps-tracking-request-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: tracking
+anchors: config/tracking/
+verified: 2026-07-13
+---
+
 # tracking — REQUEST_MAP
 
 ## TL;DR (1 min)

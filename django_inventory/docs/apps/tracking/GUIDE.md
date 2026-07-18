@@ -1,3 +1,13 @@
+---
+id: apps-tracking-guide
+type: app-guide
+status: active
+owner: handwritten
+scope: tracking
+anchors: config/tracking/
+verified: 2026-07-13
+---
+
 # tracking app — file-by-file GUIDE (append-only memory + identity)
 
 > Business view: [config/tracking/README.md](../../../config/tracking/README.md).

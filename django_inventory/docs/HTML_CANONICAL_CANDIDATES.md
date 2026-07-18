@@ -1,3 +1,13 @@
+---
+id: docs-html-canonical-candidates
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # HTML_CANONICAL_CANDIDATES — staged canonical rules (NOT yet locked)
 
 Companion to [HTML_AUDIT_MASTER.md](HTML_AUDIT_MASTER.md). Staging area for reusable

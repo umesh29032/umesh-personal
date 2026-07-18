@@ -1,0 +1,36 @@
+{% extends "accounts/base.html" %}
+{# P2 — DXF-AAMA import (one piece per file) -> draft geometry row #}
+{% block page_title %}Import DXF — {{ piece.pattern.name }}{% endblock %}
+{% block content %}
+<div class="pai-dxf">
+  <div class="page-header">
+    <h1>Import DXF · {{ piece.pattern.name }}</h1>
+    <p class="subtitle">{{ piece.product.code }} — AAMA layers honored
+    (1 = boundary, 7 = grainline, 8 = internal, 11 = cutouts). Imported
+    geometry lands as a DRAFT, trust <em>uncalibrated</em> until a
+    tape-accepted confirm.</p>
+  </div>
+  <form method="post" enctype="multipart/form-data" class="card"
+        style="padding:20px; max-width:560px;">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="field">
+      <label>Size</label>
+      <select name="size" required>
+        {% for s in sizes %}<option value="{{ s.pk }}">{{ s.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>DXF file</label>
+      <input type="file" name="dxf_file" accept=".dxf" required>
+      {{ form.dxf_file.errors }}
+    </div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <a class="btn" href="{% url 'patterns_ai:piece-detail' piece.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Import</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

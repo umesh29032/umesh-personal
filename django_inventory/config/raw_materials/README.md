@@ -1,3 +1,13 @@
+---
+id: app-raw-materials-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: raw_materials
+anchors: config/raw_materials/
+verified: 2026-07-13
+---
+
 # `raw_materials` app — Cloth Inventory (the factory's input side)
 
 > Dual-register guide (developer + owner). Canonical production-subsystem doc:
@@ -56,12 +66,32 @@ revalues every historical Adda — it is a purchase FACT (ADR-0009).
 Dashboards + roll list (DataTables, stacked cards on phone — F1 fixed),
 bulk intake form (price fields visible to financial roles only), roll detail.
 
+## Period purchases read (Phase 17 RMX, 2026-07-18 — READ-ONLY)
+
+`roll_service.material_purchases_in_period(year, month)` — is app ka EK
+period-aggregate read: us month create hue rolls ka Σ(weight_kg × cost_per_kg)
+(priced-only value) + priced/unpriced/**damaged-INCLUDED** counts + weight
+(owner ruling RMX-D9: purchases mein damaged honest rehta hai; consumption se
+excluded). `DateField` → exact month boundaries, koi tz math nahi. Consumer:
+`/expense/material-spend/` (secondary, LABELLED "purchases" basis — consumption
+se kabhi blend nahi hota). Koi writer nahi — roll truth hi sole authoritative
+material record hai (one-rupee-once).
+
 ## Common mistakes
 
 1. Don't set `is_consumed`/`consumed_in_adda` by hand — only the service.
 2. Don't "update" cost_per_kg to today's market rate — corrections only.
 3. Unpriced roll ≠ free roll: NULL surfaces on the costing dashboard banner.
 4. A roll never splits across Addas — leftovers are the split mechanism.
+5. Master-data WRITES (type/color/location create/edit/archive/delete) are
+   MANAGEMENT-only — view mixin + `master_service` gate (Phase-E worker
+   certification 2026-07-12; the old production-role gate let workers
+   mutate masters). Lists stay production-role (read-only; SidebarItemRule
+   additionally blocks workers at the middleware).
+6. Shared master templates need `title` + `list_url_name` in context — every
+   base view must pass them explicitly (Django `DeleteView` doesn't by
+   default; missing them = `{% url '' %}` NoReverseMatch 500 on the
+   delete-confirm page. Fixed MGT-E 2026-07-12, DEPLOYMENT_BACKLOG #5).
 
 ## Django Learning Notes
 

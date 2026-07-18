@@ -99,6 +99,55 @@ class Product(TimeStampedModel):
         return self.name
 
 
+class StageCategory(TimeStampedModel):
+    """R10 (frozen architecture 2026-07-05): grouping METADATA for stages —
+    Pre Production / Stitching / Finishing / Dispatch. Display, reporting and
+    filters ONLY: the workflow engine, money paths and access control NEVER
+    read categories (rule 2 of the frozen architecture; guard-tested)."""
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=64)
+    display_order = models.PositiveSmallIntegerField(default=0)
+    # Owner-editable master (data-driven rule): deactivate hides a category
+    # from NEW-stage pickers; existing stages keep their FK (PROTECT) and
+    # keep grouping under the old name — history never lies.
+    is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name_plural = 'stage categories'
+
+    def __str__(self):
+        return self.name
+
+
+class MachineType(TimeStampedModel):
+    """R10: the KIND of machine a stage runs on (Overlock/Flatlock/Sewing…).
+
+    Lives in PRODUCTION (stage-domain metadata beside Stage) so the layering
+    stays acyclic: the machines app (physical assets) points DOWN at this and
+    at Adda; production keeps no model-level machines imports (3 sanctioned
+    function-level reads, see .importlinter). Reusable across ANY number of
+    operations (plain FK from Stage — frozen rule 5). NEVER carries ₹ (future
+    MachineRate = separate table + ADR, per the frozen architecture §0.2)."""
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Stage(TimeStampedModel):
     """Global library of stages — admin-managed, reusable across Products.
 
@@ -124,6 +173,27 @@ class Stage(TimeStampedModel):
     )
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    # ── R10 frozen production model (2026-07-05) ──────────────────────────
+    # A Stage = ONE business OPERATION (Overlock, Collar Attach…), never a
+    # process ("Stitching" = a StageCategory) and never a machine number.
+    class WorkType(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        MACHINE = 'machine', 'Machine'
+
+    work_type = models.CharField(
+        max_length=16, choices=WorkType.choices, default=WorkType.MANUAL,
+        help_text="HOW the operation is performed. Machine ⇒ pick a Machine Type.",
+    )
+    machine_type = models.ForeignKey(
+        'production.MachineType', null=True, blank=True,
+        on_delete=models.PROTECT, related_name='stages',
+        help_text="Mandatory when Work Type = Machine; forbidden when Manual.",
+    )
+    category = models.ForeignKey(
+        'production.StageCategory', null=True, blank=True,
+        on_delete=models.PROTECT, related_name='stages',
+        help_text="Grouping for dashboards/reports ONLY — never workflow logic.",
+    )
     access_by_skill = models.ManyToManyField(
         'accounts.Skill', blank=True, related_name='accessible_stages',
         help_text="Users with ANY of these skills can access this stage.",
@@ -153,6 +223,15 @@ class Stage(TimeStampedModel):
             models.CheckConstraint(
                 check=models.Q(default_cost_rate__gte=0),
                 name='prod_stage_defaultrate_nonneg',
+            ),
+            # R10 frozen rule 4 — THE single enforcement point for Work Type:
+            # Machine ⇒ machine_type mandatory; Manual ⇒ machine_type forbidden.
+            models.CheckConstraint(
+                check=(
+                    models.Q(work_type='machine', machine_type__isnull=False)
+                    | (~models.Q(work_type='machine') & models.Q(machine_type__isnull=True))
+                ),
+                name='prod_stage_worktype_machinetype_pair',
             ),
         ]
 

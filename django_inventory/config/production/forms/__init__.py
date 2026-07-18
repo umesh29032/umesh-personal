@@ -14,7 +14,6 @@ from .adda_forms import AddaCreateForm
 from .layering import (
     AttachRollForm,
     CompleteLayeringForm,
-    EditRollEntryForm,
     RemainingClothForm,
     StartLayeringForm,
 )
@@ -32,7 +31,6 @@ __all__ = [
     # Layering stage
     'StartLayeringForm',
     'AttachRollForm',
-    'EditRollEntryForm',
     'RemainingClothForm',
     'CompleteLayeringForm',
     # Cutting stage

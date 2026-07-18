@@ -1,3 +1,13 @@
+---
+id: docs-forms-audit-report
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # FORMS AUDIT REPORT (Foundation 3)
 
 > **Status:** Evidence/inventory — **DESIGN ONLY. NO CODE, NO commits.** Counts MEASURED

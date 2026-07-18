@@ -1,3 +1,13 @@
+---
+id: docs-foundation-design-challenge-2026-06-14
+type: receipt
+status: active
+owner: append-only
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Foundation Design Challenge — hostile pre-S1 review (2026-06-14)
 
 Strongest-possible criticism of the LOCKED Production-Truth Foundation before Sprint S1. Six independent hostile lenses (architect/maintainer · concurrency · floor · money · scale · rework/missing) produced **63 findings (7 Critical, 22 High, 32 Medium, 2 Low)**; deduped + ranked below. Challenges the *design*, not completed P0/P1. (The lens fan-out ran as a workflow; this synthesis is hand-written — the auto-synthesis hit the session cap.)

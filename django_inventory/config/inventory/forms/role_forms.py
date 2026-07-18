@@ -2,10 +2,7 @@ from django import forms
 from django.contrib.auth.models import Permission
 
 from ..models import Role
-from accounts.services.permission_service import (
-    ROLE_EDITABLE_APPS,
-    ROLE_EDITABLE_MODELS_EXCLUDED,
-)
+from accounts.services.permission_service import permissions_qs_by_app
 
 
 class RoleForm(forms.ModelForm):
@@ -25,15 +22,21 @@ class RoleForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        qs = (
+        # The ModelMultipleChoiceField queryset is the form's validation gate —
+        # only pks IN it can be POSTed. It MUST match the curated editor
+        # (ROLE_EDITOR_SECTIONS = content-type allowlist), not the whole app.
+        # permissions_qs_by_app() is the same source the rendered checkbox
+        # sections use, so offered == validatable. (Filtering by app_label alone
+        # let a hand-crafted POST persist grants on service-only models the
+        # editor deliberately hides — e.g. production.change_machinetype — which
+        # live view gates then honored.)
+        curated_ids = [p.pk for p in permissions_qs_by_app()]
+        self.fields['permissions'].queryset = (
             Permission.objects
-            .filter(content_type__app_label__in=ROLE_EDITABLE_APPS)
+            .filter(pk__in=curated_ids)
             .select_related('content_type')
             .order_by('content_type__app_label', 'content_type__model', 'codename')
         )
-        for app_label, model in ROLE_EDITABLE_MODELS_EXCLUDED:
-            qs = qs.exclude(content_type__app_label=app_label, content_type__model=model)
-        self.fields['permissions'].queryset = qs
         for name, field in self.fields.items():
             if name == 'permissions':
                 continue

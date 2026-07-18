@@ -15,14 +15,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import DetailView, FormView, ListView, UpdateView
+from django.views.generic import DetailView, FormView, ListView, UpdateView, View
 
 from accounts.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
 from raw_materials.forms import BulkRollForm, RollEditForm
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls, update_roll_details
 
-from .mixins import ProductionRoleMixin, SuperAdminOnlyMixin
+from .mixins import ManagementRoleMixin, ProductionRoleMixin, SuperAdminOnlyMixin
 
 
 class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
@@ -207,10 +207,18 @@ class RollDetailView(LoginRequiredMixin, ProductionRoleMixin, DetailView):
         # Edit allowed only when stock is NOT_USED — once attached to Adda,
         # verified width/weight live on LayeringRollEntry (history immutable).
         ctx['can_edit'] = ctx['roll'].status == ClothRoll.Status.NOT_USED
+        # V1.1 item-1: damage transitions are MANAGEMENT acts (service guards
+        # mirror these flags — defence-in-depth).
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        _mgmt = user_has_role(self.request.user, MANAGEMENT_ROLES)
+        ctx['can_mark_damaged'] = (_mgmt and
+                                   ctx['roll'].status == ClothRoll.Status.NOT_USED)
+        ctx['can_restore_damaged'] = (_mgmt and
+                                      ctx['roll'].status == ClothRoll.Status.DAMAGED)
         return ctx
 
 
-class RollUpdateView(LoginRequiredMixin, ProductionRoleMixin, UpdateView):
+class RollUpdateView(LoginRequiredMixin, ManagementRoleMixin, UpdateView):
     """Stock-level edit form for a single roll.
 
     Why ek alag view (not generic UpdateView.save())?
@@ -258,3 +266,30 @@ class RollUpdateView(LoginRequiredMixin, ProductionRoleMixin, UpdateView):
             return self.form_invalid(form)
         messages.success(self.request, f"Roll {self.object.roll_id} updated.")
         return redirect('raw_materials:roll-detail', pk=self.object.pk)
+
+
+class RollDamageView(LoginRequiredMixin, ManagementRoleMixin, View):
+    """V1.1 item-1: POST-only mark-damaged / restore (action field); the
+    service owns every guard (mgmt, reason, used-refusal, audit rows)."""
+
+    def post(self, request, pk):
+        from raw_materials.services.roll_service import (mark_roll_damaged,
+                                                         restore_damaged_roll)
+        roll = get_object_or_404(ClothRoll, pk=pk)
+        action = request.POST.get('action')
+        reason = (request.POST.get('reason') or '').strip()
+        try:
+            if action == 'restore':
+                restore_damaged_roll(request.user, roll=roll, reason=reason)
+                messages.success(request,
+                                 f"Roll {roll.roll_id} restored to available "
+                                 "stock — reason on the roll's history.")
+            else:
+                mark_roll_damaged(request.user, roll=roll, reason=reason)
+                messages.success(request,
+                                 f"Roll {roll.roll_id} marked DAMAGED — out of "
+                                 "available stock; reason on the roll's history.")
+        except (PermissionDenied, ValidationError) as e:
+            msg = e.messages[0] if hasattr(e, 'messages') else str(e)
+            messages.error(request, msg)
+        return redirect('raw_materials:roll-detail', pk=roll.pk)

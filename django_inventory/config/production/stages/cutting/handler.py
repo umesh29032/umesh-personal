@@ -99,7 +99,7 @@ class CuttingHandler(StageHandler):
             return Decimal(cr.bundles.count())
         return Decimal(cr.pieces_cut) if cr.pieces_cut is not None else None
 
-    def contribution_schema(self, adda):
+    def contribution_schema(self, adda, worker=None):
         """REFERENCE impl of the open-closed worker-contribution schema: Cutting
         workers report pieces per colour + size. Colours = active cloth palette;
         sizes = the product's active ProductSizes. (Not the final shape of all
