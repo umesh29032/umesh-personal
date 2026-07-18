@@ -3960,7 +3960,7 @@
       "census": {
         "adr": 11,
         "app": 13,
-        "doc": 953,
+        "doc": 961,
         "feature": 28,
         "model": 91,
         "service": 58,
@@ -3970,7 +3970,7 @@
       },
       "git_head": "unknown"
     },
-    "content_hash": "sha256:5d159ece1df07c4cd5db74e98b8cfabdc027327dc7c4ad32cacc41c63a403022",
+    "content_hash": "sha256:56207d76ed26af90ae27f6b6bec51cae3f2bdf0ecb44cc095a69e419ea143ead",
     "schema_version": "1.0.1"
   },
   "nodes": [
@@ -16575,6 +16575,110 @@
       "lifecycle": "active",
       "owner_class": "handwritten",
       "path": "docs/production/TRACKING.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/ARCHITECTURE_GUIDE.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/ARCHITECTURE_GUIDE.md",
+      "kind": "doc",
+      "label": "ARCHITECTURE_GUIDE.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/ARCHITECTURE_GUIDE.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/DEPLOYMENT_GUIDE.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/DEPLOYMENT_GUIDE.md",
+      "kind": "doc",
+      "label": "DEPLOYMENT_GUIDE.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/DEPLOYMENT_GUIDE.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/DEVELOPER_GUIDE.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/DEVELOPER_GUIDE.md",
+      "kind": "doc",
+      "label": "DEVELOPER_GUIDE.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/DEVELOPER_GUIDE.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/KNOWN_LIMITATIONS.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/KNOWN_LIMITATIONS.md",
+      "kind": "doc",
+      "label": "KNOWN_LIMITATIONS.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/KNOWN_LIMITATIONS.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/OPERATIONS_MANUAL.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/OPERATIONS_MANUAL.md",
+      "kind": "doc",
+      "label": "OPERATIONS_MANUAL.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/OPERATIONS_MANUAL.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/README.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/README.md",
+      "kind": "doc",
+      "label": "README.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/README.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/ROADMAP.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/ROADMAP.md",
+      "kind": "doc",
+      "label": "ROADMAP.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/ROADMAP.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/release/TROUBLESHOOTING.md"
+      ],
+      "doc_type": "topic-canonical",
+      "id": "doc:docs/release/TROUBLESHOOTING.md",
+      "kind": "doc",
+      "label": "TROUBLESHOOTING.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/release/TROUBLESHOOTING.md",
       "tier": "T2"
     },
     {
