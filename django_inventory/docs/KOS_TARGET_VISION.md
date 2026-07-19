@@ -10,6 +10,15 @@ verified: 2026-07-13
 
 # KOS TARGET VISION — the Engineering Knowledge Operating System (long-term)
 
+> **Amendment 2026-07-19 (owner-approved two-layer split):** the human/prose half of
+> this vision now lives in **`kos/`** (repo root) — the owner-approved Knowledge
+> Operating System v1 (translation layer: code + docs/ → human understanding;
+> constitution: [kos/STANDARDS.md](../kos/STANDARDS.md)). The structural/generated
+> half (URL cards, graph, per-page items 3–10/12–14 of §2) remains this document's
+> docs/-side scope (Phases 8–9/14/18 unchanged). This amendment changes NO contract;
+> the register note in §2 (structural=generated, prose=handwritten) is exactly the
+> line along which the split was made.
+
 > **Status: `draft` — LONG-TERM VISION ONLY (owner-approved for recording 2026-07-13).**
 > This document is **NOT a contract**. It modifies NO existing contract, changes NO frozen
 > phase's scope (Phase 7 included), and introduces NO implementation work by itself. It is
