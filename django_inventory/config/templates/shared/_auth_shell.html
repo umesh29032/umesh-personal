@@ -201,6 +201,26 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         body.auth-login .auth-links a { font-weight: 600; color: var(--auth-text-dim); }
         body.auth-login .auth-btn-google { width: 100%; padding: 13px 20px; background: #ffffff; border: 1.5px solid var(--auth-input-border-warm); border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 12px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
         body.auth-login .auth-btn-google:hover { border-color: var(--copper); background: var(--cream-2); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+        /* ambient aurora — slow breathing on the brand-panel glows (login only; reduced-motion kills it) */
+        body.auth-login .auth-brand::after { animation: authAuroraA 18s ease-in-out infinite alternate; }
+        body.auth-login .auth-glow { animation: authAuroraB 14s ease-in-out infinite alternate; }
+        @keyframes authAuroraA { from { transform: translate(0,0) scale(1); opacity: 1; } to { transform: translate(-46px,32px) scale(1.14); opacity: 0.85; } }
+        @keyframes authAuroraB { from { transform: translate(0,0) scale(1); } to { transform: translate(38px,-26px) scale(1.18); } }
+        /* living thread — copper accent line drifts slowly */
+        body.auth-login .auth-right::before { background: linear-gradient(to right, var(--copper-d), var(--copper-l), var(--copper-d), var(--copper-l)); background-size: 300% 100%; animation: authThreadShift 9s linear infinite; }
+        @keyframes authThreadShift { to { background-position: -300% 0; } }
+        /* shine sweep on submit (uses ::before — ::after already carries the gradient wash) */
+        body.auth-login .auth-btn::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(105deg, transparent, rgba(255,255,255,0.22), transparent); transform: translateX(-150%) skewX(-18deg); transition: transform 0.6s ease; pointer-events: none; }
+        body.auth-login .auth-btn:hover:not(:disabled)::before { transform: translateX(320%) skewX(-18deg); }
+        /* mobile brand strip — phones lose the whole brand panel ≤860px; this puts identity back in the card */
+        body.auth-login .auth-mobile-brand { display: none; }
+        @media (max-width: 860px) {
+            body.auth-login .auth-mobile-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; padding-bottom: 20px; border-bottom: 1px solid rgba(184,115,51,0.22); }
+            body.auth-login .auth-mobile-brand .auth-monogram { width: 40px; height: 40px; margin-bottom: 0; }
+            body.auth-login .auth-mobile-brand .auth-monogram span { font-size: 16px; }
+            body.auth-login .auth-mobile-brand-text strong { display: block; font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 600; color: var(--ink); line-height: 1.15; }
+            body.auth-login .auth-mobile-brand-text span { font-size: 9px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--copper); }
+        }
         @media (max-width: 860px) { body.auth-login .auth-card { max-width: 420px; } body.auth-login .auth-right { min-height: 100dvh; } body.auth-login .auth-right::before { height: 4px; } }
         @media (max-width: 480px) { body.auth-login .auth-right { padding: 32px 18px; } }
 

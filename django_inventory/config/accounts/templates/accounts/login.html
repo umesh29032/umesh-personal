@@ -25,6 +25,17 @@ CSRF, autocomplete, autofocus and the Google button preserved verbatim.{% endcom
 {% endblock %}
 
 {% block auth_card_top %}
+            <div class="auth-mobile-brand">
+                <div class="auth-monogram"><span>KE</span></div>
+                <div class="auth-mobile-brand-text">
+                    <strong>Kapil Enterprises</strong>
+                    <span>Inventory System</span>
+                </div>
+            </div>
+            <a href="{% url 'public_home' %}" class="auth-back">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Back to Storefront
+            </a>
             <h1 class="auth-heading">Welcome<br><em>back.</em></h1>
             <p class="auth-form-sub">Sign in with your work email</p>
 {% endblock %}

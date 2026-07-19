@@ -27,7 +27,11 @@ related: [app-accounts, app-accounts-urls]
 
 **`LoginView` / `VerifyOTPView`** — the OTP pair: throttle-first, uniform
 responses, hashed single-use codes via `utils.py`. Every branch is a pinned
-behavior (37 tests) — read the tests as the spec.
+behavior (37 tests) — read the tests as the spec. UI note (2026-07-20): its
+template (`login.html` + `shared/_auth_shell.html` `body.auth-login` skin)
+got ambient-motion polish + a ≤860px brand strip + "Back to Storefront"
+link — pure CSS/markup in the login-only skin; the form contract (POST
+fields, CSRF, throttle) is byte-identical, other auth pages untouched.
 
 **`PasswordLoginView`** — extends Django's LoginView with throttle +
 normalized-email lockout keys (the mixed-case scar).

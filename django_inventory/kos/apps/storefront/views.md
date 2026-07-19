@@ -24,7 +24,15 @@ related: [app-storefront, app-storefront-urls]
 **`public_views.py`** — reads config rows, renders, nothing else; its
 module docstring IS the law ("never write anything — commerce boundary's
 public face"). Any diff adding a write/business-query here = boundary
-violation, full stop.
+violation, full stop. The template it renders (`templates/public_home.html`)
+also carries a **static About/Our-Story section (`#about`, 2026-07-20)** —
+hardcoded public company story + process timeline, deliberately NOT
+model-driven (no config rows to leak, nothing for the view to fetch).
+Its motion layer (GSAP 3.13 + Lenis, vendored under
+`static/storefront/vendor/`, choreography in
+`static/storefront/js/home-motion.js`) is presentation-only JS — degrade
+path is plain IntersectionObserver reveals, so the page works with the
+libs absent and under `prefers-reduced-motion`.
 
 **`ListingTeamMixin`** — the trust-tier gate: one role, one lane, zero
 reach elsewhere (certified). Pattern echo: a role-scoped mixin exactly like
