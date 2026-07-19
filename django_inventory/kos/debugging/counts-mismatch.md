@@ -9,7 +9,7 @@ related: [feature-cutting, feature-allocation, feature-stage-tracking]
 
 # Playbook: "Ginti alag-alag kyun hai?"
 
-> 📂 [Debugging](README.md) · [KOS home](../README.md) — *pehle poochho: KAUN-SI ginti?*
+> 📂 [Debugging](README.md) · [LOS home](../README.md) — *pehle poochho: KAUN-SI ginti?*
 
 ## Symptoms this playbook covers
 

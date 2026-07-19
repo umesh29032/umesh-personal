@@ -9,7 +9,7 @@ related: [concept-single-writer, concept-django-transactions, project-system-map
 
 # The Service Layer — where decisions live
 
-> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

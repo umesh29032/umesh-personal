@@ -14,6 +14,9 @@ verified: 2026-07-19
 > runbook). That file tells you *what to type*; this one teaches *why each
 > step exists and how it fails*. The stack was certified at RCP-8 and the
 > restore path was drilled on the real database before v1.0 shipped.
+> The complete zero-assumed-knowledge kit (per-step walkthrough, env
+> reference, file annotations, verification, rollback, deployment-day
+> checklist) = [DEPLOYMENT.md](../../DEPLOYMENT.md) (P19.5).
 
 ## The deployment architecture, and why it looks like this
 

@@ -9,7 +9,7 @@ related: [concept-append-only-tables, concept-single-writer, feature-ledger]
 
 # PostgreSQL Constraints — the wall that stands when code falls
 
-> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 
@@ -36,6 +36,18 @@ liye dono chahiye.
 > - No (needs business context) → the sole-writer service
 > The DB tier is your floor: even the worst bug cannot sink below it.
 > Never rely on the app tier alone for anything money-shaped.
+
+> ⚠️ **The temporal trap — "single row" means row-vs-itself, never row-vs-clock.**
+> A CHECK can only *soundly* compare a row's own columns. `CURRENT_DATE` /
+> `now()` are not IMMUTABLE — PostgreSQL still ACCEPTS them in a CHECK but
+> silently assumes immutability, so the "rule" drifts with the clock (checked
+> only at write time; a row valid today violates it tomorrow; dump/reload can
+> fail re-validation). The Django "fix" is worse: `Q(advance_date__lte=date.today())`
+> evaluates `date.today()` ONCE at makemigrations and freezes THAT day into
+> the DDL (the constraint stops meaning "not future" the day after deploy).
+> Rules like "`advance_date` not in the future" are tier-3: enforce them in
+> the sole-writer service (`advance_service.record_advance`) or a trigger —
+> never a CHECK. *(Clock se compare karna hai? Woh service ka kaam hai.)*
 
 ## 4. Technical Deep Dive — the full chain (Database Page Law)
 

@@ -6,6 +6,7 @@ verified: 2026-07-19
 
 # START HERE — productive by tomorrow
 
+> **Machine not set up yet?** → [dev-setup](project/dev-setup.md) first (clone→env→DB→seed).
 > New to this repository? This is your first day, time-boxed. Goal:
 > **productive**, not expert (expert = [engineering-journey](project/engineering-journey.md),
 > four weeks). *(Aaj kaam layak, mahine mein maalik.)*

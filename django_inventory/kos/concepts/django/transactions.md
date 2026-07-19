@@ -9,7 +9,7 @@ related: [feature-settlement, flow-worker-gets-paid]
 
 # Django Transactions — sab hoga, ya kuch nahi hoga
 
-> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

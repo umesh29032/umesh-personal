@@ -9,7 +9,7 @@ related: [project-system-map, project-business-story]
 
 # People & Roles — who may do what, and the walls that enforce it
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 
 ## Business Purpose
 

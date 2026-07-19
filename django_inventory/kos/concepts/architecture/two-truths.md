@@ -9,7 +9,7 @@ related: [project-money-story, feature-settlement, feature-stage-tracking, featu
 
 # Two Truths — the architecture's deepest decision
 
-> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

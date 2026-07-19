@@ -9,7 +9,7 @@ related: [concept-service-layer, feature-ledger, concept-append-only-tables]
 
 # Single-Writer Discipline — one pen per book
 
-> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Architecture concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

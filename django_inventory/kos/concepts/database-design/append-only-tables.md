@@ -9,7 +9,7 @@ related: [concept-single-writer, feature-ledger, concept-pg-constraints]
 
 # Append-Only Tables — history that cannot lie
 
-> 📂 [Database-design concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Database-design concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

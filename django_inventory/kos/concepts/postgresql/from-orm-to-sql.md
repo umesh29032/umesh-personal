@@ -9,7 +9,7 @@ related: [concept-pg-indexes, concept-query-performance, concept-django-transact
 
 # From ORM to SQL — stop guessing, start reading
 
-> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

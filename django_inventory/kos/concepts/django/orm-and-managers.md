@@ -9,7 +9,7 @@ related: [concept-from-orm-to-sql, concept-query-performance, concept-service-la
 
 # ORM & Managers — the tap the queries flow from
 
-> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

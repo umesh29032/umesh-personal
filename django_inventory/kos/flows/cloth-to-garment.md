@@ -9,7 +9,7 @@ related: [feature-cutting, feature-stage-tracking, feature-allocation, project-b
 
 # Flow: Cloth to Garment — one Adda's whole life
 
-> 📂 [Flows](README.md) · [KOS home](../README.md) — *kahani yaad rakho, files nahi.*
+> 📂 [Flows](README.md) · [LOS home](../README.md) — *kahani yaad rakho, files nahi.*
 
 **Cast:** Malik (owner) · Rakesh (manager) · the cutting crew ·
 one Adda: **3-PATTI-003** (a batch of one product).

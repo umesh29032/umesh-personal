@@ -9,7 +9,7 @@ related: [feature-stage-tracking, feature-cutting, concept-two-truths]
 
 # Allocation & the Piece Pool — you can't hand out what you don't have
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

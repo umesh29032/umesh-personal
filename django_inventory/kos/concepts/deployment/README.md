@@ -18,6 +18,7 @@ project-anchored.
 
 | Page | Real question it answers |
 |---|---|
+| [first-deploy-from-scratch.md](first-deploy-from-scratch.md) | I've NEVER deployed — what IS deployment, which 5 things do I buy, what are the 11 steps and why? |
 | [production-and-docker.md](production-and-docker.md) | How does one person run this in production and sleep — and recover by evening if the VPS dies? |
 
 **After this folder you can:** design a deploy with rehearsed rollback

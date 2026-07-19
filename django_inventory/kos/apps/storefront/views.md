@@ -1,0 +1,47 @@
+---
+id: app-storefront-views
+type: app
+verified: 2026-07-19
+knowledge_confidence: verified_against_code
+answers: "storefront's two view modules — the anonymous read and the listing lane."
+related: [app-storefront, app-storefront-urls]
+---
+
+# storefront — handler knowledge (2 modules)
+
+> 📂 [storefront app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+## Handler groups at a glance
+
+- **PUBLIC READ (1):** `public_home` (function, `public_views.py`) — the
+  ONLY anonymous handler in the entire system
+- **WRITE (8, listing_team):** Product ×4 + Category ×4 CRUD
+  (`listing_views.py`, all LoginRequired + `ListingTeamMixin` :24)
+- **ADMIN / ASYNC:** none · **DELETE:** real deletes, legal here (replicas)
+
+## The two boundaries in code
+
+**`public_views.py`** — reads config rows, renders, nothing else; its
+module docstring IS the law ("never write anything — commerce boundary's
+public face"). Any diff adding a write/business-query here = boundary
+violation, full stop.
+
+**`ListingTeamMixin`** — the trust-tier gate: one role, one lane, zero
+reach elsewhere (certified). Pattern echo: a role-scoped mixin exactly like
+expense's `_ManagementOnly` — different tier, same shape.
+
+## Rules of thumb
+
+1. New public capability = a boundary decision, not a view (README REQ #1).
+2. Listing forms: uploads through `image_service`, always.
+3. Keep the anonymous handler BORING — its simplicity is the security.
+
+## Required Knowledge (this page)
+
+- [ ] Trust tiers → [people-and-roles](../../project/people-and-roles.md)
+- [ ] Validation chain → [pattern](../../concepts/patterns/validation-chain.md)
+
+## Learning Graph
+
+**Before:** [urls.md](urls.md). **After:** [services.md](services.md) →
+`public_views.py` (a 60-line masterclass in doing nothing dangerous).

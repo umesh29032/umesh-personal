@@ -9,7 +9,7 @@ related: [feature-settlement, flow-worker-gets-paid, concept-django-transactions
 
 # The Money Story — two truths and one gate
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 
 ## Business Purpose
 

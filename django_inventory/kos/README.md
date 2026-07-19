@@ -4,7 +4,9 @@ type: system
 verified: 2026-07-19
 ---
 
-# KOS — the Engineering Brain of the Django Inventory project
+# LOS — the Learning Operating System of the Django Inventory project
+
+*(formerly "KOS"; the path stays `kos/` — stable links. The codebase is the laboratory; this system is the teacher.)*
 
 > **KOS v1.0 — declared 2026-07-19.** 55 pages · 9 docs/ human guides ·
 > frozen architecture (STANDARDS) · improvements now come from USE, not
@@ -41,6 +43,7 @@ kos/
 │   ├── database-design/ append-only-tables
 │   ├── postgresql/      locks · constraints · from-orm-to-sql · indexes · query-performance
 │   ├── testing/         testing-strategy      security/  auth-hardening
+│   ├── patterns/        11 cross-app reuse cards              ✅ hardening
 │   └── deployment/      production-and-docker             ✅ P8
 └── debugging/       ← symptom-first incident playbooks    ✅ P8
     └── money-looks-wrong · counts-mismatch · access-denied · page-slow
@@ -136,14 +139,21 @@ order, what you'll be able to do): [project/](project/README.md) ·
 [concepts/](concepts/README.md) (+ one per sub-topic). Every page links
 back to its section README.
 
+**Working IN an app right now?** → [apps/](apps/README.md) — app-first
+navigation: every URL → handler → service → model → file, in seconds.
+(✅ all 9 apps mapped — [expense](apps/expense/README.md) ·
+[production](apps/production/README.md) · accounts · inventory ·
+raw_materials · tracking · machines · storefront · core.)
+
 | You're touching… | Start at |
 |---|---|
-| `expense` app — `/expense/…` URLs (settlement, payroll, my-earnings, advances) | [features/README §Money](features/README.md) → settlement · ledger · payroll · advances; flow: [worker-gets-paid](flows/worker-gets-paid.md) |
-| `production` app — Adda/stage/cutting screens, worker reports | [features/README §Production](features/README.md) → stage-tracking · allocation · cutting; flow: [cloth-to-garment](flows/cloth-to-garment.md) |
+| `expense` app — `/expense/…` URLs (settlement, payroll, my-earnings, advances) | **[apps/expense/](apps/expense/README.md)** (URL/handler/model/service maps) · WHY: [features §Money](features/README.md); flow: [worker-gets-paid](flows/worker-gets-paid.md) |
+| `production` app — dashboards (incl. `stalled/`), Adda/stage/cutting screens, flow editor + Stage library, worker reports | **[apps/production/](apps/production/README.md)** ([urls.md](apps/production/urls.md) = all 80 routes, each with its own section) · WHY: [features/README §Production](features/README.md) → stage-tracking · allocation · cutting; flow: [cloth-to-garment](flows/cloth-to-garment.md) |
 | `accounts` / `inventory` — login, roles, sidebar, permissions | [rbac-access](features/rbac-access.md) · [people-and-roles](project/people-and-roles.md) · [auth-hardening](concepts/security/auth-hardening.md) |
 | `machines` app | [machines](features/machines.md) |
 | `raw_materials` — rolls, suppliers | [business-story](project/business-story.md) + [cloth-to-garment](flows/cloth-to-garment.md) step 0 (feature page comes with a future phase) |
 | ANY unfamiliar URL | [request-through-stack](flows/request-through-stack.md) — the universal debug recipe |
+| **Setting up a fresh machine** | [project/dev-setup.md](project/dev-setup.md) — clone → env → PG → seed → first safe commit |
 | **Lost inside docs/ itself** | [project/reading-the-docs](project/reading-the-docs.md) — the human's map of Claude's engineering memory (7 piles, the shortlist, the routing rule) |
 | **Something is BROKEN right now** | [debugging/README](debugging/README.md) — symptom-first playbooks with First-Five-Minutes thinking |
 | `deploy/` — VPS, compose, backups | [production-and-docker](concepts/deployment/production-and-docker.md) + [docs/release/](../docs/release/) handbook |

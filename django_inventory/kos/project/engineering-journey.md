@@ -9,7 +9,7 @@ related: [project-business-story, project-reading-the-docs]
 
 # The Engineering Journey — zero to mastery, in order
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 > *Productive-in-a-day version: [START-HERE](../START-HERE.md). This page
 > is the longer road: expert.*
 

@@ -9,7 +9,7 @@ related: [feature-settlement, feature-advances, feature-payroll, concept-append-
 
 # The Worker Ledger — the factory's money book
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

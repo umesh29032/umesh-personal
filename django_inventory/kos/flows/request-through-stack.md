@@ -9,7 +9,7 @@ related: [project-system-map, feature-stage-tracking, concept-service-layer]
 
 # Flow: One Tap Through the Stack
 
-> 📂 [Flows](README.md) · [KOS home](../README.md) — *kahani yaad rakho, files nahi.*
+> 📂 [Flows](README.md) · [LOS home](../README.md) — *kahani yaad rakho, files nahi.*
 
 One REAL request, hop by hop: Meena submits her cutting report from her
 phone. Same skeleton for every click in the system

@@ -9,7 +9,7 @@ related: [feature-ledger, feature-settlement, feature-payroll]
 
 # Playbook: "Yeh paisa galat kyun dikh raha hai?"
 
-> 📂 [Debugging](README.md) · [KOS home](../README.md) — *symptom se shuru karo, code se nahi.*
+> 📂 [Debugging](README.md) · [LOS home](../README.md) — *symptom se shuru karo, code se nahi.*
 
 ## Symptoms this playbook covers
 

@@ -9,7 +9,7 @@ related: [feature-rbac-access, project-people-and-roles]
 
 # Playbook: "Dikh kyun nahi raha / dikhna nahi chahiye tha"
 
-> 📂 [Debugging](README.md) · [KOS home](../README.md)
+> 📂 [Debugging](README.md) · [LOS home](../README.md)
 
 ## Symptoms this playbook covers
 

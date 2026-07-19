@@ -9,7 +9,7 @@ related: [project-business-story, project-money-story, concept-django-transactio
 
 # System Map — how the code is organized and how a click travels
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 
 ## Business Purpose
 

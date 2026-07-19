@@ -47,6 +47,7 @@ before it.
 | [database-design/](database-design/README.md) | append-only-tables | design tables that can face an audit |
 | [testing/](testing/README.md) | testing-strategy | test money like it's money |
 | [security/](security/README.md) | auth-hardening | attack your own front door before someone else does |
+| [patterns/](patterns/README.md) | 11 cross-app pattern cards | recognize + REUSE what the repo already solved (born from certification evidence) |
 
 *(Naya concept tabhi aata hai jab project usse SACH mein use kare —
 Project-Anchor Law. Kubernetes ka page tab banega jab Kubernetes aayega.)*

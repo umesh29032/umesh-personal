@@ -9,7 +9,7 @@ related: [feature-settlement, feature-allocation, concept-two-truths, flow-worke
 
 # Stage Tracking — production truth, one door
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

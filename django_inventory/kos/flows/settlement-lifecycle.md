@@ -9,7 +9,7 @@ related: [feature-settlement, flow-worker-gets-paid, concept-two-truths]
 
 # Flow: The Settlement Lifecycle — states, transitions, corrections
 
-> 📂 [Flows](README.md) · [KOS home](../README.md) — *kahani yaad rakho, files nahi.*
+> 📂 [Flows](README.md) · [LOS home](../README.md) — *kahani yaad rakho, files nahi.*
 
 [worker-gets-paid](worker-gets-paid.md) tells the story from Meena's side.
 This flow tells it from the EVENT's side: every state ADST-0007 can be in,

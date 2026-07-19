@@ -9,7 +9,7 @@ related: [project-tech-stack, concept-django-migrations, concept-service-layer]
 
 # Settings — fail at boot, never at midnight
 
-> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

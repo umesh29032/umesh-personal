@@ -13,6 +13,9 @@ verified: 2026-07-13
 Owner-approved 2026-06-11. This file is the ops runbook the architecture
 checkpoint (§5) called for. Stack: Caddy (auto-TLS) → gunicorn app →
 Postgres 16.6 + Redis 7.4, nightly restic backups to B2/R2.
+**First time deploying?** The full teaching kit (every step/file/command
+explained from zero, with troubleshooting) = [DEPLOYMENT.md](../DEPLOYMENT.md);
+this file stays the terse execution runbook.
 All images exact-pinned; app boots only after HEALTHY db+redis (compose
 condition + entrypoint wait-loop).
 

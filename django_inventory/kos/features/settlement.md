@@ -9,7 +9,7 @@ related: [concept-django-transactions, flow-worker-gets-paid]
 
 # Settlement — the moment money becomes real
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

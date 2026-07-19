@@ -9,7 +9,7 @@ related: [project-money-story, project-system-map, flow-worker-gets-paid]
 
 # The Business Story — what Kapil Enterprises actually does
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 
 ## Business Purpose
 

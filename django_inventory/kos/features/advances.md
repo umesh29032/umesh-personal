@@ -9,7 +9,7 @@ related: [feature-ledger, feature-payroll, feature-settlement]
 
 # Advances — the loan pool that never touches earnings
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 
@@ -40,7 +40,7 @@ par jhagda hota hai, chosen-kataai par nahi.
 `WorkerAdvance`, ADR-0002), at `/expense/advances/add/`:
 
 - Immutable row: worker, amount (>0, DB CHECK `expense_advance_amount_positive`),
-  date, notes, attachment (proof photo), entered_by.
+  `advance_date`, notes, attachment (proof photo), entered_by.
 - **NO ledger entry is written.** The old design posted advances to the
   ledger (legacy `advance` category still visible in old rows); today the
   loan pool and the earnings book are fully separate.

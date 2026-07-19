@@ -9,7 +9,7 @@ related: [project-people-and-roles, feature-stage-tracking, project-system-map]
 
 # Access Control in Action — the machinery behind "you can't see that"
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

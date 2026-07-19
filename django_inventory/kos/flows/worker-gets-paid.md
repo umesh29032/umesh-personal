@@ -9,7 +9,7 @@ related: [feature-settlement, concept-django-transactions]
 
 # Flow: Worker gets paid — piece se cash tak
 
-> 📂 [Flows](README.md) · [KOS home](../README.md) — *kahani yaad rakho, files nahi.*
+> 📂 [Flows](README.md) · [LOS home](../README.md) — *kahani yaad rakho, files nahi.*
 
 **Cast:** Meena (worker, stitching) · Rakesh (manager) · Malik (owner/super-admin)
 · the system's three money states: **Expected → Earned → Paid**.

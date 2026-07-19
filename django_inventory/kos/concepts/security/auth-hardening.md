@@ -9,7 +9,7 @@ related: [feature-rbac-access, project-people-and-roles, concept-testing-strateg
 
 # Auth Hardening — the front door, attacked on purpose
 
-> 📂 [Security concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Security concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

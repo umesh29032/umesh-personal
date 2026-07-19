@@ -9,7 +9,7 @@ related: [concept-django-transactions, feature-settlement, feature-payroll]
 
 # PostgreSQL Locks — freeze exactly what you bill
 
-> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

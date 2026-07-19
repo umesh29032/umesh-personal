@@ -9,7 +9,9 @@ related: [concept-django-settings, concept-testing-strategy, project-tech-stack]
 
 # Production & Docker — drilled recovery, boring on purpose
 
-> 📂 [Deployment concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Deployment concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
+> Execution layer: [deploy/README.md](../../../deploy/README.md) (runbook) ·
+> [DEPLOYMENT.md](../../../DEPLOYMENT.md) (the P19.5 step-by-step kit).
 
 ## 1. The project hook
 

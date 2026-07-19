@@ -9,7 +9,7 @@ related: [feature-stage-tracking, project-people-and-roles]
 
 # Machines — possession windows, not assignments
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 
@@ -119,6 +119,10 @@ for `EXCLUDE USING gist`."
 
 ## Code References
 - `config/machines/models.py` · possession flows in machines services/views
+- Stage-side declaration ("what KIND this stage needs"): `Stage.work_type` +
+  `Stage.machine_type` in `config/production/models/core.py` (DB CHECK
+  `prod_stage_worktype_machinetype_pair`) — edited via the Stage library,
+  see [apps/production/urls-core.md §Stage library](../apps/production/urls-core.md)
 
 ## Related Concepts
 

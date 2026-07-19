@@ -177,6 +177,73 @@ ke neeche breadcrumb rakhti hai — `> 📂 section-README link · KOS-home link
 kos/README.md = master front door (app/URL navigation table lives there);
 section READMEs = section teachers; **koi aur index file kabhi nahi** (Law 4).
 
+## The app-navigation layer (owner-ordered 2026-07-19, discoverability pass)
+
+`kos/apps/<app>/` = daily-development navigation, one consistent shape per
+app: **README** (map: owns/doesn't-own/census/laws) · **urls.md** (every
+route: business → handler → what-changes → where-it-ends → related
+kos/docs/source) · **views.md** (handlers: purpose/gates/calls/side-effects)
+· **models.md** (why/writers/readers/armor) · **services.md**
+(responsibilities/callers/failure-modes). Rules: NAVIGATION only — point at
+feature/concept pages, docs, and direct source paths; never re-teach;
+everything verified against code; `type: app` frontmatter. Built app-by-app
+with an owner gate after each. **Template additions (owner, post-expense
+review):** README opens with a **Start Here** task table (endpoint/logic/
+schema/permissions/flow/debug/tests → page) and ends with a **Change
+Impact** summary (downstream systems + tests + gates); important WRITE URLs
+carry a compact **Request Journey** block (Browser → URL → View → Permission
+→ Service [@atomic·locks] → Models → external APIs → Response); views.md
+opens with **handler groups** (READ / WRITE / ADMIN / DELETE / ASYNC —
+absent groups stated as none). App order = owner's development frequency
+(unclear → ASK). Every README also carries an **Engineering Checklist**
+(pre-flight boxes before any change: app-specific laws, gates, test plan,
+kos-sync). **An app is COMPLETE only when four scenarios pass:** (1) add a
+feature without searching the repo (2) debug a production issue from the
+symptom (3) add an endpoint knowing where each responsibility belongs
+(4) a new engineer understands ownership + architecture from the app pages
+alone. Metric: engineering NAVIGATION TIME — business requirement → correct
+source file, fastest path.
+
+**LOS learning elements (owner-ratified, post-expense-LOS review) — part of
+the app template:** (1) **Mental Model** — a real-world analogy opens every
+app README and every important feature/URL section (intuition BEFORE
+implementation: expense=bank ledger, production=factory pipeline,
+inventory=library catalog); (2) **Common Misconceptions** — the wrong
+beliefs new developers bring, corrected explicitly; (3) **Real Engineering
+Questions** — actual PM/production requests with the senior thinking-chain
+(which invariants → services → transactions → tests → playbook); (4)
+**Reading Strategy** — top of complex pages: what to read at
+Beginner / Intermediate / Senior level. Philosophy line (owner-quoted):
+*"every unknown term is a door, not a wall."* URL law stands: every URL
+individually, no grouped summaries; simple → WHY simple, complex → WHY
+complex. Path stays `kos/`; identity = LOS.
+
+**FINAL two sections (owner, post-production review) — value-gated, never
+mechanical:** **Engineering Decision** (problem · alternatives considered ·
+why this one · trade-offs accepted · *would we still choose it today?*) and
+**Evolution Timeline** (originally → problem discovered → refactor →
+current → future direction) — added ONLY where a future reader will ask
+"why on earth did we do it this way?". Include learn-from-absence (why a
+route/feature does NOT exist) wherever true.
+
+**🔒 TEMPLATE FROZEN (owner order).** The LOS template = everything above.
+No new headings, ever, unless a **Validation Sprint task** exposes a
+genuine gap. Validation Sprint protocol: 15–20 realistic engineering tasks;
+per task ask *"could an engineer complete this using ONLY the LOS?"*;
+every NO = backlog item, not failure. A stable template outranks a perfect one.
+
+**Learning-OS refinement (owner, 2026-07-19): the project IS the textbook.**
+Every app README also carries, as LINK-LAYERS into the concept canon (never
+re-taught in place): **Business Purpose** answering WHY-a-separate-app (risks
+isolated, principle followed, future evolution) · **Technology Stack** table
+(each tech → its concept page) · **Security** section (authn/authz/
+validation/threats/audit → linked canon) · **Required Knowledge** checklist
+("to understand this app you should know: …", each item linked — reader
+self-diagnoses, reads, returns) · **Learning Graph** ("Before this app read
+… → After this app continue …"). App acceptance criterion (final): *a
+beginner spending enough time in this app's KOS pages can confidently
+understand, modify, and extend the real code without feeling lost.*
+
 ## Growth protocol
 
 Project adopts X → X gets concept page + touched feature pages updated +

@@ -9,7 +9,7 @@ related: [concept-from-orm-to-sql, concept-query-performance, feature-ledger]
 
 # PostgreSQL Indexes — declared for the future, judged by the planner
 
-> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [PostgreSQL concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

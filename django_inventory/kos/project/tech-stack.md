@@ -9,7 +9,7 @@ related: [project-system-map, concept-django-transactions]
 
 # Tech Stack — deliberately boring, provably right
 
-> 📂 [Project — the WHY layer](README.md) · [KOS home](../README.md)
+> 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 
 ## Business Purpose
 

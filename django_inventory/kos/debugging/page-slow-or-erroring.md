@@ -9,7 +9,7 @@ related: [concept-query-performance, concept-pg-locks, concept-django-settings]
 
 # Playbook: "Page dheema hai / gir raha hai"
 
-> 📂 [Debugging](README.md) · [KOS home](../README.md)
+> 📂 [Debugging](README.md) · [LOS home](../README.md)
 
 ## Symptoms this playbook covers
 

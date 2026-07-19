@@ -104,3 +104,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# POC vendored deps — pinned clones with nested .git (see poc/patterns_ai/README.md manifest);
+# committing them creates broken gitlinks (P19 SVGnest incident). Reproducible via clone @ pinned commit.
+poc/patterns_ai/vendor/

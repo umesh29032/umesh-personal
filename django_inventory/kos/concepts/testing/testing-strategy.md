@@ -9,7 +9,7 @@ related: [concept-pg-constraints, concept-query-performance, feature-settlement]
 
 # Testing Strategy — pin the truth, not the coverage number
 
-> 📂 [Testing concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Testing concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 

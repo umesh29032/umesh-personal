@@ -9,7 +9,7 @@ related: [feature-settlement, feature-ledger, feature-advances]
 
 # Payroll — the cash event and the money board
 
-> 📂 [Features](README.md) · [KOS home](../README.md) — *pehle yeh page, phir code.*
+> 📂 [Features](README.md) · [LOS home](../README.md) — *pehle yeh page, phir code.*
 
 ## Business Purpose
 

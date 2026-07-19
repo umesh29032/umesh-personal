@@ -9,7 +9,7 @@ related: [concept-pg-constraints, concept-append-only-tables, concept-two-truths
 
 # Migrations — schema changes that never betray the data
 
-> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [KOS home](../../README.md)
+> 📂 [Django concepts](README.md) · [All concepts](../README.md) · [LOS home](../../README.md)
 
 ## 1. The project hook
 
