@@ -37,6 +37,33 @@ related: [concept-query-performance, concept-pg-locks, concept-django-settings]
 5. **"Suddenly" is a lie worth interrogating:** what deployed/changed?
    dated receipts + git log answer faster than profilers.
 
+## Case file: the P19A twins (2026-07-20 — both shipped inside `erp-v1.0.0`)
+
+Real production-testing 500s, both invisible to the green test battery:
+
+- **`TransactionManagementError: select_for_update cannot be used outside of
+  a transaction`** → some caller LOST its `@transaction.atomic`. This repo's
+  instance: a helper def was inserted *between* the decorator and
+  `start_layering` (decorator silently bound to the helper) — every layering
+  roster update 500'd AND left partial committed writes. 💡 Samjho aise:
+  decorator hamesha agle `def` se chipakta hai — beech mein naya function
+  ghusaya toh decorator chori ho gaya. **Why tests stayed green:** `TestCase`
+  wraps each test in a transaction, so the lock always finds one — this class
+  is only catchable by `TransactionTestCase` + a real request
+  (`production/tests/test_p19a_regressions.py`).
+- **`MultipleObjectsReturned` on a page that "worked yesterday"** → a
+  single-row `.get()` whose data grew a second row. Instance: worker report
+  resolved its stage record with `.get(adda, stage)` — the streams redesign
+  made pre-production stages one-SR-PER-LANE, so every multi-lane Adda 500'd
+  (before the permission check, for every role). Fix shape: resolve through
+  the user's OWN rows (their task picks the lane). Grep-bait: any
+  `.get(adda=…, workflow_stage=…)` on lane-scoped stages is this bug waiting.
+
+Also from the same audit: dev-only random `FATAL: sorry, too many clients` =
+`CONN_MAX_AGE=600` + runserver's thread-per-request leaking connections —
+dev overrides to 0 in `settings/local.py`; production's 3 SYNC gunicorn
+workers keep it bounded.
+
 ## Decision tree
 
 ```

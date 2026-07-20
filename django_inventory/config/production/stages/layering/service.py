@@ -39,7 +39,6 @@ from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
     RemainingClothOfClothRoll, WorkflowStage,
 )
-from production.services.adda_service import advance_to_next_stage
 
 # Absolute import — _shared stays in production/services/ (shared across stages);
 # this module moved into stages/layering/ (M2.8).
@@ -244,8 +243,6 @@ def _sync_roll_leftover(roll, leftover: RemainingClothOfClothRoll | None) -> Non
 # ── Worker assignment + retro-tag ────────────────────────────────────────────
 
 
-@transaction.atomic
-
 def _layering_workflow_stage(adda: Adda):
     """Pointer-independent lookup (streams redesign): the flow's Layering
     stage — lanes work in parallel, so `adda.current_stage` equality is no
@@ -257,6 +254,12 @@ def _layering_workflow_stage(adda: Adda):
     return ws
 
 
+# P19A C-1 fix (2026-07-20): the streams redesign inserted the helper above
+# BETWEEN this decorator and start_layering, so @transaction.atomic silently
+# decorated the read-only helper — start_layering ran in autocommit and
+# set_stage_workers' select_for_update raised TransactionManagementError (500)
+# on every roster update, with the SR/rate-snapshot writes already committed.
+@transaction.atomic
 def start_layering(*, adda: Adda, worker_ids: list[int], user,
                    stream=None) -> AddaStageRecord:
     """Manager refines workers. After Phase 4 semantic = "update workers".

@@ -19,7 +19,9 @@ Leaf module: imports only settings + models (lazily), NEVER the services facade 
 so stage services can import it without a circular import.
 
 CALL CONTRACT: `set_stage_workers` must run inside the caller's @transaction.atomic
-(all 6 callers are) so the M2M write + Task reconcile commit together; it locks
+(verify EVERY caller — P19A C-1: start_layering silently lost its decorator to an
+inserted helper and 500'd every roster update in production testing) so the M2M
+write + Task reconcile commit together; it locks
 the active tasks with select_for_update (Hinglish: roster full-replace hai —
 lock ke bina do managers ki save ek doosre ke cancel/create ko khaa jaati). `add_stage_worker` is additive and
 lock-free (the skill-sync retro-tag path is not atomic).

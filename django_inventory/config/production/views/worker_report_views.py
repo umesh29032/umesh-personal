@@ -167,17 +167,41 @@ class WorkerReportView(LoginRequiredMixin, View):
     # ── shared resolution ────────────────────────────────────────────────
     def _resolve(self, request, code, stage_type):
         adda = get_object_or_404(Adda, code=code)
-        sr = get_object_or_404(
-            AddaStageRecord.objects.select_related('workflow_stage__stage', 'adda__product'),
-            adda=adda, workflow_stage__stage__code=stage_type)
-        task = (WorkerStageTask.objects
-                .filter(stage_record=sr, worker=request.user)
-                .exclude(status=WorkerStageTask.Status.CANCELLED)
-                .first())
+        # P19A C-2 fix (2026-07-20): pre-production stages carry ONE SR PER LANE
+        # (streams redesign), so the old single-row .get() raised
+        # MultipleObjectsReturned → 500 on every multi-lane Adda, before the
+        # permission check. Resolve lane-aware: the worker's OWN task picks the
+        # SR; an optional ?stream=<id> narrows explicitly (URLs today don't
+        # carry the lane). Single-lane behaviour is byte-identical.
+        srs = list(
+            AddaStageRecord.objects
+            .select_related('workflow_stage__stage', 'adda__product')
+            .filter(adda=adda, workflow_stage__stage__code=stage_type)
+            .order_by('stream_id'))
+        if not srs:
+            from django.http import Http404
+            raise Http404("Stage has not started for this Adda.")
+        stream_raw = request.POST.get('stream') or request.GET.get('stream') or ''
+        if stream_raw.isdigit():
+            srs = [s for s in srs if s.stream_id == int(stream_raw)]
+            if not srs:
+                from django.http import Http404
+                raise Http404("No such lane on this stage.")
+        tasks = list(
+            WorkerStageTask.objects
+            .filter(stage_record__in=srs, worker=request.user)
+            .exclude(status=WorkerStageTask.Status.CANCELLED)
+            .order_by('stage_record__stream_id', 'pk'))
+        # Prefer a lane the worker can still act on; else the first (locked view).
+        open_states = (WorkerStageTask.Status.ASSIGNED,
+                       WorkerStageTask.Status.IN_PROGRESS)
+        task = next((t for t in tasks if t.status in open_states),
+                    tasks[0] if tasks else None)
         if task is None:
             # Isolation rule (V2-1c-iv): skill alone is not enough — you report
             # only on stages you are actively assigned to.
             raise PermissionDenied("You are not assigned to this stage.")
+        sr = next(s for s in srs if s.pk == task.stage_record_id)
         # C-3 (freeze closeout 2026-07-05): assignment alone is not enough
         # either — the LIVE Stage-Access predicate must also admit. Revoking a
         # stage's access in the Access hub closes the report path immediately,
