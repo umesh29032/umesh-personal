@@ -30,9 +30,13 @@ hardcoded public company story + process timeline, deliberately NOT
 model-driven (no config rows to leak, nothing for the view to fetch).
 Its motion layer (GSAP 3.13 + Lenis, vendored under
 `static/storefront/vendor/`, choreography in
-`static/storefront/js/home-motion.js`) is presentation-only JS — degrade
-path is plain IntersectionObserver reveals, so the page works with the
-libs absent and under `prefers-reduced-motion`.
+`static/storefront/js/home-motion.js`, plus the vanilla canvas particle
+engine `ke-particles.js` shared with the login brand panel) is
+presentation-only JS — degrade path is plain IntersectionObserver reveals,
+so the page works with the libs absent and under `prefers-reduced-motion`.
+Storefront ↔ login navigation uses cross-document View Transitions (both
+pages opt in via `@view-transition`; the brand mark morphs into the login
+monogram on supporting browsers, plain navigation elsewhere).
 
 **`ListingTeamMixin`** — the trust-tier gate: one role, one lane, zero
 reach elsewhere (certified). Pattern echo: a role-scoped mixin exactly like

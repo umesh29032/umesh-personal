@@ -159,7 +159,7 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `.hero-strip.copper` | Money-screen page hero (copper gradient, h1 20px) | Plain `.hero-strip` = the navy default. Page may add a flex modifier for hero actions/totals |
 | `.panel` | Content card: card-bg, radius 14, shadow, padding 16, mb 18 | Page modifiers only for real needs (e.g. `padding:16px 0 4px` table-bleed) |
 | `.stat-grid` / `.stat-card` | KPI cards (label uppercase 11px / value 22px; `.payable` → copper value) | auto-fit minmax(140px); 2-col on ≤560px |
-| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included |
+| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included. `flex-wrap: wrap` (UI-audit 2026-07-20): 3+ buttons wrap on mobile — `flex-end` + `nowrap` used to clip the first button off the LEFT edge (settlement detail regression) |
 | `.btn-copper` / `.btn-ghost` / `.btn-danger` (standalone, WITHOUT `.btn`) | Money-screen buttons: radius 10, font 13/700, 40px min-height | `:not(.btn)` shapes — combining with `.btn` keeps the classic 6px-radius system instead |
 | stacked table (`.table-responsive` + `td[data-label]`) | THE responsive-table standard for all future lists | thead hidden ≤ breakpoint; label:value rows; F1 fix guarantees width |
 
@@ -187,7 +187,7 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `.tbl` | Base table styles (alternate to inline-styled tables) |
 | `.tbl-wrap` | Wrapper with rounded corners + horizontal scroll |
 | `td[data-label="X"]` | Required on EVERY `<td>` — turns into stacked card row at ≤600px |
-| `.td-actions` | Add to actions `<td>` — full-width button row on mobile |
+| `.td-actions` | Add to actions `<td>` — full-width button row on mobile. Wraps (`flex-wrap: wrap`, UI-audit 2026-07-20): 5-button rows (Edit/Flow/Patterns/Sizes/Archive) used to clip leftmost buttons — `justify-content: flex-end` overflows leftwards, invisible + unreachable |
 | `.dt-th` | List-page `<th>` header cell (uppercase 11px tracked) — promoted from 14 identical inline styles (UIL-D 2026-07-16); add page extras (e.g. `text-align:right`) inline alongside |
 
 **⚠ Never ship a bare `<table>` (PA-14-1).** Page content sits inside `main.content { overflow-x: hidden }`, so a table wider than the viewport is **clipped with no scroll** — the rightmost columns (often money: "Final payable ₹", "Recovered ₹") become invisible and unreachable on a phone. Wrap EVERY `<table>` in `.table-responsive` AND put `data-label` on every `<td>`. The wrapper gives desktop horizontal-scroll and, at ≤600px, switches to stacked label:value cards. This includes detail/snapshot tables (e.g. settlement detail), not just DataTables lists.

@@ -203,7 +203,16 @@ def create_adda(user, *, product: Product) -> Adda:
 
     # Yahi line race-safety deti hai — Product row lock ho jaati hai
     prod = Product.objects.select_for_update().get(pk=product.pk)
+    # BUG-B1 fix (2026-07-20): advance the counter past any code that ALREADY
+    # exists. Out-of-band inserts (data migrations, imports, dev seed scripts)
+    # can desync `adda_counter` from the real max code; without this skip the
+    # generated `{code}-{counter:03d}` collides on INSERT → unhandled
+    # IntegrityError, AND the failed txn rolls the counter back, so every retry
+    # regenerates the SAME colliding code → creation permanently wedged for that
+    # product. The loop runs under the select_for_update product lock (serialised).
     prod.adda_counter += 1
+    while Adda.objects.filter(code=f"{prod.code}-{prod.adda_counter:03d}").exists():
+        prod.adda_counter += 1
     prod.save(update_fields=['adda_counter'])   # sirf counter column UPDATE
 
     # First stage pick — Product ka workflow_stages reverse FK queryset (order ASC)

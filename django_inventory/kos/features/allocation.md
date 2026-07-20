@@ -77,10 +77,15 @@ down the flow. Pool starts at cutting — pre-piece stages have nothing to count
   **blind reporting**: labels only, never quantities, so the allocation
   can't anchor what a worker claims.
 
-**The complete-time bound** (S4 Phase 4): `complete_worker_task` checks
-`Σ(good+alter+missing) ≤ Σ active allocated` per dim — gated by
-`ENFORCE_ALLOCATION_BOUND` (default OFF; deploy→soak→enable runbook).
-Refusal at complete freezes nothing — strict but recoverable.
+**The complete-time bound** (S4 Phase 4 → hardened AE-1 2026-07-20): `complete_worker_task`
+checks `Σ(good+alter+missing+damaged) ≤ Σ active allocated` per reported dim. **AE-1 (owner
+bundle model): this is now HARD + ALWAYS-ON — no feature flag, no warning mode** (the FAT
+proved the old soft/off default let a worker report 10 against 6 allocated). A reported-but-
+unallocated (colour,size) pair → allocated=0 → refused. PRODUCER stages (no upstream pool)
+are skipped — they create the pool, they don't consume it. Refusal freezes nothing — strict
+but recoverable. Whole-bundle allocation (`allocate_whole`, the default) vs partial
+(`allocate(qty=)`, explicit) both draw from the same pool; `bundle_service` projects the
+"Red / M / 100" view. Design: [ADD](../../docs/ALLOCATION_ENGINE_REDESIGN_ADD_2026_07_20.md).
 
 **Reopen armor** (S4 Phase 5): reopening a stage while ANY later stage has
 non-voided allocations / completed contributions is refused with an
@@ -95,7 +100,7 @@ pool chain never dangles.
 | "Void refused" | H-2 — worker already reported against it; fix via `set_verified_quantity`, then void |
 | "Pool empty on a downstream stage" | Was `materialize_stage_pool` reached (stage advanced through the funnel)? NONE-grain = 0 rows by design |
 | "Reopen refused" | Read the error — it names the furthest downstream blocker and the action (void/reverse) |
-| Bound refusal at complete (flag on) | `preview_allocation_bound` command shows violations before enabling |
+| Bound refusal at complete | over-report vs allocation — always enforced; `preview_allocation_bound` audits any pre-existing legacy rows |
 
 ## Change Impact
 
@@ -123,9 +128,9 @@ NOT settlement/rates (orthogonal by lock — verify it stays that way).
 
 **Q. "How do you prevent over-claiming against limited capacity in a workflow system?"**
 - *Short:* Freeze upstream output into a counted pool; allocate slices; refuse over-draw at write time; bound claims at submission.
-- *Senior:* Enforce at the SOURCE (capacity), not the sink (payment audit) — by the time money math notices, the dispute already exists. Keep capacity orthogonal to money so each can be corrected independently; share the correction resolver so one fix propagates. Roll out hard bounds behind a flag with a preview command — strictness you can't preview is an outage.
-- *Project example:* SPS/WSA + always-on over-draw refusal + flag-gated complete bound + H-2 void guard + the 120-vs-105 origin story.
-- *Follow-ups:* "Why advisory lock per pool object?" (serialize draw-downs on ONE pool without blocking others — (5375, objid)) · "Why is the bound flag OFF by default?" (deploy→soak→resolve→enable; see the runbook pattern).
+- *Senior:* Enforce at the SOURCE (capacity), not the sink (payment audit) — by the time money math notices, the dispute already exists. Keep capacity orthogonal to money so each can be corrected independently; share the correction resolver so one fix propagates. Preview strictness before you enforce it (a `preview` command over historical rows) — strictness you can't preview is an outage.
+- *Project example:* SPS/WSA + always-on over-draw refusal + always-on complete bound (previewed on legacy rows, then made unconditional) + H-2 void guard + the 120-vs-105 origin story.
+- *Follow-ups:* "Why advisory lock per pool object?" (serialize draw-downs on ONE pool without blocking others — (5375, objid)) · "Why preview a bound before enforcing?" (find pre-existing violations first so hard enforcement doesn't strand in-flight work).
 
 ## 🧠 Remember This
 
@@ -140,7 +145,7 @@ source par khatam karo, payment par nahi.
 - Cutting pool = APSCPB (never duplicated); downstream = frozen SPS
 - Offer = Coalesce(verified, good) — same resolver as settlement, per concern
 - allocate refuses > available (ALWAYS-ON); void refuses stranding reports (H-2)
-- Complete bound: Σ(g+a+m) ≤ allocated — `ENFORCE_ALLOCATION_BOUND` default OFF
+- Complete bound: Σ(g+a+m+damaged) ≤ allocated — HARD + always-on (AE-1; flag retired), producers skipped
 - Locks: (5375, objid), disjoint from 5374; grain monotonic, starts at cutting
 - Blind reporting: labels, never quantities
 

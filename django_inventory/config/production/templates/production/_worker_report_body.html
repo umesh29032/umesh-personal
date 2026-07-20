@@ -130,15 +130,23 @@ No money shown (Option B). No other worker's data (isolation, D8).
   {% else %}
     {# ════ STATE ① — EDITABLE (draft) ════ #}
     <form method="post" id="report-form"
-          action="{% url 'production:worker-report' adda.code stage_type %}{% if embedded %}?embedded=1{% endif %}">
+          action="{{ report_action }}">
       {% csrf_token %}
       <input type="hidden" name="line-count" id="line-count" value="0">
 
+      {% if single_bundle %}
+      {# AE-3: opened for ONE bundle — colour/size are fixed; worker only enters quantities. #}
+      <div class="bundle-lock">
+        <span class="bundle-lock-lbl">Your bundle</span>
+        <span class="bundle-lock-val">{{ bundle_label }}</span>
+      </div>
+      {% endif %}
+
       <div class="panel">
         <div class="panel-head"><div class="panel-num">1</div>
-          <div class="panel-title">What did you make?</div></div>
+          <div class="panel-title">{% if single_bundle %}Enter your production{% else %}What did you make?{% endif %}</div></div>
         <div class="panel-body">
-          <p class="panel-sub">Add a {{ schema.line_label }} for each kind of work you did.</p>
+          <p class="panel-sub">{% if single_bundle %}Fill only the numbers — the bundle is already chosen for you.{% else %}Add a {{ schema.line_label }} for each kind of work you did.{% endif %}</p>
           <div id="lines-wrap">
             {% for fields in form_lines %}
               {# prefilled draft line — same schema loop as the blank template below #}
@@ -171,7 +179,7 @@ No money shown (Option B). No other worker's data (isolation, D8).
               </div>
             {% endfor %}
           </div>
-          <button type="button" class="add-line" id="add-line">+ Add another {{ schema.line_label }}</button>
+          {% if not single_bundle %}<button type="button" class="add-line" id="add-line">+ Add another {{ schema.line_label }}</button>{% endif %}
         </div>
       </div>
 
@@ -276,8 +284,9 @@ No money shown (Option B). No other worker's data (isolation, D8).
           if (rm) { rm.closest('[data-line]').remove(); renumber(); totals(); }
         });
         wrap.addEventListener('input', totals);
-        document.getElementById('add-line').addEventListener('click', addLine);
-        if (!wrap.querySelector('[data-line]')) addLine();   // start with one blank line
+        var addBtn = document.getElementById('add-line');
+        if (addBtn) addBtn.addEventListener('click', addLine);   // absent in single-bundle mode
+        if (!wrap.querySelector('[data-line]') && addBtn) addLine();   // start with one blank line
         renumber(); totals();
       })();
     </script>

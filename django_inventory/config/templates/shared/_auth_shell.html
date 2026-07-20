@@ -212,6 +212,40 @@ Per-page values come ONLY through CSS vars (--auth-*); content via blocks. Pages
         /* shine sweep on submit (uses ::before — ::after already carries the gradient wash) */
         body.auth-login .auth-btn::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(105deg, transparent, rgba(255,255,255,0.22), transparent); transform: translateX(-150%) skewX(-18deg); transition: transform 0.6s ease; pointer-events: none; }
         body.auth-login .auth-btn:hover:not(:disabled)::before { transform: translateX(320%) skewX(-18deg); }
+        /* particle canvas (ke-particles.js) — behind .auth-brand-inner (z1), above the panel gradient */
+        body.auth-login .auth-brand .ke-particles { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+        /* copper shimmer sweeping through the heading accent */
+        body.auth-login .auth-heading em {
+            background: linear-gradient(110deg, var(--ink) 42%, var(--copper-l) 50%, var(--ink) 58%);
+            background-size: 260% 100%;
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: authShimmer 5.5s ease-in-out infinite;
+        }
+        @keyframes authShimmer { 0% { background-position: 130% 0; } 55%, 100% { background-position: -130% 0; } }
+        /* cursor spotlight on the form card (overlay injected by login page JS, fine pointers) */
+        body.auth-login .auth-card { position: relative; }
+        body.auth-login .auth-spotlight {
+            /* z-index:-1 — split mode makes .auth-card-body static, so a z:0 overlay would paint
+               ABOVE the form text; negative z keeps the glow under all in-flow card content */
+            position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+            opacity: 0; transition: opacity 0.4s; z-index: -1;
+            background: radial-gradient(280px circle at var(--mx, 50%) var(--my, 50%), rgba(184,115,51,0.10), transparent 65%);
+        }
+        body.auth-login .auth-card:hover .auth-spotlight { opacity: 1; }
+        /* cross-document morph: brand mark ↔ monogram (names gated per breakpoint so only ONE carries it) */
+        @media (min-width: 861px) { body.auth-login .auth-brand-inner .auth-monogram { view-transition-name: ke-brand; } }
+        @media (max-width: 860px) { body.auth-login .auth-mobile-brand .auth-monogram { view-transition-name: ke-brand; } }
+        /* reduced motion: kill every login-skin ambient animation; shimmer also needs its gradient
+           text-fill reverted or it would freeze mid-sweep with a transparent fill */
+        @media (prefers-reduced-motion: reduce) {
+            body.auth-login .auth-brand::after,
+            body.auth-login .auth-glow,
+            body.auth-login .auth-right::before,
+            body.auth-login .auth-btn::before,
+            body.auth-login .auth-heading em { animation: none; }
+            body.auth-login .auth-heading em { background: none; -webkit-background-clip: initial; background-clip: initial; -webkit-text-fill-color: currentColor; }
+        }
         /* mobile brand strip — phones lose the whole brand panel ≤860px; this puts identity back in the card */
         body.auth-login .auth-mobile-brand { display: none; }
         @media (max-width: 860px) {

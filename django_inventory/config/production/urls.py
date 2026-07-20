@@ -40,6 +40,7 @@ urlpatterns = [
     path('',                              views.AddaDashboardView.as_view(),   name='dashboard'),
     path('stalled/',                      views.StalledAddaListView.as_view(), name='stalled-addas'),
     path('pending-reports/',              views.PendingReportListView.as_view(), name='pending-reports'),
+    path('my-work/',                      views.MyAssignedWorkView.as_view(),  name='my-work'),
     path('costing/',                      views.ProductionCostingView.as_view(), name='costing'),
 
     # Products
@@ -104,6 +105,7 @@ urlpatterns = [
     # Same ?embedded=1 convention as stage-panel for the dashboard iframe route.
     path('addas/<str:code>/report/<str:stage_type>/',   views.WorkerReportView.as_view(),       name='worker-report'),
     # P1 (F5-lite): management quantity review/correction before settlement.
+    path('addas/<str:code>/snapshot/',        views.AddaSnapshotView.as_view(),      name='adda-snapshot'),
     path('addas/<str:code>/review-reports/',             views.AddaReportReviewView.as_view(),    name='adda-report-review'),
 
     # Layering workflow — workspace (GET) + actions (POST)

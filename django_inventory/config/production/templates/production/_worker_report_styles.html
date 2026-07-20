@@ -112,4 +112,10 @@ mirrors shared/_form_styles.html + stage_panel_embedded :root.{% endcomment %}
      Good field (owner D2: only good pays; keep the worker's eye on it). */
   .line-field--obs .fld-label{color:var(--stone,#7a6a58);font-weight:500;}
   .line-field--obs .qty-input{background:var(--cream-2,#ede3d4);}
+  /* AE-3 single-bundle lock — the bundle is chosen; worker only enters numbers. */
+  .worker-report .bundle-lock{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--cream,#f7f0e6);border:1.5px solid var(--border-subtle,#e0d6c6);
+    border-radius:12px;padding:12px 14px;margin-bottom:12px;}
+  .worker-report .bundle-lock-lbl{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--stone,#7a6a58);}
+  .worker-report .bundle-lock-val{font-size:17px;font-weight:800;color:var(--ink,#2a2118);}
 </style>

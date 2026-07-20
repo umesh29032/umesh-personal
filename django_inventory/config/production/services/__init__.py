@@ -87,9 +87,12 @@ from .flow_service import (
     set_stage_grain,
 )
 from .pool_service import (
-    allocate, available, bound_soft_warning, check_allocation_bound, clear_stage_pool,
-    materialize_stage_pool, pool_good, preview_bound_violations, void_allocation,
-    worker_allocated,
+    allocate, allocate_whole, available, check_allocation_bound,
+    clear_stage_pool, materialize_stage_pool, pool_good, preview_bound_violations,
+    void_allocation, worker_allocated,
+)
+from .bundle_service import (
+    bundles_for_stage, my_assigned_work, stage_snapshot, worker_bundles,
 )
 
 __all__ = [
@@ -98,12 +101,16 @@ __all__ = [
     'materialize_stage_pool',
     'clear_stage_pool',
     'allocate',
+    'allocate_whole',
     'available',
     'void_allocation',
     'worker_allocated',
     'check_allocation_bound',
     'preview_bound_violations',
-    'bound_soft_warning',
+    'bundles_for_stage',
+    'worker_bundles',
+    'my_assigned_work',
+    'stage_snapshot',
     'create_adda',
     'advance_to_next_stage',
     'create_product',

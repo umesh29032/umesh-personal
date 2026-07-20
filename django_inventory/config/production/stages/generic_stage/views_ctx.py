@@ -16,52 +16,30 @@ from decimal import Decimal
 from accounts.services import MANAGEMENT_ROLES, user_has_role
 
 
-def _dim_labels(color_ids, size_ids):
-    """Bulk label lookup: {color_id: (name, hex)} + {size_id: label}."""
-    from raw_materials.models import ClothColor
-    from production.models import ProductSize
-    colors = {c.pk: c for c in ClothColor.objects.filter(pk__in=[i for i in color_ids if i])}
-    sizes = {s.pk: s for s in ProductSize.objects.filter(pk__in=[i for i in size_ids if i])}
-    return colors, sizes
-
-
 def _pool_section(sr, wf):
-    """Management-only split data: available per upstream dim + active allocations.
-    Reads ONLY through pool_service (single reader — no APSCPB/SPS queries here)."""
+    """Management-only bundle allocation data (AE-2). Reads ONLY through the services
+    (pool_service single reader + bundle_service read-model — no APSCPB/SPS queries here).
+
+    `bundles` = the AE-2 whole-first list: one row per Manufacturing Bundle (colour,size)
+    with total / assigned / remaining (available) / holders (worker · qty · mode · wsa_id
+    for inline void). `source_stage`/`grain` unchanged."""
     from production.constants import ALLOC_DIM_NONE
-    from production.models import WorkerStageAllocation
-    from production.services import pool_service
+    from production.services import bundle_service, pool_service
 
     if sr is None or wf is None or wf.allocation_dimensions == ALLOC_DIM_NONE:
         return None
     source = pool_service.upstream_pool_source(sr)
     if source is None:
-        return {'rows': [], 'allocations': [], 'source_stage': None,
-                'grain': wf.allocation_dimensions}
+        return {'bundles': [], 'source_stage': None, 'grain': wf.allocation_dimensions,
+                'has_available': False}
 
-    src_good = pool_service.pool_good(source)
-    dims = sorted(src_good.keys(), key=lambda k: (k[0] or 0, k[1] or 0))
-    if wf.allocation_dimensions == 'quantity':
-        dims = [(None, None)]   # scalar grain — one row, dims collapse
-    colors, sizes = _dim_labels({c for c, _ in dims}, {s for _, s in dims})
-
-    rows = []
-    for color_id, size_id in dims:
-        avail = pool_service.available(sr, color_id, size_id)
-        rows.append({
-            'color_id': color_id, 'size_id': size_id,
-            'color': colors.get(color_id), 'size': sizes.get(size_id),
-            'available': avail,
-        })
-
-    allocations = list(
-        WorkerStageAllocation.objects
-        .filter(stage_record=sr, voided_at__isnull=True)
-        .select_related('worker', 'color', 'size')
-        .order_by('worker_id', 'pk'))
+    bundles = bundle_service.bundles_for_stage(sr)
+    # Stable, human order: colour name then size label (None-safe).
+    bundles.sort(key=lambda b: ((b['color'].name if b['color'] else ''),
+                                (b['size'].label if b['size'] else '')))
     return {
-        'rows': rows,
-        'allocations': allocations,
+        'bundles': bundles,
+        'has_available': any(b['available'] > 0 for b in bundles),
         'source_stage': source.workflow_stage.stage.name,
         'grain': wf.allocation_dimensions,
     }
@@ -171,6 +149,26 @@ def build_generic_panel_context(request, adda, stage_code: str, stage_name: str)
             machine_holders = []
 
     pool = _pool_section(sr, wf) if is_management else None
+    # AE-2: worker context for the allocation dropdown — each active worker's CURRENT
+    # load on THIS stage (bundle count + Σ pieces) so a manager can balance at a glance.
+    alloc_workers = []
+    if is_management and pool is not None and sr is not None:
+        from django.db.models import Count, Sum
+        from production.models import WorkerStageAllocation
+        load = {
+            row['worker_id']: row for row in (
+                WorkerStageAllocation.objects
+                .filter(stage_record=sr, voided_at__isnull=True)
+                .values('worker_id')
+                .annotate(bundles=Count('pk'), pieces=Sum('allocated_quantity')))
+        }
+        for w in sr.active_workers:
+            ld = load.get(w.pk, {})
+            alloc_workers.append({
+                'worker': w,
+                'bundles': ld.get('bundles', 0),
+                'pieces': ld.get('pieces', Decimal('0')) or Decimal('0'),
+            })
     # Panel section numbers (conditional sections shift them; templates can't count).
     sec, n = {}, 1
     sec['workers'] = n; n += 1
@@ -197,5 +195,9 @@ def build_generic_panel_context(request, adda, stage_code: str, stage_name: str)
         'pool': pool,
         'sec': sec,
         'eligible_workers': eligible_stage_workers(stage_code) if can_assign else [],
+        'alloc_workers': alloc_workers,
+        # UX: after an allocation the panel reloads with ?worker=<pk> so the picker
+        # keeps the same worker selected (assign many bundles to one worker, pick once).
+        'preselect_worker': request.GET.get('worker') or '',
         'machine_holders': machine_holders,
     }

@@ -36,9 +36,17 @@ class GenericStageHandler(StageHandler):
 
         fields = []
         initial_lines = []
+        # AE-1 gap-E fix: the flat colour/size option lists lose the PAIRING — a
+        # worker allocated Red/M + Blue/XL would otherwise pass Red (a valid colour)
+        # + XL (a valid size) = Red/XL, a pair never allocated. `allowed_pairs`
+        # carries the worker's real allocated pairs; `pair_keys` names the choice
+        # fields that form a pair, so the GENERIC parser refuses an unallocated pair
+        # at entry (no stage names). None = don't pair-check (unscoped / non-dim stage).
+        pair_keys, allowed_pairs = [], None
         wf = adda.product.workflow_stages.filter(stage__code=self.code).first()
         if wf is not None and wf.allocation_dimensions == ALLOC_DIM_COLOR_SIZE:
             color_opts, size_opts = [], []
+            pair_keys = ['color_id', 'size_id']
             if worker is not None:
                 sr = self._sr(adda)
                 if sr is not None:
@@ -65,6 +73,9 @@ class GenericStageHandler(StageHandler):
                                                   'size_id': a.size_id})
                     color_opts = list(seen_c.values())
                     size_opts = list(seen_s.values())
+                    # worker-scoped → we KNOW the real pairs; empty set = worker has
+                    # no allocation yet (reporting is refused entirely upstream).
+                    allowed_pairs = sorted(seen_pairs)
             fields += [
                 {'key': 'color_id', 'kind': 'choice', 'label': 'Colour',
                  'required': True, 'options': color_opts},
@@ -85,7 +96,8 @@ class GenericStageHandler(StageHandler):
              'label': 'Damaged / scrap', 'required': False, 'unit': 'pieces'},
         ]
         return {'line_label': 'work line', 'fields': fields,
-                'initial_lines': initial_lines}
+                'initial_lines': initial_lines,
+                'pair_keys': pair_keys, 'allowed_pairs': allowed_pairs}
 
     # ── snapshots (read-only references — frozen rule: render live rows) ──
     def _sr(self, adda):

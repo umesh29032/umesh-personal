@@ -23,9 +23,7 @@
   .gsp .out-table{width:100%;border-collapse:collapse;font-size:14px;}
   .gsp .out-table th,.gsp .out-table td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--border-subtle,#e7ddcf);}
   .gsp .help-note{color:var(--stone,#7a6a58);font-size:13px;}
-  .gsp .alloc-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px;align-items:end;}
-  .gsp .alloc-form label{display:block;font-size:12px;font-weight:600;color:var(--ink,#1a1410);}
-  .gsp .alloc-form select,.gsp .alloc-form input[type="number"],.gsp .fancy-select-trigger{width:100%;background:var(--cream,#f5ede0);border:1.5px solid var(--border-subtle,#e7ddcf);border-radius:10px;padding:9px 10px;font-size:14px;color:var(--ink,#1a1410);font-family:inherit;text-align:left;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);}
+  .gsp .fancy-select-trigger{width:100%;background:var(--cream,#f5ede0);border:1.5px solid var(--border-subtle,#e7ddcf);border-radius:10px;padding:9px 10px;font-size:14px;color:var(--ink,#1a1410);font-family:inherit;text-align:left;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);}
   .gsp .void-btn{background:transparent;border:none;color:var(--status-danger-text,#a33);font-weight:700;cursor:pointer;font-size:14px;padding:0 2px;}
   .gsp .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 10px;}
   .gsp .stat{background:var(--cream-2,#ede3d4);border:1px solid var(--border-subtle,#e7ddcf);border-radius:12px;padding:8px 14px;min-width:86px;}
@@ -67,85 +65,71 @@
   </div>
 
   {% if pool %}
-  <div class="panel">
-    <div class="panel-head"><span class="panel-num">{{ sec.split }}</span><span class="panel-title">Split the work</span></div>
+  {# ── AE-2 Manager allocation: WHOLE-bundle first, partial = explicit override ── #}
+  <div class="panel alloc-bundles">
+    <div class="panel-head"><span class="panel-num">{{ sec.split }}</span><span class="panel-title">Allocate bundles</span></div>
     <div class="panel-body">
       {% if pool.source_stage %}
-      <div class="out-wrap">
-      <table class="out-table">
-        <thead><tr>{% if pool.grain == 'color_size' %}<th>Colour</th><th>Size</th>{% endif %}<th>Available from {{ pool.source_stage }}</th></tr></thead>
+      {% if not stage_record.completed_at %}
+        {% if pool.has_available %}
+        {# Step 1 — pick the worker ONCE; it syncs into every bundle's Assign button. #}
+        <label class="ab-worker-label">Worker
+          <select id="ab-worker-{{ generic_stage_code }}" class="ab-worker" required>
+            <option value="">— pick worker —</option>
+            {% for aw in alloc_workers %}<option value="{{ aw.worker.pk }}"{% if aw.worker.pk|stringformat:'s' == preselect_worker %} selected{% endif %}>{{ aw.worker.get_full_name|default:aw.worker.email }}{% if aw.bundles %} — holds {{ aw.bundles }} bundle{{ aw.bundles|pluralize }} · {{ aw.pieces|floatformat:"-2" }} pc{% endif %}</option>{% endfor %}
+          </select>
+        </label>
+        <p class="help-note ab-hint">Pick a worker, then tap <strong>Assign whole</strong> on each bundle. Use <em>Partial</em> only when splitting a bundle between workers.</p>
+
+        {# Step 2 — available bundles; each = one-tap whole assign + optional partial. #}
+        <div class="ab-list">
+          {% for b in pool.bundles %}{% if b.available > 0 %}
+          <div class="ab-card">
+            <div class="ab-id">
+              {% if pool.grain == 'color_size' %}{% if b.color.hex_code %}<span class="sw" style="background:{{ b.color.hex_code }};"></span>{% endif %}<span class="ab-name">{{ b.color.name|default:"—" }}</span><span class="ab-size">{{ b.size.label|default:"—" }}</span>{% else %}<span class="ab-name">Pieces</span>{% endif %}
+              <span class="ab-remain">{{ b.available|floatformat:"-2" }}{% if b.assigned %} <span class="ab-of">/ {{ b.total|floatformat:"-2" }}</span>{% endif %} left</span>
+            </div>
+            {% if b.holders %}<div class="ab-holders">{% for h in b.holders %}<span class="chip chip-sm">{{ h.worker.get_full_name|default:h.worker.email }} · {{ h.allocated|floatformat:"-2" }}{% if h.mode == 'partial' %} <span class="ab-tag">partial</span>{% endif %}</span>{% endfor %}</div>{% endif %}
+            <form method="post" class="ab-form" action="{% url 'production:generic-stage-allocate' adda.code generic_stage_code %}">
+              {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+              <input type="hidden" name="worker" class="ab-worker-sync">
+              <input type="hidden" name="dim_pair" value="{{ b.color_id|default:'' }}:{{ b.size_id|default:'' }}">
+              <button type="submit" name="mode" value="whole" class="lybtn lybtn-primary ab-whole">Assign whole →</button>
+              <button type="button" class="ab-toggle" aria-expanded="false">Partial…</button>
+              <span class="ab-partial" hidden>
+                <input type="number" name="qty" inputmode="numeric" step="1" min="1" max="{{ b.available|floatformat:'-2' }}" placeholder="pieces">
+                <button type="submit" name="mode" value="partial" class="lybtn lybtn-ghost">Assign</button>
+              </span>
+            </form>
+          </div>
+          {% endif %}{% endfor %}
+        </div>
+        {% else %}
+        <span class="help-note">Every bundle is fully allocated. Void a holder below to reassign, or complete the stage.</span>
+        {% endif %}
+      {% endif %}
+
+      {# Live board — Bundle · Total · Assigned · Remaining · Holders (with inline void). #}
+      {% if pool.bundles %}
+      <div class="out-wrap" style="margin-top:12px;">
+      <table class="out-table ab-board">
+        <thead><tr>{% if pool.grain == 'color_size' %}<th>Colour</th><th>Size</th>{% endif %}<th>Total</th><th>Assigned</th><th>Remaining</th><th>Holders</th></tr></thead>
         <tbody>
-        {% for r in pool.rows %}
-          <tr>{% if pool.grain == 'color_size' %}
-              <td data-label="Colour">{% if r.color.hex_code %}<span class="sw" style="background:{{ r.color.hex_code }};"></span> {% endif %}{{ r.color.name|default:"—" }}</td>
-              <td data-label="Size">{{ r.size.label|default:"—" }}</td>{% endif %}
-              <td data-label="Available">{{ r.available|floatformat:"-2" }}</td></tr>
-        {% empty %}<tr><td colspan="3" class="help-note">Nothing in the upstream pool yet — complete {{ pool.source_stage }} first.</td></tr>{% endfor %}
+        {% for b in pool.bundles %}
+          <tr>
+            {% if pool.grain == 'color_size' %}
+            <td data-label="Colour">{% if b.color.hex_code %}<span class="sw" style="background:{{ b.color.hex_code }};"></span> {% endif %}{{ b.color.name|default:"—" }}</td>
+            <td data-label="Size">{{ b.size.label|default:"—" }}</td>{% endif %}
+            <td data-label="Total">{{ b.total|floatformat:"-2" }}</td>
+            <td data-label="Assigned">{{ b.assigned|floatformat:"-2" }}</td>
+            <td data-label="Remaining">{{ b.available|floatformat:"-2" }}</td>
+            <td data-label="Holders">
+              {% for h in b.holders %}<span class="chip chip-sm">{{ h.worker.get_full_name|default:h.worker.email }} · {{ h.allocated|floatformat:"-2" }}{% if h.mode == 'partial' %} <span class="ab-tag">partial</span>{% endif %}{% if not stage_record.completed_at %}<form method="post" action="{% url 'production:generic-stage-alloc-void' adda.code generic_stage_code %}" style="display:inline;" onsubmit="return confirm('Void this allocation? The quantity returns to the pool.');">{% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}<input type="hidden" name="allocation_id" value="{{ h.wsa_id }}"><button type="submit" class="void-btn" title="Void — return to pool">×</button></form>{% endif %}</span>{% empty %}<span class="help-note">—</span>{% endfor %}
+            </td>
+          </tr>
+        {% empty %}<tr><td colspan="6" class="help-note">Nothing in the upstream pool yet — complete {{ pool.source_stage }} first.</td></tr>{% endfor %}
         </tbody>
       </table>
-      </div>
-      {% if not stage_record.completed_at and pool.rows %}
-      <form method="post" class="alloc-form" action="{% url 'production:generic-stage-allocate' adda.code generic_stage_code %}">
-        {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-        <label>Worker
-          <select name="worker" required>
-            <option value="">— pick —</option>
-            {% for w in stage_record.active_workers %}<option value="{{ w.pk }}">{{ w.get_full_name|default:w.email }}</option>{% endfor %}
-          </select>
-        </label>
-        {% if pool.grain == 'color_size' %}
-        {# ONE pair select (old dual dropdowns duplicated entries + allowed non-pool pairs); "colorpk:sizepk" splits into the hidden inputs the endpoint expects — backend unchanged #}
-        <label>Cut lot (colour · size)
-          <select name="dim_pair" required data-alloc-pair>
-            <option value="">— pick —</option>
-            {% for r in pool.rows %}<option value="{{ r.color.pk|default:'' }}:{{ r.size.pk|default:'' }}" data-available="{{ r.available|floatformat:'-2' }}">{{ r.color.name|default:"—" }} · {{ r.size.label|default:"—" }} — {{ r.available|floatformat:"-2" }} left</option>{% endfor %}
-          </select>
-        </label>
-        <input type="hidden" name="color_id"><input type="hidden" name="size_id">
-        {% endif %}
-        <label>Pieces
-          <input type="number" name="qty" inputmode="numeric" step="0.01" min="0.01" required placeholder="e.g. 50">
-        </label>
-        <button type="submit" class="lybtn lybtn-ghost">Allocate</button>
-      </form>
-      <div class="help-note" style="margin-top:6px;">Picking a lot pre-fills its remaining pieces — edit to split. Over-allocation is refused.</div>
-      <script>
-        (function () {
-          var form = document.currentScript.previousElementSibling.previousElementSibling;
-          if (!form || !form.classList.contains('alloc-form')) {
-            form = document.querySelector('form.alloc-form[action*="{{ generic_stage_code }}"]');
-          }
-          if (!form) return;
-          var pair = form.querySelector('select[data-alloc-pair]');
-          if (!pair) return;
-          var sync = function () {
-            var bits = (pair.value || ':').split(':');
-            form.querySelector('input[name=color_id]').value = bits[0] || '';
-            form.querySelector('input[name=size_id]').value = bits[1] || '';
-          };
-          pair.addEventListener('change', function () {
-            sync();
-            var opt = pair.options[pair.selectedIndex];
-            var qty = form.querySelector('input[name=qty]');
-            if (opt && opt.dataset.available && qty) qty.value = opt.dataset.available;
-          });
-          form.addEventListener('submit', sync);   // guarantee even if change never fired
-        })();
-      </script>
-      {% endif %}
-      {% if pool.allocations %}
-      <div style="margin-top:10px;">
-        {% for a in pool.allocations %}
-        <span class="chip">{% if a.color %}<span class="sw" style="background:{{ a.color.hex_code|default:'transparent' }};"></span>{{ a.color.name }}{% endif %}{% if a.size %} · {{ a.size.label }}{% endif %} → {{ a.worker.get_full_name|default:a.worker.email }} · {{ a.allocated_quantity|floatformat:"-2" }}
-          {% if not stage_record.completed_at %}
-          <form method="post" action="{% url 'production:generic-stage-alloc-void' adda.code generic_stage_code %}" style="display:inline;" onsubmit="return confirm('Void this allocation? The quantity returns to the pool.');">
-            {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-            <input type="hidden" name="allocation_id" value="{{ a.pk }}">
-            <button type="submit" class="void-btn" title="Void allocation">×</button>
-          </form>
-          {% endif %}
-        </span>
-        {% endfor %}
       </div>
       {% endif %}
       {% else %}
@@ -153,6 +137,65 @@
       {% endif %}
     </div>
   </div>
+  <style>
+    .alloc-bundles .ab-worker-label{display:block;font-weight:600;font-size:13px;margin-bottom:4px;}
+    .alloc-bundles .ab-worker{width:100%;max-width:420px;}
+    .alloc-bundles .ab-hint{margin:6px 0 12px;}
+    .alloc-bundles .ab-list{display:flex;flex-direction:column;gap:8px;}
+    .alloc-bundles .ab-card{border:1px solid var(--border-card,#e5ded3);border-radius:12px;padding:10px 12px;background:var(--surface,#fff);}
+    .alloc-bundles .ab-id{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;}
+    .alloc-bundles .ab-name{font-weight:700;}
+    .alloc-bundles .ab-size{color:var(--muted,#6b6b6b);}
+    .alloc-bundles .ab-remain{margin-left:auto;font-weight:700;color:var(--copper,#a8632a);}
+    .alloc-bundles .ab-of{color:var(--muted,#999);font-weight:400;}
+    .alloc-bundles .ab-holders{margin:6px 0;display:flex;flex-wrap:wrap;gap:4px;}
+    .alloc-bundles .ab-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;}
+    .alloc-bundles .ab-whole{min-height:44px;flex:1 1 auto;min-width:160px;}
+    .alloc-bundles .ab-toggle{min-height:44px;background:none;border:1px dashed var(--border-card,#ccc);border-radius:10px;padding:0 14px;cursor:pointer;color:var(--muted,#555);}
+    .alloc-bundles .ab-partial{display:flex;align-items:center;gap:6px;flex:1 1 100%;margin-top:6px;}
+    .alloc-bundles .ab-partial[hidden]{display:none;}
+    .alloc-bundles .ab-partial input{width:120px;min-height:44px;}
+    .alloc-bundles .ab-tag{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#888);border:1px solid currentColor;border-radius:6px;padding:0 4px;}
+    .alloc-bundles .chip-sm{font-size:12px;}
+    .alloc-bundles .void-btn{margin-left:4px;}
+    @media (max-width:600px){.alloc-bundles .ab-whole{flex:1 1 100%;}}
+  </style>
+  <script>
+    (function () {
+      var root = document.currentScript.previousElementSibling; // the <style>
+      root = document.querySelector('.alloc-bundles');
+      if (!root) return;
+      var picker = root.querySelector('.ab-worker');
+      var syncWorker = function () {
+        var v = picker ? (picker.value || '') : '';
+        root.querySelectorAll('.ab-worker-sync').forEach(function (h) { h.value = v; });
+      };
+      if (picker) picker.addEventListener('change', syncWorker);
+      syncWorker();   // initial: honor a ?worker= pre-selection so the first Assign works
+      root.querySelectorAll('.ab-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var box = btn.parentElement.querySelector('.ab-partial');
+          var open = box.hasAttribute('hidden');
+          if (open) { box.removeAttribute('hidden'); } else { box.setAttribute('hidden', ''); }
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      });
+      // Guard every assign: sync the chosen worker in, and refuse an empty pick
+      // with a clear inline message (the service also refuses — defence in depth).
+      root.querySelectorAll('.ab-form').forEach(function (f) {
+        f.addEventListener('submit', function (e) {
+          syncWorker();
+          var w = f.querySelector('.ab-worker-sync').value;
+          if (!w) {
+            e.preventDefault();
+            if (picker) { picker.focus(); }
+            var hint = root.querySelector('.ab-hint');
+            if (hint) { hint.textContent = 'Pick a worker first, then tap Assign.'; hint.style.color = 'var(--danger,#b00)'; }
+          }
+        });
+      });
+    })();
+  </script>
   {% endif %}
   {% endif %}
 

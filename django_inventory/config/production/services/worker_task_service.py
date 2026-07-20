@@ -349,6 +349,61 @@ def report_contributions(task, lines, *, actor):
 
 
 @transaction.atomic
+def report_bundle(task, line, *, actor):
+    """AE-3 per-bundle submit — the "My Assigned Work" card flow.
+
+    A worker may hold several bundles on ONE stage task; reporting one must NOT lock the
+    others. So this UPSERTS a single bundle's contribution (replaces only that (colour,size)
+    line, leaves the rest untouched), enforces the allocation bound for THAT bundle
+    immediately, and completes the task ONLY when every active-allocated bundle now has a
+    report. Returns {'completed': bool, 'remaining_bundles': int}.
+
+    (The full multi-line form's save_draft + complete path is unchanged; this is the
+    focused single-bundle path.)
+
+    R1 (2026-07-20 engineering review): the over-report rule is NOT re-derived here — it is the
+    single canonical `pool_service.check_allocation_bound`. We upsert the line first, then call
+    that one validator; on refusal the enclosing @transaction.atomic rolls the upsert back, so
+    the worker's prior state is preserved. No duplicated business rule; reads persisted `good`
+    (never the S6-retired `reported_quantity` form key)."""
+    from production.models import (
+        WorkerStageAllocation, WorkerStageContribution, WorkerStageTask,
+    )
+    from production.services import pool_service
+    _ensure_task_actor(task, actor)
+    locked = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED,
+              WorkerStageTask.Status.CANCELLED)
+    if task.status in locked:
+        raise ValidationError("Cannot edit a completed or cancelled submission.")
+
+    color_id = line.get('color_id')
+    size_id = line.get('size_id')
+    sr = task.stage_record
+
+    # Upsert: drop only THIS bundle's existing line(s), keep the other bundles' lines.
+    task.contributions.filter(color_id=color_id, size_id=size_id).delete()
+    report_contributions(task, [line], actor=actor)
+
+    # CANONICAL over-report bound (single source) — raises if this (or any reported) dim
+    # exceeds its allocation; the atomic rollback then undoes the upsert above.
+    pool_service.check_allocation_bound(task)
+
+    # All allocated bundles reported? (every active (colour,size) has a contribution)
+    alloc_pairs = set(
+        WorkerStageAllocation.objects
+        .filter(stage_record=sr, worker=task.worker, voided_at__isnull=True)
+        .values_list('color_id', 'size_id'))
+    reported_pairs = set(
+        WorkerStageContribution.objects
+        .filter(task=task).values_list('color_id', 'size_id'))
+    remaining = alloc_pairs - reported_pairs
+    if not remaining:
+        complete_worker_task(task, actor=actor)
+        return {'completed': True, 'remaining_bundles': 0}
+    return {'completed': False, 'remaining_bundles': len(remaining)}
+
+
+@transaction.atomic
 def save_draft_contributions(task, lines, *, actor):
     """Save the worker's DRAFT contribution lines — operational convenience, NOT
     business truth. REPLACES the task's current draft lines (so a worker can keep
@@ -398,7 +453,7 @@ def complete_worker_task(task, *, actor):
     if locked_status == WorkerStageTask.Status.CANCELLED:
         raise ValidationError("Cannot complete a cancelled task.")
     # Foundation S4/Phase 4: Strict allocation bound BEFORE any freeze (a refused complete
-    # freezes nothing). No-op unless ENFORCE_ALLOCATION_BOUND on + a pool-participant stage.
+    # freezes nothing). Always enforced; a no-op only on non-pool / pool-producer stages.
     # Production-CAPACITY only (good+alter+missing ≤ Σ active allocated) — reads no money.
     from production.services import pool_service
     pool_service.check_allocation_bound(task)
@@ -510,9 +565,8 @@ def set_verified_quantity(contribution, quantity, *, actor):
         if quantity < 0:
             raise ValidationError("Verified quantity cannot be negative.")
         # H-1 (owner-approved 2026-07-06): verification REDUCES or CONFIRMS
-        # production — it can never create it. Two ceilings, flag-independent
-        # (this is a post-complete money path ENFORCE_ALLOCATION_BOUND never
-        # touches — settlement pays verified-else-good):
+        # production — it can never create it. Two ceilings (this is a
+        # post-complete money path — settlement pays verified-else-good):
         #   1. never above what the worker reported good;
         if quantity > c.good_quantity:
             raise ValidationError(
@@ -522,10 +576,9 @@ def set_verified_quantity(contribution, quantity, *, actor):
         #   2. on a piece-pool stage WHERE this worker holds an allocation for
         #      the dimension, never above that allocation (Σ verified-else-good
         #      of the task's OTHER lines on the same dimension counts against
-        #      the same ceiling). allocated == 0 → the stage ran un-split
-        #      (rollout phase, ENFORCE_ALLOCATION_BOUND off) — ceiling 1 alone
-        #      governs, otherwise verification would be unusable exactly where
-        #      corrections are most needed.
+        #      the same ceiling). allocated == 0 → the stage ran un-split —
+        #      ceiling 1 alone governs, otherwise verification would be unusable
+        #      exactly where corrections are most needed.
         from production.constants import ALLOC_DIM_NONE
         sr_ = c.task.stage_record
         if sr_.workflow_stage.allocation_dimensions != ALLOC_DIM_NONE:

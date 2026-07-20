@@ -99,11 +99,13 @@ class ContaminationTests(TestCase):
 
 
 class ProductionSafetyFailTests(TestCase):
-    @override_settings(ENFORCE_ALLOCATION_BOUND=True)
+    # AE-1 (2026-07-20): ENFORCE_ALLOCATION_BOUND retired from the declaration (bound is now
+    # always-on). Mismatch detection is proven with the remaining declared flag.
+    @override_settings(ENFORCE_SETTLEMENT_RECONCILIATION=True)
     def test_flag_mismatch_fails(self):
         r = production.check_flags_vs_declaration()
         self.assertEqual(r.status, "fail")
-        self.assertTrue(r.measured["actual"]["ENFORCE_ALLOCATION_BOUND"])
+        self.assertTrue(r.measured["actual"]["ENFORCE_SETTLEMENT_RECONCILIATION"])
 
     def test_migrations_consistent_live(self):
         self.assertEqual(production.check_migrations_consistency().status, "pass")

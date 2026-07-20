@@ -1,0 +1,115 @@
+{% extends "accounts/base.html" %}
+{% comment %}AE-4 — Super-Admin Production Snapshot (management operational control screen).
+Per pool stage: stage totals + per-bundle rollup + per-worker×bundle allocation detail.
+Read-only via bundle_service.stage_snapshot. Management-only (view gates). Tables scroll
+inside their own container (rule 11) + data-label stack on mobile.{% endcomment %}
+
+{% block title %}Production Snapshot · {{ adda.code }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .prod-snap{max-width:1100px;margin:0 auto;}
+  .prod-snap .hero{background:linear-gradient(135deg,#1c1a2e,#5a3b1e);color:#fff;border-radius:16px;padding:18px 22px;margin-bottom:16px;}
+  .prod-snap .hero h1{font-size:22px;margin:0 0 4px;}
+  .prod-snap .hero p{margin:0;opacity:.85;font-size:14px;}
+  .snap-stage{border:1.5px solid var(--border-card,#e0d6c6);border-radius:14px;padding:16px 18px;margin-bottom:18px;background:var(--surface,#fff);}
+  .snap-stage > h2{font-size:18px;margin:0 0 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .snap-stage .lane-chip{font-size:11px;background:var(--cream,#f7f0e6);border:1px solid var(--border-subtle,#e0d6c6);border-radius:999px;padding:2px 9px;color:var(--stone,#7a6a58);}
+  /* Totals strip */
+  .snap-totals{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:14px;}
+  .snap-totals .t{background:var(--cream,#f7f0e6);border:1px solid var(--border-subtle,#e0d6c6);border-radius:10px;padding:8px 6px;text-align:center;}
+  .snap-totals .t .lbl{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--stone,#7a6a58);}
+  .snap-totals .t .val{display:block;font-size:18px;font-weight:800;color:var(--ink,#2a2118);}
+  .snap-sub{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--stone,#7a6a58);margin:10px 0 6px;}
+  .snap-wrap{overflow-x:auto;border:1px solid var(--border-subtle,#eee);border-radius:10px;}
+  table.snap-table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+  table.snap-table th,table.snap-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--border-subtle,#efe8dc);white-space:nowrap;}
+  table.snap-table th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--stone,#7a6a58);background:var(--cream,#faf5ec);}
+  .sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #0002;vertical-align:middle;margin-right:4px;}
+  .mode-tag{font-size:10px;text-transform:uppercase;border:1px solid currentColor;border-radius:6px;padding:0 5px;}
+  .mode-tag.whole{color:#1e7a3d;}.mode-tag.partial{color:#a8632a;}
+  .prod-snap .unassigned{color:var(--copper,#a8632a);}
+  .st{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .st.ready{background:#e8f0ff;color:#2a52be;}.st.in_progress{background:#fff2d9;color:#a8632a;}.st.done{background:#e6f4ea;color:#1e7a3d;}
+  .bar{height:7px;border-radius:5px;background:var(--cream-2,#ede3d4);overflow:hidden;width:80px;}
+  .bar i{display:block;height:100%;background:var(--copper,#a8632a);}
+  .snap-empty{color:var(--stone,#7a6a58);padding:30px;text-align:center;}
+  @media (max-width:720px){.snap-totals{grid-template-columns:repeat(3,1fr);}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="prod-snap">
+  <div class="hero">
+    <h1>Production Snapshot — {{ adda.code }}</h1>
+    <p>{{ adda.product.name }} · who owns what, what's done, what's pending, what's unassigned.</p>
+  </div>
+
+  {% for s in stages %}
+  <section class="snap-stage">
+    <h2>{{ s.name }}{% if s.stream %}<span class="lane-chip">lane {{ s.stream.label }}</span>{% endif %}</h2>
+
+    {# ── Stage totals ── #}
+    <div class="snap-totals">
+      <div class="t"><span class="lbl">Bundles</span><span class="val">{{ s.snap.totals.bundles }}</span></div>
+      <div class="t"><span class="lbl">Whole</span><span class="val">{{ s.snap.totals.whole }}</span></div>
+      <div class="t"><span class="lbl">Partial</span><span class="val">{{ s.snap.totals.partial }}</span></div>
+      <div class="t"><span class="lbl">Workers</span><span class="val">{{ s.snap.totals.workers }}</span></div>
+      <div class="t"><span class="lbl">Allocated</span><span class="val">{{ s.snap.totals.allocated|floatformat:"-2" }}</span></div>
+      <div class="t"><span class="lbl">Completed</span><span class="val">{{ s.snap.totals.completed|floatformat:"-2" }}</span></div>
+      <div class="t"><span class="lbl">Remaining</span><span class="val">{{ s.snap.totals.remaining|floatformat:"-2" }}</span></div>
+    </div>
+
+    {# ── Per-bundle rollup ── #}
+    <div class="snap-sub">Bundles</div>
+    <div class="snap-wrap">
+    <table class="snap-table">
+      <thead><tr><th>Colour</th><th>Size</th><th>Total</th><th>Assigned</th><th>Unassigned</th><th>Completed</th><th>Progress</th><th>Holders</th></tr></thead>
+      <tbody>
+      {% for b in s.snap.bundles %}
+        <tr>
+          <td>{% if b.color.hex_code %}<span class="sw" style="background:{{ b.color.hex_code }}"></span>{% endif %}{{ b.color.name|default:"—" }}</td>
+          <td>{{ b.size.label|default:"—" }}</td>
+          <td>{{ b.total|floatformat:"-2" }}</td>
+          <td>{{ b.assigned|floatformat:"-2" }}</td>
+          <td>{{ b.available|floatformat:"-2" }}</td>
+          <td>{{ b.completed|floatformat:"-2" }}</td>
+          <td><div class="bar"><i style="width:{{ b.progress }}%"></i></div> {{ b.progress }}%</td>
+          <td>{% for h in b.holders %}{{ h.worker.get_full_name|default:h.worker.email }} <span class="mode-tag {{ h.mode }}">{{ h.mode }}</span>{{ h.allocated|floatformat:"-2" }}{% if not forloop.last %} · {% endif %}{% empty %}<span class="unassigned">unassigned</span>{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    {# ── Per-worker × bundle allocation detail ── #}
+    <div class="snap-sub">Allocations</div>
+    <div class="snap-wrap">
+    <table class="snap-table">
+      <thead><tr><th>Worker</th><th>Bundle</th><th>Mode</th><th>Allocated</th><th>Completed</th><th>Remaining</th><th>Expected ₹</th><th>Status</th><th>Started</th><th>Updated</th></tr></thead>
+      <tbody>
+      {% for a in s.snap.allocations %}
+        <tr>
+          <td>{{ a.worker.get_full_name|default:a.worker.email }}</td>
+          <td>{% if a.color.hex_code %}<span class="sw" style="background:{{ a.color.hex_code }}"></span>{% endif %}{{ a.color.name|default:"—" }}{% if a.size %} · {{ a.size.label }}{% endif %}</td>
+          <td><span class="mode-tag {{ a.mode }}">{{ a.mode }}</span></td>
+          <td>{{ a.allocated|floatformat:"-2" }}</td>
+          <td>{{ a.completed|floatformat:"-2" }}</td>
+          <td>{{ a.remaining|floatformat:"-2" }}</td>
+          <td>₹{{ a.expected_earning|floatformat:2 }}</td>
+          <td><span class="st {{ a.status }}">{{ a.status|title }}</span></td>
+          <td>{{ a.started_at|date:"d M H:i"|default:"—" }}</td>
+          <td>{{ a.updated_at|date:"d M H:i"|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="10" class="snap-empty">No allocations yet — assign bundles from the stage panel.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </section>
+  {% empty %}
+  <div class="snap-empty">No pool stages with allocations yet for this Adda. Allocate bundles on a stitching stage to populate the snapshot.</div>
+  {% endfor %}
+</div>
+{% endblock %}

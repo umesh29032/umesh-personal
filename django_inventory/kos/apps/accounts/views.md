@@ -30,8 +30,10 @@ responses, hashed single-use codes via `utils.py`. Every branch is a pinned
 behavior (37 tests) — read the tests as the spec. UI note (2026-07-20): its
 template (`login.html` + `shared/_auth_shell.html` `body.auth-login` skin)
 got ambient-motion polish + a ≤860px brand strip + "Back to Storefront"
-link — pure CSS/markup in the login-only skin; the form contract (POST
-fields, CSRF, throttle) is byte-identical, other auth pages untouched.
+link, then (round 2, same day) a canvas particle field on the brand panel,
+heading shimmer, card cursor-spotlight and a cross-document View Transition
+opt-in — all presentation-only, gated to the login page; the form contract
+(POST fields, CSRF, throttle) is byte-identical, other auth pages untouched.
 
 **`PasswordLoginView`** — extends Django's LoginView with throttle +
 normalized-email lockout keys (the mixed-case scar).

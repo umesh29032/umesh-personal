@@ -137,17 +137,18 @@ class Op1World(TestCase):
         self.client.force_login(self.mgr)
         url = reverse('production:generic-stage-allocate',
                       kwargs={'code': self.adda.code, 'stage_type': 'op1_press'})
+        # AE-2 WHOLE mode (default) — takes the whole remaining bundle (50), no qty needed.
         resp = self.client.post(url, {
-            'worker': self.w1.pk, 'color_id': self.red.pk,
-            'size_id': self.size_m.pk, 'qty': '50'})
+            'worker': self.w1.pk, 'dim_pair': f'{self.red.pk}:{self.size_m.pk}',
+            'mode': 'whole'})
         self.assertEqual(resp.status_code, 302)
         wsa = WorkerStageAllocation.objects.get(stage_record=sr2)
-        self.assertEqual((wsa.worker_id, wsa.allocated_quantity),
-                         (self.w1.pk, Decimal('50')))
-        # Over-allocation refused (pool integrity — always on).
+        self.assertEqual((wsa.worker_id, wsa.allocated_quantity, wsa.allocation_mode),
+                         (self.w1.pk, Decimal('50'), 'whole'))
+        # PARTIAL over-allocation refused (pool now empty — only 0 available).
         resp = self.client.post(url, {
-            'worker': self.w2.pk, 'color_id': self.red.pk,
-            'size_id': self.size_m.pk, 'qty': '1'}, follow=True)
+            'worker': self.w2.pk, 'dim_pair': f'{self.red.pk}:{self.size_m.pk}',
+            'mode': 'partial', 'qty': '1'}, follow=True)
         self.assertContains(resp, 'only 0')
         self.assertEqual(WorkerStageAllocation.objects.filter(
             stage_record=sr2).count(), 1)
@@ -236,7 +237,9 @@ class Op1World(TestCase):
         self.assertEqual(c.expected_earning, Decimal('240.00'))
         self.assertEqual(task.status, WorkerStageTask.Status.COMPLETED)
 
-    def test_over_allocation_report_soft_warns(self):
+    def test_over_allocation_submit_hard_refused(self):
+        # AE-1 (owner ruling): over-report is HARD-refused at SUBMIT (no soft warning).
+        # Draft may hold anything; submit (= complete) enforces the bound.
         self._run_stage1()
         sr2 = self._start_stage2()
         from production.services import pool_service
@@ -246,11 +249,13 @@ class Op1World(TestCase):
         url = reverse('production:worker-report',
                       kwargs={'code': self.adda.code, 'stage_type': 'op1_press'})
         resp = self.client.post(url, {
-            'action': 'draft', 'line-count': '1',
+            'action': 'submit', 'line-count': '1',
             'line-0-color_id': str(self.red.pk),
             'line-0-size_id': str(self.size_m.pk),
-            'line-0-reported_quantity': '25'}, follow=True)
-        self.assertContains(resp, 'exceeds')   # bound_soft_warning fired
+            'line-0-reported_quantity': '25'}, follow=True)   # 25 > 10 allocated
+        self.assertContains(resp, 'allocated')   # hard refusal message
+        task = WorkerStageTask.objects.get(stage_record=sr2, worker=self.w1)
+        self.assertNotEqual(task.status, WorkerStageTask.Status.COMPLETED)
 
     # ── lenses: management board vs worker slice ───────────────────────────
     def test_panel_lenses_management_board_vs_worker_slice(self):
@@ -261,20 +266,19 @@ class Op1World(TestCase):
                               color_id=self.red.pk, size_id=self.size_m.pk)
         panel = reverse('production:stage-panel',
                         kwargs={'code': self.adda.code, 'stage_type': 'op1_press'})
-        # Manager: split section + board with Allocated/Expected columns.
+        # Manager: AE-2 bundle allocation panel + board with Allocated/Expected columns.
         self.client.force_login(self.mgr)
         html = self.client.get(panel).content.decode()
-        for needle in ('Split the work', 'Available from Dye', 'Allocated',
+        for needle in ('Allocate bundles', 'Remaining', 'Allocated',
                        'Expected', 'op1-w2@test'):
             self.assertIn(needle, html)
-        # Worker: own slice only — no colleague, no pool numbers, no board.
+        # Worker: own slice only — no colleague, no pool numbers, no allocation panel.
         self.client.force_login(self.w1)
         html = self.client.get(panel).content.decode()
         self.assertIn('Your work', html)
         self.assertIn('OP1 Red', html)               # own dims chip
         self.assertNotIn('op1-w2@test', html)        # colleague hidden
-        self.assertNotIn('Split the work', html)     # pool section hidden
-        self.assertNotIn('Available', html)          # pool numbers hidden
+        self.assertNotIn('Allocate bundles', html)   # allocation panel hidden
         w2_panel_html = html
         self.assertNotIn('OP1 Blue', w2_panel_html)  # unallocated colour hidden
 

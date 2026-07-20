@@ -17,7 +17,8 @@ class RoleForm(forms.ModelForm):
         model = Role
         fields = ['name', 'code', 'description', 'permissions']
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            # sf-input = base.html canonical input skin (.form-control was removed in Forms F-2 2026-06-16)
+            'description': forms.Textarea(attrs={'rows': 2, 'class': 'sf-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -41,8 +42,8 @@ class RoleForm(forms.ModelForm):
             if name == 'permissions':
                 continue
             cls = field.widget.attrs.get('class', '')
-            if 'form-control' not in cls and 'form-select' not in cls:
-                field.widget.attrs['class'] = (cls + ' form-control').strip()
+            if 'sf-input' not in cls:
+                field.widget.attrs['class'] = (cls + ' sf-input').strip()
 
     def clean_code(self):
         code = self.cleaned_data.get('code', '').strip()

@@ -3,12 +3,12 @@
 Σ(good+alter+missing) per REPORTED (worker, stage, colour, size) ≤ Σ active allocated.
 Per-dimension + independent: under-consuming an allocated dim passes; a reported-but-
 UNALLOCATED dim fails. Production-capacity ONLY — never reads verified/settlement/rate/
-earning/cost. Gated by ENFORCE_ALLOCATION_BOUND (default False = no check).
+earning/cost. HARD + always-on (the former feature flag was retired 2026-07-20).
 """
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User
@@ -79,16 +79,10 @@ class _Base(TestCase):
                 c.save(update_fields=['alter_quantity', 'missing_quantity'])
 
 
-class FlagOffTests(_Base):
-    def test_flag_off_does_not_check(self):
-        # ENFORCE default False → over-report completes (back-compat), no allocation needed.
-        self._setup()
-        self._report([{'reported_quantity': '999', 'color_id': self.red.pk, 'size_id': self.m.pk}])
-        complete_worker_task(self.task, actor=self.worker)
-        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)
-
-
-@override_settings(ENFORCE_ALLOCATION_BOUND=True)
+# AE-1 (2026-07-20): the allocation bound is now HARD + always-on (the former feature flag
+# was retired). The old FlagOffTests — over-report completing when the flag was off — is
+# deleted; that path no longer exists. These tests allocate, then report over, and assert the
+# unconditional refusal.
 class BoundEnforcedTests(_Base):
     def test_within_bound_completes(self):
         ssr = self._setup()
@@ -185,22 +179,30 @@ class BoundEnforcedTests(_Base):
 
 
 class PreviewAndSoftWarnTests(_Base):
-    """S5 / S4-005 rollout safety — preview (pre-flip audit) + non-blocking soft-warn.
-    ENFORCE_ALLOCATION_BOUND stays OFF (default) so over-bound contributions can complete."""
+    """AE-1: the bound is now HARD, so an over-bound row can no longer be created via
+    complete_worker_task. `preview_bound_violations` remains the AUDIT of PRE-AE-1 historical
+    completed rows that would now be refused — so these tests mark the task COMPLETED directly
+    (simulating legacy data) and assert the audit flags it."""
+
+    def _mark_completed(self):
+        self.task.status = WorkerStageTask.Status.COMPLETED
+        self.task.save(update_fields=['status'])
 
     def test_preview_lists_over_bound(self):
         ssr = self._setup()
         self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 5)
         self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
-        complete_worker_task(self.task, actor=self.worker)   # flag off → completes
+        self._mark_completed()   # legacy over-bound completed row (bypasses the hard bound)
         v = pool_service.preview_bound_violations(adda=ssr.adda)
         self.assertTrue(any(x['kind'] == 'over_bound' for x in v))
 
     def test_preview_lists_unallocated(self):
         ssr = self._setup()
-        self._cut(self.red, self.m, 50)                       # NO allocation created
-        self._report([{'reported_quantity': '4', 'color_id': self.red.pk, 'size_id': self.m.pk}])
-        complete_worker_task(self.task, actor=self.worker)
+        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 3)  # alloc → consumer stage
+        # Red/M allocated, Blue/L NOT — the Blue/L dim is the 'unallocated' audit hit.
+        self._report([{'reported_quantity': '3', 'color_id': self.red.pk, 'size_id': self.m.pk},
+                      {'reported_quantity': '2', 'color_id': self.blue.pk, 'size_id': self.l.pk}])
+        self._mark_completed()
         v = pool_service.preview_bound_violations(adda=ssr.adda)
         self.assertTrue(any(x['kind'] == 'unallocated' for x in v))
 
@@ -210,15 +212,3 @@ class PreviewAndSoftWarnTests(_Base):
         self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
         complete_worker_task(self.task, actor=self.worker)
         self.assertEqual(pool_service.preview_bound_violations(adda=ssr.adda), [])
-
-    def test_soft_warning_over_returns_message(self):
-        ssr = self._setup()
-        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 5)
-        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
-        self.assertIsNotNone(pool_service.bound_soft_warning(self.task))   # 8 > 5
-
-    def test_soft_warning_within_bound_none(self):
-        ssr = self._setup()
-        self._cut(self.red, self.m, 50); self._alloc(ssr, self.red, self.m, 10)
-        self._report([{'reported_quantity': '8', 'color_id': self.red.pk, 'size_id': self.m.pk}])
-        self.assertIsNone(pool_service.bound_soft_warning(self.task))      # 8 ≤ 10

@@ -7,6 +7,27 @@
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var finePointer = window.matchMedia('(pointer: fine)').matches;
 
+    /* ── Ambient layer (GSAP-independent) ── */
+    /* hero particle field — engine self-guards reduced-motion/hidden hosts */
+    if (window.KEParticles) {
+        var heroHost = document.querySelector('.hero');
+        if (heroHost) KEParticles.attach(heroHost, { max: 70, density: 16000 });
+    }
+    /* spotlight cards — copper glow follows the cursor */
+    if (!reduceMotion && finePointer) {
+        document.querySelectorAll('.about-panel, .why-card').forEach(function (el) {
+            el.setAttribute('data-spotlight', '');
+            var glow = document.createElement('span');
+            glow.className = 'spotlight-glow';
+            el.appendChild(glow);
+            el.addEventListener('pointermove', function (e) {
+                var r = el.getBoundingClientRect();
+                el.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+                el.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+            }, { passive: true });
+        });
+    }
+
     /* ── Fallback: plain IO reveals (same behavior the page had pre-GSAP) ── */
     function basicReveals() {
         if (reduceMotion || !('IntersectionObserver' in window)) return;

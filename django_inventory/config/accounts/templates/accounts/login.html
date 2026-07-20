@@ -1,9 +1,19 @@
 {% extends 'shared/_auth_shell.html' %}
+{% load static %}
 {% comment %}Phase C-2 Step 2: SPLIT mode + login marketing skin. Chrome + all login-specific
 values come from shared/_auth_shell.html (.auth-* + body.auth-login skin block). Form (email),
 CSRF, autocomplete, autofocus and the Google button preserved verbatim.{% endcomment %}
 {% block auth_title %}Sign In — Kapil Enterprises{% endblock %}
 {% block auth_mode %}auth-layout-split auth-login{% endblock %}
+
+{% block auth_extra_head %}
+        /* login page ONLY opts into cross-document view transitions — storefront ↔ login
+           morphs (both pages opted in); OTP/reset pages don't, so they navigate plain. */
+        @view-transition { navigation: auto; }
+        @media (prefers-reduced-motion: reduce) {
+            @view-transition { navigation: none; }
+        }
+{% endblock %}
 
 {% block auth_brand %}
         <div class="auth-thread"></div>
@@ -66,4 +76,30 @@ CSRF, autocomplete, autofocus and the Google button preserved verbatim.{% endcom
                 <a href="{% url 'accounts:login_password' %}">Sign in with password instead</a>
                 {# Self-signup disabled (PA-02-OPEN-SIGNUP) — accounts are admin-provisioned. #}
             </div>
+{% endblock %}
+
+{% block auth_scripts %}
+<script src="{% static 'storefront/js/ke-particles.js' %}" defer></script>
+<script>
+    // Presentation only — form untouched. Engine self-guards reduced-motion + hidden hosts
+    // (brand panel is display:none ≤860px → attach() returns null on phones).
+    window.addEventListener('DOMContentLoaded', function () {
+        var brand = document.querySelector('.auth-brand');
+        if (window.KEParticles && brand) KEParticles.attach(brand, { max: 45, density: 14000, linkDist: 100 });
+
+        if (window.matchMedia('(pointer: fine)').matches && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            var card = document.querySelector('.auth-card');
+            if (card) {
+                var glow = document.createElement('span');
+                glow.className = 'auth-spotlight';
+                card.insertBefore(glow, card.firstChild);   // z-index:-1 in the skin → paints under the form
+                card.addEventListener('pointermove', function (e) {
+                    var r = card.getBoundingClientRect();
+                    card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+                    card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+                }, { passive: true });
+            }
+        }
+    });
+</script>
 {% endblock %}

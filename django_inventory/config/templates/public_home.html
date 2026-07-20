@@ -1036,6 +1036,67 @@
         [data-tilt] { transition-property: box-shadow, background, border-color; will-change: transform; }
         [data-magnetic] { transition-property: background, box-shadow, border-color, color; }
 
+        /* ── Cross-document View Transition (MPA morph, Chrome/Edge 126+ & Safari 18+; others just navigate) ── */
+        @view-transition { navigation: auto; }
+        @media (prefers-reduced-motion: reduce) {
+            @view-transition { navigation: none; }
+        }
+        /* brand mark morphs into the login monogram across navigation */
+        .nav-brand-mark { view-transition-name: ke-brand; }
+
+        /* ── Particle canvas (created by ke-particles.js inside .hero) ── */
+        .hero .ke-particles {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* ── Spotlight cards — copper glow tracks the cursor (overlay injected by JS) ── */
+        /* host must be positioned or the absolute glow anchors to an ancestor (why-card has no
+           position of its own — about-panel already relative, rule is harmless there) */
+        [data-spotlight] { position: relative; }
+        .spotlight-glow {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s;
+            background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(212,146,74,0.16), transparent 65%);
+            z-index: 1;
+        }
+        [data-spotlight]:hover .spotlight-glow { opacity: 1; }
+
+        /* ── Border beam — a light runs the About panel's border (typed custom property → smooth conic spin) ── */
+        @property --beam {
+            syntax: '<angle>';
+            inherits: false;
+            initial-value: 0deg;
+        }
+        .beam-border {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1.5px;
+            background: conic-gradient(from var(--beam),
+                transparent 0deg, transparent 250deg,
+                rgba(212,146,74,0.9) 310deg, rgba(245,237,224,0.85) 330deg, transparent 360deg);
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            animation: beamSpin 7s linear infinite;
+            pointer-events: none;
+            z-index: 2;
+        }
+        @keyframes beamSpin { to { --beam: 360deg; } }
+        /* decorative paint-loop: skip on touch devices (battery) and under reduced motion
+           (explicit none — the global 0.01ms kill would still restart an infinite loop every frame) */
+        @media (pointer: coarse), (prefers-reduced-motion: reduce) {
+            .beam-border { animation: none; }
+        }
+
         /* trailing cursor ring (fine pointers only; created by home-motion.js) */
         .cursor-ring {
             position: fixed;
@@ -1817,7 +1878,8 @@
                 <div class="about-quote">"Every garment leaves our floor with a story we can trace — from roll to rack."</div>
             </div>
 
-            <div class="about-panel">
+            <div class="about-panel" data-spotlight>
+                <div class="beam-border" aria-hidden="true"></div>
                 <div class="about-panel-tag">How a garment is made</div>
                 <ol class="process-list reveal-stagger">
                     <li class="process-step">
@@ -2002,6 +2064,7 @@
 <script src="{% static 'storefront/vendor/ScrollTrigger.min.js' %}" defer></script>
 <script src="{% static 'storefront/vendor/SplitText.min.js' %}" defer></script>
 <script src="{% static 'storefront/vendor/lenis.min.js' %}" defer></script>
+<script src="{% static 'storefront/js/ke-particles.js' %}" defer></script>
 <script src="{% static 'storefront/js/home-motion.js' %}" defer></script>
 
 </body>

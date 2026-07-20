@@ -73,10 +73,12 @@ class GenericStageCompleteView(_GenericActionBase):
 
 
 class GenericStageAllocateView(_GenericActionBase):
-    """OP-1: manager splits the upstream pool — one allocation row per submit.
-    parse→delegate; pool_service.allocate owns mgmt gate + over-allocation
-    refusal + the D2 advisory lock. Worker must already be on the roster
-    (dropdown is roster-only; the service itself is roster-agnostic)."""
+    """AE-2 bundle allocation — one bundle assigned per submit. Two modes:
+      • WHOLE (default): assign the whole remaining bundle, NO qty → pool_service.allocate_whole.
+      • PARTIAL (explicit): manager typed a quantity → pool_service.allocate(qty, mode='partial').
+    parse→delegate; the service owns the mgmt gate + over/negative/zero refusal + D2 lock.
+    The bundle is identified by `dim_pair` = "colorpk:sizepk" (either side blank for a
+    QUANTITY-grain stage). Worker must already be on the roster (dropdown is roster-only)."""
 
     def post(self, request, code, stage_type):
         from decimal import Decimal, InvalidOperation
@@ -94,22 +96,33 @@ class GenericStageAllocateView(_GenericActionBase):
             if not worker_raw.isdigit():
                 raise ValidationError("Pick a worker.")
             worker = get_object_or_404(User, pk=int(worker_raw))
-            try:
-                qty = Decimal((request.POST.get('qty') or '').strip())
-            except InvalidOperation:
-                raise ValidationError("Quantity must be a number.")
-            color_raw = request.POST.get('color_id') or ''
-            size_raw = request.POST.get('size_id') or ''
-            pool_service.allocate(
-                sr, worker, qty=qty, actor=request.user,
-                color_id=int(color_raw) if color_raw.isdigit() else None,
-                size_id=int(size_raw) if size_raw.isdigit() else None)
+            # Bundle identity: "colorpk:sizepk" (single field — avoids the old dual
+            # dropdowns that could form non-pool pairs). Either side blank = QUANTITY grain.
+            pair = (request.POST.get('dim_pair') or '').split(':')
+            color_raw = (pair[0] if len(pair) > 0 else '') or (request.POST.get('color_id') or '')
+            size_raw = (pair[1] if len(pair) > 1 else '') or (request.POST.get('size_id') or '')
+            color_id = int(color_raw) if color_raw.isdigit() else None
+            size_id = int(size_raw) if size_raw.isdigit() else None
+            mode = request.POST.get('mode') or 'whole'
+            if mode == 'partial':
+                try:
+                    qty = Decimal((request.POST.get('qty') or '').strip())
+                except InvalidOperation:
+                    raise ValidationError("Enter the number of pieces to allocate.")
+                pool_service.allocate(sr, worker, qty=qty, actor=request.user,
+                                      color_id=color_id, size_id=size_id, mode='partial')
+            else:   # WHOLE — the default; no qty typed, takes the whole remaining bundle
+                pool_service.allocate_whole(sr, worker, actor=request.user,
+                                            color_id=color_id, size_id=size_id)
         except (PermissionDenied, ValidationError) as exc:
             messages.error(request, _err(exc))
             return redirect(self.panel_url(code, stage_type, request))
         messages.success(
-            request, f"Work allocated to {worker.get_full_name() or worker.email}.")
-        return redirect(self.panel_url(code, stage_type, request))
+            request, f"Bundle allocated to {worker.get_full_name() or worker.email}.")
+        # UX (browser-verification High): keep the SAME worker selected after the reload
+        # so a manager assigning several bundles to one worker picks them once, not per bundle.
+        url = self.panel_url(code, stage_type, request)
+        return redirect(f"{url}{'&' if '?' in url else '?'}worker={worker.pk}")
 
 
 class GenericStageAllocationVoidView(_GenericActionBase):

@@ -67,9 +67,10 @@ def check_dev_contamination(environment):
 # ── production-safety ────────────────────────────────────────────────────────
 
 # U10 owner DECLARATION (changed only by the owner; post-R11 flips update THIS
-# declaration, never the check): both enforcement flags ship OFF.
+# declaration, never the check). AE-1 (2026-07-20): ENFORCE_ALLOCATION_BOUND was
+# RETIRED — the allocation bound is now hard + always-on (no flag). Only the
+# settlement-reconciliation flag remains a declared lever.
 OWNER_DECLARED_FLAGS = {
-    "ENFORCE_ALLOCATION_BOUND": False,
     "ENFORCE_SETTLEMENT_RECONCILIATION": False,
 }
 

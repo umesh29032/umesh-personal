@@ -167,12 +167,14 @@ class HardeningWorld(TestCase):
         sr2 = start_generic_stage(adda=self.adda, stage_code='hrd_press',
                                   worker_ids=[self.w2.pk], user=self.mgr)
         self._allocate(sr2, self.w2, self.red, self.size_m, '20')
-        # flag OFF: worker over-reports 25 (accepted) — verify may not exceed 20
+        # AE-1: over-report is now hard-blocked (reported ≤ allocated always), so the
+        # allocation-cap on verify is redundant — the binding cap is verified ≤ reported
+        # good. Worker reports 20; verify may only confirm/reduce, never exceed reported.
         task = self._report(sr2, self.w2, [
-            {'reported_quantity': '25', 'color_id': self.red.pk, 'size_id': self.size_m.pk}])
+            {'reported_quantity': '20', 'color_id': self.red.pk, 'size_id': self.size_m.pk}])
         line = task.contributions.get()
-        with self.assertRaisesMessage(ValidationError, 'above the'):
-            set_verified_quantity(line, '22', actor=self.mgr)
+        with self.assertRaisesMessage(ValidationError, 'reported good'):
+            set_verified_quantity(line, '22', actor=self.mgr)   # 22 > reported 20
         set_verified_quantity(line, '18', actor=self.mgr)
         line.refresh_from_db()
         self.assertEqual(line.verified_quantity, Decimal('18'))

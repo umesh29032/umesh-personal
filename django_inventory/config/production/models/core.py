@@ -516,6 +516,19 @@ class WorkerStageAllocation(TimeStampedModel):
         'production.ProductSize', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
     )
     allocated_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # AE-1 (owner-approved bundle model 2026-07-20): the manager's INTENT at
+    # allocation time. WHOLE = "assign the whole remaining bundle" (one click, no
+    # qty typed); PARTIAL = "assign N pieces" (explicit exception). Stored (not
+    # derived) for audit/analytics/debugging — the numbers stay authoritative from
+    # `allocated_quantity`. Default PARTIAL so pre-AE-1 rows read truthfully (they
+    # were typed quantity slices). TextChoices = DB string + human label.
+    class Mode(models.TextChoices):
+        WHOLE = 'whole', 'Whole bundle'
+        PARTIAL = 'partial', 'Partial'
+    allocation_mode = models.CharField(
+        max_length=8, choices=Mode.choices, default=Mode.PARTIAL)
+
     created_by = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
     # Set = voided (correction); never deleted. Voided rows leave the `available` sum.
     voided_at = models.DateTimeField(null=True, blank=True)

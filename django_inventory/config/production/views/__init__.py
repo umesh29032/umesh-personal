@@ -29,7 +29,7 @@ from .barcode_gen_views import (
     BarcodeGenCompleteView, BarcodeGenReopenView,
 )
 from .costing_views import ProductionCostingView
-from .worker_report_views import AddaReportReviewView, WorkerReportView
+from .worker_report_views import AddaReportReviewView, AddaSnapshotView, MyAssignedWorkView, WorkerReportView
 from .generic_stage_views import (
     GenericStageAllocateView, GenericStageAllocationVoidView,
     GenericStageCompleteView, GenericStageReopenView, GenericStageStartView,
@@ -65,6 +65,8 @@ __all__ = [
     'StalledAddaListView',
     'PendingReportListView',
     'AddaReportReviewView',
+    'AddaSnapshotView',
+    'MyAssignedWorkView',
     'WorkerReportView',
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',
     'ProductSizesEditView',
@@ -82,6 +84,7 @@ __all__ = [
     'LayeringStartView',
     'LayeringQuickCreateAndAttachView',
     'LayeringAttachRollView',
+    'LayeringConsumeLeftoverView',
     'LayeringEntryRemoveView',
     'LayeringCompleteView',
     'LayeringReopenView',

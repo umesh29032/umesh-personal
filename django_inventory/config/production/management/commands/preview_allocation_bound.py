@@ -1,11 +1,10 @@
-"""S5 / S4-005 — allocation-bound pre-flip audit.
+"""Allocation-bound legacy-row audit.
 
     env/bin/python config/manage.py preview_allocation_bound [--adda CODE]
 
-Lists every COMPLETED contribution that WOULD fail the allocation bound if
-ENFORCE_ALLOCATION_BOUND were enabled (over-bound or unallocated), on pool-participant
-stages. Exit 1 if any violation is found (cron / pre-flip gate); exit 0 when clean.
-RUN THIS + clear violations BEFORE turning ENFORCE_ALLOCATION_BOUND on.
+The allocation bound is now always-on, so new completions can't violate it. This lists any
+PRE-EXISTING COMPLETED contribution (created before the bound went hard) that would fail it
+(over-bound or unallocated), on pool-participant stages. Exit 1 if any is found; exit 0 clean.
 """
 import sys
 
@@ -15,7 +14,7 @@ from production.services import preview_bound_violations
 
 
 class Command(BaseCommand):
-    help = "Preview allocation-bound violations before enabling ENFORCE_ALLOCATION_BOUND."
+    help = "Audit pre-existing completed rows that violate the (always-on) allocation bound."
 
     def add_arguments(self, parser):
         parser.add_argument('--adda', help='Scope to one Adda code (default: all).')
@@ -32,10 +31,10 @@ class Command(BaseCommand):
         violations = preview_bound_violations(adda=adda)
         if not violations:
             self.stdout.write(self.style.SUCCESS(
-                "Clean — no allocation-bound violations. Safe to enable ENFORCE_ALLOCATION_BOUND."))
+                "Clean — no legacy allocation-bound violations."))
             return
         self.stdout.write(self.style.WARNING(
-            f"{len(violations)} allocation-bound violation(s) — resolve BEFORE enabling enforcement:"))
+            f"{len(violations)} legacy allocation-bound violation(s) — pre-existing completed rows:"))
         for v in violations:
             self.stdout.write(
                 f"  [{v['kind']}] adda={v['adda']} stage={v['stage']} worker={v['worker_id']} "

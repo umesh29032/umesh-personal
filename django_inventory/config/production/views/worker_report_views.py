@@ -1,5 +1,6 @@
 """V2-1c-iii pt.2b — worker self-report view (schema-driven, stage-agnostic).
 
+Also hosts MyAssignedWorkView (AE-3): the worker's "My Assigned Work" bundle dashboard.
 The ONLY worker-facing write surface for WorkerStageContribution. Renders from
 `StageHandler.contribution_schema(adda)` (open-closed: no stage-name conditionals
 here — adding a stage needs NO edit to this file) and persists through the two
@@ -63,8 +64,7 @@ def _parse_lines(post, schema):
                 # schema's OWN options. The worker-scoped schema limits choices to
                 # that worker's active allocation, so a forged POST carrying any
                 # other PK (unallocated dim — or an unallocated worker, whose
-                # option list is empty) is refused HERE at parse time,
-                # independent of ENFORCE_ALLOCATION_BOUND.
+                # option list is empty) is refused HERE at parse time.
                 if row[f['key']] not in {o['value'] for o in f.get('options', ())}:
                     raise ValidationError(
                         f"{f['label']} is not in your assigned work — "
@@ -79,6 +79,18 @@ def _parse_lines(post, schema):
             if f.get('required') and f['key'] not in row:
                 raise ValidationError(
                     f"Line {len(lines) + 1}: {f['label']} is required.")
+        # AE-1 gap-E: the (colour,size) PAIR must be one the worker was actually
+        # allocated — flat per-field option checks above pass Red + XL separately
+        # even if Red/XL was never a pair. Generic: only fires when the schema
+        # declares pair_keys + allowed_pairs (dimensioned pool stages).
+        allowed_pairs = schema.get('allowed_pairs')
+        pair_keys = schema.get('pair_keys') or []
+        if allowed_pairs is not None and pair_keys:
+            pair = tuple(row.get(k) for k in pair_keys)
+            if pair not in set(allowed_pairs):
+                raise ValidationError(
+                    f"Line {len(lines) + 1}: this colour+size combination is not "
+                    "in your assigned work — ask your manager if something is missing.")
         lines.append(row)
     return lines
 
@@ -112,12 +124,13 @@ def _display_lines(task, schema):
     return out
 
 
-def _form_lines(task, schema):
+def _form_lines(task, schema, contribs=None):
     """Render-ready structure for the EDITABLE state: one entry per saved draft
     line, each field carrying its current value (+ per-option `selected` for
-    choices) so the template stays a dumb schema loop."""
+    choices) so the template stays a dumb schema loop. `contribs` overrides the
+    source rows (AE-3 single-bundle mode passes ONLY the scoped bundle's lines)."""
     out = []
-    for c in task.contributions.all().order_by('pk'):
+    for c in (contribs if contribs is not None else task.contributions.all().order_by('pk')):
         fields = []
         for f in schema['fields']:
             value = getattr(c, f['key'], None)
@@ -217,14 +230,65 @@ class WorkerReportView(LoginRequiredMixin, View):
         # OP-1: worker-scoped schema — a pool stage limits choice options to THIS
         # worker's allocated dims (blind reporting; labels only, no quantities).
         schema = handler.contribution_schema(adda, worker=request.user)
+        # AE-3: single-bundle scope — when the "My Assigned Work" card opens ONE
+        # bundle (?color=&size=), lock the schema to that pair so the worker never
+        # picks colour/size/bundle and can only enter quantities.
+        self._scope_to_bundle(request, schema)
         return adda, sr, task, schema
+
+    @staticmethod
+    def _scope_to_bundle(request, schema):
+        """If ?color=&size= name a pair the worker actually holds, trim the schema in
+        place to just that bundle: one option per choice field (pre-fixed), one initial
+        line, allowed_pairs = {that pair}. Sets schema['single_bundle'] + a label.
+        Reads request.GET so it applies on both GET and the POST-back (form action keeps
+        the query). Invalid/absent params → no-op (full multi-bundle form)."""
+        allowed = schema.get('allowed_pairs')
+        if allowed is None:
+            return
+        c_raw = request.GET.get('color') or ''
+        s_raw = request.GET.get('size') or ''
+        color_id = int(c_raw) if c_raw.isdigit() else None
+        size_id = int(s_raw) if s_raw.isdigit() else None
+        if (color_id, size_id) not in set(allowed):
+            return   # not this worker's pair — leave the full form (defence in depth)
+        label_bits = []
+        for f in schema['fields']:
+            if f['kind'] != 'choice':
+                continue
+            keep = color_id if f['key'] == 'color_id' else size_id
+            f['options'] = [dict(o, selected=True) for o in f.get('options', ())
+                            if o['value'] == keep]
+            if f['options']:
+                label_bits.append(f['options'][0]['label'])
+        schema['initial_lines'] = [{'color_id': color_id, 'size_id': size_id}]
+        schema['allowed_pairs'] = [(color_id, size_id)]
+        schema['single_bundle'] = True
+        schema['bundle_label'] = ' · '.join(label_bits)
+
+    @staticmethod
+    def _scoped_contribs(task, schema):
+        """AE-3: in single-bundle mode, the editable form must show ONLY the scoped
+        bundle's saved line (not the worker's other bundles on the same task). None =
+        full multi-bundle form (all saved lines)."""
+        if not schema.get('single_bundle'):
+            return None
+        c_id, s_id = schema['allowed_pairs'][0]
+        return [c for c in task.contributions.all().order_by('pk')
+                if c.color_id == c_id and c.size_id == s_id]
 
     def _report_url(self, request, code, stage_type):
         from django.urls import reverse
         url = reverse('production:worker-report', args=[code, stage_type])
+        params = []
         if request.GET.get('embedded') == '1':
-            url += '?embedded=1'
-        return url
+            params.append('embedded=1')
+        # Preserve single-bundle scope across the POST-redirect loop.
+        for k in ('color', 'size', 'stream'):
+            v = request.GET.get(k)
+            if v:
+                params.append(f'{k}={v}')
+        return url + ('?' + '&'.join(params) if params else '')
 
     # ── GET ──────────────────────────────────────────────────────────────
     def get(self, request, code, stage_type):
@@ -247,10 +311,17 @@ class WorkerReportView(LoginRequiredMixin, View):
             'locked': locked,
             'saved_lines': saved,
             # J-2: saved draft wins; otherwise prefill one row per allocated pair.
-            'form_lines': [] if locked else (_form_lines(task, schema)
-                                             or _initial_form_lines(schema)),
+            # AE-3 single-bundle: only THIS bundle's saved line (never other bundles').
+            'form_lines': [] if locked else (
+                _form_lines(task, schema, contribs=self._scoped_contribs(task, schema))
+                or _initial_form_lines(schema)),
             'total_quantity': sum((l['quantity'] for l in saved), start=0),
             'embedded': embedded,
+            # AE-3 single-bundle mode: lock the form to one bundle + keep the scope
+            # on the POST-back (form posts to this same query-carrying action).
+            'single_bundle': schema.get('single_bundle', False),
+            'bundle_label': schema.get('bundle_label', ''),
+            'report_action': self._report_url(request, code, stage_type),
         })
 
     # ── POST ─────────────────────────────────────────────────────────────
@@ -281,19 +352,32 @@ class WorkerReportView(LoginRequiredMixin, View):
             lines = _parse_lines(request.POST, schema)
             if action == 'submit' and not lines:
                 raise ValidationError("Add at least one line before submitting.")
-            # Both actions persist via the SAME single-writer services — the view
-            # never touches WorkerStageContribution directly (ADR 0001 discipline).
-            save_draft_contributions(task, lines, actor=request.user)
-            if action == 'submit':
-                complete_worker_task(task, actor=request.user)
-                messages.success(request, "Work report submitted — thank you!")
+            # AE-3 per-bundle path: a "My Assigned Work" card opens ONE bundle. Submitting
+            # it must NOT lock the worker's OTHER bundles on this stage — report_bundle
+            # upserts just this bundle and completes the task only when every allocated
+            # bundle has a report. (The full multi-line form keeps the save+complete path.)
+            if schema.get('single_bundle') and action == 'submit' and lines:
+                from production.services.worker_task_service import report_bundle
+                result = report_bundle(task, lines[0], actor=request.user)
+                if result['completed']:
+                    messages.success(request, "Work report submitted — thank you!")
+                else:
+                    n = result['remaining_bundles']
+                    messages.success(
+                        request,
+                        f"Bundle saved. {n} more bundle{'s' if n != 1 else ''} to report — "
+                        "open them from My Assigned Work.")
             else:
-                messages.success(request, "Draft saved. You can keep editing until you submit.")
-            # S5/S4-005: non-blocking over-allocation hint (works even with the hard bound off).
-            from production.services import bound_soft_warning
-            _warn = bound_soft_warning(task)
-            if _warn:
-                messages.warning(request, _warn)
+                # Both actions persist via the SAME single-writer services — the view
+                # never touches WorkerStageContribution directly (ADR 0001 discipline).
+                save_draft_contributions(task, lines, actor=request.user)
+                if action == 'submit':
+                    complete_worker_task(task, actor=request.user)
+                    messages.success(request, "Work report submitted — thank you!")
+                else:
+                    messages.success(request, "Draft saved. You can keep editing until you submit.")
+            # AE-1: the soft over-allocation warning is retired — over-report is now
+            # HARD-refused at submit (report_bundle / check_allocation_bound). No warning mode.
         except ValidationError as exc:
             messages.error(request, '; '.join(exc.messages))
         except PermissionDenied:
@@ -380,3 +464,51 @@ class AddaReportReviewView(LoginRequiredMixin, View):
         else:
             messages.info(request, "No changes.")
         return redirect(request.path)
+
+
+class MyAssignedWorkView(LoginRequiredMixin, View):
+    """AE-3: the worker's "My Assigned Work" screen — every active bundle allocation
+    across all in-progress Addas, as independent cards + a workload summary. The worker
+    never picks colour/size/bundle: each card deep-links to its own quantity-only report
+    (`?color=&size=`). Read-only; data via the bundle_service read-model."""
+
+    def get(self, request):
+        from production.services import my_assigned_work
+        data = my_assigned_work(request.user)
+        return render(request, 'production/my_assigned_work.html', {
+            'cards': data['cards'], 'summary': data['summary'],
+        })
+
+
+class AddaSnapshotView(LoginRequiredMixin, View):
+    """AE-4 Super-Admin Production Snapshot — management's operational control screen for
+    ONE Adda. Per pool stage: stage totals + per-bundle rollup + per-worker×bundle detail
+    (mode/allocated/completed/remaining/expected/status/times). Read-only via bundle_service;
+    management-only (workers never see other workers' names/quantities — OP-1)."""
+
+    def _gate(self, request):
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        if not user_has_role(request.user, MANAGEMENT_ROLES):
+            raise PermissionDenied("Production snapshot is management-only.")
+
+    def get(self, request, code):
+        self._gate(request)
+        from production.constants import ALLOC_DIM_NONE
+        from production.services import stage_snapshot
+        adda = get_object_or_404(Adda, code=code)
+        stages = []
+        wss = (adda.product.workflow_stages
+               .exclude(allocation_dimensions=ALLOC_DIM_NONE)
+               .select_related('stage').order_by('order'))
+        for ws in wss:
+            for sr in (AddaStageRecord.objects
+                       .filter(adda=adda, workflow_stage=ws)
+                       .select_related('workflow_stage__stage', 'stream')
+                       .order_by('stream_id')):
+                snap = stage_snapshot(sr)
+                if snap['bundles'] or snap['allocations']:
+                    stages.append({
+                        'sr': sr, 'name': ws.stage.name,
+                        'stream': sr.stream, 'snap': snap})
+        return render(request, 'production/adda_snapshot.html',
+                      {'adda': adda, 'stages': stages})

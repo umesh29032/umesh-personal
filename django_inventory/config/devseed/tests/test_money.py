@@ -64,7 +64,8 @@ class GoldenSettlementTests(TestCase):
         self.assertEqual(m2["counts"]["8-money"], {"created": 0, "skipped": 1})
 
     def test_flags_never_touched(self):
+        # Seeding must never flip an enforcement flag. (ENFORCE_ALLOCATION_BOUND was retired
+        # 2026-07-20 — the bound is now unconditional; the settlement flag remains the lever.)
         from django.conf import settings
         core.seed_scenario("feature-settlement")
-        self.assertFalse(getattr(settings, "ENFORCE_ALLOCATION_BOUND", False))
         self.assertFalse(getattr(settings, "ENFORCE_SETTLEMENT_RECONCILIATION", False))

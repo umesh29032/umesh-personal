@@ -185,12 +185,11 @@ else:
 # deletion of the legacy path stays soak-gated (separate future PR).
 LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
-# Foundation S4 / Phase 4 — Strict allocation-bound enforcement at complete. Default
-# False = OFF (the kill-switch + back-compat: complete_worker_task behaves exactly as
-# pre-S4; existing flows untouched). True = pool-participant stages enforce
-# Σ(good+alter+missing) per (worker, stage, colour, size) ≤ Σ active allocated. A
-# PRODUCTION-CAPACITY rule only — reads no rate/earning/verified/settlement/cost data.
-ENFORCE_ALLOCATION_BOUND = config('ENFORCE_ALLOCATION_BOUND', default=False, cast=bool)
+# AE-1 (owner ruling 2026-07-20): the allocation bound is now HARD + ALWAYS enforced
+# (no feature flag — see pool_service.check_allocation_bound). The former
+# ENFORCE_ALLOCATION_BOUND kill-switch was removed: the FAT proved the soft/off default
+# let workers over-report beyond their allocation. `preview_allocation_bound` remains as
+# a read-only audit of any pre-existing rows that would now be refused at complete.
 
 # Foundation S5 — M-6 settlement reconciliation BLOCK. Default False = WARN-only (today's
 # behavior: an over-allocated settlement is recorded + warned, never blocked). True = finalize

@@ -1069,6 +1069,7 @@
             /* Actions cell: full-width row of buttons, no label */
             .table-responsive tbody td.td-actions {
                 justify-content: flex-end;
+                flex-wrap: wrap; /* >3 buttons must wrap, not clip off the left edge (flex-end overflows leftwards) */
                 gap: 8px;
                 background: var(--surface-2);
                 padding: 10px 16px;
@@ -1684,6 +1685,7 @@
             background: rgba(255,255,255,.88); backdrop-filter: blur(8px);
             border-top: 1px solid var(--border-card); border-radius: 12px 12px 0 0;
             padding: 12px 16px; display: flex; gap: 10px; justify-content: flex-end;
+            flex-wrap: wrap; /* 3+ buttons on mobile must wrap — flex-end + nowrap clips the first button off the left edge */
         }
         html[data-theme="dark"] .sticky-bar { background: rgba(20,16,12,.88); }
 

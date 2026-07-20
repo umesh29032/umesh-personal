@@ -9,6 +9,22 @@ verified: 2026-07-13
 ---
 
 ## TL;DR (2 min)
+**AE-1 BUNDLE MODEL (2026-07-20, owner-approved — Adapt & Harden, [ADD](../../ALLOCATION_ENGINE_REDESIGN_ADD_2026_07_20.md)):**
+(1) `allocate_whole(consuming_sr, worker, *, actor, color_id, size_id)` = the DEFAULT factory
+workflow: assign the WHOLE remaining bundle in one act (`qty = available`, `mode='whole'`),
+compute-and-write under the pool lock (no TOCTOU); grabs the *remainder* on an
+already-partial bundle; refuses when nothing is left. `allocate(...)` keeps the explicit
+PARTIAL path (`mode='partial'`, default). `WorkerStageAllocation.allocation_mode` stores the
+manager's intent.
+(2) `check_allocation_bound` is now **HARD + ALWAYS-ON** (the `ENFORCE_ALLOCATION_BOUND` flag
+was RETIRED — owner: no flag, no warning mode). It refuses at worker-submit/complete when
+Σ(good+alter+missing+damaged) > Σ active allocated per reported dim; a reported-but-UNALLOCATED
+(colour,size) pair has allocated=0 → refused (this also closes the flat-list unallocated-pair
+hole, together with the schema `allowed_pairs` check in `_parse_lines`). **Producer stages
+(no upstream pool source) are skipped** — their reports create the pool and are never
+allocated. `bundle_service` (read-model, no table) projects bundles (total/assigned/available/
+holders) for the UI; `preview_bound_violations` now audits PRE-AE-1 historical over-bound rows.
+
 **HARDENING (2026-07-06, owner-approved):** (J-1) `materialize_stage_pool` now freezes
 **Σ verified-else-good** (was Σ good) — verification is the final business truth, so the
 next operation receives the manager-corrected number (same resolver rule as settlement,

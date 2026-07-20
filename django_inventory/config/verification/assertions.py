@@ -56,9 +56,11 @@ def assert_dev_marking(handles, prefixes):
 
 
 def assert_flags_untouched():
-    """U10: seeding must never perturb the enforcement flags (both ship False)."""
+    """U10: seeding must never perturb the enforcement flags. AE-1 (2026-07-20):
+    ENFORCE_ALLOCATION_BOUND retired (bound now always-on, no flag); only the
+    settlement-reconciliation flag remains."""
     failures = []
-    for flag in ("ENFORCE_ALLOCATION_BOUND", "ENFORCE_SETTLEMENT_RECONCILIATION"):
+    for flag in ("ENFORCE_SETTLEMENT_RECONCILIATION",):
         if getattr(settings, flag, False):
             failures.append(f"enforcement flag {flag} is ON — seeding must never touch flags")
     return failures

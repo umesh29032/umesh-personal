@@ -343,15 +343,18 @@ def _validate_dims(consuming_sr, color_id, size_id):
 
 
 @transaction.atomic
-def allocate(consuming_sr, worker, *, qty, actor, color_id=None, size_id=None):
+def allocate(consuming_sr, worker, *, qty, actor, color_id=None, size_id=None, mode='partial'):
     """Allocate `worker` a `qty` slice of `consuming_sr`'s available upstream pool.
-    Management only. Refuses if qty exceeds available (pool integrity — always on,
-    independent of ENFORCE_ALLOCATION_BOUND). NO money. Returns the WorkerStageAllocation."""
+    Management only. Refuses if qty exceeds available (pool integrity — ALWAYS on).
+    `mode` records the manager's intent (whole|partial) for audit; whole callers
+    come through `allocate_whole`. NO money. Returns the WorkerStageAllocation."""
     from accounts.services import MANAGEMENT_ROLES, user_has_role
     from production.models import WorkerStageAllocation
 
     if not user_has_role(actor, MANAGEMENT_ROLES):
         raise PermissionDenied("Only management can allocate stage work.")
+    if mode not in (WorkerStageAllocation.Mode.WHOLE, WorkerStageAllocation.Mode.PARTIAL):
+        raise ValidationError("Allocation mode must be 'whole' or 'partial'.")
     qty = Decimal(str(qty))
     if qty <= 0:
         raise ValidationError("Allocated quantity must be greater than 0.")
@@ -368,11 +371,35 @@ def allocate(consuming_sr, worker, *, qty, actor, color_id=None, size_id=None):
             f"Cannot allocate {qty}: only {avail} available in the pool for these dimensions.")
     wsa = WorkerStageAllocation.objects.create(
         stage_record=consuming_sr, worker=worker, color_id=color_id, size_id=size_id,
-        allocated_quantity=qty, created_by=actor)
-    logger.info("pool.allocate sr=%s worker=%s c=%s s=%s qty=%s by=%s",
+        allocated_quantity=qty, allocation_mode=mode, created_by=actor)
+    logger.info("pool.allocate sr=%s worker=%s c=%s s=%s qty=%s mode=%s by=%s",
                 consuming_sr.pk, getattr(worker, 'pk', worker), color_id, size_id, qty,
-                getattr(actor, 'pk', None))
+                mode, getattr(actor, 'pk', None))
     return wsa
+
+
+@transaction.atomic
+def allocate_whole(consuming_sr, worker, *, actor, color_id=None, size_id=None):
+    """AE-1 (owner bundle model): assign the WHOLE remaining bundle to `worker` in
+    one act — the factory's DEFAULT workflow. No quantity is typed; we take the
+    entire `available` for these dims and stamp `mode='whole'`. If the bundle was
+    already partially allocated, this grabs the REMAINING (owner decision 3).
+    Compute-and-write happens inside the pool lock (via `allocate`) so two
+    concurrent 'whole' clicks cannot both claim the same remainder. Refuses when
+    the bundle has nothing left."""
+    _validate_dims(consuming_sr, color_id, size_id)
+    source = _upstream_pool_source(consuming_sr)
+    if source is None:
+        raise ValidationError("No upstream pool to allocate from.")
+    # Lock first, THEN read available, THEN allocate — all under the same advisory
+    # lock so the remaining qty we hand over cannot be stolen mid-flight.
+    _acquire_pool_lock(source.pk, color_id, size_id)
+    remaining = available(consuming_sr, color_id, size_id)
+    if remaining <= 0:
+        raise ValidationError(
+            "This bundle is already fully allocated — nothing left to assign.")
+    return allocate(consuming_sr, worker, qty=remaining, actor=actor,
+                    color_id=color_id, size_id=size_id, mode='whole')
 
 
 def worker_allocated(stage_record, worker, color_id=None, size_id=None) -> Decimal:
@@ -389,11 +416,22 @@ def worker_allocated(stage_record, worker, color_id=None, size_id=None) -> Decim
     return agg['q'] or Decimal('0')
 
 
+def _contribution_load(c) -> Decimal:
+    """THE single definition of a contribution row's load against its allocation:
+    good + alter + missing + damaged. Both the enforcement (`check_allocation_bound`)
+    and the legacy-row audit (`preview_bound_violations`) sum THIS one helper, so the
+    over-report bound can never silently diverge between them (e.g. if a 5th
+    observation column is ever added, or `damaged` is ever excluded)."""
+    return (c.good_quantity + c.alter_quantity
+            + c.missing_quantity + c.damaged_quantity)
+
+
 def preview_bound_violations(adda=None) -> list:
-    """S5 / S4-005 rollout safety — the PRE-FLIP audit. Returns every COMPLETED contribution
-    set that WOULD fail the allocation bound if ENFORCE_ALLOCATION_BOUND were enabled, on
-    pool-participant stages (allocation_dimensions != NONE): `over_bound` (Σ good+alter+missing
-    > Σ active allocated) or `unallocated` (allocated=0, reported>0). Read-only. `adda=None`
+    """Legacy-row audit. The allocation bound is now always-on, so new completions can't
+    violate it — this scans PRE-EXISTING COMPLETED contributions (created before the bound
+    went hard) that would fail it, on pool-participant stages (allocation_dimensions != NONE):
+    `over_bound` (Σ good+alter+missing > Σ active allocated) or `unallocated` (allocated=0,
+    reported>0). Read-only. `adda=None`
     scans all; else one Adda. Run this + clear violations BEFORE flipping the flag on."""
     from collections import defaultdict
 
@@ -410,13 +448,16 @@ def preview_bound_violations(adda=None) -> list:
         srs = srs.filter(adda=adda)
     out = []
     for sr in srs:
+        # AE-1: skip pool PRODUCERS (no upstream source) — their reports create the
+        # pool and are never allocated, so they are not bound violations (mirrors
+        # check_allocation_bound). Audits only CONSUMING stages.
+        if _upstream_pool_source(sr) is None:
+            continue
         produced = defaultdict(lambda: Decimal('0'))
         for c in (WorkerStageContribution.objects
                   .filter(task__stage_record=sr, task__status__in=done)
                   .select_related('task')):
-            produced[(c.task.worker_id, c.color_id, c.size_id)] += (
-                c.good_quantity + c.alter_quantity + c.missing_quantity
-                + c.damaged_quantity)
+            produced[(c.task.worker_id, c.color_id, c.size_id)] += _contribution_load(c)
         for (worker_id, color_id, size_id), got in produced.items():
             allocated = (WorkerStageAllocation.objects
                          .filter(stage_record=sr, worker_id=worker_id,
@@ -436,63 +477,44 @@ def preview_bound_violations(adda=None) -> list:
     return out
 
 
-def bound_soft_warning(task):
-    """S5 / S4-005 — non-blocking over-allocation hint for the worker report UI. Returns a
-    message if this task's good+alter+missing would exceed the worker's allocation on a
-    pool-participant stage (else None). NEVER raises; independent of ENFORCE_ALLOCATION_BOUND
-    (it warns during the ramp, before the hard gate is ever turned on)."""
-    from collections import defaultdict
-
-    sr = task.stage_record
-    if sr.workflow_stage.allocation_dimensions == ALLOC_DIM_NONE:
-        return None
-    reported = defaultdict(lambda: Decimal('0'))
-    for c in task.contributions.all():
-        reported[(c.color_id, c.size_id)] += (
-            c.good_quantity + c.alter_quantity + c.missing_quantity
-                + c.damaged_quantity)
-    for (color_id, size_id), got in reported.items():
-        if got > worker_allocated(sr, task.worker, color_id, size_id):
-            return ("Heads up: reported quantity exceeds what's allocated to this worker for "
-                    "these dimensions. Allowed now, but refused once allocation enforcement is on.")
-    return None
-
-
 def check_allocation_bound(task) -> None:
-    """Strict complete-time bound (S4/Phase 4, I-5). For each DIMENSION the worker actually
-    REPORTED on a pool-participant stage, refuse if Σ(good+alter+missing+damaged) exceeds Σ active
+    """Strict complete-time bound. For each DIMENSION the worker actually REPORTED on a
+    pool-participant stage, refuse if Σ(good+alter+missing+damaged) exceeds Σ active
     allocated for (worker, stage, dims). Evaluated per-reported-dimension and independently:
     an allocated-but-unreported dim is never checked (no need to consume all); a reported-
-    but-UNALLOCATED dim has allocated=0 → refused.
+    but-UNALLOCATED dim has allocated=0 → refused (this also closes the flat-list
+    unallocated-pair hole — a worker can never report a (colour,size) pair they were not given).
+
+    AE-1 (owner ruling 2026-07-20): HARD validation, ALWAYS enforced — no feature flag, no
+    warning mode. (Previously gated by `ENFORCE_ALLOCATION_BOUND`, now removed; the FAT proved
+    the soft/off default let workers over-report.)
 
     PRODUCTION-CAPACITY ONLY: reads good/alter/missing (observations) + allocated_quantity
     (capacity). Reads NO verified_quantity / settlement / rate / earning / cost_method.
-    No-op unless ENFORCE_ALLOCATION_BOUND is on AND the stage is a pool participant
-    (allocation_dimensions != NONE).
+    No-op when the stage is not a pool participant (allocation_dimensions == NONE) OR when the
+    stage is a pool PRODUCER (no upstream source) — a producer's workers report to CREATE the
+    pool and are never allocated, so there is nothing to over-consume. The bound is a CONSUMER
+    rule: you cannot report more than you were allocated FROM an upstream pool.
     """
     from collections import defaultdict
 
-    from django.conf import settings
-
-    if not getattr(settings, 'ENFORCE_ALLOCATION_BOUND', False):
-        return
     sr = task.stage_record
     if sr.workflow_stage.allocation_dimensions == ALLOC_DIM_NONE:
         return   # pre-piece / non-pool stage — never bounded
 
+    source = _upstream_pool_source(sr)
+    if source is None:
+        return   # pool PRODUCER (e.g. cutting / first dimensioned stage) — reports create the pool
+
     # Σ(good+alter+missing) grouped by the dimensions the worker REPORTED.
     reported = defaultdict(lambda: Decimal('0'))
     for c in task.contributions.all():
-        reported[(c.color_id, c.size_id)] += (
-            c.good_quantity + c.alter_quantity + c.missing_quantity
-                + c.damaged_quantity)
+        reported[(c.color_id, c.size_id)] += _contribution_load(c)
 
-    source = _upstream_pool_source(sr)
     for (color_id, size_id), produced in sorted(
             reported.items(), key=lambda kv: (kv[0][0] or 0, kv[0][1] or 0)):
         # Serialise vs concurrent allocate/void on this (source, dims).
-        if source is not None:
-            _acquire_pool_lock(source.pk, color_id, size_id)
+        _acquire_pool_lock(source.pk, color_id, size_id)
         allocated = worker_allocated(sr, task.worker, color_id, size_id)
         if produced > allocated:
             raise ValidationError(
