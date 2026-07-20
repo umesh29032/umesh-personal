@@ -42,6 +42,8 @@
         background: rgba(255,255,255,0.08); cursor: pointer; font-family: inherit;
     }
     .adda-detail .hero-action-btn:hover { background: rgba(255,255,255,0.16); }
+    /* S1.1 + AE-4: hero text links (Stage Rates, Production Snapshot) — scoped class so no inline raw font-size (DS-LINT rule #10). */
+    .adda-detail .hero-link { font-size: 13px; color: rgba(255,255,255,0.85); text-decoration: underline; }
     /* R1 (PDD §27-D7): My Work cards — mobile-first, presentation-only. */
     .adda-detail .my-work {
         background: var(--surface-card, #fff); border: var(--border-card, 1px solid #e5e0d8);
@@ -523,10 +525,15 @@
                 </form>
                 {% endif %}
                 {% endif %}
+                {% if is_management %}
+                {# AE-4: production snapshot — worker×bundle allocation state at a glance. #}
+                <a href="{% url 'production:adda-snapshot' code=adda.code %}"
+                   class="hero-link">Production Snapshot</a>
+                {% endif %}
                 {% if is_super_admin %}
                 {# S1.1: super-admin rate-correction entry — before-settlement only. #}
                 <a href="{% url 'production:stage-rates' code=adda.code %}"
-                   style="font-size:13px;color:rgba(255,255,255,0.85);text-decoration:underline;">Stage Rates</a>
+                   class="hero-link">Stage Rates</a>
                 {% endif %}
             </div>
         </div>
