@@ -118,6 +118,15 @@ Product → Stage ka join with `order` field. Per-product workflow define karta 
 Ek production batch. Code = `{Product.code}-NNN`.
 - `current_stage` (FK WorkflowStage) — abhi kaunsa stage chal raha hai. `None` = completed.
 - `status` — `in_progress | on_hold | completed | cancelled`.
+- **Deletion safety (owner rule 2026-07-22):** an Adda is heavily PROTECT-anchored
+  (16 FKs) + a model-level `delete()` guard. **Cannot be hard-deleted once it has
+  a completed stage, a settlement, worker earnings/allocations, reported
+  production, or barcodes** — `deletion_block_reason()` returns why. Two lifecycle
+  exits, **super_admin only** (`adda_service`): `cancel_adda` (SOFT — status→
+  CANCELLED, row+history kept; the abandon path for a batch with real work) and
+  `delete_adda` (HARD — pristine/mistaken batches only, irreversible). Raw admin
+  delete is disabled (`AddaAdmin.has_delete_permission=False`). See
+  [ADR-0012](../../docs/adr/0012-adda-cancellation-and-deletion.md).
 
 ### AddaStageRecord
 Har Adda + stage combination ka **execution row**. Yahi row workers + started_at + completed_at carry karta hai. Typed records (LayeringRecord, CuttingPatternRecord, CuttingRecord) `OneToOne` se hang karte hain.
@@ -386,6 +395,8 @@ config/production/
 - **Layering Reopen** (admin only): `POST /addas/<code>/layering/reopen/` — completed Layering ko unlock karta hai correction ke liye. Header values (length/duration/notes) `sr.draft_*` mein wapas copy hote hain. Refuses if downstream stage already started.
 - **Stage library editor**: `/production/stages/` — perm-gated (`production.change_stage`). Super Admin bypass.
 - **Per-product flow editor**: `/production/products/<pk>/flow/` — drag stages in/out of product workflow.
+- **Cancel batch** (super_admin): `POST /addas/<code>/cancel/` → `cancel_adda` — SOFT abandon (status→CANCELLED, open worker tasks auto-cancel, history logged `ADDA_CANCELLED`). Blocked once a settlement exists / already completed. Danger-zone button on the Adda detail.
+- **Delete batch** (super_admin): `GET/POST /addas/<code>/delete/` → `delete_adda` — HARD delete, pristine batches ONLY (confirm page shows the block reason + offers Cancel when unsafe). Irreversible.
 
 ---
 

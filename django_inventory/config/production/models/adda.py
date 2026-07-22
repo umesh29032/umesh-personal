@@ -79,6 +79,62 @@ class Adda(TimeStampedModel):
             total=Sum('total_pieces'),
         )['total'] or 0
 
+    # ── Deletion safety (owner rule 2026-07-22): an Adda is the factory's heart.
+    # Money/earning truth is immutable (ADR-0002 append-only ledger, ADR-0009
+    # cost-truth): a batch workers earned from, that was settled, or that shipped
+    # barcodes is PERMANENT record — deleting it would erase financial history.
+    # Such batches are ABANDONED via `cancel_adda` (status→CANCELLED), NEVER
+    # erased. Only a genuinely empty/early batch (created by mistake, no earnings)
+    # may be hard-deleted — and only by super_admin, through `delete_adda`.
+    def deletion_block_reason(self) -> str:
+        """Human reason this Adda must NOT be hard-deleted ('' = safe to delete).
+
+        Enforced in `delete()` below so admin / shell / service paths ALL obey
+        one rule. `delete_adda` re-checks this before tearing anything down.
+        """
+        if self.status == self.Status.COMPLETED:
+            return "it is completed — finished batches are permanent record"
+        # Any FINISHED stage = physical work done (cloth laid / pieces cut) →
+        # history, abandon via cancel. Keeps the deletable set to pristine
+        # "created-by-mistake" batches (teardown below stays safe + bounded).
+        if self.stage_records.filter(completed_at__isnull=False).exists():
+            return "work has been completed on one of its stages — it is history now"
+        # expense app (money) — lazy import avoids a production→expense cycle.
+        from expense.models import AddaSettlement, StageWorkAssignment
+        if AddaSettlement.objects.filter(adda=self).exists():
+            return "it has a settlement — money history can never be deleted"
+        if StageWorkAssignment.objects.filter(stage_record__adda=self).exists():
+            return "workers have earning records on it — settle then cancel"
+        # payable worker production (good>0) = real work happened → history.
+        from production.models import WorkerStageAllocation, WorkerStageContribution
+        if WorkerStageContribution.objects.filter(
+                task__stage_record__adda=self, good_quantity__gt=0).exists():
+            return "workers have reported production on it — it is history now"
+        if WorkerStageAllocation.objects.filter(
+                stage_record__adda=self, voided_at__isnull=True).exists():
+            return "workers are allocated work on it — reverse allocations first"
+        # generated barcodes = production output already in tracking downstream.
+        if self.barcode_batches.exists():
+            return "barcodes were generated for it — it has entered tracking"
+        return ""
+
+    @property
+    def can_delete(self) -> bool:
+        """True = safe to hard-delete (no money/earning/barcode footprint)."""
+        return self.deletion_block_reason() == ""
+
+    def delete(self, *args, **kwargs):
+        # Defense-in-depth backstop: refuse an unsafe delete on EVERY path, even
+        # a raw shell `adda.delete()`. ValidationError (not silent) — deliberate
+        # business rule, distinct from the DB-level PROTECT that guards children.
+        reason = self.deletion_block_reason()
+        if reason:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(
+                f"Adda {self.code} cannot be deleted because {reason}. "
+                f"Use Cancel to abandon it instead.")
+        return super().delete(*args, **kwargs)
+
 
 class CuttingStream(TimeStampedModel):
     """One fabric group's independent pre-production LANE inside one Adda

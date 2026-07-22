@@ -13,7 +13,7 @@ entry points so callers do `from production.services import complete_layering`.
 
 Future stages = drop in services/<stage>_service.py + re-export here.
 """
-from .adda_service import create_adda, advance_to_next_stage
+from .adda_service import create_adda, advance_to_next_stage, cancel_adda, delete_adda
 from .product_service import create_product, update_product, archive_product
 from .product_size_service import (
     add_product_size, archive_product_size, reactivate_product_size,
@@ -113,6 +113,8 @@ __all__ = [
     'stage_snapshot',
     'create_adda',
     'advance_to_next_stage',
+    'cancel_adda',
+    'delete_adda',
     'create_product',
     'update_product',
     'archive_product',

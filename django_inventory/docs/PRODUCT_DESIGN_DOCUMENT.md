@@ -125,6 +125,14 @@ verified: 2026-07-18
 >    the incomplete-material statement mandatory). ADR-0009/0011 preserved;
 >    Money-Write census unchanged (no writers). Full charter of record:
 >    [RM_EXPENSE_INTEGRATION_LOG.md](RM_EXPENSE_INTEGRATION_LOG.md) §RMX-0.
+> 9. **Adda lifecycle exits (2026-07-22, owner) — [ADR-0012](adr/0012-adda-cancellation-and-deletion.md):**
+>    §3 gains `→ CANCELLED`. Super_admin ONLY: `cancel_adda` (SOFT — status→
+>    CANCELLED, row+history kept, open tasks auto-cancel, refused once settled)
+>    + `delete_adda` (HARD — pristine/mistaken batches only; refused on any
+>    completed stage / settlement / earning / allocation / reported-good /
+>    barcode). Model `delete()` guard + `AddaAdmin` delete disabled (closes
+>    business-acceptance finding M-5). Settlement stays the only money boundary;
+>    no path books/erases money.
 >
 > **Layering of truth (who wins on conflict):**
 > - **Business intent** → THIS document wins.
@@ -211,7 +219,7 @@ REOPEN    allowed until money exists: settlement-credited stage REFUSES
           reopen (armor ✅); downstream-consumer guard blocks unsafe reopen ✅
 ```
 
-Adda statuses: `IN_PROGRESS` → `COMPLETED` (verified in `production/models/adda.py`).
+Adda statuses: `IN_PROGRESS` → `COMPLETED`, or `→ CANCELLED` (super-admin soft-abandon, `cancel_adda`; amendment 9 / ADR-0012). Hard delete = super-admin, pristine batches only. (verified in `production/models/adda.py`).
 
 ## 4) Generic workflow engine ✅
 

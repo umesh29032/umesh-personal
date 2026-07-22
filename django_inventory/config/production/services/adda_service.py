@@ -579,6 +579,155 @@ def cancel_stream(adda: Adda, *, stream, reason: str, user):
     return lane
 
 
+def _require_super_admin(user, action: str):
+    """Adda-level destructive acts (cancel/delete) are super_admin ONLY
+    (owner rule 2026-07-22) — stricter than the management gate on lanes."""
+    from accounts.services import ROLE_SUPER_ADMIN
+    if not user_has_role(user, [ROLE_SUPER_ADMIN]):
+        raise PermissionDenied(f"Only a super admin can {action} an Adda.")
+
+
+@transaction.atomic
+def cancel_adda(adda: Adda, *, user, reason: str) -> Adda:
+    """SOFT-abandon a whole batch — status→CANCELLED, the row + its history stay
+    forever (owner rule 2026-07-22). This is the path for a batch that already
+    carries real work but must be stopped; the hard-delete (`delete_adda`) is
+    only for pristine/mistaken batches.
+
+    Guards: super_admin only · mandatory reason · never a COMPLETED batch · never
+    already-cancelled · never once a SETTLEMENT exists (money is frozen — reverse
+    the settlement first). Open (assigned/in_progress, unreported) worker tasks
+    auto-cancel (F3: no pay eligibility on an abandoned batch); reported/verified
+    work stays immutable. Does NOT touch money — settlement is the only money
+    boundary (ADR-0009).
+    """
+    from expense.models import AddaSettlement
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+
+    _require_super_admin(user, "cancel")
+    if not (reason or '').strip():
+        raise ValidationError("A reason is required to cancel an Adda.")
+    locked = Adda.objects.select_for_update().get(pk=adda.pk)   # §5 row lock
+    if locked.status == Adda.Status.CANCELLED:
+        raise ValidationError("This Adda is already cancelled.")
+    if locked.status == Adda.Status.COMPLETED:
+        raise ValidationError(
+            "This Adda is completed — a finished batch is permanent record, "
+            "not something to cancel.")
+    if AddaSettlement.objects.filter(adda=locked).exists():
+        raise ValidationError(
+            "This Adda has a settlement — reverse the settlement first; money "
+            "history is never abandoned silently.")
+
+    prev_status = locked.status
+    cancelled_tasks = _cancel_open_tasks(
+        locked, note=f"Adda cancelled: {reason.strip()}")
+    locked.status = Adda.Status.CANCELLED
+    # current_stage is KEPT on purpose — a cancelled batch still records where it
+    # was abandoned (unlike COMPLETED, which nulls it). Status is the signal.
+    locked.save(update_fields=['status'])
+    log_adda(locked, AddaHistory.ChangeType.ADDA_CANCELLED, user,
+             note=reason.strip()[:200],
+             metadata={'reason': reason.strip(), 'prev_status': prev_status,
+                       'cancelled_tasks': cancelled_tasks})
+    logger.warning("adda.cancelled code=%s by=%s tasks_cancelled=%s reason=%s",
+                   locked.code, getattr(user, 'pk', None), cancelled_tasks,
+                   reason.strip())
+    return locked
+
+
+def _cancel_open_tasks(adda: Adda, *, note: str) -> int:
+    """Auto-cancel every OPEN (assigned/in_progress) worker task across the
+    Adda's stage records — reuses the F3 resolver (keeps completed/verified).
+    Returns count cancelled. Caller must be inside a transaction."""
+    from production.models import WorkerStageTask
+    from production.services import worker_task_service
+    total = 0
+    open_by_sr = (WorkerStageTask.objects
+                  .filter(stage_record__adda=adda,
+                          status__in=(WorkerStageTask.Status.ASSIGNED,
+                                      WorkerStageTask.Status.IN_PROGRESS))
+                  .values_list('stage_record_id', flat=True))
+    for sr_id in set(open_by_sr):
+        sr = AddaStageRecord.objects.get(pk=sr_id)
+        n = (WorkerStageTask.objects
+             .filter(stage_record=sr,
+                     status__in=(WorkerStageTask.Status.ASSIGNED,
+                                 WorkerStageTask.Status.IN_PROGRESS)).count())
+        worker_task_service.resolve_stage_tasks_on_complete(sr, cancel_note=note)
+        total += n
+    return total
+
+
+@transaction.atomic
+def delete_adda(adda: Adda, *, user, reason: str) -> str:
+    """HARD-DELETE a pristine/mistaken batch — super_admin ONLY, IRREVERSIBLE
+    (owner rule 2026-07-22). Allowed only when `Adda.deletion_block_reason()`
+    is empty: no completed stage, no money/earnings/allocations, no barcodes.
+    Anything with real work must be `cancel_adda` (soft) instead.
+
+    Safety: runs in ONE transaction. Tears down the batch's scaffolding
+    (draft worker tasks/contributions/allocations, stage records + their CASCADE
+    typed rows/rate snapshots, streams, the AddaHistory audit), then deletes the
+    Adda. If ANY unexpected PROTECT child remains (cloth linked, a chosen
+    pattern layout, a machine window — cross-app rows this layer must not touch),
+    `adda.delete()` raises ProtectedError → the WHOLE transaction rolls back and
+    we surface a clean "cancel instead" error. So a delete either fully succeeds
+    or changes nothing — never a partial wipe.
+    """
+    from django.db.models import ProtectedError
+    from production.models import (
+        CuttingStream, WorkerStageAllocation, WorkerStageContribution,
+        WorkerStageTask,
+    )
+
+    _require_super_admin(user, "delete")
+    if not (reason or '').strip():
+        raise ValidationError("A reason is required to delete an Adda.")
+    locked = Adda.objects.select_for_update().get(pk=adda.pk)   # §5 row lock
+    block = locked.deletion_block_reason()
+    if block:
+        raise ValidationError(
+            f"This Adda cannot be deleted because {block}. "
+            f"Use Cancel to abandon it instead.")
+
+    code = locked.code
+    # Durable audit BEFORE teardown — the Adda's own AddaHistory dies with it, so
+    # this app-log line is the surviving record of who/why (metadata is minimal
+    # by design: a pristine batch has no business data worth preserving).
+    logger.warning(
+        "adda.delete code=%s product=%s by=%s streams=%s stage_records=%s "
+        "history=%s reason=%s",
+        code, locked.product.code, getattr(user, 'pk', None),
+        locked.cutting_streams.count(), locked.stage_records.count(),
+        locked.history.count(), reason.strip())
+
+    # Leaf-first teardown of the scaffolding a pristine batch can hold. All rows
+    # here are draft/identity/audit only (the guard proved no payable/settled
+    # rows exist). Cross-app children (cloth/patterns_ai/machines) are NOT touched
+    # by design (acyclic layers) — if present they trip the ProtectedError guard
+    # below and the batch must be cancelled instead.
+    WorkerStageContribution.objects.filter(task__stage_record__adda=locked).delete()
+    WorkerStageTask.objects.filter(stage_record__adda=locked).delete()
+    WorkerStageAllocation.objects.filter(stage_record__adda=locked).delete()
+    AddaStageRecord.objects.filter(adda=locked).delete()   # CASCADE: rates, typed, pool
+    CuttingStream.objects.filter(adda=locked).delete()
+    locked.history.all().delete()                          # AddaHistory audit trail
+
+    try:
+        locked.delete()   # guard passes (safe) → real delete + collector backstop
+    except ProtectedError as exc:
+        # A child this layer can't tear down still points at the Adda. atomic
+        # rolls everything back — nothing was actually deleted.
+        raise ValidationError(
+            "This Adda still has dependent records (e.g. a chosen pattern "
+            "layout, a machine assignment, or linked cloth) that can't be "
+            "auto-removed. Use Cancel to abandon it instead.") from exc
+    logger.warning("adda.deleted code=%s by=%s", code, getattr(user, 'pk', None))
+    return code
+
+
 def advance_lane(adda: Adda, *, stream, leaving_sr, user,
                  enforce_worker_credit: bool = True,
                  override_pending_reason: str | None = None,

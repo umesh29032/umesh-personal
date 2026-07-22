@@ -496,6 +496,13 @@
         .adda-detail .activity-row { flex-direction: column; gap: 4px; }
         .adda-detail .activity-time { width: auto; }
     }
+    /* Super-admin Danger Zone (owner 2026-07-22) — tokens/classes only (ds-lint). */
+    .adda-detail .danger-zone { margin: 18px 0; border: 1px solid var(--danger); border-radius: var(--radius-card, 12px); padding: 16px 18px; background: var(--danger-bg); }
+    .adda-detail .danger-zone-title { font-weight: 700; color: var(--danger); font-size: var(--fs-sm, 14px); margin-bottom: 4px; }
+    .adda-detail .danger-zone-note { color: var(--stone); font-size: var(--fs-xs, 13px); margin: 0 0 12px; }
+    .adda-detail .danger-zone-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .adda-detail .danger-zone-actions form { margin: 0; }
+    .adda-detail .btn-ghost.is-danger { color: var(--danger); }
 </style>
 {% endblock %}
 
@@ -847,6 +854,29 @@
                 {% include 'production/_activity_feed.html' with activity=activity show_adda_code=False %}
             </div>
         </details>
+    </div>
+    {% endif %}
+
+    {% comment %}Owner rule 2026-07-22: super-admin Danger Zone — soft Cancel + hard
+    Delete. Hidden once the batch is completed/cancelled (terminal). Service owns all
+    guards; the confirm page shows WHY if a delete is blocked.{% endcomment %}
+    {% if is_super_admin and adda.status != 'completed' and adda.status != 'cancelled' %}
+    <div class="danger-zone">
+        <div class="danger-zone-title">Danger zone</div>
+        <p class="danger-zone-note">
+            Cancel keeps the batch on record (status → Cancelled). Delete removes a
+            pristine/mistaken batch permanently — blocked once any work, earning or
+            barcode exists.
+        </p>
+        <div class="danger-zone-actions">
+            <form method="post" action="{% url 'production:adda-cancel' code=adda.code %}"
+                  onsubmit="var r=prompt('Reason for cancelling this batch?');if(!r){return false;}this.reason.value=r;">
+                {% csrf_token %}
+                <input type="hidden" name="reason">
+                <button type="submit" class="btn btn-ghost is-danger">Cancel batch</button>
+            </form>
+            <a href="{% url 'production:adda-delete' code=adda.code %}" class="btn btn-danger">Delete batch</a>
+        </div>
     </div>
     {% endif %}
 

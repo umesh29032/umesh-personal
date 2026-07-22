@@ -17,9 +17,9 @@ from django.views.generic import DetailView, FormView, ListView
 
 from production.forms import AddaCreateForm
 from production.models import Adda
-from production.services import create_adda
+from production.services import cancel_adda, create_adda, delete_adda
 
-from .mixins import ManagementRoleMixin, ProductionRoleMixin
+from .mixins import ManagementRoleMixin, ProductionRoleMixin, SuperAdminOnlyMixin
 
 
 class AddaListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
@@ -401,7 +401,6 @@ class AddaAddLaneView(LoginRequiredMixin, ManagementRoleMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         adda = self.object
         from production.models import AddaStageRecord, CuttingStream
-        from production.services.adda_service import PRE_PRODUCTION_STAGE_CODES
         lanes = list(CuttingStream.objects.filter(adda=adda)
                      .order_by('fabric_group', 'sequence'))
         done_cut = set(AddaStageRecord.objects.filter(
@@ -464,3 +463,55 @@ class AddaCancelLaneView(LoginRequiredMixin, ManagementRoleMixin, DetailView):
             msg = e.messages[0] if hasattr(e, 'messages') else str(e)
             messages.error(request, msg)
         return redirect('production:adda-detail', code=adda.code)
+
+
+class AddaCancelView(LoginRequiredMixin, SuperAdminOnlyMixin, DetailView):
+    """Owner rule 2026-07-22: super_admin SOFT-abandons a batch — POST-only; the
+    service owns every guard (super-admin, reason, not-completed, no-settlement,
+    open-task auto-cancel). Redirects back to the (now cancelled) Adda."""
+    model = Adda
+    slug_field = 'code'
+    slug_url_kwarg = 'code'
+    http_method_names = ['post']
+
+    def post(self, request, *args, **kwargs):
+        adda = self.get_object()
+        try:
+            cancel_adda(adda, reason=(request.POST.get('reason') or '').strip(),
+                        user=request.user)
+            messages.success(
+                request, f"Adda {adda.code} cancelled — it stays on the record, "
+                "with its reason and history intact.")
+        except (ValidationError, PermissionDenied) as e:
+            msg = e.messages[0] if hasattr(e, 'messages') else str(e)
+            messages.error(request, msg)
+        return redirect('production:adda-detail', code=adda.code)
+
+
+class AddaDeleteView(LoginRequiredMixin, SuperAdminOnlyMixin, DetailView):
+    """Owner rule 2026-07-22: super_admin HARD-DELETES a pristine/mistaken batch.
+    GET renders the confirm page (shows WHY if it can't be deleted → offers
+    Cancel instead); POST runs `delete_adda` (irreversible) and returns to the
+    Adda list. All guards live in the service."""
+    model = Adda
+    slug_field = 'code'
+    slug_url_kwarg = 'code'
+    template_name = 'production/adda_confirm_delete.html'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        # Drives the template: '' = safe to delete; else the human block reason.
+        ctx['block_reason'] = self.object.deletion_block_reason()
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        adda = self.get_object()
+        try:
+            code = delete_adda(adda, reason=(request.POST.get('reason') or '').strip(),
+                               user=request.user)
+            messages.success(request, f"Adda {code} deleted.")
+            return redirect('production:adda-list')
+        except (ValidationError, PermissionDenied) as e:
+            msg = e.messages[0] if hasattr(e, 'messages') else str(e)
+            messages.error(request, msg)
+            return redirect('production:adda-detail', code=adda.code)

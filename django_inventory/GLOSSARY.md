@@ -25,7 +25,7 @@ garment-manufacturing business, so many terms are Hindi/Hinglish factory words.
 
 | Term | Means | Model / where |
 |---|---|---|
-| **Adda** | One **production batch** — a single run of a product (e.g. `T-SHIRT-001`). Moves through the workflow stages start→finish. | `production.Adda` |
+| **Adda** | One **production batch** — a single run of a product (e.g. `T-SHIRT-001`). Moves through the workflow stages start→finish. Lifecycle: `IN_PROGRESS → COMPLETED`, or `→ CANCELLED` (super-admin soft-abandon, `cancel_adda`). Never accidentally deletable — 16 PROTECT FKs + a model guard; a hard `delete_adda` (super-admin) works only on a pristine batch with no earnings/money/barcodes (else Cancel). See [ADR-0012](docs/adr/0012-adda-cancellation-and-deletion.md). | `production.Adda` |
 | **Product** | A factory product *definition* (T-SHIRT, NIKKAR). This is the **manufacturing** master, NOT a sellable catalog item. | `production.Product` |
 | **Stage** (library) | A reusable, admin-managed step definition (Layering, Cutting…). Holds access rules (skills/roles) + a default cost rate. | `production.Stage` |
 | **WorkflowStage** | A Stage **attached to one Product** with an order position + binding cost rate. The per-product production flow = its ordered WorkflowStages. | `production.WorkflowStage` |

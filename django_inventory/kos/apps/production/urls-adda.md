@@ -46,6 +46,14 @@ ASR per WorkflowStage + frozen role-rates] → redirect adda-detail
 **Why reasons are DATA:** exceptional flows become auditable acts, not silent edits — six months later "why is there a lane 3?" answers itself.
 **Failure modes:** cancel refuses once the lane has content. **Learn:** [cutting §streams](../../features/cutting.md) · fork-join DSA there.
 
+### `addas/<code>/cancel/` — `adda-cancel` · `addas/<code>/delete/` — `adda-delete` 🔐
+
+**Purpose:** the two Adda lifecycle exits (owner rule 2026-07-22, ADR-0012), **super_admin only** — the per-batch Danger Zone on the detail page.
+**Cancel (soft):** POST → `AddaCancelView` → `cancel_adda`. status → CANCELLED, the row + full history stay forever; open (unreported) worker tasks auto-cancel; **refused once a settlement exists** or the batch is completed. The abandon path for a batch that already has real work.
+**Delete (hard):** GET confirm + POST → `AddaDeleteView` → `delete_adda`. Only a PRISTINE/mistaken batch — the confirm page shows WHY it's blocked (completed stage / earning / settlement / allocation / reported good / barcode) and offers Cancel instead. Irreversible; runs as one transaction so a leftover dependency rolls back to a clean refusal (never a half-delete).
+**Why two paths:** money + worker earnings are immutable (settlement is the only money boundary). You can't erase a batch people earned from — you abandon it (Cancel) or, if nothing happened yet, remove the mistake (Delete). Raw Django-admin delete is disabled on purpose.
+**Misconception:** "super admin can delete anything" — no; even super_admin can't hard-delete a batch with earnings. That's the guard, not a missing feature.
+
 ---
 
 ### `addas/<code>/stage-rates/` — `stage-rates` · `…/<sr_id>/<role_id>/correct/` — `stage-rate-correct` 🔐

@@ -252,7 +252,7 @@ One management command, `sync_master_data` (or `sync_stage_library`):
 | M-2 | Medium | `stage_views.py:655-733` | quick-create-roll: rolls persist when attach gate refuses (gate in 2nd txn). |
 | M-3 | Medium | `cutting_pattern/service.py:136` + 3 views | Lazy SR+rate creation non-atomic and before skill gate (photos/verify/sizes). |
 | M-4 | Medium | `cutting_pattern/handler.py:104-147` | Checklist submit = txn sequence; mid-fail leaves partial committed state. |
-| M-5 | Medium | adda lifecycle | No pause/resume/cancel writers; ON_HOLD/CANCELLED dead; no delete path (PROTECT-safe — good); AddaAdmin delete → ProtectedError 500. |
+| M-5 | Medium | adda lifecycle | ~~No pause/resume/cancel writers; ON_HOLD/CANCELLED dead; no delete path (PROTECT-safe — good); AddaAdmin delete → ProtectedError 500.~~ **RESOLVED 2026-07-22 (ADR-0012):** super_admin `cancel_adda` (writes CANCELLED) + `delete_adda` (pristine-only, money-guarded) shipped; AddaAdmin delete disabled (no more ProtectedError 500). `test_adda_delete` 19/19. |
 | M-6 | Medium | expense views 449/544/631, machines assign, product_views 95/99/121 | Non-int POST ids → ValueError 500. |
 | M-7 | Medium | accounts data | 3 active users with role=None; junk test accounts active. |
 | L-1..L-11 | Low | various | `advance_lane`/`create_bundle`/barcode-SR-helper undecorated (latent C-1 class); `_ensure_bundling_open` displaced decorator; Stage M2M unatomic; pattern-photo-remove direct write; review bulk-loop partial-commit UX; `update_payout_profile` ungated in service; stale contract comment `worker_task_service.py:21`; junk stage rows 5/6/11; `collar_attach` unused; fnf multi-txn (documented design). |

@@ -79,6 +79,12 @@ urlpatterns = [
          views.AddaAddLaneView.as_view(), name='adda-add-lane'),
     path('addas/<str:code>/lanes/cancel/',
          views.AddaCancelLaneView.as_view(), name='adda-cancel-lane'),
+    # Owner rule 2026-07-22: super_admin-only batch abandon (soft) + delete (hard).
+    # cancel = POST-only; delete = GET confirm + POST. Service owns all guards.
+    path('addas/<str:code>/cancel/',
+         views.AddaCancelView.as_view(), name='adda-cancel'),
+    path('addas/<str:code>/delete/',
+         views.AddaDeleteView.as_view(), name='adda-delete'),
 
     # Stage role-rate correction (S1.1, super-admin only): list + correct.
     path('addas/<str:code>/stage-rates/', views.StageRateListView.as_view(), name='stage-rates'),

@@ -4,8 +4,8 @@ from .product_views import (
     ProductSizesEditView, ProductUpdateView,
 )
 from .adda_views import (AddaAddLaneView, AddaBundleSetsView,
-                         AddaCancelLaneView, AddaCreateView, AddaDetailView,
-                         AddaListView)
+                         AddaCancelLaneView, AddaCancelView, AddaCreateView,
+                         AddaDeleteView, AddaDetailView, AddaListView)
 from .rate_views import StageRateListView, StageRateCorrectView
 from .access_views import (
     MachineTypeCreateView, MachineTypeListView, MachineTypeUpdateView,
@@ -71,7 +71,7 @@ __all__ = [
     'ProductListView', 'ProductCreateView', 'ProductUpdateView', 'ProductArchiveView',
     'ProductSizesEditView',
     'AddaListView', 'AddaCreateView', 'AddaDetailView', 'AddaBundleSetsView',
-    'AddaAddLaneView', 'AddaCancelLaneView',
+    'AddaAddLaneView', 'AddaCancelLaneView', 'AddaCancelView', 'AddaDeleteView',
     'StageRateListView', 'StageRateCorrectView',
     'LayeringWorkspaceView',
     'GenericStageStartView',

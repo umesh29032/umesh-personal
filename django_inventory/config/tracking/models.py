@@ -279,6 +279,11 @@ class AddaHistory(AbstractHistoryEntry):
         # Add-lane flow. metadata = {stream_id, fabric_group, sequence, reason}.
         STREAM_ADDED = 'stream_added', 'Cutting Lane Added'
         STREAM_CANCELLED = 'stream_cancelled', 'Cutting Lane Cancelled'
+        # Owner rule 2026-07-22: super_admin ABANDONED the whole batch (soft —
+        # status→CANCELLED, record kept). metadata = {reason, prev_status,
+        # cancelled_tasks}. Distinct from a hard delete (which leaves no row to
+        # log against). The one path that writes Adda.status = CANCELLED.
+        ADDA_CANCELLED = 'adda_cancelled', 'Adda Cancelled'
 
     adda = models.ForeignKey(
         'production.Adda', on_delete=models.PROTECT, related_name='history',
