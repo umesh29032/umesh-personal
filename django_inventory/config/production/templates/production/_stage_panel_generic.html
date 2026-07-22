@@ -36,6 +36,34 @@
     .gsp .out-wrap td{display:flex;justify-content:space-between;gap:10px;border:none;padding:3px 8px;}
     .gsp .out-wrap td::before{content:attr(data-label);font-weight:700;color:var(--stone,#7a6a58);}
   }
+  /* Worker multi-select dropdown (owner 2026-07-22) — replaces the checkbox
+     wall. Inline-expanding (never absolute) so it can't clip inside the iframe;
+     the embedded doc's ResizeObserver auto-grows the frame. Real name="workers"
+     checkboxes stay inside → zero backend change. Progressive: without JS the
+     [data-ready] hook is absent, so the panel stays open = plain usable list. */
+  .gsp .worker-ms{position:relative;max-width:440px;}
+  .gsp .worker-ms-trigger{display:flex;align-items:center;gap:8px;width:100%;min-height:46px;background:var(--cream,#f5ede0);border:1.5px solid var(--border-subtle,#e7ddcf);border-radius:10px;padding:10px 14px;font:inherit;font-size:15px;color:var(--ink,#1a1410);cursor:pointer;text-align:left;box-shadow:inset 0 1px 2px rgba(0,0,0,.04);}
+  .gsp .worker-ms-trigger:hover,.gsp .worker-ms[data-open] .worker-ms-trigger{border-color:var(--copper,#b87333);}
+  .gsp .worker-ms-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gsp .worker-ms-count{flex:none;background:var(--copper,#b87333);color:#fff;border-radius:999px;font-size:12px;font-weight:700;padding:1px 9px;}
+  .gsp .worker-ms-caret{flex:none;color:var(--stone,#7a6a58);transition:transform .15s;}
+  .gsp .worker-ms[data-open] .worker-ms-caret{transform:rotate(180deg);}
+  .gsp .worker-ms-panel{margin-top:6px;border:1.5px solid var(--border-subtle,#e7ddcf);border-radius:10px;background:var(--card-bg,#fff);box-shadow:var(--shadow-card,0 4px 16px rgba(14,11,9,.12));overflow:hidden;}
+  .gsp .worker-ms[data-ready] .worker-ms-panel{display:none;}
+  .gsp .worker-ms[data-ready][data-open] .worker-ms-panel{display:block;}
+  .gsp .worker-ms-search{width:100%;box-sizing:border-box;border:none;border-bottom:1px solid var(--border-subtle,#e7ddcf);background:var(--cream,#f5ede0);padding:11px 14px;font:inherit;font-size:14px;color:var(--ink,#1a1410);}
+  .gsp .worker-ms-search:focus{outline:none;background:#fff;}
+  .gsp .worker-ms-list{max-height:244px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .gsp .worker-ms-opt{display:flex;align-items:center;gap:11px;padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--border-subtle,#f0e8db);}
+  .gsp .worker-ms-opt:last-child{border-bottom:none;}
+  .gsp .worker-ms-opt:hover{background:var(--cream,#f7f0e4);}
+  .gsp .worker-ms-opt input{position:absolute;opacity:0;width:0;height:0;}
+  .gsp .worker-ms-check{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-subtle,#cfc0aa);display:grid;place-items:center;background:#fff;}
+  .gsp .worker-ms-opt input:checked + .worker-ms-check{background:var(--copper,#b87333);border-color:var(--copper,#b87333);}
+  .gsp .worker-ms-opt input:checked + .worker-ms-check::after{content:'✓';color:#fff;font-size:13px;font-weight:800;line-height:1;}
+  .gsp .worker-ms-opt input:focus-visible + .worker-ms-check{outline:2px solid var(--copper,#b87333);outline-offset:2px;}
+  .gsp .worker-ms-name{font-size:15px;color:var(--ink,#1a1410);}
+  .gsp .worker-ms-empty{padding:12px 14px;color:var(--stone,#7a6a58);font-size:13px;}
 </style>
 <div class="gsp">
 
@@ -51,13 +79,30 @@
       {% if can_assign and not stage_record.completed_at %}
       <form method="post" action="{% url 'production:generic-stage-start' adda.code generic_stage_code %}" style="margin-top:10px;">
         {% csrf_token %}{% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
-        <div>
-          {% for w in eligible_workers %}
-            <label class="chip-pick"><input type="checkbox" name="workers" value="{{ w.pk }}"
-              {% if stage_record and w in stage_record.active_workers %}checked{% endif %}>
-              <span>{{ w.get_full_name|default:w.email }}</span></label>
-          {% empty %}<span class="help-note">No eligible workers — wire skills on the Stage (Access hub).</span>{% endfor %}
+        {% if eligible_workers %}
+        {# Multi-select dropdown (owner 2026-07-22): trigger + searchable checklist; real name="workers" checkboxes live inside so POST is unchanged. #}
+        <div class="worker-ms" data-worker-ms>
+          <button type="button" class="worker-ms-trigger" data-ms-trigger aria-haspopup="listbox" aria-expanded="true">
+            <span class="worker-ms-label" data-ms-label>Select workers…</span>
+            <span class="worker-ms-count" data-ms-count hidden>0</span>
+            <span class="worker-ms-caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="worker-ms-panel" data-ms-panel>
+            <input type="text" class="worker-ms-search" data-ms-search placeholder="Search workers…" autocomplete="off" aria-label="Search workers">
+            <div class="worker-ms-list" data-ms-list role="listbox" aria-multiselectable="true">
+              {% for w in eligible_workers %}
+              <label class="worker-ms-opt" data-ms-opt data-name="{{ w.get_full_name|default:w.email }}">
+                <input type="checkbox" name="workers" value="{{ w.pk }}"
+                  {% if stage_record and w in stage_record.active_workers %}checked{% endif %}>
+                <span class="worker-ms-check" aria-hidden="true"></span>
+                <span class="worker-ms-name">{{ w.get_full_name|default:w.email }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="worker-ms-empty" data-ms-empty hidden>No worker matches.</div>
+          </div>
         </div>
+        {% else %}<span class="help-note">No eligible workers — wire skills on the Stage (Access hub).</span>{% endif %}
         <button type="submit" class="lybtn lybtn-ghost" style="margin-top:8px;">{% if stage_record and stage_record.started_at %}Update workers{% else %}Start {{ generic_stage_name }}{% endif %}</button>
       </form>
       {% endif %}
@@ -295,3 +340,55 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+(function(){
+  // Worker multi-select (owner 2026-07-22). Progressive enhancement: the real
+  // name="workers" checkboxes remain the source of truth — this only collapses
+  // them into a searchable dropdown + a live "N selected" label. Setting
+  // [data-ready] flips the CSS from "open list" (no-JS fallback) to "collapsed".
+  document.querySelectorAll('[data-worker-ms]').forEach(function(root){
+    var trigger = root.querySelector('[data-ms-trigger]');
+    var label   = root.querySelector('[data-ms-label]');
+    var countEl = root.querySelector('[data-ms-count]');
+    var search  = root.querySelector('[data-ms-search]');
+    var emptyEl = root.querySelector('[data-ms-empty]');
+    var opts    = Array.prototype.slice.call(root.querySelectorAll('[data-ms-opt]'));
+    if(!trigger) return;
+
+    function selected(){ return opts.filter(function(o){ return o.querySelector('input').checked; }); }
+    function syncLabel(){
+      var sel = selected();
+      countEl.hidden = sel.length === 0;
+      countEl.textContent = sel.length;
+      if(sel.length === 0)      label.textContent = 'Select workers…';
+      else if(sel.length === 1) label.textContent = sel[0].querySelector('.worker-ms-name').textContent;
+      else                      label.textContent = sel.length + ' workers selected';
+    }
+    function open(o){
+      root.toggleAttribute('data-open', o);
+      trigger.setAttribute('aria-expanded', o ? 'true' : 'false');
+      if(o && search) search.focus();
+    }
+    trigger.addEventListener('click', function(){ open(!root.hasAttribute('data-open')); });
+    root.addEventListener('change', function(e){ if(e.target.type === 'checkbox') syncLabel(); });
+    if(search){
+      search.addEventListener('input', function(){
+        var q = search.value.trim().toLowerCase(), any = false;
+        opts.forEach(function(o){
+          var hit = o.getAttribute('data-name').toLowerCase().indexOf(q) > -1;
+          o.style.display = hit ? '' : 'none';
+          if(hit) any = true;
+        });
+        emptyEl.hidden = any;
+      });
+    }
+    // Close on outside click (within this iframe doc).
+    document.addEventListener('click', function(e){ if(!root.contains(e.target)) open(false); });
+
+    root.setAttribute('data-ready', '');   // take over → CSS collapses the panel
+    open(false);
+    syncLabel();
+  });
+})();
+</script>
