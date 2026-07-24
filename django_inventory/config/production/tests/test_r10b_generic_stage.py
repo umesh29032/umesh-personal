@@ -191,6 +191,48 @@ class CategoryPresentationTests(TestCase):
         self.assertFalse(grouped)
 
 
+class GenericPanelRosterPickerTests(GenericOperationWorld):
+    """F-4 invariant, generic_stage path specifically (audit gap 2026-07-24):
+    F4SharedPickerTests in test_pre_r10_polish.py only iterates the four
+    bespoke stages — build_generic_panel_context's own 'eligible_workers'
+    key (views_ctx.py) had no direct regression pin."""
+
+    def test_eligible_workers_matches_shared_source_and_excludes_inactive(self):
+        from django.test import RequestFactory
+
+        from production.services import eligible_stage_workers
+        from production.stages.generic_stage.views_ctx import (
+            build_generic_panel_context,
+        )
+
+        inactive = _user('r10b-x@test', skills=['overlock_operator'])
+        inactive.is_active = False
+        inactive.save()
+        unskilled_mgr = _user('r10b-mgr2@test', 'manager')
+
+        request = RequestFactory().get('/')
+        request.user = self.mgr
+        ctx = build_generic_panel_context(request, self.adda, 'overlock', 'Overlock')
+
+        eligible = list(ctx['eligible_workers'])
+        self.assertEqual(set(eligible), set(eligible_stage_workers('overlock')))
+        self.assertIn(self.worker, eligible)
+        self.assertNotIn(inactive, eligible)
+        self.assertNotIn(unskilled_mgr, eligible)
+
+    def test_eligible_workers_empty_for_non_management(self):
+        from django.test import RequestFactory
+
+        from production.stages.generic_stage.views_ctx import (
+            build_generic_panel_context,
+        )
+
+        request = RequestFactory().get('/')
+        request.user = self.worker
+        ctx = build_generic_panel_context(request, self.adda, 'overlock', 'Overlock')
+        self.assertEqual(list(ctx['eligible_workers']), [])
+
+
 class GenericReopenTests(GenericOperationWorld):
     """M6-campaign regression (2026-07-11): reopen_generic_stage lacked
     @transaction.atomic — the shared skeleton's select_for_update raised
