@@ -1,2 +1,28 @@
 sw obsidian/
 .gstack/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONOREPO-WIDE rules. This file guards EVERY folder here (django_inventory,
+# Django_app, DSA, …). django_inventory/.gitignore only guards its own folder,
+# which is why a stray dump in Django_app/ once slipped into git history.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Database dumps = DATA, not code. A .sql dump is plaintext: committing one
+# publishes every row (emails, password hashes, session keys). Git history is
+# append-only, so a later delete does NOT remove it — prevention is the fix.
+# Backups belong in a backup location, never in a code repo.
+*.sql
+*.dump
+*.sql.gz
+db_backups/
+backups/
+
+# Dependencies — reinstallable from the lockfile, so never worth committing.
+node_modules/
+
+# ── Escape hatch ─────────────────────────────────────────────────────────────
+# Need to commit a genuinely-code .sql one day (a view definition, a seed
+# script)? These patterns block `git add`, so force it explicitly:
+#     git add -f path/to/that.sql
+# Being forced to type -f is the point: it makes committing SQL a decision
+# instead of an accident.

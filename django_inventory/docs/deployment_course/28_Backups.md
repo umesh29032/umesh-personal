@@ -33,6 +33,49 @@ A Docker volume ([Ch 20](20_Docker_Volumes.md)) protects `pgdata` against *conta
 - **Static / code** = in git, reproducible → **NO**.
 - **Redis** = ephemeral cache/counters → **NO** ([Ch 22](22_Redis.md)).
 
+### What a "dump" actually IS — open one and look
+Before the tool, the artefact. A **database dump** is an ordinary **text file full of SQL
+statements** that, when replayed, rebuilds the database from nothing. Not a photo of the
+data — the **instructions to recreate it**. Two halves, always in this order:
+
+**1. The shape** — `CREATE TABLE` statements, so the empty structure exists first:
+```sql
+CREATE TABLE public.accounts_user (
+    id bigint NOT NULL,
+    password character varying(128) NOT NULL,   -- the stored hash
+    email character varying(254) NOT NULL,
+    salary numeric(10,2)
+);
+```
+
+**2. The contents** — a `COPY … FROM stdin` block, then one row per line, tab-separated:
+```sql
+COPY public.accounts_user (id, password, email, salary) FROM stdin;
+1	pbkdf2_sha256$1000000$3ukT81…$etmD3r…=	umesh@example.com	1000.00
+\.
+```
+
+Open any dump in a text editor and you can **read every row of your database**. That is the
+whole point — and the whole danger (see *Security Considerations*).
+
+The top of the file names the tool and version that made it, which is how you identify a
+stray dump you find lying around:
+```
+-- PostgreSQL database dump
+-- Dumped from database version 14.18 (Ubuntu 14.18-0ubuntu0.22.04.1)
+-- Dumped by pg_dump version 14.18
+```
+
+**Reading a filename.** `mydb_backup_20250620.sql` decodes as `mydb` (which database) +
+`backup` + `20250620` (**2025-06-20**, the date it was taken) + `.sql` (plain SQL text).
+Dated filenames are convention, not magic: `pg_dump` writes whatever name you pass it, so
+the date is only as honest as the person who typed it. Prefer letting a script stamp it
+(`$(date +%F)`) over typing it by hand.
+
+> 💡 **Samjho aise:** Dump = **ghar banane ki poori likhi hui vidhi** — pehle deewaar
+> (`CREATE TABLE`), phir andar ka saaman (`COPY`). Photo nahi hai, **nuskha** hai. Isliye
+> notepad mein khol ke saara data padha ja sakta hai — apna bhi, aur chori karne wale ka bhi.
+
 ### `pg_dump` (logical backup)
 `pg_dump` exports the database as a restorable file. The **custom format** (`-Fc`) is compressed and lets `pg_restore` do selective/parallel restores. A logical dump is portable across minor version differences and easy to verify — ideal for a single-VPS deploy. (Contrast: physical/PITR backups via WAL archiving — more powerful, more complex; overkill here.)
 
@@ -127,6 +170,15 @@ docker compose exec backup sh -c '. /srv/backup.sh; run_backup'   # runs one cyc
 - Encrypt at rest and in transit; restrict who can read the backup location.
 - Test restores in an isolated environment, never against production.
 - A stolen backup is a full data breach even if the server was never touched.
+- **Never commit a dump to git.** A dump is plaintext, so `git add` publishes every row —
+  emails, password hashes, session keys, and any OAuth client secret sitting in
+  `socialaccount_socialapp`. Worse, git history is **append-only**: deleting the file in a
+  later commit leaves it fully readable in every earlier commit, so `git rm` alone is not a
+  fix. Removing it for real means rewriting history (`git-filter-repo` + a force-push).
+  Prevent instead — a `*.sql` / `*.dump` line in `.gitignore` costs nothing and closes the
+  hole permanently. *(This repo learned it the hard way: two June-2025 dumps from an old
+  practice app sat in public history. Audited — OAuth tables empty, hashes 1,000,000-iteration
+  pbkdf2, sessions long expired, so exposure was mild — but the lesson stands.)*
 
 # Architecture Decisions
 - **Database and media together**, because the database stores paths and the disk stores bytes.
@@ -149,6 +201,9 @@ docker compose exec backup sh -c '. /srv/backup.sh; run_backup'   # runs one cyc
 - **No integrity check** → silent repo corruption discovered only when you desperately need it. Weekly `restic check`.
 - **No failure alerting** → backups silently stop; you find out during a disaster. Watch the `FAILED` log line ([Ch 30](30_Monitoring.md)).
 - **Backing up media read-write** → a buggy backup could mangle live uploads; mount `:ro`.
+- **Committing the dump to git** → a `.sql` file is plaintext, so the repo now publishes every
+  email and password hash, and history keeps it even after you delete the file. `.gitignore`
+  `*.sql` from day one; keep dumps in a backup directory that git never sees.
 
 # Interview Questions
 - **Junior:** "What do you back up and how often?" — Postgres (the business data) and the media uploads, nightly, encrypted, to off-site storage — RPO ≤ 24h. Static/code aren't backed up (they're in git).
