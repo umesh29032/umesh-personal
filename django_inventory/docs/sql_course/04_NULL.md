@@ -233,3 +233,8 @@ NULL is a *policy* on the live system, not an accident:
 # Further Reading & Live Resources
 - [Modern SQL on NULL](https://modern-sql.com/concept/null) — best short treatment on the internet
 - [Postgres: comparison & NULL](https://www.postgresql.org/docs/current/functions-comparison.html)
+- [Postgres docs — Functions and operators: comparison](https://www.postgresql.org/docs/current/functions-comparison.html) — `IS NULL`, `IS DISTINCT FROM`, and three-valued logic
+- [Postgres docs — `coalesce`, `nullif`](https://www.postgresql.org/docs/current/functions-conditional.html) — the two functions that make NULL manageable
+- [Postgres docs — partial indexes](https://www.postgresql.org/docs/current/indexes-partial.html) — the fix for "UNIQUE accepts many NULLs"
+- [Django docs — `null` vs `blank`](https://docs.djangoproject.com/en/5.0/ref/models/fields/#null) — the distinction that confuses every Django beginner exactly once
+- Sibling chapter: [08 — GROUP BY & Aggregates](08_GROUP_BY_And_Aggregates.md) — where NULL silently changes your averages

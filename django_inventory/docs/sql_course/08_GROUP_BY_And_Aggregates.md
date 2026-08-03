@@ -252,3 +252,7 @@ This chapter *is* the payroll reporting layer:
 - [PgExercises: aggregates](https://pgexercises.com/questions/aggregates/) — do all of these
 - [Postgres aggregate functions](https://www.postgresql.org/docs/current/functions-aggregate.html)
 - [Mode: SQL aggregate functions](https://mode.com/sql-tutorial/sql-aggregate-functions/)
+- [Postgres docs — Aggregate functions](https://www.postgresql.org/docs/current/functions-aggregate.html) — including `FILTER`, which replaces most `CASE WHEN` sums
+- [Postgres docs — GROUP BY / HAVING](https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-GROUP) — why `HAVING` is not just a second `WHERE`
+- [Modern SQL — GROUPING SETS, ROLLUP, CUBE](https://modern-sql.com/feature/grouping-sets) — subtotals without three queries
+- Sibling chapter: [10 — Window Functions](10_Window_Functions.md) — when you need the aggregate *and* the row

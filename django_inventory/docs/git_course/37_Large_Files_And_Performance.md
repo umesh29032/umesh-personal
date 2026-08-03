@@ -200,7 +200,7 @@ count: 4873            size: 26.19 MiB       ← loose
 in-pack: 25975         size-pack: 63.66 MiB  ← packed, 2 packs
 ```
 
-**`.git` is 97 MB** while the tracked working tree is a few MB of Python, templates and markdown. The
+**`.git` is 97 MB** *(2026-08-03 snapshot — [why your number differs](00_COURSE_OVERVIEW.md#about-the-numbers-in-this-course--read-this-once))* while the tracked working tree is a few MB of Python, templates and markdown. The
 gap is history — and specifically, history that includes things which never belonged in git.
 
 ### The two real offenders, both from the sibling project

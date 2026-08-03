@@ -255,3 +255,8 @@ Types are why the audit could prove ₹18,254.25 to the paisa on the live system
 - [Postgres numeric types](https://www.postgresql.org/docs/current/datatype-numeric.html)
 - [0.30000000000000004.com](https://0.30000000000000004.com/) — the float lie, visualised, every language
 - [Postgres date/time types](https://www.postgresql.org/docs/current/datatype-datetime.html)
+- [Postgres docs — Numeric types](https://www.postgresql.org/docs/current/datatype-numeric.html) — the exact precision/scale rules for `numeric`
+- [Postgres docs — Date/Time types](https://www.postgresql.org/docs/current/datatype-datetime.html) — `timestamp` vs `timestamptz`, from the source
+- [Floating-point guide — why 0.1 + 0.2 ≠ 0.3](https://floating-point-gui.de/) — the arithmetic behind "never float for money"
+- [Django docs — DecimalField](https://docs.djangoproject.com/en/5.0/ref/models/fields/#decimalfield) — how this project declares money
+- Sibling chapter: [12 — Append-Only Money](12_Append_Only_Money.md) — the right type is necessary but nowhere near sufficient

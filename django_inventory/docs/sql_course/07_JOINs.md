@@ -272,3 +272,7 @@ When a JOIN result looks wrong, in this order:
 - [Visual JOIN explainer](https://joins.spathon.com/) — drag the circles, see the rows
 - [PgExercises: joins](https://pgexercises.com/questions/joins/) — the best free drills
 - [Postgres JOIN docs](https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-JOIN)
+- [Postgres docs — Joins between tables](https://www.postgresql.org/docs/current/tutorial-join.html) — the official walkthrough
+- [Use The Index, Luke — join operations](https://use-the-index-luke.com/sql/join) — nested loop vs hash vs merge join, and when each is chosen
+- [Postgres docs — `LATERAL`](https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-LATERAL) — the join people reach for once they know it exists
+- Sibling chapter: [16 — ORM to SQL & N+1](16_ORM_To_SQL_And_N_Plus_1.md) — `select_related` is a join; `prefetch_related` is not

@@ -33,7 +33,7 @@ $ git diff --stat main...new_flask_app | tail -1
  5040 files changed, 336453 insertions(+), 331748 deletions(-)
 ```
 
-296 commits, 5,040 files. Nobody reviews that. A human scrolls for ninety seconds, feels guilty, and types **LGTM** — a lie with a timestamp on it, attached to the change forever. That is not the reviewer's discipline failing; the **author** built an unreviewable object.
+296 commits, 5,040 files (snapshot 2026-08-03). Nobody reviews that. A human scrolls for ninety seconds, feels guilty, and types **LGTM** — a lie with a timestamp on it, attached to the change forever. That is not the reviewer's discipline failing; the **author** built an unreviewable object.
 
 This project has already paid for a missed review. A bug wrote `entry_date` in UTC instead of IST inside the **primary settlement path** (`django_inventory/config/expense/services/adda_settlement_service.py`, lines 438 and 448) — a money record filed under the wrong day. Tests were green: they asserted the *amount*, which was right. One reviewer question — *"which day is that, in whose timezone?"* — catches it in ten seconds.
 

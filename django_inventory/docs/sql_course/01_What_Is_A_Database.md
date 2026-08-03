@@ -239,3 +239,7 @@ Same three words, on the live server:
 - [SQLBolt — interactive lessons](https://sqlbolt.com/) — do lessons 1–2 today
 - [Postgres official tutorial, ch 1](https://www.postgresql.org/docs/current/tutorial-start.html)
 - [psql cheat sheet](https://www.postgresqltutorial.com/postgresql-administration/psql-commands/)
+- [Postgres docs — Architectural Fundamentals](https://www.postgresql.org/docs/current/tutorial-arch.html) — the client/server split this chapter describes, from the source
+- [Use The Index, Luke — anatomy of an SQL query](https://use-the-index-luke.com/sql/anatomy) — what the server does between receiving text and returning rows
+- [Designing Data-Intensive Applications, ch 1–2](https://dataintensive.net/) — the standard reference on when a relational model fits and when it does not (book; ch 1–2 are the relevant part)
+- Sibling course: [Deployment ch 21 — PostgreSQL](../deployment_course/21_PostgreSQL.md) — the same database, seen as a thing you have to run and back up

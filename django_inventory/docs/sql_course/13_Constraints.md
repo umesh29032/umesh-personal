@@ -282,3 +282,8 @@ The live schema carries **137 CHECK constraints and 271 foreign keys**. What the
 - [Postgres constraints docs](https://www.postgresql.org/docs/current/ddl-constraints.html) — readable, with examples
 - [Postgres ALTER TABLE (NOT VALID / VALIDATE)](https://www.postgresql.org/docs/current/sql-altertable.html)
 - [Django constraints](https://docs.djangoproject.com/en/5.0/ref/models/constraints/)
+- [Postgres docs — Constraints](https://www.postgresql.org/docs/current/ddl-constraints.html) — CHECK, NOT NULL, UNIQUE, EXCLUDE, foreign keys
+- [Postgres docs — `EXCLUDE` constraints](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-CONSTRAINT) — how to forbid overlapping ranges (e.g. two operators holding one machine)
+- [Django docs — `constraints` Meta option](https://docs.djangoproject.com/en/5.0/ref/models/constraints/) — `CheckConstraint` and `UniqueConstraint`, as this project declares them
+- [Django 5.1 release notes — `CheckConstraint.condition`](https://docs.djangoproject.com/en/5.1/releases/5.1/) — the rename from `check=`, and why this project pins 5.0 until 71 call sites are migrated
+- Sibling chapter: [19 — Migrations](19_Migrations.md) — a constraint is only real once its migration has run

@@ -274,3 +274,8 @@ WHERE u.email='a2.cm1@audit.local' ORDER BY l.id;
 - [Martin Fowler: Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) — the general form of this idea
 - [Martin Fowler: Accounting patterns (Ledger)](https://martinfowler.com/eaaDev/AccountingNarrative.html)
 - [Postgres: transactions](https://www.postgresql.org/docs/current/tutorial-transactions.html) — the mechanism the gate relies on (ch 17)
+- [Martin Fowler — Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html) — the general pattern behind an append-only ledger
+- [Postgres docs — Transactions & isolation](https://www.postgresql.org/docs/current/transaction-iso.html) — what actually protects a two-row money write
+- [Postgres docs — advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS) — the mechanism this project uses to serialise settlement
+- [Django docs — `select_for_update`](https://docs.djangoproject.com/en/5.0/ref/models/querysets/#select-for-update) — row locking from the ORM
+- Sibling course: [Git ch 33 — Secrets & Leaks](../git_course/33_Secrets_And_Leaks.md) — why a database dump of this ledger is a breach in one file

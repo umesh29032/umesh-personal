@@ -218,3 +218,7 @@ Every list screen in the ERP is one of these underneath:
 - [SQLBolt lessons 1–6](https://sqlbolt.com/) — interactive, exactly this material
 - [Postgres SELECT reference](https://www.postgresql.org/docs/current/sql-select.html) — dense but authoritative
 - [Mode SQL tutorial: basics](https://mode.com/sql-tutorial/sql-select-statement/)
+- [Postgres docs — SELECT](https://www.postgresql.org/docs/current/sql-select.html) — the full grammar, including clause evaluation order
+- [Use The Index, Luke — the WHERE clause](https://use-the-index-luke.com/sql/where-clause) — why *how* you filter decides whether an index can help
+- [Modern SQL — `FETCH FIRST` vs `LIMIT`](https://modern-sql.com/feature/fetch-first) — the portable form, and why `LIMIT` without `ORDER BY` is undefined
+- Sibling chapter: [15 — EXPLAIN & the Planner](15_EXPLAIN_And_The_Planner.md) — see what your SELECT actually does

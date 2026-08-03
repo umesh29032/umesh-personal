@@ -42,7 +42,7 @@ git rev-list --count main..new_flask_app          # 296
 git rev-list --count origin/main..new_flask_app   # 1
 ```
 
-**296 versus 1.** Same repo, same syntax, one wrong by a factor of 296. Nothing was broken. Local
+**296 versus 1.** *(2026-08-03 snapshot — [why your number differs](00_COURSE_OVERVIEW.md#about-the-numbers-in-this-course--read-this-once))* Same repo, same syntax, one wrong by a factor of 296. Nothing was broken. Local
 `main` was five commits behind the merge, because **nothing had moved it**. `git fetch` had
 updated `origin/main`; local `main` was exactly where it had been left weeks earlier.
 

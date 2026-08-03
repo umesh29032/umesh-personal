@@ -237,3 +237,8 @@ The same 115 tables exist on the server — created by the identical migration h
 # Further Reading & Live Resources
 - [SQLBolt lesson on tables](https://sqlbolt.com/lesson/introduction)
 - [Postgres docs: table basics](https://www.postgresql.org/docs/current/ddl-basics.html)
+- [Postgres docs — Constraints](https://www.postgresql.org/docs/current/ddl-constraints.html) — primary keys, foreign keys, and what each one actually enforces
+- [Postgres docs — Inheritance & partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html) — where "one table" stops being one table
+- [Django docs — Models](https://docs.djangoproject.com/en/5.0/topics/db/models/) — how the tables in this chapter are declared in this project
+- [Modern SQL — surrogate vs natural keys](https://modern-sql.com/concept/surrogate-key) — the choice this chapter makes, argued properly
+- Sibling chapter: [13 — Constraints](13_Constraints.md) — keys are constraints; this is the rest of the family

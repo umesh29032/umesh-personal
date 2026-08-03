@@ -46,6 +46,54 @@ verified: 2026-08-03
    **[CONTRIBUTING.md](../../../CONTRIBUTING.md)**. The course is the *why*; that file is
    the *law*.
 
+## About the numbers in this course — read this once
+
+Every figure here was **measured against this repository**, not invented. That is the
+course's main strength and its one maintenance hazard, so it is worth being explicit about
+which numbers are permanent and which are snapshots.
+
+**Permanent facts.** These are frozen history and will never change:
+
+| Fact | Value |
+|---|---|
+| PR #15's size when it merged | **289 commits**, ~2,100 files, 336,372 insertions |
+| The merge commit it produced | `83a144ba`, with two parent lines |
+| Its feature-branch parent (`^2`) | `7fe2bb0e` |
+| The dump-cleanup commit | `42a2ecc4` — **2,954** files untracked, 331,748 deletions, 0 bytes lost |
+| Release tag | `erp-v1.0.0` = `90c1f2f3` |
+| The leaked dumps' contents | 3 emails · 2 × `pbkdf2_sha256$1000000$` · OAuth tables empty · sessions expired |
+| `printf 'blob 10\0hello git\n' \| sha1sum` | `8d0e41234f24b6da002d962a26c2495ea16a425f` — arithmetic, true forever |
+
+**Snapshots, measured 2026-08-03.** These move whenever anyone commits, pushes or runs
+`git gc`. They are quoted because a concrete number teaches far better than "some commits",
+**not** because the digit itself matters:
+
+| Snapshot | Value on 2026-08-03 | Re-derive it yourself |
+|---|---|---|
+| local `main` behind the remote | 295 | `git rev-list --left-right --count main...origin/main` |
+| stale-`main` divergence | 296 | `git rev-list --count main..new_flask_app` |
+| the honest divergence | 1 | `git rev-list --count origin/main..new_flask_app` |
+| `.git` size | 97 MB | `du -sh .git` |
+| loose / packed objects | 4,873 / 25,975 | `git count-objects -vH` |
+| test battery | 2,035 tests / 422 s | `manage.py test <14 apps>` |
+
+**If your numbers differ, nothing is wrong — that is the subject of
+[Chapter 18](18_Remotes.md).** Refs move; a snapshot is a photograph, not a promise. The
+*lesson* attached to each number is what you are meant to keep:
+
+- **296 versus 1** is not about 296. It is that a range query answers the question you
+  *actually asked* — and `main` is not `origin/main`.
+- **97 MB unchanged after untracking 2,954 files** is not about 97. It is that history is
+  append-only, so `git rm --cached` reclaims nothing.
+- **289 commits** is not about 289. It is that a branch left to live becomes unreviewable.
+
+> 💡 **Samjho aise:** yahaan ke number **naapey gaye** hain, banaye nahi. Par kuch number
+> **pakke** hain (PR #15 ki 289 commits — wo itihaas hai, kabhi nahi badlega) aur kuch
+> **aaj ki photo** hain (296, 97 MB — koi bhi commit karega toh badal jaayenge).
+>
+> Tumhara number alag aaye? **Kuch galat nahi hai** — wahi to Chapter 18 ka poora sabaq
+> hai. Number yaad rakhne ki cheez nahi; uske saath juda **sabaq** yaad rakho.
+
 ## The five parts
 
 | Part | Chapters | What you get |

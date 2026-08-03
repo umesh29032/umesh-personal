@@ -212,7 +212,7 @@ git rev-list --count main..new_flask_app          # 296   ← against STALE loca
 git rev-list --count origin/main..new_flask_app   # 1     ← the truth
 ```
 
-**296 versus 1.** Same syntax, same repo, one wrong by a factor of 296.
+**296 versus 1.** *(2026-08-03 snapshot — [why your number differs](00_COURSE_OVERVIEW.md#about-the-numbers-in-this-course--read-this-once))* Same syntax, same repo, one wrong by a factor of 296.
 
 Nothing is broken. `main` is a **local pointer** and nothing updates it automatically. The merge
 happened on GitHub, so `origin/main` moved when I fetched; local `main` stayed where it was last

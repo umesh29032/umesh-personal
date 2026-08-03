@@ -255,3 +255,7 @@ SELECT count(*) FROM unused;    -- safe here only because product_id is NOT NULL
 - [Postgres WITH / CTE docs](https://www.postgresql.org/docs/current/queries-with.html)
 - [Modern SQL: WITH](https://modern-sql.com/feature/with) — including the materialisation history
 - [PgExercises: aggregates & subqueries](https://pgexercises.com/questions/aggregates/)
+- [Postgres docs — WITH queries (CTEs)](https://www.postgresql.org/docs/current/queries-with.html) — including recursive CTEs and `MATERIALIZED`
+- [Postgres 12 release notes — CTEs are no longer always materialised](https://www.postgresql.org/docs/12/release-12.html) — the change that made "CTEs are slow" outdated advice
+- [Use The Index, Luke — `NOT IN` and NULL](https://use-the-index-luke.com/sql/where-clause/null) — why `NOT EXISTS` is the safe form
+- Sibling chapter: [04 — NULL](04_NULL.md) — the reason `NOT IN` can return zero rows without erroring

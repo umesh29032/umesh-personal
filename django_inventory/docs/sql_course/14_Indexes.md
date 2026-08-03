@@ -294,3 +294,8 @@ FROM pg_stat_user_indexes ORDER BY idx_scan ASC LIMIT 10;
 - [Use The Index, Luke](https://use-the-index-luke.com/) — the free book; read the first three chapters slowly
 - [Postgres index types](https://www.postgresql.org/docs/current/indexes-types.html)
 - [Postgres CREATE INDEX (incl. CONCURRENTLY)](https://www.postgresql.org/docs/current/sql-createindex.html)
+- [Use The Index, Luke](https://use-the-index-luke.com/) — the best free book on indexing, full stop
+- [Postgres docs — Index types](https://www.postgresql.org/docs/current/indexes-types.html) — B-tree, hash, GiST, GIN, BRIN, and when each earns its keep
+- [Postgres docs — Indexes and ORDER BY / multicolumn](https://www.postgresql.org/docs/current/indexes-ordering.html) — why column order in a composite index decides whether it is used
+- [Postgres docs — `CREATE INDEX CONCURRENTLY`](https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY) — adding an index without locking writes in production
+- Sibling chapter: [15 — EXPLAIN & the Planner](15_EXPLAIN_And_The_Planner.md) — proving an index is actually used, instead of hoping

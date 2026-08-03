@@ -130,7 +130,7 @@ $ git branch -vv
 $ git rev-list --left-right --count main...origin/main
 0	295
 ```
-Local `main` has **0** commits the remote lacks and is **295** behind. Note `main` has no `[upstream]` in `branch -vv` above — no link is configured, so git prints no ahead/behind for it and you must ask explicitly.
+Local `main` has **0** commits the remote lacks and is **295** behind. *(2026-08-03 snapshot — [why your number differs](00_COURSE_OVERVIEW.md#about-the-numbers-in-this-course--read-this-once))* Note `main` has no `[upstream]` in `branch -vv` above — no link is configured, so git prints no ahead/behind for it and you must ask explicitly.
 
 **Tags** are refs that do not move. A *lightweight* tag is just a ref pointing at a commit. An **annotated** tag (`git tag -a`, which `CONTRIBUTING.md` §7 requires) creates a whole **tag object** — with its own author, date and message — and the ref points at *that*. So a tag name can resolve to something that is not a commit:
 

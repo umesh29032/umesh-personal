@@ -242,7 +242,7 @@ One thing CI cannot re-check: `pre-commit` and `commit-msg` hooks do **not** run
 - Undo: `--abort` (during) · `reset --hard ORIG_HEAD` (after) · `git reflog` (always, ~90 days).
 - Push with **`--force-with-lease`**; plain `--force` is banned by `CONTRIBUTING.md` §10.
 - Rebase runs **no** `pre-commit`/`commit-msg` hooks and keeps **no** GPG signature.
-- 296 commits on `new_flask_app` = 296 replays. Short branches *are* a rebase strategy.
+- 296 commits on `new_flask_app` = 296 replays (snapshot 2026-08-03). Short branches *are* a rebase strategy.
 
 # Cheat Sheet
 - **Where did we diverge:** `git merge-base main HEAD` · **how many:** `git rev-list --count origin/main..HEAD`
