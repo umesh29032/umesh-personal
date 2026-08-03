@@ -200,6 +200,17 @@ class PreDeploySafetyTests(TestCase):
         c.refresh_from_db()
         self.assertIsNone(c.verified_quantity)
 
+    def test_verify_non_numeric_rejected_gracefully(self):
+        # PA-07-2: a non-numeric verified value (tampered/locale-comma in the review
+        # form) must raise ValidationError (caught by the review view), NOT a bare
+        # decimal.InvalidOperation → 500.
+        from production.services.worker_task_service import set_verified_quantity
+        self._complete()
+        c = self.task.contributions.get()
+        for bad in ('abc', '1,5', '1.2.3'):
+            with self.assertRaises(ValidationError):
+                set_verified_quantity(c, bad, actor=self.mgmt)
+
     def test_verify_refused_after_settlement(self):
         from production.services.worker_task_service import set_verified_quantity
         from expense.services.adda_settlement_service import (

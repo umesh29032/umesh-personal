@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-adda-creation
+type: request-journey
+status: active
+owner: handwritten
+scope: adda_creation (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Adda Creation (one-click batch start)
 
 > **TL;DR** — Owner picks a product; one POST → `adda_service.create_adda` opens

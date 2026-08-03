@@ -47,7 +47,7 @@ Renders: file input + crop modal + card-size preview
             Preview ({{ widget.target_width }}&times;{{ widget.target_height }}px)
         </label>
         <div class="cw-preview-box"
-             style="width:{{ widget.preview_width }}px; height:{{ widget.preview_height }}px;
+             style="width:100%; max-width:{{ widget.preview_width }}px; aspect-ratio:{{ widget.preview_width }}/{{ widget.preview_height }}; height:auto;
                     border:2px dashed #e2d5c3; border-radius:10px; overflow:hidden;
                     background:#f5ede0; display:flex; align-items:center; justify-content:center;
                     position:relative;">

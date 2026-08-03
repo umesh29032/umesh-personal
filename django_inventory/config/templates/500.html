@@ -1,0 +1,50 @@
+{% comment %}
+  500 — server error. Rendered by django.views.defaults.server_error (handler500)
+  ONLY when DEBUG=False. MUST be self-contained: server_error renders with an
+  EMPTY context (no context processors, no DB) — so NO template tags that touch
+  the request/DB/{% url %}, NO base.html inheritance. Inline CSS only. A 500 page
+  that itself errors is worse than no page (P0-2 / RC-7).
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Something went wrong — Kapil Enterprises</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #f5ede0; color: #0e0b09; padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .card {
+      max-width: 480px; width: 100%; background: #faf7f2; border: 1px solid #e2d5c3;
+      border-radius: 16px; padding: 40px 32px; text-align: center;
+      box-shadow: 0 8px 30px rgba(14,11,9,0.08);
+    }
+    .mark {
+      width: 52px; height: 52px; margin: 0 auto 22px; border-radius: 12px;
+      background: linear-gradient(160deg, #b87333, #8a5520); color: #faf7f2;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; letter-spacing: .04em; font-size: 18px;
+    }
+    .code { font-size: 13px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: #b87333; }
+    h1 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 30px; margin: 8px 0 12px; }
+    p { color: #7a6a58; line-height: 1.6; font-size: 15px; margin: 0 0 26px; }
+    a.btn {
+      display: inline-block; background: #b87333; color: #faf7f2; text-decoration: none;
+      padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">KE</div>
+    <div class="code">Error 500</div>
+    <h1>Something went wrong</h1>
+    <p>An unexpected error occurred on our side. The issue has been logged. Please try again in a moment — if it keeps happening, tell your administrator.</p>
+    <a class="btn" href="/">Back to home</a>
+  </main>
+</body>
+</html>

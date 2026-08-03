@@ -1,0 +1,52 @@
+{% extends "accounts/base.html" %}
+{# FE-1: composed from the SKILLS CRUD canon — .page-header + .card.card-clip +
+   stacked-table standard (.table-responsive + td[data-label]) + badge family.
+   One template serves Stage Categories + Machine Types (masters). #}
+{% block page_title %}{{ master_title }}{% endblock %}
+
+{% block content %}
+<div class="master-list">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1>{{ master_title }}</h1>
+      <p>{{ master_sub }}</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="btn btn-ghost" href="{% url back_url %}">← Stages</a>
+      {% if can_add %}<a class="btn btn-primary" href="{% url add_url %}">+ Add</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="card card-clip">
+    <div class="table-responsive">
+      <table class="tbl">
+        <thead>
+          <tr><th>Name</th><th>Code</th>{% if show_order %}<th>Order</th>{% endif %}
+              <th>Used by</th><th>Status</th>{% if can_change %}<th></th>{% endif %}</tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td data-label="Name"><strong>{{ r.name }}</strong></td>
+            <td data-label="Code"><code>{{ r.code }}</code></td>
+            {% if show_order %}<td data-label="Order">{{ r.display_order }}</td>{% endif %}
+            <td data-label="Used by">{{ r.usage }} stage{{ r.usage|pluralize }}</td>
+            <td data-label="Status">
+              {% if r.is_active %}<span class="badge badge-active">Active</span>
+              {% else %}<span class="badge badge-inactive">Inactive</span>{% endif %}
+            </td>
+            {% if can_change %}
+            <td data-label="Actions" class="td-actions">
+              <a class="action-link" href="{% url edit_url r.pk %}">✎ Edit</a>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="6"><div class="empty-state"><p>Nothing yet — add the first one.</p></div></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,3 +1,13 @@
+---
+id: l2-project-brain-debugging-index
+type: topic-canonical
+status: active
+owner: handwritten
+scope: navigation index
+anchors: —
+verified: 2026-07-13
+---
+
 # DEBUGGING INDEX — symptom → where to look first
 
 ## TL;DR

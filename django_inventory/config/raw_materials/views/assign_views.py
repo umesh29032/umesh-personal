@@ -19,10 +19,10 @@ from raw_materials.forms import AssignRollForm
 from raw_materials.models import ClothRoll
 from raw_materials.services import assign_roll_to_adda
 
-from .mixins import ProductionRoleMixin
+from .mixins import ManagementRoleMixin, ProductionRoleMixin
 
 
-class RollAssignView(LoginRequiredMixin, ProductionRoleMixin, FormView):
+class RollAssignView(LoginRequiredMixin, ManagementRoleMixin, FormView):
     template_name = 'raw_materials/roll_assign_form.html'
     form_class = AssignRollForm
 

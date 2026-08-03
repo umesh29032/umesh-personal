@@ -1,0 +1,827 @@
+{% extends "accounts/base.html" %}
+{# ROADMAP_V2 Phase 4 workspace + Phase 5 M3 optimize UI. Vanilla JS,
+   page-scoped; client numbers are DISPLAY ONLY — the server verifier is
+   authoritative. M3 UI rules: everything inline (no dialogs/wizards),
+   instant, zero surprises (only Preview/Return/Keep/Save change things),
+   minimal visuals (no animations). #}
+{% block page_title %}Layout editor — #{{ c.pk }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-ws { --wsbg:#f3efe4; }
+  .pai-ws .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    background:#fff; border:var(--border-card,1px solid #e5e0d5);
+    border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .pai-ws .toolbar .grp { display:flex; gap:6px; align-items:center; }
+  .pai-ws .toolbar label { font-size:12px; color:#555; }
+  .pai-ws .toolbar input[type=text] { width:84px; }
+  .pai-ws .toolbar input.narrow { width:52px; }
+  .pai-ws .tbtn { padding:6px 10px; border-radius:8px; border:1px solid #d8d2c2;
+    background:#faf7ee; cursor:pointer; font-size:13px; }
+  .pai-ws .tbtn.on { background:#2e6e4e; color:#fff; border-color:#2e6e4e; }
+  .pai-ws .tbtn:disabled { opacity:0.5; cursor:default; }
+  .pai-ws .selchip { background:#e3ecfa; color:#2a4d86; border-radius:10px;
+    padding:4px 10px; font-size:12px; }
+  .pai-ws .rotnote { font-size:12px; color:#777; }
+  .pai-ws #optmsg { color:#a33; font-size:13px; margin:4px 2px; min-height:16px; }
+  .pai-ws #canvas-wrap { background:var(--wsbg); border:var(--border-card,1px solid #e5e0d5);
+    border-radius:12px; overflow:hidden; position:relative; touch-action:none; }
+  .pai-ws #ws { display:block; width:100%; height:58vh; cursor:grab; }
+  .pai-ws #ws.panning { cursor:grabbing; }
+  .pai-ws .piece { cursor:move; }
+  .pai-ws .piece polygon { fill:#e8d9b8; stroke:#6d5a33; stroke-width:1;
+    vector-effect:non-scaling-stroke; }
+  .pai-ws .piece.sel polygon { stroke:#1d4ed8; stroke-width:2; }
+  .pai-ws .piece.locked { cursor:not-allowed; }
+  .pai-ws .piece.locked polygon { fill:#d7dceb; stroke-dasharray:5 3; }
+  .pai-ws .piece.colliding polygon { fill:#f3c1b8; stroke:#a33; stroke-width:2; }
+  .pai-ws.previewing .piece { cursor:default; }
+  .pai-ws .metrics { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; }
+  .pai-ws .metric { background:#fff; border:var(--border-card,1px solid #e5e0d5);
+    border-radius:10px; padding:8px 12px; font-size:13px; }
+  .pai-ws .metric strong { font-size:16px; }
+  .pai-ws .metric.bad { border-color:#a33; color:#a33; }
+  .pai-ws .hint { font-size:12px; color:#777; }
+  .pai-ws .guide { stroke:#1d4ed8; stroke-width:1; stroke-dasharray:6 4;
+    vector-effect:non-scaling-stroke; cursor:move; }
+  /* ── M3 options strip (simple cards, no animations) ── */
+  .pai-ws #strip { display:none; gap:10px; overflow-x:auto; padding:10px;
+    background:#fff; border:var(--border-card,1px solid #e5e0d5);
+    border-radius:12px; margin-bottom:8px; }
+  .pai-ws #strip.open { display:flex; }
+  .pai-ws .opt { min-width:180px; max-width:200px; border:1px solid #d8d2c2;
+    border-radius:10px; padding:8px; background:#faf7ee; cursor:pointer;
+    flex:0 0 auto; }
+  .pai-ws .opt.active { border:2px solid #1d4ed8; }
+  .pai-ws .opt h4 { margin:0 0 4px; font-size:13px; }
+  .pai-ws .opt svg { width:100%; height:70px; background:#fff;
+    border:1px solid #eee; display:block; }
+  .pai-ws .opt .nums { font-size:12px; color:#444; margin:4px 0; }
+  .pai-ws .opt .badge { display:inline-block; font-size:11px; font-weight:600;
+    border-radius:8px; padding:2px 6px; }
+  .pai-ws .b-better { background:#d9efe1; color:#20603c; }
+  .pai-ws .b-worse { background:#fbe9e7; color:#a33; }
+  .pai-ws .b-same { background:#eee; color:#555; }
+  .pai-ws .opt .keep { margin-top:6px; width:100%; }
+  .pai-ws #previewbar { display:none; background:#e3ecfa; color:#2a4d86;
+    border:1px solid #bcd0f0; border-radius:10px; padding:8px 12px;
+    font-size:13px; margin-bottom:8px; }
+  .pai-ws #previewbar.open { display:block; }
+  .pai-ws .ctx-strip { display:flex; flex-wrap:wrap; gap:6px;
+    margin:0 0 10px; }
+  .pai-ws .ctx-chip { font-size:12px; background:#f1f3f7; color:#444;
+    border:1px solid var(--border-subtle, #ddd); border-radius:999px;
+    padding:3px 10px; white-space:nowrap; }
+  .pai-ws .ctx-prod { background:#eef4ee; color:#2c5638; font-weight:600; }
+  .pai-ws .lsw-wrap { position:relative; }
+  .pai-ws .lsw-menu { display:none; position:absolute; top:calc(100% + 4px);
+    left:0; z-index:60; background:#fff; border:1px solid var(--border-card);
+    border-radius:10px; box-shadow:var(--shadow-card); min-width:240px;
+    padding:6px; max-height:60vh; overflow:auto; }
+  .pai-ws .lsw-menu.open { display:block; }
+  .pai-ws .lsw-item { display:block; padding:11px 12px; border-radius:8px;
+    font-size:13px; color:#333; text-decoration:none; white-space:nowrap; }
+  .pai-ws .lsw-item:hover { background:#f4f1ea; }
+  .pai-ws .lsw-item.cur { background:#eef4ee; font-weight:600; }
+  .pai-ws .lsw-item.lsw-new { color:#2a4d86; }
+  .pai-ws .lsw-sep { height:1px; background:var(--border-subtle, #ddd);
+    margin:4px 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-ws" id="pai-ws-root">
+  <div class="page-header">
+    <h1>Layout editor · #{{ c.pk }}</h1>
+    <p class="subtitle">Drag pieces · shift-click multi-select · R rotates
+    180° · L locks · ✨ Optimize rearranges only unlocked (or selected)
+    pieces · saving stores a verified layout.</p>
+  </div>
+
+  {# Rule D (§2b): read-only context — the user never wonders which product is open #}
+  <div class="ctx-strip">
+    <span class="ctx-chip ctx-prod">{{ product.name }} ({{ product.code }})</span>
+    <span class="ctx-chip">Layout #{{ c.pk }}{% if is_production %} · ★ Production{% endif %}</span>
+    {% if ratio_display %}<span class="ctx-chip">Ratio: {{ ratio_display }}</span>{% endif %}
+    <span class="ctx-chip">Fabric width: {{ width_mm }} mm</span>
+  </div>
+
+  <div class="toolbar">
+    {# Rule F (§2c): version-history switcher — ★ production → drafts newest-first → ＋ Generate New. Pure links (Rule I: opening a layout loads it, NOTHING else runs). #}
+    <div class="grp lsw-wrap">
+      <button class="tbtn" id="lswbtn" type="button">Layout ▾</button>
+      <div class="lsw-menu" id="lswmenu">
+        {% if production_pk %}
+        <a class="lsw-item {% if production_pk == c.pk %}cur{% endif %}"
+           href="{% url 'patterns_ai:workspace' production_pk %}">★ Production · #{{ production_pk }}</a>
+        <div class="lsw-sep"></div>
+        {% endif %}
+        {% for d in drafts %}
+        <a class="lsw-item {% if d == c.pk %}cur{% endif %}"
+           href="{% url 'patterns_ai:workspace' d %}">Draft · #{{ d }}</a>
+        {% endfor %}
+        {% if drafts %}<div class="lsw-sep"></div>{% endif %}
+        <a class="lsw-item lsw-new"
+           href="{% url 'patterns_ai:generate' %}?product={{ product.pk }}">＋ Generate New Layout</a>
+      </div>
+    </div>
+    <div class="grp">
+      <button class="tbtn" id="zin">＋</button>
+      <button class="tbtn" id="zout">－</button>
+      <button class="tbtn" id="zfit">Fit</button>
+    </div>
+    <div class="grp">
+      <button class="tbtn on" id="tgrid">Grid</button>
+      <button class="tbtn on" id="tsnap">Snap</button>
+      <button class="tbtn" id="addvg">+V guide</button>
+      <button class="tbtn" id="addhg">+H guide</button>
+    </div>
+    <div class="grp">
+      <label>Width mm <input type="text" id="fw" inputmode="numeric" value="{{ width_mm }}"></label>
+      <label>Height mm <input type="text" id="fh" inputmode="numeric" value="{{ height_mm }}"></label>
+    </div>
+    <div class="grp">
+      <button class="tbtn" id="rot">Rotate 180° (R)</button>
+      <button class="tbtn" id="lock">Lock/Unlock (L)</button>
+      <button class="tbtn" id="undo" disabled>↶ Undo</button>
+      <button class="tbtn" id="redo" disabled>↷ Redo</button>
+      <span class="selchip" id="selchip" style="display:none;">0 selected</span>
+    </div>
+    <span style="flex:1;"></span>
+    <a class="btn" href="{% url 'patterns_ai:candidate-detail' c.pk %}">← Details</a>
+    <form method="post" id="saveform" style="margin:0;">
+      {% csrf_token %}
+      <input type="hidden" name="placements" id="placements">
+      <input type="hidden" name="width_mm" id="save_w">
+      <input type="hidden" name="height_mm" id="save_h">
+      <button type="submit" class="btn btn-primary">💾 Save layout</button>
+    </form>
+  </div>
+
+  <div class="toolbar">
+    <div class="grp"><label>Layout options
+      <input type="text" class="narrow" id="opt_n" inputmode="numeric" value="3"></label></div>
+    <div class="grp"><label>Mode
+      <select id="opt_mode">
+        <option value="fast">Fast</option>
+        <option value="balanced" selected>Balanced</option>
+        <option value="best">Best</option>
+      </select></label></div>
+    <div class="grp"><label>Piece spacing mm
+      <input type="text" class="narrow" id="opt_spacing" inputmode="decimal" value="3"></label></div>
+    <span class="rotnote">Rotation: 0° / 180° (grain rule)</span>
+    <span style="flex:1;"></span>
+    <button class="tbtn" id="optimize">✨ Optimize</button>
+  </div>
+  <div id="optmsg"></div>
+
+  <div id="previewbar">Previewing <strong id="pv_name"></strong> — editing is
+    paused. <em>Keep this option</em> to adopt it, or click
+    <em>Current Layout</em> to return.</div>
+
+  <div id="strip"></div>
+
+  <div class="metrics">
+    <span class="metric"><strong id="m_len">—</strong> mm length</span>
+    <span class="metric"><strong id="m_util">—</strong>% utilization</span>
+    <span class="metric"><span id="m_waste">—</span>% wastage</span>
+    <span class="metric" id="m_fit_box"><span id="m_fit">—</span></span>
+    <span class="metric" id="m_coll_box"><span id="m_coll">0</span> collisions</span>
+    <span class="hint">numbers are live estimates — the server decides at
+      Optimize/Save</span>
+  </div>
+
+  <div id="canvas-wrap"><svg id="ws" xmlns="http://www.w3.org/2000/svg"></svg></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var raw = JSON.parse('{{ placements_json|escapejs }}');
+  var W = parseFloat(document.getElementById('fw').value);
+  var H = parseFloat(document.getElementById('fh').value);
+  var GRID = 10, SNAP_D = 8;
+  var root = document.getElementById('pai-ws-root');
+
+  // ---- piece model: IMMUTABLE base geometry (built once) + light
+  // transforms {dx,dy,rot,locked}. Undo history stores ONLY the
+  // transforms (rule 2: geometry referenced, never copied).
+  var pieces = [];
+  function buildPieces(placementList) {
+    pieces = placementList.map(function (p, i) {
+      var xs = p.polygon_mm.map(function (q) { return q[0]; });
+      var ys = p.polygon_mm.map(function (q) { return q[1]; });
+      var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+      var cy = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2;
+      return { key: p.key, instance: p.instance, mirrored: !!p.mirrored,
+               baseRot: p.rotation_deg || 0,
+               ring: p.polygon_mm.map(function (q) { return [q[0] - cx, q[1] - cy]; }),
+               dx: cx, dy: cy, rot: 0, locked: !!p.locked, el: null, id: i };
+    });
+  }
+  function area(r) {
+    var s = 0;
+    for (var i = 0; i < r.length; i++) {
+      var a = r[i], b = r[(i + 1) % r.length];
+      s += a[0] * b[1] - b[0] * a[1];
+    }
+    return Math.abs(s) / 2;
+  }
+  function worldRing(p) {
+    var k = p.rot === 180 ? -1 : 1;
+    return p.ring.map(function (q) { return [q[0] * k + p.dx, q[1] * k + p.dy]; });
+  }
+  function serialize() {
+    return pieces.map(function (p) {
+      return { key: p.key, instance: p.instance, mirrored: p.mirrored,
+               rotation_deg: (p.baseRot + p.rot) % 360, locked: p.locked,
+               polygon_mm: worldRing(p).map(function (q) {
+                 return [Math.round(q[0] * 1000) / 1000,
+                         Math.round(q[1] * 1000) / 1000]; }) };
+    });
+  }
+
+  // ---- layout state (transforms only) + history (M4) --------------------
+  function snapState() {
+    return pieces.map(function (p) {
+      return { dx: p.dx, dy: p.dy, rot: p.rot, locked: p.locked };
+    });
+  }
+  function applyState(st) {
+    pieces.forEach(function (p, i) {
+      p.dx = st[i].dx; p.dy = st[i].dy; p.rot = st[i].rot;
+      p.locked = st[i].locked;
+      p.el.classList.toggle('locked', p.locked);
+    });
+    render(true);
+  }
+  function statesEqual(a, b) {
+    for (var i = 0; i < a.length; i++)
+      if (a[i].dx !== b[i].dx || a[i].dy !== b[i].dy ||
+          a[i].rot !== b[i].rot || a[i].locked !== b[i].locked) return false;
+    return true;
+  }
+  // engine options only translate / rotate-180 the SAME shapes, so any
+  // returned placement maps onto the immutable base as pure transforms
+  function stateFromPlacements(pl) {
+    var byId = {};
+    pieces.forEach(function (p) { byId[p.key + '\u0000' + p.instance] = p; });
+    var st = snapState();
+    pl.forEach(function (item) {
+      var p = byId[item.key + '\u0000' + item.instance];
+      if (!p) return;
+      var xs = item.polygon_mm.map(function (q) { return q[0]; });
+      var ys = item.polygon_mm.map(function (q) { return q[1]; });
+      var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+      var cy = (Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2;
+      var rel = ((item.rotation_deg || 0) - p.baseRot + 360) % 360;
+      st[p.id] = { dx: cx, dy: cy, rot: rel === 180 ? 180 : 0,
+                   locked: !!item.locked };
+    });
+    return st;
+  }
+  var undoStack = [], redoStack = [];
+  var HIST_MAX = 100;
+  function committed() { return undoStack[undoStack.length - 1]; }
+  function pushHistory() {
+    var st = snapState();
+    if (undoStack.length && statesEqual(st, committed())) return;
+    undoStack.push(st);
+    if (undoStack.length > HIST_MAX) undoStack.shift();
+    redoStack.length = 0;                    // standard editor semantics
+    histButtons();
+  }
+  function histButtons() {
+    document.getElementById('undo').disabled =
+      previewing || undoStack.length <= 1;
+    document.getElementById('redo').disabled =
+      previewing || redoStack.length === 0;
+    root.dataset.undoDepth = String(undoStack.length);
+    root.dataset.redoDepth = String(redoStack.length);
+  }
+  function doUndo() {
+    if (previewing || undoStack.length <= 1) return;
+    redoStack.push(undoStack.pop());
+    applyState(committed()); histButtons();
+  }
+  function doRedo() {
+    if (previewing || !redoStack.length) return;
+    undoStack.push(redoStack.pop());
+    applyState(committed()); histButtons();
+  }
+
+  // ---- svg scaffolding ----------------------------------------------------
+  var svg = document.getElementById('ws');
+  var defs = document.createElementNS(NS, 'defs');
+  defs.innerHTML =
+    '<pattern id="g10" width="' + GRID + '" height="' + GRID + '" patternUnits="userSpaceOnUse">' +
+    '<path d="M ' + GRID + ' 0 L 0 0 0 ' + GRID + '" fill="none" stroke="#ddd5c2" stroke-width="0.5"/></pattern>' +
+    '<pattern id="g50" width="50" height="50" patternUnits="userSpaceOnUse">' +
+    '<rect width="50" height="50" fill="url(#g10)"/>' +
+    '<path d="M 50 0 L 0 0 0 50" fill="none" stroke="#c9bfa4" stroke-width="0.8"/></pattern>';
+  svg.appendChild(defs);
+  var gridRect = document.createElementNS(NS, 'rect');
+  gridRect.setAttribute('fill', 'url(#g50)');
+  svg.appendChild(gridRect);
+  var fabric = document.createElementNS(NS, 'rect');
+  fabric.setAttribute('fill', 'rgba(255,255,255,0.75)');
+  fabric.setAttribute('stroke', '#8a7648');
+  fabric.setAttribute('stroke-width', '1.5');
+  fabric.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(fabric);
+  var gGuides = document.createElementNS(NS, 'g');
+  var gPieces = document.createElementNS(NS, 'g');
+  svg.appendChild(gGuides); svg.appendChild(gPieces);
+
+  function mountPieces() {
+    while (gPieces.firstChild) gPieces.removeChild(gPieces.firstChild);
+    pieces.forEach(function (p) {
+      var g = document.createElementNS(NS, 'g');
+      g.setAttribute('class', 'piece');
+      var poly = document.createElementNS(NS, 'polygon');
+      var t = document.createElementNS(NS, 'title');
+      g.appendChild(poly); g.appendChild(t);
+      gPieces.appendChild(g);
+      p.el = g; p.polyEl = poly; p.titleEl = t;
+      g.addEventListener('pointerdown', function (e) { pieceDown(e, p); });
+      g.classList.toggle('locked', p.locked);
+    });
+  }
+
+  // ---- camera -------------------------------------------------------------
+  var cam = { x: -40, y: -40, w: 1200, h: 800 };
+  function applyCam() {
+    var box = svg.getBoundingClientRect();
+    cam.h = cam.w * box.height / box.width;
+    svg.setAttribute('viewBox', cam.x + ' ' + cam.y + ' ' + cam.w + ' ' + cam.h);
+    gridRect.setAttribute('x', Math.floor(cam.x / 50) * 50 - 50);
+    gridRect.setAttribute('y', Math.floor(cam.y / 50) * 50 - 50);
+    gridRect.setAttribute('width', cam.w + 150);
+    gridRect.setAttribute('height', cam.h + 150);
+  }
+  function fit() {
+    cam.x = -H * 0.05 - 20; cam.y = -W * 0.08 - 20;
+    cam.w = Math.max(H, 400) * 1.15 + 40; applyCam();
+  }
+  function toWorld(cx, cy) {
+    var r = svg.getBoundingClientRect();
+    return { x: cam.x + (cx - r.left) / r.width * cam.w,
+             y: cam.y + (cy - r.top) / r.height * cam.h };
+  }
+  function zoom(f, cx, cy) {
+    var pt = toWorld(cx, cy);
+    cam.w *= f; cam.x = pt.x - (pt.x - cam.x) * f;
+    cam.y = pt.y - (pt.y - cam.y) * f; applyCam();
+  }
+  svg.addEventListener('wheel', function (e) {
+    e.preventDefault(); zoom(e.deltaY > 0 ? 1.15 : 0.87, e.clientX, e.clientY);
+  }, { passive: false });
+  document.getElementById('zin').onclick = function () { cam.w *= 0.8; applyCam(); };
+  document.getElementById('zout').onclick = function () { cam.w *= 1.25; applyCam(); };
+  document.getElementById('zfit').onclick = fit;
+
+  var pan = null, drag = null;
+  svg.addEventListener('pointerdown', function (e) {
+    if (e.target === svg || e.target === gridRect || e.target === fabric) {
+      if (!e.shiftKey) clearSel();          // background click clears selection
+      pan = { x: e.clientX, y: e.clientY, cx: cam.x, cy: cam.y };
+      svg.classList.add('panning'); svg.setPointerCapture(e.pointerId);
+    }
+  });
+  svg.addEventListener('pointermove', function (e) {
+    if (pan) {
+      var r = svg.getBoundingClientRect();
+      cam.x = pan.cx - (e.clientX - pan.x) / r.width * cam.w;
+      cam.y = pan.cy - (e.clientY - pan.y) / r.height * cam.h;
+      applyCam();
+    } else if (drag) { dragMove(e); }
+  });
+  svg.addEventListener('pointerup', function () {
+    if (pan) { pan = null; svg.classList.remove('panning'); }
+    if (drag) { dragEnd(); }
+  });
+
+  // ---- grid + snap + guides ------------------------------------------------
+  var gridOn = true, snapOn = true;
+  var guides = [];
+  document.getElementById('tgrid').onclick = function () {
+    gridOn = !gridOn; this.classList.toggle('on', gridOn);
+    gridRect.style.display = gridOn ? '' : 'none';
+  };
+  document.getElementById('tsnap').onclick = function () {
+    snapOn = !snapOn; this.classList.toggle('on', snapOn);
+  };
+  function addGuide(dir) {
+    var el = document.createElementNS(NS, 'line');
+    el.setAttribute('class', 'guide');
+    var g = { dir: dir, pos: dir === 'v' ? cam.x + cam.w / 2 : cam.y + cam.h / 2, el: el };
+    gGuides.appendChild(el);
+    el.addEventListener('pointerdown', function (e) {
+      e.stopPropagation();
+      var move = function (ev) {
+        var w = toWorld(ev.clientX, ev.clientY);
+        g.pos = dir === 'v' ? w.x : w.y; drawGuides();
+      };
+      var up = function () {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+    guides.push(g); drawGuides();
+  }
+  function drawGuides() {
+    guides.forEach(function (g) {
+      if (g.dir === 'v') {
+        g.el.setAttribute('x1', g.pos); g.el.setAttribute('x2', g.pos);
+        g.el.setAttribute('y1', -100000); g.el.setAttribute('y2', 100000);
+      } else {
+        g.el.setAttribute('y1', g.pos); g.el.setAttribute('y2', g.pos);
+        g.el.setAttribute('x1', -100000); g.el.setAttribute('x2', 100000);
+      }
+    });
+  }
+  document.getElementById('addvg').onclick = function () { addGuide('v'); };
+  document.getElementById('addhg').onclick = function () { addGuide('h'); };
+
+  // ---- multi-selection / drag / rotate / lock -------------------------------
+  var sel = new Set();                       // piece ids
+  function selChip() {
+    var chip = document.getElementById('selchip');
+    chip.style.display = sel.size ? '' : 'none';
+    chip.textContent = sel.size + ' selected';
+  }
+  function clearSel() {
+    sel.forEach(function (id) { pieces[id] && pieces[id].el.classList.remove('sel'); });
+    sel.clear(); selChip();
+  }
+  function toggleSel(p, additive) {
+    if (!additive) {
+      var only = sel.size === 1 && sel.has(p.id);
+      clearSel();
+      if (only) return;                      // plain click on sole selection deselects
+    }
+    if (sel.has(p.id)) { sel.delete(p.id); p.el.classList.remove('sel'); }
+    else { sel.add(p.id); p.el.classList.add('sel'); }
+    selChip();
+  }
+  function pieceDown(e, p) {
+    e.stopPropagation();
+    if (previewing) return;                  // rule: previewing pauses editing
+    // select-then-drag must work: a press on an ALREADY-selected piece
+    // starts the drag immediately; the deselect-toggle happens only on a
+    // no-move release (click semantics) in dragEnd.
+    var wasSelected = sel.has(p.id);
+    var clickToggle = false;
+    if (wasSelected && !e.shiftKey) {
+      clickToggle = true;                    // maybe a deselect-click
+    } else {
+      toggleSel(p, e.shiftKey);
+    }
+    if (p.locked || !sel.has(p.id)) return;
+    var w = toWorld(e.clientX, e.clientY);
+    drag = { p: p, ox: w.x - p.dx, oy: w.y - p.dy, moved: false,
+             clickToggle: clickToggle };
+    svg.setPointerCapture(e.pointerId);
+  }
+  function dragMove(e) {
+    var w = toWorld(e.clientX, e.clientY);
+    drag.p.dx = w.x - drag.ox; drag.p.dy = w.y - drag.oy;
+    drag.moved = true;
+    render(false);
+  }
+  function dragEnd() {
+    var p = drag.p;
+    var didMove = drag.moved;
+    var clickToggle = drag.clickToggle;
+    drag = null;
+    if (!didMove) {            // a plain click must NEVER move a piece
+      if (clickToggle) toggleSel(p, false);   // click on selected = deselect
+      return;                  // (rule 3: no snap, no history on selection)
+    }
+    var before = committed();
+    if (snapOn) {
+      var r = worldRing(p);
+      var minx = Math.min.apply(null, r.map(function (q) { return q[0]; }));
+      var miny = Math.min.apply(null, r.map(function (q) { return q[1]; }));
+      var tx = Math.round(minx / GRID) * GRID - minx;
+      var ty = Math.round(miny / GRID) * GRID - miny;
+      guides.forEach(function (g) {
+        if (g.dir === 'v') {
+          var d = g.pos - minx;
+          if (Math.abs(d) < SNAP_D && Math.abs(d) < Math.abs(tx)) tx = d;
+        } else {
+          var d2 = g.pos - miny;
+          if (Math.abs(d2) < SNAP_D && Math.abs(d2) < Math.abs(ty)) ty = d2;
+        }
+      });
+      p.dx += tx; p.dy += ty;
+    }
+    render(true);
+    if (!before || !statesEqual(snapState(), before)) pushHistory();
+  }
+  function eachSel(fn) { sel.forEach(function (id) { fn(pieces[id]); }); }
+  function rotateSel() {
+    if (previewing || !sel.size) return;
+    eachSel(function (p) { if (!p.locked) p.rot = p.rot === 180 ? 0 : 180; });
+    render(true); pushHistory();
+  }
+  function lockSel() {
+    if (previewing || !sel.size) return;
+    eachSel(function (p) {
+      p.locked = !p.locked; p.el.classList.toggle('locked', p.locked);
+    });
+    render(true); pushHistory();
+  }
+  document.getElementById('rot').onclick = rotateSel;
+  document.getElementById('lock').onclick = lockSel;
+  window.addEventListener('keydown', function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) doRedo(); else doUndo();
+      return;
+    }
+    if (e.key === 'r' || e.key === 'R') rotateSel();
+    if (e.key === 'l' || e.key === 'L') lockSel();
+  });
+  document.getElementById('undo').onclick = doUndo;
+  document.getElementById('redo').onclick = doRedo;
+
+  // ---- collisions ------------------------------------------------------------
+  function bbox(r) {
+    var xs = r.map(function (q) { return q[0]; });
+    var ys = r.map(function (q) { return q[1]; });
+    return [Math.min.apply(null, xs), Math.min.apply(null, ys),
+            Math.max.apply(null, xs), Math.max.apply(null, ys)];
+  }
+  function segsIntersect(a, b, c, d) {
+    function o(p, q, r) {
+      return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
+    }
+    var s1 = o(a, b, c), s2 = o(a, b, d), s3 = o(c, d, a), s4 = o(c, d, b);
+    return ((s1 > 0) !== (s2 > 0)) && ((s3 > 0) !== (s4 > 0));
+  }
+  function inside(pt, ring) {
+    var inn = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if ((yi > pt[1]) !== (yj > pt[1]) &&
+          pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) inn = !inn;
+    }
+    return inn;
+  }
+  function ringsOverlap(r1, r2) {
+    for (var i = 0; i < r1.length; i++)
+      for (var j = 0; j < r2.length; j++)
+        if (segsIntersect(r1[i], r1[(i + 1) % r1.length],
+                          r2[j], r2[(j + 1) % r2.length])) return true;
+    return inside(r1[0], r2) || inside(r2[0], r1);
+  }
+
+  // ---- render + live metrics ---------------------------------------------------
+  function render(recalc) {
+    fabric.setAttribute('x', 0); fabric.setAttribute('y', 0);
+    fabric.setAttribute('width', H); fabric.setAttribute('height', W);
+    var rings = [];
+    pieces.forEach(function (p) {
+      var r = worldRing(p);
+      rings.push(r);
+      p.polyEl.setAttribute('points', r.map(function (q) {
+        return q[0].toFixed(2) + ',' + q[1].toFixed(2); }).join(' '));
+      p.titleEl.textContent = p.key + ' #' + (p.instance + 1) +
+        (p.locked ? ' (locked)' : '') + (p.rot ? ' rot180' : '');
+    });
+    if (!recalc) return;
+    var boxes = rings.map(bbox);
+    var collisions = 0;
+    pieces.forEach(function (p) { p.el.classList.remove('colliding'); });
+    for (var i = 0; i < pieces.length; i++)
+      for (var j = i + 1; j < pieces.length; j++) {
+        var a = boxes[i], b = boxes[j];
+        if (a[0] > b[2] || b[0] > a[2] || a[1] > b[3] || b[1] > a[3]) continue;
+        if (ringsOverlap(rings[i], rings[j])) {
+          collisions++;
+          pieces[i].el.classList.add('colliding');
+          pieces[j].el.classList.add('colliding');
+        }
+      }
+    var maxx = 0, totalA = 0, minOk = true;
+    rings.forEach(function (r, idx) {
+      maxx = Math.max(maxx, Math.max.apply(null, r.map(function (q) { return q[0]; })));
+      totalA += area(pieces[idx].ring);
+      var ys = r.map(function (q) { return q[1]; });
+      if (Math.min.apply(null, ys) < -0.5 || Math.max.apply(null, ys) > W + 0.5)
+        minOk = false;
+    });
+    var len = maxx, util = len > 0 ? totalA / (len * W) * 100 : 0;
+    document.getElementById('m_len').textContent = len.toFixed(1);
+    document.getElementById('m_util').textContent = util.toFixed(2);
+    document.getElementById('m_waste').textContent = (100 - util).toFixed(2);
+    var okFit = len <= H && minOk;
+    document.getElementById('m_fit').textContent =
+      okFit ? 'fits fabric' : (len > H ? 'EXCEEDS height' : 'OUTSIDE width');
+    document.getElementById('m_fit_box').classList.toggle('bad', !okFit);
+    document.getElementById('m_coll').textContent = collisions;
+    document.getElementById('m_coll_box').classList.toggle('bad', collisions > 0);
+  }
+
+  document.getElementById('fw').addEventListener('change', function () {
+    var v = parseFloat(this.value); if (v > 0) { W = v; render(true); }
+  });
+  document.getElementById('fh').addEventListener('change', function () {
+    var v = parseFloat(this.value); if (v > 0) { H = v; render(true); }
+  });
+
+  // ---- M3: optimize + options strip -----------------------------------------
+  var previewing = false;                    // rule: preview pauses editing
+  var baselineRings = null;                  // serialized rings (POST + thumb)
+  var lastOptions = null;
+  var seedCounter = 42;
+
+  function csrf() {
+    return document.querySelector('#saveform input[name=csrfmiddlewaretoken]').value;
+  }
+  function setPreview(on, name) {
+    previewing = on;
+    root.classList.toggle('previewing', on);
+    var bar = document.getElementById('previewbar');
+    bar.classList.toggle('open', on);
+    if (on) document.getElementById('pv_name').textContent = name;
+    histButtons();                            // undo/redo pause with editing
+  }
+  // previews/keeps apply as TRANSFORMS over the immutable base — pieces
+  // are never rebuilt after load (rule 2), selection survives untouched
+  function applyPlacements(pl) {
+    applyState(stateFromPlacements(pl));
+  }
+  function thumb(pl, wmm, len) {
+    var pad = 5;
+    var parts = ['<svg xmlns="' + NS + '" viewBox="' + (-pad) + ' ' + (-pad) +
+                 ' ' + (len + 2 * pad) + ' ' + (wmm + 2 * pad) + '" preserveAspectRatio="xMidYMid meet">',
+                 '<rect x="0" y="0" width="' + len + '" height="' + wmm +
+                 '" fill="#fff" stroke="#b7a87f" stroke-width="2" vector-effect="non-scaling-stroke"/>'];
+    pl.forEach(function (p) {
+      var pts = p.polygon_mm.map(function (q) {
+        return q[0].toFixed(1) + ',' + (wmm - q[1]).toFixed(1); }).join(' ');
+      parts.push('<polygon points="' + pts + '" fill="' +
+                 (p.locked ? '#d7dceb' : '#e8d9b8') +
+                 '" stroke="#6d5a33" stroke-width="1" vector-effect="non-scaling-stroke"/>');
+    });
+    parts.push('</svg>');
+    return parts.join('');
+  }
+  function card(title, nums, badgeHtml, thumbHtml, keepBtn) {
+    return '<h4>' + title + '</h4>' + thumbHtml +
+           '<div class="nums">' + nums + '</div>' + badgeHtml +
+           (keepBtn ? '<button class="tbtn keep">Keep this option</button>' : '');
+  }
+  function renderStrip(resp) {
+    var strip = document.getElementById('strip');
+    strip.innerHTML = '';
+    strip.classList.add('open');
+    // Current Layout — the permanent baseline (rule 6)
+    var cur = resp.current;
+    var c0 = document.createElement('div');
+    c0.className = 'opt active';
+    c0.innerHTML = card('Current Layout',
+      cur.length_mm + ' mm · ' +
+      (cur.utilization_pct != null ? cur.utilization_pct + '% used · ' +
+       cur.waste_pct + '% waste' : '—'),
+      '<span class="badge b-same">your layout</span>',
+      thumb(baselineRings, W, Math.max(cur.length_mm, 1)), false);
+    c0.addEventListener('click', function () {
+      // Return = restore the committed layout; NOT a history entry
+      // (rule 3: it does not change the working layout)
+      applyState(committed());
+      setPreview(false, '');
+      markActive(c0);
+    });
+    strip.appendChild(c0);
+
+    resp.options.forEach(function (o, idx) {
+      var el = document.createElement('div');
+      el.className = 'opt';
+      var badge;
+      if (o.worse_than_current) {
+        badge = '<span class="badge b-worse">Worse than Current</span>';
+      } else if (o.delta_length_mm !== null && o.delta_length_mm < 0) {
+        badge = '<span class="badge b-better">Saves ' +
+                Math.abs(o.delta_length_mm).toFixed(1) + ' mm</span>';
+      } else {
+        badge = '<span class="badge b-same">Same as Current</span>';
+      }
+      var nums = o.length_mm + ' mm · ' + o.utilization_pct + '% used · ' +
+                 o.waste_pct + '% waste';
+      el.innerHTML = card('Option ' + (idx + 1), nums, badge,
+                          thumb(o.placements, W, Math.max(o.length_mm, 1)),
+                          true);
+      el.addEventListener('click', function (e) {
+        if (e.target.classList.contains('keep')) return;
+        applyPlacements(o.placements);       // preview: ZERO history entries
+        setPreview(true, 'Option ' + (idx + 1));
+        markActive(el);
+      });
+      el.querySelector('.keep').addEventListener('click', function () {
+        applyPlacements(o.placements);
+        pushHistory();                       // Keep = ONE editing decision
+        setPreview(false, '');
+        strip.classList.remove('open');      // decision made for this round
+        strip.innerHTML = '';
+        msg('Option ' + (idx + 1) + ' kept — keep editing or save.', false);
+      });
+      strip.appendChild(el);
+    });
+    function markActive(active) {
+      Array.prototype.forEach.call(strip.children, function (ch) {
+        ch.classList.toggle('active', ch === active);
+      });
+    }
+  }
+  function msg(text, isError) {
+    var m = document.getElementById('optmsg');
+    m.textContent = text || '';
+    m.style.color = isError ? '#a33' : '#20603c';
+  }
+  document.getElementById('optimize').addEventListener('click', function () {
+    if (previewing) { msg('Keep the option or return to Current first.', true); return; }
+    var btn = this;
+    var n = parseInt(document.getElementById('opt_n').value, 10);
+    var spacing = document.getElementById('opt_spacing').value;
+    if (!(n >= 1 && n <= 8)) { msg('layout options must be 1–8', true); return; }
+    baselineRings = serialize();             // rings for the POST + thumbnail
+    var selPairs = [];
+    sel.forEach(function (id) {
+      selPairs.push([pieces[id].key, pieces[id].instance]);
+    });
+    seedCounter += 1;
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', csrf());
+    fd.append('action', 'optimize');
+    fd.append('width_mm', String(Math.round(W)));
+    fd.append('height_mm', String(Math.round(H)));
+    fd.append('spacing_mm', spacing);
+    fd.append('options_wanted', String(n));
+    fd.append('effort', document.getElementById('opt_mode').value);
+    fd.append('seed', String(seedCounter));
+    fd.append('placements', JSON.stringify(baselineRings));
+    fd.append('selected', JSON.stringify(selPairs));
+    btn.disabled = true; msg('Optimizing…', false);
+    fetch(location.pathname, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        btn.disabled = false;
+        if (!j.ok) { msg(j.error, true); return; }
+        msg('', false);
+        lastOptions = j;
+        renderStrip(j);
+      })
+      .catch(function () { btn.disabled = false; msg('optimize failed — try again', true); });
+  });
+
+  // ---- save (unchanged Phase-4 path) ------------------------------------------
+  document.getElementById('saveform').addEventListener('submit', function () {
+    document.getElementById('placements').value = JSON.stringify(serialize());
+    document.getElementById('save_w').value = Math.round(W);
+    document.getElementById('save_h').value = Math.round(H);
+  });
+
+  // init
+  buildPieces(raw); mountPieces();
+  fit(); render(true);
+  pushHistory();                              // depth 1 = the loaded layout
+  window.addEventListener('resize', applyCam);
+
+  // Layout switcher (Rules F + I, §2c): pure navigation between immutable
+  // saved layouts — document-editor semantics. Dirty = any layout op since
+  // load (history depth > 1) or an edited width/height field. Cancelling
+  // the confirm stays put; nothing here ever generates/optimizes/verifies.
+  (function(){
+    var btn = document.getElementById('lswbtn'),
+        menu = document.getElementById('lswmenu');
+    if (!btn || !menu) return;
+    var fwEl = document.getElementById('fw'),
+        fhEl = document.getElementById('fh'),
+        fwInit = fwEl.value, fhInit = fhEl.value;
+    btn.addEventListener('click', function(e){
+      e.stopPropagation(); menu.classList.toggle('open');
+    });
+    document.addEventListener('click', function(){
+      menu.classList.remove('open');
+    });
+    menu.addEventListener('click', function(e){
+      var a = e.target.closest('a.lsw-item');
+      if (!a) return;
+      if (a.classList.contains('cur')) {          // already open — no-op
+        e.preventDefault(); menu.classList.remove('open'); return;
+      }
+      var dirty = undoStack.length > 1
+                  || fwEl.value !== fwInit || fhEl.value !== fhInit;
+      if (dirty && !confirm('Discard changes and open another layout?')) {
+        e.preventDefault(); menu.classList.remove('open');
+      }
+    });
+  })();
+})();
+</script>
+{% endblock %}

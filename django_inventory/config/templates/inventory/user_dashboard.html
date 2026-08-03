@@ -8,7 +8,7 @@
 
     /* Hero greeting — soft dark gradient, matches form-shell elsewhere. */
     .user-dash .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position: relative; overflow: hidden;
@@ -121,20 +121,7 @@
         display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 14px; margin-bottom: 18px;
     }
-    .user-dash .stat-tile {
-        padding: 16px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card);
-    }
-    .user-dash .stat-tile .stat-label {
-        font-size: 11px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--stone);
-    }
-    .user-dash .stat-tile .stat-value {
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 28px; font-weight: 600; color: var(--ink); margin-top: 4px;
-    }
-    .user-dash .stat-tile .stat-unit { font-size: 14px; color: var(--stone); }
+    /* D-2a: stat tiles now use canonical .stat-card.stat-card--serif (base.html); local chrome removed */
 
     .user-dash .helper-tag {
         display: inline-block; padding: 3px 10px; margin-top: 8px;
@@ -182,6 +169,22 @@
         .user-dash .iframe-wrap { margin-left: -10px; margin-right: -10px; }
         .user-dash .adda-stage-iframe { border-radius: 0; }
     }
+    /* R1 (PDD §27-D6): broadcast rows — read-only, no link affordance. */
+    .user-dash .broadcast-list { list-style: none; margin: 0; padding: 0; }
+    .user-dash .broadcast-row {
+        display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px;
+        padding: 10px 4px; border-bottom: 1px dashed #e7e0d2; font-size: 14px;
+    }
+    .user-dash .broadcast-row:last-child { border-bottom: 0; }
+    .user-dash .broadcast-code { font-weight: 700; }
+    .user-dash .broadcast-product { color: #6b6357; }
+    .user-dash .broadcast-date { margin-left: auto; font-size: 12px; color: #8a8071; }
+    .user-dash .broadcast-hint { font-size: 12px; color: #8a8071; padding-top: 8px; }
+    /* accounts panel (accountant view): header action link — page-scoped per UI rule 10 */
+    .user-dash .card-link { font-size: 12px; }
+    @media (max-width: 600px) {
+        .user-dash .broadcast-date { margin-left: 0; width: 100%; }  /* stack on phones */
+    }
 </style>
 {% endblock %}
 
@@ -192,6 +195,106 @@
         <div class="hero-title">Welcome, {{ request.user.get_full_name|default:request.user.email }}</div>
         {% if helper_data %}<span class="helper-tag">CUTTING MASTER HELPER</span>{% endif %}
     </div>
+
+    {% comment %}
+    R1 (PDD §27-D6): "New Adda started" broadcast — read-only rows for
+    IN_PROGRESS Addas the worker is NOT assigned to. Code/product/date only:
+    no financials, no link (the assigned Active-Addas list below stays the
+    actionable set). Worker-only (management sees all Addas anyway).
+    {% endcomment %}
+    {% if broadcast_addas %}
+    <div class="card broadcast-card" style="margin-bottom: 18px;">
+        <div class="card-header"><div class="card-title">New Addas Started</div></div>
+        <div class="card-body">
+            <ul class="broadcast-list">
+                {% for b in broadcast_addas %}
+                <li class="broadcast-row">
+                    <span class="broadcast-code">{{ b.code }}</span>
+                    <span class="broadcast-product">{{ b.product.name }}</span>
+                    <span class="broadcast-date">started {{ b.started_at|date:"d M Y" }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% if does_floor_work %}
+            <div class="broadcast-hint">Production started — you'll see a task here if you're assigned.</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% comment %}
+    R5 (PDD §21/§23 + ADR-0011): this-month factory-expense digest, management
+    only (expense_month is None for workers — no data even reaches the page).
+    Factory-LEVEL costs: deliberately NOT part of any Adda's manufacturing cost.
+    {% endcomment %}
+    {% if expense_month %}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header">
+            <div class="card-title">Expenses · {{ expense_month.month_value }}</div>
+            <a href="{% url 'expense:factory-expense-list' %}" style="font-size:12px;">View / record →</a>
+        </div>
+        <div class="card-body">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div style="background:var(--cream);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 14px;min-width:120px;">
+                    <div style="font-size:17px;font-weight:800;">₹{{ expense_month.total }}</div>
+                    <div style="font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;">This month</div>
+                </div>
+                {% for cat in expense_month.by_category.values %}
+                <div style="background:var(--cream);border:1px solid var(--border-subtle);border-radius:12px;padding:10px 14px;min-width:120px;">
+                    <div style="font-size:17px;font-weight:800;">₹{{ cat.total }}</div>
+                    <div style="font-size:11px;color:var(--stone);text-transform:uppercase;letter-spacing:.05em;">{{ cat.label }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% comment %}
+    Owner ruling 2026-08-02 — the ACCOUNTS panel. A financial reader who is not
+    management used to land on the WORKER dashboard. These are the three numbers
+    their job starts from, all derived live and all read-only. Reuses the card +
+    cream-tile vocabulary of the expense digest above — no new CSS (UI rule 9).
+    {% endcomment %}
+    {% if accounts_panel %}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header">
+            <div class="card-title">Accounts — where to start</div>
+            <a href="{% url 'expense:material-spend' %}" class="card-link">Material spend →</a>
+        </div>
+        <div class="card-body">
+            {% comment %}Canonical `.stat-grid`/`.stat-card` from base.html (UI_COMPONENTS
+               §dashboards) — the same component the cloth + earnings dashboards use. No
+               inline sizing/radius: the design system is tokens-only, and `.stat-grid`
+               already goes 2-col at ≤560px, so mobile needs nothing extra.{% endcomment %}
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="label">Unpriced rolls</div>
+                    <div class="value">{{ accounts_panel.rolls_unpriced }} / {{ accounts_panel.rolls_total }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Advance exposure</div>
+                    <div class="value">₹{{ accounts_panel.advance_exposure|default:"0.00" }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Pending payable</div>
+                    <div class="value">₹{{ accounts_panel.pending_payable|default:"0.00" }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Paid this month ({{ accounts_panel.settlements_count }})</div>
+                    <div class="value">₹{{ accounts_panel.settlements_total|default:"0.00" }}</div>
+                </div>
+            </div>
+            {% if accounts_panel.rolls_unpriced %}
+            <p class="broadcast-hint">
+                {{ accounts_panel.rolls_unpriced }} roll(s) have no cost per kg yet — the system shows them as
+                <strong>unpriced</strong> rather than ₹0, so material cost stays honest until you enter it.
+                <a href="{% url 'raw_materials:roll-list' %}">Price them →</a>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     {% comment %}
     Active Addas list — shown to everyone.
@@ -216,11 +319,20 @@
                             started {{ a.started_at|date:"d M H:i" }}
                         </div>
                     </div>
+                    {% if is_admin_view or not a.current_focus %}
                     <div class="adda-pipeline">
                         {% for p in a.pipeline %}
                             <span class="pipe-pill pipe-{{ p.state }}">{% if p.state == 'done' %}✓ {% elif p.state == 'current' %}▸ {% endif %}{{ p.label }}</span>
                         {% endfor %}
                     </div>
+                    {% else %}
+                    {# R10-B worker lens: current-operation focus — prev ✔ / NOW / next; never the full pipeline #}
+                    <div class="adda-pipeline">
+                        {% if a.current_focus.prev %}<span class="pipe-pill pipe-done">✓ {{ a.current_focus.prev }}</span>{% endif %}
+                        <span class="pipe-pill pipe-current">▸ {{ a.current_focus.current }}</span>
+                        {% if a.current_focus.next %}<span class="pipe-pill pipe-pending">{{ a.current_focus.next }}</span>{% endif %}
+                    </div>
+                    {% endif %}
                     {% comment %}Per-Adda Layering snapshot — confidential (roll/layer/leftover counts).
                     Restricted to skilled users (Cutting Master / Helper) + management. Other roles
                     must not see internal production metrics.{% endcomment %}
@@ -249,8 +361,10 @@
                                 </div>
                             </details>
                         {% endfor %}
-                        {% if a.current_stage %}
-                        {% comment %}Accordion: tap to expand inline iframe of the current stage panel.{% endcomment %}
+                        {% if a.current_stage and a.current_can_open %}
+                        {% comment %}C-2: workspace accordion renders ONLY when the panel gate would
+                        admit this viewer (live Stage Access AND assignment) — never an iframe the
+                        user can't open. Pipeline chips above stay as the status summary.{% endcomment %}
                         <details class="adda-stage-acc">
                             <summary>▸ Open {{ a.current_stage.get_stage_type_display }} workspace</summary>
                             <div class="iframe-wrap">
@@ -273,24 +387,26 @@
     </div>
     {% endif %}
 
-    {% comment %}Helper section — only rendered for users with cutting_master_helper skill. Spec: helpers see every active Layering across the factory, plus their stats.{% endcomment %}
+    {% comment %}Layering board — gated by LIVE layering Stage Access (C-2; was a hardcoded
+    helper-skill check). Non-management see only layerings they're assigned to.{% endcomment %}
     {% if helper_data %}
     <div class="stats-grid">
-        <div class="stat-tile">
-            <div class="stat-label">Layerings Completed</div>
-            <div class="stat-value">{{ helper_data.completed_count }}</div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Layerings Completed</div>
+            <div class="value">{{ helper_data.completed_count }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">My Active Tasks</div>
-            <div class="stat-value">{{ helper_data.active_assigned_count }}</div>
+        <div class="stat-card stat-card--serif">
+            {# Layering-board scope: counts layering assignments only, not all stages. #}
+            <div class="label">My Active Layerings</div>
+            <div class="value">{{ helper_data.active_assigned_count }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">Total Layers Recorded</div>
-            <div class="stat-value">{{ helper_data.total_layers }}</div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Total Layers Recorded</div>
+            <div class="value">{{ helper_data.total_layers }}</div>
         </div>
-        <div class="stat-tile">
-            <div class="stat-label">Total Time</div>
-            <div class="stat-value">{{ helper_data.total_minutes }} <span class="stat-unit">min</span></div>
+        <div class="stat-card stat-card--serif">
+            <div class="label">Total Time</div>
+            <div class="value">{{ helper_data.total_minutes }} <span class="unit">min</span></div>
         </div>
     </div>
 
@@ -353,10 +469,20 @@
             </ul>
         </div>
     </div>
-    {% else %}
+    {% elif does_floor_work %}
     <div class="empty">
         <h2>No active tasks</h2>
-        <p>When a manager assigns you to a Layering or Cutting stage, it'll appear here.</p>
+        {# post-OP-1 copy: workers get assigned to ANY operation, not just layering/cutting #}
+        <p>Jab manager aapko kaam dega, woh yahan dikhega. (Your assigned work will appear here.)</p>
+    </div>
+    {% else %}
+    {% comment %}Owner feedback 2026-08-02: an accountant/listing_team/student is
+       never assigned floor work, so promising them tasks was simply wrong. Say
+       what their account IS for instead of showing an empty worker panel.{% endcomment %}
+    <div class="empty">
+        <h2>Nothing assigned to you</h2>
+        <p>This account is not set up for factory floor work, so production tasks
+           will not appear here. Use the menu on the left for what your role covers.</p>
     </div>
     {% endif %}
 

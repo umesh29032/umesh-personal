@@ -1,3 +1,13 @@
+---
+id: config-production-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: production
+anchors: config/production/
+verified: 2026-07-18
+---
+
 # `production` app — Kapil Enterprises
 
 > Junior-Django friendly walkthrough. Hinglish + English.
@@ -11,7 +21,7 @@ Yeh app **factory ka production lifecycle** handle karta hai — raw cloth se le
 - Live **Adda** (production batch) ka state track karna
 - Har stage ka **typed record** save karna (Layering, Cutting Pattern, Cutting)
 
-`raw_materials` upstream hai (cloth inventory) aur `tracking` downstream (barcode + history). Cross-app FK rule: **production app `raw_materials` se kuch import nahi karta**, sirf string FKs use karta hai.
+`raw_materials` upstream hai (cloth inventory) aur `tracking` downstream (barcode + history). Import direction (`.importlinter` layering): **production `raw_materials` ko import KAR SAKTA hai (downward legal — e.g. costing/layering ClothRoll import karte hain); `raw_materials` production ko KABHI import nahi karta.** FK references jahan possible string form mein. _(2026-07-18 correction — purani line "production raw_materials se kuch import nahi karta" galat thi, code se contradict hoti thi.)_
 
 ---
 
@@ -108,6 +118,15 @@ Product → Stage ka join with `order` field. Per-product workflow define karta 
 Ek production batch. Code = `{Product.code}-NNN`.
 - `current_stage` (FK WorkflowStage) — abhi kaunsa stage chal raha hai. `None` = completed.
 - `status` — `in_progress | on_hold | completed | cancelled`.
+- **Deletion safety (owner rule 2026-07-22):** an Adda is heavily PROTECT-anchored
+  (16 FKs) + a model-level `delete()` guard. **Cannot be hard-deleted once it has
+  a completed stage, a settlement, worker earnings/allocations, reported
+  production, or barcodes** — `deletion_block_reason()` returns why. Two lifecycle
+  exits, **super_admin only** (`adda_service`): `cancel_adda` (SOFT — status→
+  CANCELLED, row+history kept; the abandon path for a batch with real work) and
+  `delete_adda` (HARD — pristine/mistaken batches only, irreversible). Raw admin
+  delete is disabled (`AddaAdmin.has_delete_permission=False`). See
+  [ADR-0012](../../docs/adr/0012-adda-cancellation-and-deletion.md).
 
 ### AddaStageRecord
 Har Adda + stage combination ka **execution row**. Yahi row workers + started_at + completed_at carry karta hai. Typed records (LayeringRecord, CuttingPatternRecord, CuttingRecord) `OneToOne` se hang karte hain.
@@ -164,7 +183,7 @@ Storage: BarcodeBatch range row per (Adda, bundle, size, color). Lazy per-piece 
    - Last stage ho to `adda.status = COMPLETED`, `completed_at` stamp
    - History entry via `tracking.services.log_adda`
 
-**Iframe-safe redirect**: jab user iframe ke andar Complete dabata hai, view check karta hai `request.POST['embedded']=='1'`. Agar haan to **new current stage ke embedded panel** pe redirect karta hai with `?advanced=1`. Embedded panel JS `?advanced=1` dekh ke parent ko postMessage bhejta hai: `{type:'stage-advanced'}`. Parent (`adda_detail.html` / `user_dashboard.html`) sun ke `window.location.reload()` chala deta hai.
+**Iframe-safe redirect (F-3 polish 2026-07-05)**: jab user iframe ke andar Complete dabata hai (`request.POST['embedded']=='1'`), view **`production:stage-advanced` bounce page** pe redirect karta hai (`views.mixins.embedded_advance_redirect`, all 4 stage completes). Bounce = login-only, ZERO stage data, koi access gate nahi — isliye completing WORKER kabhi 403 nahi dekh sakta (purana behavior next-stage panel pe bhejta tha, jo worker ke liye gated hai; completed stage ka apna panel bhi refuse kar sakta hai kyunki complete pe unreported task auto-cancel hota hai). Bounce JS parent ko postMessage bhejta hai `{type:'stage-advanced'}` → parent (`adda_detail.html` / `user_dashboard.html`) reload; standalone (no-iframe) hit ho to seedha Adda page pe `location.replace`.
 
 ---
 
@@ -376,6 +395,8 @@ config/production/
 - **Layering Reopen** (admin only): `POST /addas/<code>/layering/reopen/` — completed Layering ko unlock karta hai correction ke liye. Header values (length/duration/notes) `sr.draft_*` mein wapas copy hote hain. Refuses if downstream stage already started.
 - **Stage library editor**: `/production/stages/` — perm-gated (`production.change_stage`). Super Admin bypass.
 - **Per-product flow editor**: `/production/products/<pk>/flow/` — drag stages in/out of product workflow.
+- **Cancel batch** (super_admin): `POST /addas/<code>/cancel/` → `cancel_adda` — SOFT abandon (status→CANCELLED, open worker tasks auto-cancel, history logged `ADDA_CANCELLED`). Blocked once a settlement exists / already completed. Danger-zone button on the Adda detail.
+- **Delete batch** (super_admin): `GET/POST /addas/<code>/delete/` → `delete_adda` — HARD delete, pristine batches ONLY (confirm page shows the block reason + offers Cancel when unsafe). Irreversible.
 
 ---
 
@@ -423,6 +444,26 @@ Adda start → stage records (one per WorkflowStage) → workers assigned
 EVERY capture path — manual today, barcode later — converges through it) ·
 stage records/typed records → each stage's service via the shared skeletons ·
 costing freeze → `cost_service`.
+
+## Material/full-cost READ engine (Phase 17 RMX, 2026-07-18 — READ-ONLY, no writers)
+
+`cost_service` ab material-money reads bhi own karta hai (sab READ-ONLY —
+FactoryExpense/ledger/settlement ko kabhi nahi chhoote):
+
+- `material_costs_for_addas(adda_ids)` — bulk per-Adda material arm (ADR-0009
+  Decision 5 valuation: purchase price; leftovers at SOURCE roll price; honest-NULL
+  never ₹0). `material_cost_for_adda` isi ko DELEGATE karta hai (ek hi valuation).
+- `full_costs_for_addas` / `full_cost_for_adda` — **THE ADR-0009 Decision-2
+  assembly** (material G1 + Σ non-voided SWA labor via earn_map source + non-payable
+  priced processing; overhead reserved-future). A360 + costing page dono YAHI padhte
+  hain — kabhi re-derive nahi.
+- `material_consumption_in_period(year, month)` — per-Adda derive law time-sliced
+  (+layering entries −remnants +leftover-ins at source price). Purchases-read
+  (`roll_service.material_purchases_in_period`) se alag, LABELLED basis — kabhi blend
+  nahi. Signature proof: **one-rupee-once** (Σperiods ≡ ΣAddas ≡ intake-once, pinned
+  in `tests/test_rmx_read_paths.py`).
+- Permission: aggregates management-visible (RMX-D2 PERMANENT rule); per-roll
+  economics FINANCIAL_ROLES wall ke peeche hi rehte hain.
 
 **What breaks if bypassed:** a WSC written elsewhere skips the expected-*
 freeze and the settlement guards — a payable line that money code can't

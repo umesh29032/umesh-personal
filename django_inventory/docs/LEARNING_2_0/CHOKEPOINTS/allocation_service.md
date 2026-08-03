@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-allocation-service
+type: chokepoint
+status: active
+owner: handwritten
+scope: allocation_service (chokepoint)
+anchors: config/expense/services/allocation_service.py
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
 The LEGACY earning path (era-A). Default OFF since V2-3 (`LEDGER_CREDIT_AT_
 ALLOCATION=False`); env True = tested rollback lever. Writes era-A SWA + its

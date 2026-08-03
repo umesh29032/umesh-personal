@@ -20,12 +20,13 @@ from django.urls import reverse
 from django.views.generic import TemplateView
 
 from accounts.services import ROLE_SUPER_ADMIN, user_has_role
-from production.models import CostMethod, Product, Stage, WorkflowStage
+from production.models import AllocationDimensions, CostMethod, Product, Stage, WorkflowStage
 from production.services import (
     add_stage_to_product_flow,
     move_stage_in_product_flow,
     remove_stage_from_product_flow,
     set_stage_cost,
+    set_stage_grain,
 )
 
 
@@ -64,6 +65,8 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
             'available_stages': available_stages,
             'flow_count': len(flow_rows),
             'cost_methods': CostMethod.choices,
+            # OP-1: piece-pool grain choices (S4/D1) — flow-editable work split.
+            'grain_choices': AllocationDimensions.choices,
         })
         return ctx
 
@@ -102,7 +105,16 @@ class ProductFlowEditView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
                     cost_method=request.POST.get('cost_method') or '',
                     cost_rate=request.POST.get('cost_rate'),
                     cost_billed_at_id=int(billed_raw) if billed_raw.isdigit() else None,
+                    # R2 (PDD §6/§17): payability toggle lives on the same cost
+                    # form — unchecked checkbox = absent key = False (HTML forms).
+                    credits_workers=bool(request.POST.get('credits_workers')),
                 )
+                # OP-1: work-split grain rides the same Save (separate service —
+                # pool concern, not cost). set_stage_grain enforces monotonicity.
+                grain = request.POST.get('work_split') or ''
+                if grain and grain != ws.allocation_dimensions:
+                    set_stage_grain(user=request.user, workflow_stage=ws,
+                                    allocation_dimensions=grain)
                 messages.success(request, f"Updated cost for '{ws.stage.name}'.")
 
             else:

@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import Skill, User
 from inventory.models import Role
@@ -69,7 +70,7 @@ class UserDashboardHelperTests(TestCase):
     def test_non_helper_user_has_no_helper_data(self):
         karigar = _make_user('k@dash.test', role_code='worker')
         self.client.force_login(karigar)
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         self.assertEqual(resp.status_code, 200)
         self.assertIsNone(resp.context.get('helper_data'))
 
@@ -77,17 +78,23 @@ class UserDashboardHelperTests(TestCase):
         helper = _make_user('h@dash.test', role_code='worker',
                             skill_names=['cutting_master_helper'])
         self.client.force_login(helper)
-        # Spin up an active layering elsewhere — helper not assigned, but should still see it.
-        _start_layering_on_new_adda(self.admin)  # returns (adda, sr, entry) — unused
+        # C-2 (freeze closeout): the board is access-gated AND assignment-
+        # scoped for non-management — an UNASSIGNED helper sees the board
+        # section but ZERO rows (was: every active layering factory-wide).
+        adda, sr, _entry = _start_layering_on_new_adda(self.admin)
 
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         self.assertEqual(resp.status_code, 200)
         data = resp.context['helper_data']
         self.assertIsNotNone(data)
-        # Spec: helper sees ALL active Layering, even if not assigned to this one.
-        self.assertEqual(len(data['active_layering']), 1)
-        self.assertEqual(data['active_assigned_count'], 0)
+        self.assertEqual(len(data['active_layering']), 0)
         self.assertEqual(data['completed_count'], 0)
+        # Assign them → the row appears (manager assignment = the only source).
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, [helper.pk])
+        data2 = self.client.get(reverse('inventory:my_dashboard')).context['helper_data']
+        self.assertEqual(len(data2['active_layering']), 1)
+        self.assertEqual(data2['active_assigned_count'], 1)
 
     def test_helper_stats_update_after_completion(self):
         helper = _make_user('h2@dash.test', role_code='worker',
@@ -106,7 +113,7 @@ class UserDashboardHelperTests(TestCase):
             notes='', user=helper,
         )
         self.client.force_login(helper)
-        resp = self.client.get(reverse('inventory:user_dashboard'))
+        resp = self.client.get(reverse('inventory:my_dashboard'))
         data = resp.context['helper_data']
         self.assertEqual(data['completed_count'], 1)
         self.assertEqual(data['total_layers'], 4)
@@ -162,3 +169,205 @@ class SidebarSingleSourceTest(TestCase):
             f"SidebarItemRule rows reference menu items absent from the code SIDEBAR "
             f"registry (drift from a rename/removal): {orphans}",
         )
+
+
+class RoleDeleteGuardTests(TestCase):
+    """PA-05A-2: deleting a Role must be refused while it is assigned to ANY user
+    — primary role (`users`) OR stacked via extra_roles (`extra_users`). The
+    extra_roles M2M would otherwise cascade and silently strip the role."""
+
+    def setUp(self):
+        self.admin = _make_user('rdg-admin@t.com', role_code='super_admin', is_super=True)
+        self.client.force_login(self.admin)
+
+    def _delete(self, role):
+        return self.client.post(reverse('inventory:role_delete', args=[role.pk]))
+
+    def test_blocked_when_used_as_extra_role(self):
+        role = Role.objects.create(name='Extra Only', code='extra_only')
+        u = _make_user('rdg-u@t.com', role_code='worker')
+        u.extra_roles.add(role)
+        self._delete(role)
+        self.assertTrue(Role.objects.filter(pk=role.pk).exists())  # not deleted
+
+    def test_blocked_when_system_role(self):
+        sysrole = Role.objects.get(code='manager')  # seeded, is_system
+        self._delete(sysrole)
+        self.assertTrue(Role.objects.filter(pk=sysrole.pk).exists())
+
+    def test_deletes_when_unused_and_not_system(self):
+        role = Role.objects.create(name='Disposable', code='disposable')
+        self._delete(role)
+        self.assertFalse(Role.objects.filter(pk=role.pk).exists())
+
+
+class RolePermissionCurationTests(TestCase):
+    """OWN-D carry-in fix (2026-07-13): the RoleForm.permissions field queryset
+    is the form's VALIDATION gate — only pks in it can be POSTed. It must equal
+    the CURATED editor allowlist (ROLE_EDITOR_SECTIONS content types), not the
+    whole app (ROLE_EDITABLE_APPS). The app-level filter let a hand-crafted POST
+    persist a grant on a service-only model the editor never renders (e.g.
+    production.change_machinetype), and live view gates (user_has_perm) honored it."""
+
+    def setUp(self):
+        self.admin = _make_user('rpc-admin@t.com', role_code='super_admin', is_super=True)
+        self.client.force_login(self.admin)
+
+    def test_queryset_equals_curated_allowlist(self):
+        from django.contrib.auth.models import Permission
+        from accounts.services.permission_service import permissions_qs_by_app
+        from inventory.forms import RoleForm
+        offered = set(RoleForm().fields['permissions'].queryset.values_list('pk', flat=True))
+        curated = {p.pk for p in permissions_qs_by_app()}
+        self.assertEqual(offered, curated)
+        # an in-app-but-non-curated perm (service-only model) must NOT be offered
+        mt = Permission.objects.get(content_type__app_label='production', codename='change_machinetype')
+        self.assertNotIn(mt.pk, offered)
+
+    def test_handcrafted_noncurated_perm_rejected(self):
+        from django.contrib.auth.models import Permission
+        role = Role.objects.create(name='Carry In', code='carry_in')
+        view_stage = Permission.objects.get(content_type__app_label='production', codename='view_stage')
+        mt = Permission.objects.get(content_type__app_label='production', codename='change_machinetype')
+        resp = self.client.post(reverse('inventory:role_edit', args=[role.pk]), {
+            'name': role.name, 'code': role.code, 'description': '',
+            'permissions': [view_stage.pk, mt.pk],  # mt is offered by app but not curated
+        })
+        self.assertEqual(resp.status_code, 200)  # form re-renders with an error
+        self.assertIn('permissions', resp.context['form'].errors)
+        self.assertFalse(role.permissions.filter(pk=mt.pk).exists())  # nothing persisted
+
+
+class SidebarAccessSaveTests(TestCase):
+    """RCP-1A F1: the sidebar-access save is SERVICE-owned (Law 4 — the view only
+    parses POST into primitives). Behaviour preserved: checkbox lists update the
+    M2Ms, super_admin is NEVER persisted even if posted, an un-posted rule clears."""
+
+    def setUp(self):
+        self.admin = _make_user('sb-admin@test.test', role_code='super_admin', is_super=True)
+        self.manager = _make_user('sb-mgr@test.test', role_code='manager')
+        from accounts.models import SidebarItemRule
+        self.rule = SidebarItemRule.objects.create(
+            url_name='inventory:my_dashboard', section='Main', label='Dashboard')
+
+    def test_post_updates_roles_and_excludes_super_admin(self):
+        from accounts.models import SidebarItemRule
+        sa_role = Role.objects.get(code='super_admin')
+        mgr_role = Role.objects.get(code='manager')
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse('inventory:sidebar-access'), {
+            f'roles_{self.rule.id}': [str(mgr_role.id), str(sa_role.id)],
+        })
+        self.assertEqual(resp.status_code, 302)
+        rule = SidebarItemRule.objects.get(pk=self.rule.pk)
+        codes = set(rule.allowed_roles.values_list('code', flat=True))
+        self.assertEqual(codes, {'manager'})  # SA posted but excluded at write
+
+    def test_unposted_rule_is_cleared(self):
+        from accounts.models import SidebarItemRule
+        self.rule.allowed_roles.set([Role.objects.get(code='manager')])
+        self.client.force_login(self.admin)
+        resp = self.client.post(reverse('inventory:sidebar-access'), {})
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(
+            SidebarItemRule.objects.get(pk=self.rule.pk).allowed_roles.count(), 0)
+
+    def test_service_is_the_writer(self):
+        # Law-4 pin: the view module performs no M2M writes itself.
+        import inspect
+        from inventory.views import sidebar_access_views as v
+        src = inspect.getsource(v.SidebarAccessListView.post)
+        self.assertIn('save_sidebar_rules', src)
+        self.assertNotIn('.set(', src)
+
+
+class NonFloorRoleExperienceTests(TestCase):
+    """Owner feedback 2026-08-02: an `accountant` login showed a WORKER experience.
+
+    The app only knew two kinds of person — management (`MANAGEMENT_ROLES`) and
+    "everyone else", who got the worker dashboard and the worker earnings page. So
+    an accountant saw *"Jab manager aapko kaam dega"* (your assigned work will
+    appear here — it never would) and a "My Earnings" page reading
+    *"Pieces Produced 0"*. An accountant never produces pieces.
+
+    `user_does_production_work()` is the missing third notion. These pin that a
+    non-floor role stops seeing worker content, and — critically — that a real
+    worker LOSES NOTHING, because the predicate guards a money page.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from accounts.models import Role, Skill
+        cls.roles = {r.code: r for r in Role.objects.all()}
+        cls.skill = Skill.objects.first() or Skill.objects.create(
+            name='t-skill', label='T Skill')
+
+    def _user(self, email, role_code, *, with_skill=False):
+        u = User.objects.create_user(email=email, password='x')
+        if role_code:
+            u.role = self.roles[role_code]
+            u.save(update_fields=['role'])
+        if with_skill:
+            u.skills.add(self.skill)
+        return u
+
+    # ── the predicate itself ─────────────────────────────────────────────────
+    def test_worker_role_does_floor_work(self):
+        from accounts.services import user_does_production_work
+        self.assertTrue(user_does_production_work(self._user('w@t', 'worker')))
+
+    def test_a_skill_alone_counts_as_floor_work(self):
+        """Skill == stage access, so anyone holding one is meant to open a stage —
+        even if their primary role is something else."""
+        from accounts.services import user_does_production_work
+        u = self._user('skilled@t', 'accountant', with_skill=True)
+        self.assertTrue(user_does_production_work(u))
+
+    def test_accountant_and_listing_team_do_not_do_floor_work(self):
+        from accounts.services import user_does_production_work
+        for code in ('accountant', 'listing_team'):
+            self.assertFalse(
+                user_does_production_work(self._user(f'{code}@t', code)), code)
+
+    def test_existing_earnings_reveal_the_page_even_without_role_or_skill(self):
+        """The safety clause: this predicate must never HIDE wages from somebody
+        who actually has money on the books."""
+        from decimal import Decimal
+
+        from accounts.services import user_does_production_work
+        from expense.models import WorkerLedgerEntry
+        u = self._user('paid@t', 'accountant')
+        self.assertFalse(user_does_production_work(u))
+        WorkerLedgerEntry.objects.create(
+            worker=u, entry_type=WorkerLedgerEntry.EntryType.CREDIT,
+            category=WorkerLedgerEntry.Category.STAGE_EARNING,
+            amount=Decimal('1.00'), entry_date=timezone.localdate())
+        u = User.objects.get(pk=u.pk)          # drop the request-cached principal
+        self.assertTrue(user_does_production_work(u),
+                        'a user WITH earnings must still be shown My Earnings')
+
+    # ── the menu ─────────────────────────────────────────────────────────────
+    def test_my_earnings_hidden_from_non_floor_roles_but_kept_for_workers(self):
+        from accounts.services import build_menu_for
+
+        def labels(u):
+            return {i['label'] for s in build_menu_for(u) for i in s['items']}
+        self.assertIn('My Earnings', labels(self._user('w2@t', 'worker')))
+        self.assertNotIn('My Earnings', labels(self._user('acc2@t', 'accountant')))
+        self.assertNotIn('My Earnings', labels(self._user('lt2@t', 'listing_team')))
+
+    # ── the dashboard copy ───────────────────────────────────────────────────
+    def test_worker_copy_is_not_shown_to_a_non_floor_role(self):
+        u = self._user('acc3@t', 'accountant')
+        self.client.force_login(u)
+        body = self.client.get(reverse('inventory:my_dashboard')).content.decode()
+        self.assertNotIn('aapko kaam dega', body,
+                         'accountant was promised assigned work that can never come')
+        self.assertIn('not set up for factory floor work', body)
+
+    def test_worker_still_sees_their_own_task_copy(self):
+        u = self._user('w3@t', 'worker')
+        self.client.force_login(u)
+        body = self.client.get(reverse('inventory:my_dashboard')).content.decode()
+        self.assertIn('aapko kaam dega', body,
+                      'a real worker must still be told where their work appears')

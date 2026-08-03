@@ -1,0 +1,83 @@
+{% extends "accounts/base.html" %}
+{# Block 3E — stacked-table canon @390; every number derived at read (F6) #}
+{% block page_title %}Yield Board{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-yb .thumb { width:48px; height:48px; object-fit:cover; border-radius:8px; background:#eee; }
+  .pai-yb .controls { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 14px; align-items:center; }
+  .pai-yb .badge { padding:2px 8px; border-radius:10px; background:#eef; font-size:12px; }
+  .pai-yb .best { background:#e7f6e7; }
+  .pai-yb .muted { color:#777; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-yb">
+  <div class="page-header">
+    <h1>Yield Board</h1>
+    <p class="subtitle">Which marker feeds the factory cheapest — meters per
+    100 garments, derived live from recorded facts. Nothing here is stored.</p>
+  </div>
+  <form method="get" class="controls">
+    <label>Product
+      <select name="product" onchange="this.form.submit()">
+        {% for p in products %}
+          <option value="{{ p.pk }}" {% if product and p.pk == product.pk %}selected{% endif %}>{{ p.code }} · {{ p.name }}</option>
+        {% empty %}<option value="">— no products with markers yet —</option>{% endfor %}
+      </select>
+    </label>
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <noscript><button class="btn">Go</button></noscript>
+    <span style="flex:1;"></span>
+    {% for s in sorts %}
+      <a class="badge" {% if s == sort %}style="background:#cde;"{% endif %}
+         href="?product={{ product.pk }}&sort={{ s }}">{{ s }}</a>
+    {% endfor %}
+  </form>
+
+  {% if not product %}
+    <div class="card"><div class="card-body">
+      No markers recorded yet — the board fills as manual markers and their
+      usages are captured.</div></div>
+  {% else %}
+  <div class="card card-clip"><div class="table-responsive">
+    <table>
+      <thead><tr>
+        <th>Photo</th><th>Reference</th><th>Status</th><th>Origin</th>
+        <th>Used</th><th>Outcomes (n)</th><th>Avg m/100</th><th>Avg m/garment</th>
+        <th>Last used</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr {% if forloop.first and sort == 'avg' and r.avg_meters_per_100 %}class="best"{% endif %}>
+          <td data-label="Photo">
+            {% if r.marker.photo_id %}<img class="thumb" loading="lazy"
+              src="{% url 'patterns_ai:capture-thumb' r.marker.photo_id %}" alt="">
+            {% else %}<span class="badge">—</span>{% endif %}</td>
+          <td data-label="Reference">
+            <a href="{% url 'patterns_ai:marker-detail' r.reference %}">{{ r.reference }}</a></td>
+          <td data-label="Status"><span class="badge">{{ r.marker.get_status_display }}</span></td>
+          <td data-label="Origin">{{ r.marker.get_origin_display }}</td>
+          <td data-label="Used">{{ r.usage_count }}×
+            {% if r.voided_usage_count %}<span class="muted">(+{{ r.voided_usage_count }} void)</span>{% endif %}</td>
+          <td data-label="Outcomes (n)">n={{ r.n_for_average }}</td>
+          <td data-label="Avg m/100">
+            {% if r.avg_meters_per_100 %}<strong>{{ r.avg_meters_per_100 }}</strong>
+            {% else %}<span class="muted">— (no facts yet)</span>{% endif %}</td>
+          <td data-label="Avg m/garment">
+            {% if r.avg_meters_per_garment %}{{ r.avg_meters_per_garment }}
+            {% else %}<span class="muted">—</span>{% endif %}</td>
+          <td data-label="Last used">
+            {% if r.last_used_at %}{{ r.last_used_at|date:"d M Y" }}{% else %}<span class="muted">never</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="9">No markers for {{ product.code }} yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <p class="muted" style="margin-top:8px;">All numbers derived at read from
+  recorded usage/outcome facts (metrics v{{ rows.0.metrics_version|default:"1" }}) —
+  honest n shown; “—” means the facts don’t exist yet, never a guess.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -13,7 +13,7 @@ entry points so callers do `from production.services import complete_layering`.
 
 Future stages = drop in services/<stage>_service.py + re-export here.
 """
-from .adda_service import create_adda, advance_to_next_stage
+from .adda_service import create_adda, advance_to_next_stage, cancel_adda, delete_adda
 from .product_service import create_product, update_product, archive_product
 from .product_size_service import (
     add_product_size, archive_product_size, reactivate_product_size,
@@ -31,8 +31,8 @@ from production.stages.layering.service import (
     save_layering_breakup,
     save_layering_draft,
     start_layering,
-    sync_layering_workers_for_skill,
     update_layering_roll_entry,
+    worker_layer_reconciliation,
 )
 from production.stages.cutting.service import (
     add_bundle_item,
@@ -78,17 +78,43 @@ from production.stages.barcode_generation.service import (
 )
 from .cost_service import clear_stage_cost
 from .activity_service import adda_activity, user_activity_across_addas
-from .access_service import user_can_access_stage, stage_access_map
+from .access_service import eligible_stage_workers, stage_access_map, user_can_access_stage
 from .flow_service import (
     add_stage_to_product_flow,
     move_stage_in_product_flow,
     remove_stage_from_product_flow,
     set_stage_cost,
+    set_stage_grain,
+)
+from .pool_service import (
+    allocate, allocate_whole, available, check_allocation_bound,
+    clear_stage_pool, materialize_stage_pool, pool_good, preview_bound_violations,
+    void_allocation, worker_allocated,
+)
+from .bundle_service import (
+    bundles_for_stage, my_assigned_work, stage_snapshot, worker_bundles,
 )
 
 __all__ = [
+    'set_stage_grain',
+    'pool_good',
+    'materialize_stage_pool',
+    'clear_stage_pool',
+    'allocate',
+    'allocate_whole',
+    'available',
+    'void_allocation',
+    'worker_allocated',
+    'check_allocation_bound',
+    'preview_bound_violations',
+    'bundles_for_stage',
+    'worker_bundles',
+    'my_assigned_work',
+    'stage_snapshot',
     'create_adda',
     'advance_to_next_stage',
+    'cancel_adda',
+    'delete_adda',
     'create_product',
     'update_product',
     'archive_product',
@@ -98,7 +124,6 @@ __all__ = [
     'reactivate_product_size',
     # Layering stage
     'start_layering',
-    'sync_layering_workers_for_skill',
     'attach_roll_to_layering',
     'update_layering_roll_entry',
     'detach_roll_from_layering',
@@ -107,6 +132,7 @@ __all__ = [
     'record_remaining_cloth',
     'remove_remaining_cloth',
     'complete_layering',
+    'worker_layer_reconciliation',
     'reopen_layering',
     'get_layering_snapshot',
     'attach_layering_snapshots',
@@ -156,6 +182,7 @@ __all__ = [
     'user_activity_across_addas',
     # Stage access control (DB-driven)
     'user_can_access_stage',
+    'eligible_stage_workers',
     'stage_access_map',
     # Product flow management
     'add_stage_to_product_flow',

@@ -1,23 +1,11 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
+{% load machines_tags %}
 
-{% block page_title %}Adda Dashboard{% endblock %}
+{% block page_title %}Operations{% endblock %}
 
 {% block extra_head %}
-<style>
-    .adda-dash .filter-card {
-        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
-        padding: 14px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card); margin-bottom: 18px;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .adda-dash .filter-card > * { flex-shrink: 0; }
-    .adda-dash .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
-    .adda-dash .filter-card label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--stone);
-    }
-    .adda-dash .filter-card input {
+<style>    .adda-dash .filter-card input {
         padding: 9px 12px; min-width: 150px;
         border: 1.5px solid #cfc0aa; border-radius: 10px;
         background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
@@ -39,6 +27,30 @@
     }
     .adda-dash .stage-chip strong { font-size: 18px; color: var(--copper); line-height: 1; }
     .adda-dash .stage-chip span { font-size: 13px; }
+    /* Operations digest (P1-1) — mobile-first auto-fit grid; stacks on phones. */
+    .adda-dash .digest {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px; margin-bottom: 18px;
+    }
+    .adda-dash .digest-tile {
+        padding: 14px 16px; background: var(--card-bg);
+        border: 1px solid var(--border-card); border-radius: 14px;
+        box-shadow: var(--shadow-card); text-decoration: none; color: var(--ink);
+        display: flex; flex-direction: column; gap: 6px; min-height: 84px;
+        transition: all 0.15s;
+    }
+    .adda-dash a.digest-tile { text-decoration: none; }
+    .adda-dash a.digest-tile:hover { border-color: var(--copper); transform: translateY(-1px); }
+    .adda-dash .digest-label {
+        font-size: 10px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--stone);
+    }
+    .adda-dash .digest-value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .adda-dash .digest-sub { font-size: 11px; color: var(--stone); }
+    .adda-dash .digest-tile.alert .digest-value { color: var(--danger); }
+    .adda-dash .digest-tile.warn  .digest-value { color: var(--warning); }
+    @media (max-width: 600px) {        .adda-dash .filter-card input, .adda-dash .filter-card select { width: 100%; min-width: 0; }
+    }
 </style>
 {# Shared accordion + time-log styles #}
 {% include 'inventory/_time_log_styles.html' %}
@@ -49,17 +61,54 @@
 <div class="adda-dash">
     <div class="page-header">
         <div class="page-header-text">
-            <h1>Adda Dashboard</h1>
+            <h1>Operations</h1>
             <p>Live snapshot of production batches.{% if filter_from or filter_to %} <strong>Filtered.</strong>{% endif %}</p>
         </div>
         <a href="{% url 'production:adda-create' %}" class="btn btn-primary">+ Start Adda</a>
     </div>
 
+    {% comment %} Operations digest (P1-1) — management-only morning pulse, locked priority order. {% endcomment %}
+    {% if digest %}
+    <div class="digest">
+        <a class="digest-tile {% if digest.stalled_count %}alert{% endif %}" href="{% url 'production:stalled-addas' %}">
+            <span class="digest-label">⚠ Stalled Addas</span>
+            <span class="digest-value">{{ digest.stalled_count }}</span>
+            <span class="digest-sub">no move in {{ digest.stalled_threshold_days }}+ days</span>
+        </a>
+        <a class="digest-tile {% if digest.pending_reports %}warn{% endif %}" href="{% url 'production:pending-reports' %}">
+            <span class="digest-label">Pending Reports</span>
+            <span class="digest-value">{{ digest.pending_reports }}</span>
+            <span class="digest-sub">assigned, not submitted</span>
+        </a>
+        <div class="digest-tile">
+            <span class="digest-label">Active Addas</span>
+            <span class="digest-value">{{ digest.active_addas }}</span>
+            <span class="digest-sub">in progress</span>
+        </div>
+        <div class="digest-tile">
+            <span class="digest-label">Completed Today</span>
+            <span class="digest-value">{{ digest.completed_today }}</span>
+        </div>
+        <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
+            <span class="digest-label">Pending Payable</span>
+            <span class="digest-value">{% money digest.pending_payable %}</span>
+            <span class="digest-sub">owed to workers</span>
+        </a>
+        <a class="digest-tile" href="{% url 'expense:payroll-overview' %}">
+            <span class="digest-label">Advance Exposure</span>
+            <span class="digest-value">{% money digest.advance_exposure %}</span>
+            <span class="digest-sub">outstanding advances</span>
+        </a>
+        {# R10-A machines tile via the machines app's tag — python imports stay downward-only #}
+        {% machines_ops_tile user %}
+    </div>
+    {% endif %}
+
     <form method="get" class="filter-card">
-        <div class="field"><label>From (created)</label><input type="date" name="from" value="{{ filter_from }}"></div>
-        <div class="field"><label>To (created)</label><input type="date" name="to" value="{{ filter_to }}"></div>
-        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
-        <div class="field"><label>&nbsp;</label><a href="{% url 'production:dashboard' %}" class="btn btn-ghost">Reset</a></div>
+        <div class="filter-field"><label>From (created)</label><input type="date" data-fancy-date name="from" value="{{ filter_from }}"></div>
+        <div class="filter-field"><label>To (created)</label><input type="date" data-fancy-date name="to" value="{{ filter_to }}"></div>
+        <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="filter-field"><label>&nbsp;</label><a href="{% url 'production:dashboard' %}" class="btn btn-ghost">Reset</a></div>
     </form>
 
     <div class="kpis">
@@ -91,7 +140,7 @@
                         <span>at {{ s.label }}</span>
                     </a>
                 {% empty %}
-                    <span style="color:var(--stone); font-size:13px;">No stages configured.</span>
+                    <span style="color:var(--stone); font-size:13px;">Nothing in progress right now.</span>
                 {% endfor %}
             </div>
         </div>

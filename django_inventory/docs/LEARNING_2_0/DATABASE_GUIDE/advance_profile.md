@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-advance-profile
+type: database-guide
+status: active
+owner: handwritten
+scope: advance_profile (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: WorkerAdvance (+ WorkerProfile)
 
 ## TL;DR

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from production.constants import STAGE_CUTTING
+from production.constants import ALLOC_DIM_COLOR_SIZE, STAGE_CUTTING
 from production.stages.base import CompletionResult, ReopenResult, StageHandler, register
 
 
@@ -25,6 +25,31 @@ class CuttingHandler(StageHandler):
     code = STAGE_CUTTING
     name = 'Cutting'
     template_partial = 'production/_stage_panel_cutting.html'
+    # S4/D1: Cutting is the piece-pool SOURCE — first stage where piece quantities +
+    # the (colour,size) breakup exist. Owner-locked 2026-06-14.
+    pool_grain = ALLOC_DIM_COLOR_SIZE
+
+    # S4/D3 (Option B): Cutting's pool good is AddaProductSizeColorPieceBreakdown — the
+    # single source of truth (C1), NOT duplicated into StagePoolSnapshot.
+    def pool_good(self, stage_record) -> dict:
+        """{(color_id, size_id): Decimal} from the verified cut-piece breakdown
+        (APSCPB), never from StagePoolSnapshot. Empty if cutting not completed."""
+        from decimal import Decimal
+
+        from django.db.models import Sum
+
+        from production.models import AddaProductSizeColorPieceBreakdown as Breakdown
+        cr = getattr(stage_record, 'cutting', None)   # OneToOne reverse; None pre-complete
+        if cr is None:
+            return {}
+        rows = (Breakdown.objects.filter(cutting_record=cr)
+                .values('color_id', 'size_id').annotate(g=Sum('verified_piece_count')))
+        return {(r['color_id'], r['size_id']): Decimal(r['g']) for r in rows}
+
+    def materialize_pool(self, stage_record) -> int:
+        """No-op: APSCPB is materialised by cutting completion (_materialize_breakdown),
+        and is the single source of truth — cutting writes NO StagePoolSnapshot row."""
+        return 0
 
     def snapshot(self, adda):
         from production.services import get_cutting_snapshot
@@ -74,15 +99,41 @@ class CuttingHandler(StageHandler):
             return Decimal(cr.bundles.count())
         return Decimal(cr.pieces_cut) if cr.pieces_cut is not None else None
 
-    def contribution_schema(self, adda):
+    def contribution_schema(self, adda, worker=None):
         """REFERENCE impl of the open-closed worker-contribution schema: Cutting
         workers report pieces per colour + size. Colours = active cloth palette;
         sizes = the product's active ProductSizes. (Not the final shape of all
         stages — a later stage-taxonomy review may revise this; the FRAMEWORK is the
         point. Default base schema = quantity-only.)"""
         from raw_materials.models import ClothColor
-        from production.models import ProductSize
+        from production.models import (
+            LayeringRollEntry, ProductSize, RemainingClothOfClothRoll,
+        )
+        # AUDIT-2: offer only the colours actually on this Adda, not the whole
+        # palette — a cutting master could otherwise report a colour that was
+        # never brought here (the downstream stitching reports are already
+        # Adda-scoped, so this also removes an inconsistency between them).
+        # TWO sources, because cloth reaches an Adda two ways:
+        #   1. rolls attached at layering            -> LayeringRollEntry
+        #   2. a leftover piece re-issued into it    -> consume_leftover only
+        #      flips RemainingClothOfClothRoll flags, it creates NO roll entry,
+        #      so source 2 must be unioned in or its colour goes missing.
+        # Fallback to the full active palette when neither source has anything
+        # yet, so the picker is never empty (e.g. a freshly created Adda).
+        laid_ids: set = set()
+        if adda is not None:
+            laid_ids |= set(
+                LayeringRollEntry.objects
+                .filter(stage_record__adda=adda)
+                .values_list('roll__cloth_color_id', flat=True))
+            laid_ids |= set(
+                RemainingClothOfClothRoll.objects
+                .filter(consumed_in_adda=adda)
+                .values_list('roll__cloth_color_id', flat=True))
+        laid_ids.discard(None)
         colors = ClothColor.active.all().order_by('name')
+        if laid_ids:
+            colors = colors.filter(pk__in=laid_ids)
         sizes = ProductSize.objects.filter(
             product=adda.product, is_active=True).order_by('display_order')
         return {

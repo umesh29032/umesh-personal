@@ -1,3 +1,13 @@
+---
+id: l2-apps-inventory-app-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: inventory
+anchors: config/inventory/
+verified: 2026-07-13
+---
+
 # inventory — business flows (APP_FLOW)
 
 ## TL;DR (1 min)

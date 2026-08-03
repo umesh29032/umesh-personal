@@ -1,0 +1,145 @@
+---
+id: debug-page-slow-or-erroring
+type: debugging
+verified: 2026-07-19
+knowledge_confidence: verified_against_code
+answers: "A page is suddenly slow, 500ing, or a save is deadlocking — where does a senior look first?"
+related: [concept-query-performance, concept-pg-locks, concept-django-settings]
+---
+
+# Playbook: "Page dheema hai / gir raha hai"
+
+> 📂 [Debugging](README.md) · [LOS home](../README.md)
+
+## Symptoms this playbook covers
+
+- A list page got slow (gradually or suddenly)
+- 500 on an action that "worked yesterday"
+- Saves hanging / deadlock errors under concurrent use
+- Works locally, broken in production
+
+> 💡 **Samjho aise:** Page dheema hone ki sabse aam wajah "server kamzor hai"
+> nahi hoti — wajah hoti hai ki code **ek hi sawaal database se sau baar** pooch
+> raha hai. 50 Adde dikhane hain, aur har Adde ke liye alag query chali jaati hai.
+>
+> Socho: ek aadmi ko 50 files chahiye. Wo 50 baar almirah tak jaata hai, ek-ek
+> file laata hai. Sahi tareeka? **Ek hi baar jaao, saari 50 uthaa lao.**
+> Django mein ye `select_related` / `prefetch_related` hai.
+>
+> Aur "**kal to chal raha tha**" ka matlab aksar yeh hota hai ki data badh gaya.
+> Code wahi hai — 10 rows pe theek tha, 10,000 pe nahi.
+>
+> Isliye pehle **query ginto**, phir code padho. Bina naapé optimize karna sirf
+> andaaza hai.
+
+## First Five Minutes
+
+1. **Slow or erroring? Different lanes.** Slow → count queries FIRST
+   (`CaptureQueriesContext` / debug toolbar): count exploded = N+1 at the
+   call site (code-shape bug, not a DB bug); count normal = ONE expensive
+   query → EXPLAIN it. *Never start by adding an index.*
+2. **500 → read the actual exception, bottom frame first.** This repo's
+   classifier: `ValidationError` text = a REFUSAL working as designed (read
+   the message — it names the fix) · `IntegrityError` = the DB wall caught
+   bad data (find the writer, never loosen the wall) · `InvalidOperation`/
+   type errors at the edge = input parsed past the boundary (PA-07-2 class).
+3. **Hanging saves → who holds the lock?** Settlement-adjacent = check the
+   documented order (5374 first, always). A NEW operation deadlocking =
+   someone took row locks without the gate.
+4. **Works-locally-not-prod → config lane:** settings overlay diff, then
+   `verify_production` output; the answer is usually an env var, not code.
+5. **"Suddenly" is a lie worth interrogating:** what deployed/changed?
+   dated receipts + git log answer faster than profilers.
+
+## Case file: the P19A twins (2026-07-20 — both shipped inside `erp-v1.0.0`)
+
+Real production-testing 500s, both invisible to the green test battery:
+
+- **`TransactionManagementError: select_for_update cannot be used outside of
+  a transaction`** → some caller LOST its `@transaction.atomic`. This repo's
+  instance: a helper def was inserted *between* the decorator and
+  `start_layering` (decorator silently bound to the helper) — every layering
+  roster update 500'd AND left partial committed writes. 💡 Samjho aise:
+  decorator hamesha agle `def` se chipakta hai — beech mein naya function
+  ghusaya toh decorator chori ho gaya. **Why tests stayed green:** `TestCase`
+  wraps each test in a transaction, so the lock always finds one — this class
+  is only catchable by `TransactionTestCase` + a real request
+  (`production/tests/test_p19a_regressions.py`).
+- **`MultipleObjectsReturned` on a page that "worked yesterday"** → a
+  single-row `.get()` whose data grew a second row. Instance: worker report
+  resolved its stage record with `.get(adda, stage)` — the streams redesign
+  made pre-production stages one-SR-PER-LANE, so every multi-lane Adda 500'd
+  (before the permission check, for every role). Fix shape: resolve through
+  the user's OWN rows (their task picks the lane). Grep-bait: any
+  `.get(adda=…, workflow_stage=…)` on lane-scoped stages is this bug waiting.
+
+Also from the same audit: dev-only random `FATAL: sorry, too many clients` =
+`CONN_MAX_AGE=600` + runserver's thread-per-request leaking connections —
+dev overrides to 0 in `settings/local.py`; production's 3 SYNC gunicorn
+workers keep it bounded.
+
+## Decision tree
+
+```
+SLOW
+├─ query count exploded → N+1: template loop attr / dropped select_related /
+│    per-row method → fix at call site → RE-PIN the count (named constant)
+├─ count fine, one big query → EXPLAIN (ANALYZE, BUFFERS):
+│    est-vs-actual rows way off → stale stats (ANALYZE table)
+│    Seq Scan on a NOW-big table → the declared index finally matters
+│    (dev-size ≠ prod-size — the planner changed its mind WITH the data)
+└─ neither → not the DB: template size? middleware? network?
+500
+├─ ValidationError → a guard refused; message names the actor/fix — do THAT
+├─ IntegrityError → which constraint? (23505 unique / 23514 check) —
+│    find the writer that skipped the service path
+├─ Decimal/InvalidOperation → unparsed input reached logic — add the
+│    edge-parse + the refusal pin
+└─ ImproperlyConfigured/KeyError at boot → fail-fast config doing its job —
+     fill .env, don't add a default
+DEADLOCK / HANG
+├─ settlement family → order violated: EVERY money op takes 5374 FIRST;
+│    a lighter op holding WSC rows blocks finalize correctly (short wait ≠ deadlock)
+└─ new feature → its locks joined the documented order? sorted per-worker?
+```
+
+## Which checks, concretely
+
+| Check | How |
+|---|---|
+| Query count | `CaptureQueriesContext` around the view; diff vs its pin (12 pins exist — is one failing?) |
+| The plan | `EXPLAIN (ANALYZE, BUFFERS)` — read bottom-up; Rows Removed = waste ([from-orm-to-sql §4](../concepts/postgresql/from-orm-to-sql.md)) |
+| Lock waits | `pg_stat_activity` / `pg_locks` — who waits on whom; advisory 5374/5375 visible there |
+| Config parity | production overlay is SHORT — read it; then `verify_production` |
+| Template caching | dev runserver caches templates — RESTART after template edits (repeat repo lesson) |
+
+## Known real causes (this repo's scars)
+
+- **SETL reference race** → two clerks, IntegrityError 500 → fixed with the
+  global advisory lock (the comment in `create_settlement` tells it).
+- **`select_for_update` on nullable-FK join** → PG refuses → `of=('self',)`.
+- **RunPython in `dependencies`** → migration crash class.
+- **`--keepdb` state poison** → "flaky" tests that were cross-suite
+  contamination; sequential fresh-DB law exists because of it.
+- **Template edit "not taking"** → dev server template cache, restart.
+
+## Where to learn the concepts
+
+[query-performance](../concepts/postgresql/query-performance.md) ·
+[indexes](../concepts/postgresql/indexes.md) · [locks](../concepts/postgresql/locks.md) ·
+[settings](../concepts/django/settings.md) · [constraints](../concepts/postgresql/constraints.md)
+
+> 🧠 **Remember This:** dheema page = aksar **N+1 query** (ek hi sawaal sau
+> baar). Almirah tak 50 baar mat jao — `select_related` / `prefetch_related`
+> se ek hi baar mein le aao. "Kal chal raha tha" ka matlab aksar **data badh
+> gaya**, code nahi badla. Hamesha **pehle naapo (query count), phir sudharo** —
+> bina naapé optimize karna sirf andaaza hai.
+
+## Implementation References
+
+- Ops trees: [docs/release/TROUBLESHOOTING.md](../../docs/release/TROUBLESHOOTING.md) (11 field scenarios) · symptom router: [docs/LEARNING_2_0/PROJECT_BRAIN/DEBUGGING_INDEX.md](../../docs/LEARNING_2_0/PROJECT_BRAIN/DEBUGGING_INDEX.md)
+
+## Code References
+
+- Pins: `production/tests/test_perf_baseline.py` · `expense/tests/test_perf_settlement.py` — a slow-page fix ends by re-pinning
+- Lock order canon: `expense/services/adda_settlement_service.py` + the chokepoint doc

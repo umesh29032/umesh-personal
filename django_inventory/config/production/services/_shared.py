@@ -68,13 +68,14 @@ def _ensure_can_complete_layering(user):
 # ── Shared stage-reopen skeleton (Template Method) ───────────────────────────
 
 def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
-                        guard=None, teardown=None) -> AddaStageRecord:
+                        guard=None, teardown=None,
+                        stream=None) -> AddaStageRecord:
     """Common skeleton for every per-stage `reopen_*` service (layering / cutting /
     cutting_pattern / barcode_generation). Owns the invariant ALL reopens share;
     each stage passes its OWN `guard` + `teardown` so the stage-specific logic
     stays local + visible at the call site (no hidden framework).
 
-    Skeleton (in order):
+    Skeleton (in order, stream=None):
       1. management-role gate
       2. find this product's WorkflowStage(stage_code)   → ValidationError if absent
       3. select_for_update its AddaStageRecord           → ValidationError if absent
@@ -105,9 +106,17 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     try:
         # Hinglish: SR row lock — reopen aur settlement-finalize dono isi row
         # ko lock karte hain, isliye yeh check finalize se race nahi kar sakta.
-        sr = AddaStageRecord.objects.select_for_update().get(
-            adda=adda, workflow_stage=wf,
-        )
+        from production.services.adda_service import (
+            PRE_PRODUCTION_STAGE_CODES, lane_stage_record, resolve_stream)
+        if stage_code in PRE_PRODUCTION_STAGE_CODES:
+            lane = resolve_stream(adda, stream)
+            sr = lane_stage_record(adda, wf, lane, for_update=True)
+            if sr is None:
+                raise AddaStageRecord.DoesNotExist
+        else:
+            sr = AddaStageRecord.objects.select_for_update().get(
+                adda=adda, workflow_stage=wf,
+            )
     except AddaStageRecord.DoesNotExist:
         raise ValidationError(f"{stage_label} stage has never been started.")
     if sr.completed_at is None:
@@ -132,6 +141,11 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
             "reverse that settlement first (Adda Settlements screen), then reopen."
         )
 
+    # S4/Phase 5 (M-4 contract, uniform across ALL stages): refuse reopen while a
+    # downstream CONSUMER of this stage's pool output still exists. Names the furthest
+    # blocking stage + blocker + the corrective action. Reverse-first discipline.
+    _downstream_consumer_guard(adda, sr, wf)
+
     if guard is not None:
         guard(adda, sr, wf)
 
@@ -146,6 +160,13 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
     from production.services.cost_service import clear_stage_cost
     clear_stage_cost(sr)
 
+    # F4: re-float + unlock the worker-rate snapshot, SYMMETRIC with the cost re-freeze
+    # above — re-complete re-freezes the rate at the current resolved value (grouped→0 via
+    # the F2 structural guard). Reopen is a production-truth correction; cost-freeze and
+    # worker-rate-freeze behave consistently. Settlement remains the final money boundary.
+    from production.services.stage_rate_service import refloat_rates_on_reopen
+    refloat_rates_on_reopen(sr)
+
     # PAY-3 (narrowed V2-3 PR-A): reopen reverses the ALLOCATION-era worker
     # earnings for this stage (era-A only — adda_settlement IS NULL). The frozen
     # manufacturing cost is cleared above; era-A ledger credits must be voided
@@ -158,6 +179,11 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
                             adda_settlement__isnull=True)
     ):
         void_allocation(assignment, user=user)
+
+    # S4/Phase 5: clear this stage's StagePoolSnapshot (if it produced one) — re-complete
+    # refreezes it. No-op for cutting (APSCPB cleared by its own teardown) + NONE stages.
+    from production.services.pool_service import clear_stage_pool
+    clear_stage_pool(sr)
 
     adda.current_stage = wf
     adda.status = Adda.Status.IN_PROGRESS
@@ -173,6 +199,46 @@ def reopen_stage_record(*, adda: Adda, stage_code: str, stage_label: str, user,
         stage_code, adda.code, sr.pk, wf.pk, getattr(user, 'pk', None),
     )
     return sr
+
+
+def _downstream_consumer_guard(adda, sr, wf):
+    """S4/Phase 5 (M-4 contract): refuse reopen of stage `wf` while a DOWNSTREAM consumer of
+    its pool output still exists — a non-voided WorkerStageAllocation, a completed/verified
+    WorkerStageContribution (good/alter/missing), or (future) an AlterCase. Transitive:
+    checks ALL stages with order > wf.order in this Adda. Names the FURTHEST blocking stage
+    (where recovery starts), the blocker type(s), and the corrective action — reverse-first.
+
+    Uniform across every stage (skeleton-level), so pool integrity can't be bypassed by an
+    upstream edit. Dormant in flows whose downstream stages have no allocations/contributions
+    (e.g. today: cutting's only downstream is barcode = NONE/auto)."""
+    from production.models import (
+        AddaStageRecord, WorkerStageAllocation, WorkerStageContribution, WorkerStageTask,
+    )
+    downstream = (
+        AddaStageRecord.objects
+        .filter(adda=adda, workflow_stage__order__gt=wf.order)
+        .select_related('workflow_stage__stage')
+        .order_by('-workflow_stage__order')   # furthest downstream first — recovery start
+    )
+    for d in downstream:
+        blockers = []
+        if WorkerStageAllocation.objects.filter(
+                stage_record=d, voided_at__isnull=True).exists():
+            blockers.append('active worker allocations')
+        if WorkerStageContribution.objects.filter(
+                task__stage_record=d,
+                task__status__in=(WorkerStageTask.Status.COMPLETED,
+                                  WorkerStageTask.Status.VERIFIED)).exists():
+            blockers.append('completed production (good/alter/missing)')
+        # Future: an open AlterCase on `d` → blockers.append('open alter cases')
+        if blockers:
+            name = d.workflow_stage.stage.name
+            raise ValidationError(
+                f"Cannot reopen {wf.stage.name}: downstream stage '{name}' still has "
+                f"{' and '.join(blockers)} that depend on this stage's output. Reverse-first — "
+                f"reverse any settlement on '{name}', void its allocations, then reopen "
+                f"'{name}'; work back toward '{wf.stage.name}'."
+            )
 
 
 def downstream_started_guard(adda, sr, wf):

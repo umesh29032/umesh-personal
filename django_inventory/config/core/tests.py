@@ -10,8 +10,12 @@ an import-load cycle — but should stay rare.)
 """
 import ast
 import pathlib
+from datetime import date, datetime
+from datetime import timezone as dt_timezone
+from unittest import mock
 
 from django.test import Client, SimpleTestCase, TestCase
+from django.utils import timezone
 
 CONFIG_DIR = pathlib.Path(__file__).resolve().parent.parent  # .../config
 DOMAIN_APPS = {
@@ -42,6 +46,166 @@ def _offenders(app: str, forbidden: set[str]) -> dict[str, list[str]]:
         if bad:
             out[str(py.relative_to(CONFIG_DIR))] = sorted(bad)
     return out
+
+
+class LocalDateGuardTests(SimpleTestCase):
+    """`timezone.now().date()` returns a **UTC** date. With TIME_ZONE='Asia/Kolkata'
+    and USE_TZ=True, the factory's books run on IST, so a UTC date is one day behind
+    for 5.5 hours every day — and a whole month behind on the 1st.
+
+    That bug shipped in **15** places (2026-08-01), FIVE of them stamping dates onto
+    money records: `settlement_date`, advance date, and ledger `entry_date` in BOTH
+    the per-worker and the Adda settlement paths. It was found only because bod's
+    money-tile cross-check compared an IST tile against a UTC page and failed on a
+    month boundary. Report: docs/UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md
+
+    The correct primitive is `timezone.localdate()` — and `timezone.localdate(dt)`
+    when an instant already exists, so a derived date can never disagree with the
+    datetime it came from.
+
+    **Why this test is AST-based, not a string scan.** The first version of this pin
+    matched the literal text `timezone.now().date()`. It passed while FIVE real bugs
+    survived, because they were written as:
+
+        now = timezone.now()      # aware UTC datetime
+        ... now.date() ...        # <- UTC date, invisible to a string scan
+
+    A guard that only catches the shape you already fixed is not a guard. This one
+    walks the tree and follows the variable.
+
+    **The stored-field shape is covered too.** `obj.created_at.month` is the UTC
+    month and is the same bug — it bit immediately, in `outcome_trend`, where the
+    bucket *keys* were local while the bucket *fill* read `created_at.month`. Type
+    inference is impossible here, so `DATETIME_FIELDS` is a curated list of this
+    project's aware-datetime field names. **Add to it when you add such a field.**
+
+    Parsing an explicit string (`datetime.strptime(s, '%Y-%m-%d').date()`) is
+    legitimate and must stay allowed.
+    """
+
+    DATE_PARTS = ('date', 'year', 'month', 'day')
+
+    # Aware datetime fields in this project: reading a date part off one of these
+    # gives the UTC value. Not exhaustive by construction — extend it.
+    DATETIME_FIELDS = frozenset({
+        'created_at', 'updated_at', 'completed_at', 'started_at', 'settled_at',
+        'reversed_at', 'voided_at', 'last_opened_at', 'finalized_at', 'paid_at',
+        'timestamp', 'logged_at', 'recorded_at', 'issued_at', 'generated_at',
+        'last_login', 'date_joined', 'locked_until', 'deleted_at', 'cancelled_at',
+    })
+
+    def _offenders(self, path):
+        """Every UTC-derived date-part access in one file, as readable strings."""
+        try:
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+        except SyntaxError:                     # pragma: no cover - not our files
+            return []
+        found = []
+
+        def is_tz_now(node):
+            return (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == 'now'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'timezone')
+
+        # 1. names bound to timezone.now() — the shape the string scan missed
+        utc_names = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and is_tz_now(node.value):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        utc_names[target.id] = node.lineno
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute) or node.attr not in self.DATE_PARTS:
+                continue
+            recv = node.value
+            # 2. inline: timezone.now().date() / .year / .month / .day
+            if is_tz_now(recv):
+                found.append(f'L{node.lineno}: timezone.now().{node.attr}')
+            # 3. via a variable: now = timezone.now(); now.date()
+            elif isinstance(recv, ast.Name) and recv.id in utc_names:
+                found.append(f'L{node.lineno}: {recv.id}.{node.attr} '
+                             f'({recv.id} = timezone.now() at L{utc_names[recv.id]})')
+            # 4. off a stored aware field: obj.created_at.month  (UTC month)
+            elif isinstance(recv, ast.Attribute) and recv.attr in self.DATETIME_FIELDS:
+                found.append(f'L{node.lineno}: .{recv.attr}.{node.attr} '
+                             '(stored field is UTC — wrap in timezone.localtime())')
+
+        # 5. Python's date.today() reads the SERVER clock, not Django's TIME_ZONE —
+        #    on a UTC container that is the same bug by another route.
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                    and node.func.attr == 'today' \
+                    and isinstance(node.func.value, ast.Name) \
+                    and node.func.value.id in ('date', 'datetime', '_date'):
+                found.append(f'L{node.lineno}: {node.func.value.id}.today()')
+        return found
+
+    def test_no_utc_date_used_as_a_local_date(self):
+        offenders = {}
+        for py in CONFIG_DIR.rglob('*.py'):
+            # Tests may build fixtures from a UTC date; migrations are frozen history.
+            if 'migrations' in py.parts or 'tests' in py.parts \
+                    or py.name == 'tests.py' or py.name.startswith('test_'):
+                continue
+            hits = self._offenders(py)
+            if hits:
+                offenders[str(py.relative_to(CONFIG_DIR))] = hits
+        self.assertEqual(
+            offenders, {},
+            'UTC date used where a LOCAL date is meant. Use timezone.localdate() — '
+            'or timezone.localdate(dt) to derive from an existing instant. '
+            '(TIME_ZONE=Asia/Kolkata, USE_TZ=True.) See '
+            f'docs/UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md. Offenders: {offenders}')
+
+    def test_the_guard_actually_catches_the_shape_that_escaped_it(self):
+        """Meta-test: prove the AST guard sees the variable form. Without this,
+        a future refactor could silently weaken the guard back to a string scan
+        and nothing would fail."""
+        import tempfile
+        cases = {
+            'inline.py': 'from django.utils import timezone\nd = timezone.now().date()\n',
+            'viavar.py': ('from django.utils import timezone\n'
+                          'now = timezone.now()\nd = now.date()\n'),
+            'year.py': ('from django.utils import timezone\n'
+                        'now = timezone.now()\ny = now.year\n'),
+            'today.py': 'from datetime import date\nd = date.today()\n',
+            'stored.py': 'k = f"{o.created_at.year}-{o.created_at.month}"\n',
+        }
+        ok = {
+            'good1.py': 'from django.utils import timezone\nd = timezone.localdate()\n',
+            'good2.py': ('from django.utils import timezone\n'
+                         'w = timezone.now()\nd = timezone.localdate(w)\n'),
+            'good3.py': ("from datetime import datetime\n"
+                         "d = datetime.strptime(s, '%Y-%m-%d').date()\n"),
+            'good4.py': ('from django.utils import timezone\n'
+                         'c = timezone.localtime(o.created_at)\n'
+                         'k = f"{c.year}-{c.month}"\n'),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for name, src in {**cases, **ok}.items():
+                (root / name).write_text(src)
+            for name in cases:
+                self.assertTrue(self._offenders(root / name),
+                                f'guard MISSED the offending shape in {name}')
+            for name in ok:
+                self.assertEqual(self._offenders(root / name), [],
+                                 f'guard false-positived on legitimate {name}')
+
+    def test_localdate_is_actually_local_not_utc(self):
+        """Proves the primitive we mandate does the thing we claim, rather than
+        trusting the name."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+        self.assertEqual(timezone.get_current_timezone_name(), 'Asia/Kolkata')
+        # IST is UTC+05:30, so the local date can never be BEHIND the UTC date,
+        # and is one day AHEAD for 5.5h every day.
+        self.assertIn(timezone.localdate() - timezone.now().date(),
+                      (timedelta(0), timedelta(days=1)))
 
 
 class FoundationPurityTests(SimpleTestCase):
@@ -313,6 +477,77 @@ class PkalsNavigationGuardTests(SimpleTestCase):
         self.assertTrue(
             impact.match_file('config/production/services/worker_task_service.py', file_rows),
             "worker_task_service.py no longer matches any matrix row — /impact broken.")
+
+
+class MidnightBoundaryTests(TestCase):
+    """Prove the local-date contract holds **inside the divergence window**.
+
+    IST is UTC+05:30, so between 00:00 and 05:30 IST the UTC date is one day
+    behind — and on the 1st of a month, a whole month behind. Every test that
+    exercises "today" therefore PASSES mid-month and can only fail in that
+    5.5-hour window. `bod`'s money-tile cross-check was exactly such a test: it
+    sat green for months and only went red because someone ran it at 01:27 IST
+    on the 1st (docs/UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md).
+
+    Luck is not a test strategy. These freeze the clock **at** the boundary so
+    the contract is checked on every run, at any hour.
+    """
+
+    # 2026-07-31 19:30 UTC == 2026-08-01 01:00 IST — different DAY *and* MONTH.
+    UTC_INSTANT = datetime(2026, 7, 31, 19, 30, tzinfo=dt_timezone.utc)
+    LOCAL_DATE = date(2026, 8, 1)      # what the factory calls "today"
+    UTC_DATE = date(2026, 7, 31)       # what a naive .date() would give
+
+    def test_the_fixture_really_straddles_the_boundary(self):
+        """Guard the guard: if this ever stops diverging, the tests below become
+        vacuous and would pass while proving nothing."""
+        self.assertEqual(self.UTC_INSTANT.date(), self.UTC_DATE)
+        self.assertEqual(timezone.localtime(self.UTC_INSTANT).date(), self.LOCAL_DATE)
+        self.assertNotEqual(self.UTC_DATE, self.LOCAL_DATE)
+        self.assertNotEqual(self.UTC_DATE.month, self.LOCAL_DATE.month)
+
+    def test_localdate_of_that_instant_is_the_local_day(self):
+        self.assertEqual(timezone.localdate(self.UTC_INSTANT), self.LOCAL_DATE)
+
+    def test_expense_month_default_uses_the_LOCAL_month_at_the_boundary(self):
+        """The exact divergence that made a BOD tile disagree with its own source
+        page: tile said August (local), page said July (UTC)."""
+        from django.test import RequestFactory
+
+        from expense.views import _parse_month
+        with mock.patch('django.utils.timezone.now', return_value=self.UTC_INSTANT):
+            year, month = _parse_month(RequestFactory().get('/expense/expenses/'))
+        self.assertEqual((year, month), (2026, 8),
+                         'expense month default fell back to the UTC month')
+
+    def test_month_start_uses_the_LOCAL_month_at_the_boundary(self):
+        from expense.views import _month_start
+        with mock.patch('django.utils.timezone.now', return_value=self.UTC_INSTANT):
+            self.assertEqual(_month_start(), date(2026, 8, 1))
+
+    def test_bod_tile_and_expense_page_agree_at_the_boundary(self):
+        """The two sides of the original bug, compared directly. They must bucket
+        the same month whatever the clock says."""
+        from django.test import RequestFactory
+
+        from expense.views import _parse_month
+        with mock.patch('django.utils.timezone.now', return_value=self.UTC_INSTANT):
+            tile_now = timezone.localtime()          # what bod/widgets.py uses
+            page_year, page_month = _parse_month(
+                RequestFactory().get('/expense/expenses/'))
+        self.assertEqual((tile_now.year, tile_now.month), (page_year, page_month),
+                         'BOD money tile and the expense page are on different clocks')
+
+    def test_completed_today_uses_the_LOCAL_day_at_the_boundary(self):
+        """An Adda completed at 01:00 IST on the 1st belongs to the 1st, not to
+        the previous month's last day."""
+        from production.services.operations_digest import adda_status_counts
+        with mock.patch('django.utils.timezone.now', return_value=self.UTC_INSTANT):
+            with mock.patch(
+                    'production.services.operations_digest.timezone.localdate',
+                    return_value=self.LOCAL_DATE) as m:
+                adda_status_counts(fields={'completed_today'})
+            self.assertTrue(m.called, 'completed_today no longer derives a local date')
 
 
 class ObservabilityTests(TestCase):

@@ -1,3 +1,13 @@
+---
+id: l2-apps-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system
+anchors: —
+verified: 2026-07-13
+---
+
 # LEARNING_2_0/APPS — per-app navigation layer
 
 **Purpose.** A compact per-app *navigation* view: what each app does, its

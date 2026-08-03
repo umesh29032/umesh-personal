@@ -60,10 +60,23 @@ def allocate_stage_work(*, user, stage_record, worker, allocated_quantity,
     """
     _ensure_management(user)
 
+    # 🔒 ADR-0011 (hostile-review H-1 fix, 2026-07-05): a MONTHLY worker must
+    # NEVER receive piece-rate earnings from ANY code path — this legacy path
+    # included, REGARDLESS of the rollback lever below. Checked FIRST so the
+    # invariant holds even when the lever is ON.
+    from expense.services.payroll_service import is_monthly
+    if is_monthly(worker):
+        raise ValidationError(
+            "This worker is on a monthly salary — they never receive "
+            "piece-rate credits. Salary is recorded under Factory Expenses.")
+
     # V2-2 cutover lever (ADR-0007): with the flag OFF, earnings book ONLY at
     # Adda settlement — the allocation-credit path refuses outright.
+    # Fallback is False (settlement-first) — matches base.py default + stage_views,
+    # so if the setting is ever removed this path can never silently revert to
+    # allocation-era crediting (P0-3 / E-2). Setting is always defined today.
     from django.conf import settings as dj_settings
-    if not getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', True):
+    if not getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', False):
         raise ValidationError(
             "Allocation-time crediting is disabled — earnings now book at Adda "
             "settlement (finalize). Use the Adda Settlements screen.")
@@ -128,7 +141,7 @@ def allocate_stage_work(*, user, stage_record, worker, allocated_quantity,
     )
     ledger_service.log_credit(
         worker=worker, category=WorkerLedgerEntry.Category.STAGE_EARNING,
-        amount=amount, entry_date=entry_date or timezone.now().date(),
+        amount=amount, entry_date=entry_date or timezone.localdate(),
         created_by=user, assignment=assignment,
         notes=f"{stage_record.adda.code} · {ws.stage.name}",
     )

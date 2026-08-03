@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}{{ s.reference }}{% endblock %}
 
@@ -53,6 +54,20 @@
     </div>
     {% endif %}
 
+    {% comment %} M-6 reconciliation WARNING (S1 / D-β): paid-more-than-produced surfaced, not blocked. {% endcomment %}
+    {% if reconciliation_warnings %}
+    <div class="card" style="border-left:5px solid var(--warning); background:var(--warning-bg); margin:14px 0; padding:14px 16px;">
+        <strong style="color:var(--warning); text-transform:uppercase; letter-spacing:.06em; font-size:12px;">⚠ Quantity reconciliation</strong>
+        <p style="margin:6px 0 8px; font-size:13px; color:var(--ink);">Settled quantity exceeds recorded output on:</p>
+        <ul style="margin:0; font-size:13px;">
+            {% for r in reconciliation_warnings %}
+            <li><code>{{ r.stage }}</code> — output {{ r.output_qty|default:"—" }}, settled {{ r.allocated_qty }} ({{ r.flag }}{% if r.qty_delta != None %}, Δ {{ r.qty_delta }}{% endif %})</li>
+            {% endfor %}
+        </ul>
+        <p style="margin:8px 0 0; font-size:11px; color:var(--stone);">Warn-only (verify the worker reports). Settlement enforcement arrives with the Production-Truth Foundation (S5).</p>
+    </div>
+    {% endif %}
+
     {% if s.status == 'draft' %}
     {# ── DRAFT: recomputable preview + variance + recovery + finalize ── #}
     <div class="panel muted" style="font-size:12px;">
@@ -63,22 +78,25 @@
         {% for w in workers %}
         <div class="panel">
             <h2>{{ w.worker.get_full_name|default:w.worker.email }}
-                <span class="muted">— expected ₹{{ w.expected|floatformat:2 }}</span></h2>
+                <span class="muted">— expected {% money w.expected %}</span></h2>
+            {# .table-responsive = horizontal-scroll on desktop, stacked label:value cards ≤600px (mobile) #}
+            <div class="table-responsive">
             <table>
                 <thead><tr><th>Stage</th><th>Color</th><th>Size</th><th class="num">Qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th></tr></thead>
                 <tbody>
                 {% for l in w.lines %}
                     <tr>
-                        <td>{{ l.stage }}</td>
-                        <td>{{ l.color|default:"—" }}</td>
-                        <td>{{ l.size|default:"—" }}</td>
-                        <td class="num">{{ l.qty }}{% if l.verified %} <span class="muted" title="verified quantity used">✓</span>{% endif %}</td>
-                        <td class="num">{{ l.rate|floatformat:2 }}</td>
-                        <td class="num">{{ l.amount|floatformat:2 }}</td>
+                        <td data-label="Stage">{{ l.stage }}</td>
+                        <td data-label="Color">{{ l.color|default:"—" }}</td>
+                        <td data-label="Size">{{ l.size|default:"—" }}</td>
+                        <td class="num" data-label="Qty">{{ l.qty }}{% if l.verified %} <span class="muted" title="verified quantity used">✓</span>{% endif %}</td>
+                        <td class="num" data-label="Rate ₹">{{ l.rate|floatformat:2 }}</td>
+                        <td class="num" data-label="Amount ₹">{{ l.amount|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
 
             <h3>Variance (counts only — factory absorbs; pay is not reduced)</h3>
             <div style="display:flex; gap:14px; flex-wrap:wrap;">
@@ -89,24 +107,50 @@
 
             {% if w.advances %}
             <h3>Recover advances <span class="muted">— optional, ≤ remaining; you decide per advance</span></h3>
+            <div class="table-responsive">
             <table>
                 <thead><tr><th>Date</th><th class="num">Remaining ₹</th><th class="num">Recover now ₹</th></tr></thead>
                 <tbody>
                 {% for a in w.advances %}
                     <tr>
-                        <td>{{ a.advance.advance_date }}{% if a.advance.notes %} · <span class="muted">{{ a.advance.notes }}</span>{% endif %}</td>
-                        <td class="num">{{ a.remaining|floatformat:2 }}</td>
-                        <td class="num"><input type="number" inputmode="decimal" step="0.01" min="0" max="{{ a.remaining|floatformat:2 }}" name="recover_{{ a.advance.id }}" placeholder="0.00"></td>
+                        <td data-label="Date">{{ a.advance.advance_date }}{% if a.advance.notes %} · <span class="muted">{{ a.advance.notes }}</span>{% endif %}</td>
+                        <td class="num" data-label="Remaining ₹">{{ a.remaining|floatformat:2 }}</td>
+                        <td class="num" data-label="Recover now ₹"><input type="number" inputmode="decimal" step="0.01" min="0" max="{{ a.remaining|floatformat:2 }}" name="recover_{{ a.advance.id }}" placeholder="0.00"></td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% endif %}
         </div>
         {% endfor %}
 
         {% if not workers %}
-        <div class="panel"><div class="muted">No settleable lines — every completed contribution on payable stages is already credited (see below).</div></div>
+        <div class="panel"><div class="muted">No settleable lines — every completed contribution on payable stages is already credited or excluded (see below).</div></div>
+        {% endif %}
+
+        {# R4 (PDD §27-D4): monthly workers' lines — visible so the admin SEES what won't pay #}
+        {% if skip_monthly %}
+        <div class="panel">
+            <h2>Excluded — monthly-salary worker <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span></h2>
+            <div class="skip">
+                <div class="why">Why excluded: these workers are paid a monthly salary (recorded under Expenses), so their production is tracked for records but never becomes a settlement line. If a worker is switched back to piece-rate before settling, these lines become payable again.</div>
+                <div class="table-responsive">
+                <table>
+                    <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th></tr></thead>
+                    <tbody>
+                    {% for l in skip_monthly %}
+                        <tr>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
         {% endif %}
 
         {% if skip_a %}
@@ -114,19 +158,21 @@
             <h2>Excluded — already credited at allocation (legacy)</h2>
             <div class="skip">
                 <div class="why">Why excluded: these earnings were booked the old way, at work allocation, before Adda settlements existed. Settling them again would pay the worker twice. They stay on the old ledger entries.</div>
+                <div class="table-responsive">
                 <table>
                     <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th class="num">Would-be ₹</th></tr></thead>
                     <tbody>
                     {% for l in skip_a %}
                         <tr>
-                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
-                            <td>{{ l.stage }}</td>
-                            <td class="num">{{ l.qty }}</td>
-                            <td class="num">{{ l.amount|floatformat:2 }}</td>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                            <td class="num" data-label="Would-be ₹">{{ l.amount|floatformat:2 }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         {% endif %}
@@ -136,83 +182,99 @@
             <h2>Excluded — settled by an earlier Adda settlement</h2>
             <div class="skip">
                 <div class="why">Why excluded: an earlier settlement already booked these lines. To re-settle them, reverse that settlement first.</div>
+                <div class="table-responsive">
                 <table>
                     <thead><tr><th>Worker</th><th>Stage</th><th class="num">Qty</th><th>Settled by</th></tr></thead>
                     <tbody>
                     {% for l in skip_b %}
                         <tr>
-                            <td>{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
-                            <td>{{ l.stage }}</td>
-                            <td class="num">{{ l.qty }}</td>
-                            <td>{{ l.contribution.settlement_line.adda_settlement.reference|default:"—" }}</td>
+                            <td data-label="Worker">{{ l.contribution.task.worker.get_full_name|default:l.contribution.task.worker.email }}</td>
+                            <td data-label="Stage">{{ l.stage }}</td>
+                            <td class="num" data-label="Qty">{{ l.qty }}</td>
+                            <td data-label="Settled by">{{ l.contribution.settlement_line.adda_settlement.reference|default:"—" }}</td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
         {% endif %}
 
         <div class="panel totals">
-            <div class="t"><div class="v">₹{{ grand_expected|floatformat:2 }}</div><div class="l">Total expected earning</div></div>
+            <div class="t"><div class="v">{% money grand_expected %}</div><div class="l">Total expected earning</div></div>
             <div class="t"><div class="v">{{ workers|length }}</div><div class="l">Workers</div></div>
         </div>
 
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
-            <button type="submit" name="action" value="discard" class="btn-ghost"
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="discard" class="btn btn-ghost btn-lg"
                     onclick="return confirm('Discard draft {{ s.reference }}? Nothing was booked; this just removes the scratchpad.');">Discard draft</button>
             {% if workers %}
-            <button type="submit" name="action" value="finalize" class="btn-copper"
+            <button type="submit" name="action" value="finalize" class="btn btn-copper btn-lg"
                     onclick="return confirm('Finalize {{ s.reference }}? This books earnings and recoveries to the ledger.');">Finalize settlement</button>
             {% endif %}
         </div>
+        {% comment %} S5: super-admin audited override — only needed if finalize is BLOCKED by an
+        over-allocation (settled more than produced). Leave blank for a normal finalize. {% endcomment %}
+        {% if is_super_admin and workers %}
+        <div class="field" style="margin-top:14px;">
+            <label for="recon-override" style="font-size:.85rem;">Reconciliation override reason
+                <span style="color:var(--ink-soft,#6b6b6b);">(super-admin; required only if finalize is blocked by over-allocation)</span></label>
+            <textarea id="recon-override" name="reconciliation_override" rows="2" class="sf-input"
+                      placeholder="Why settle more than produced? (audited)"></textarea>
+        </div>
+        {% endif %}
     </form>
 
     {% else %}
     {# ── FINALIZED / REVERSED / SUPERSEDED: frozen snapshot ── #}
     <div class="panel totals">
-        <div class="t"><div class="v">₹{{ s.expected_total|floatformat:2 }}</div><div class="l">Expected total</div></div>
+        <div class="t"><div class="v">{% money s.expected_total %}</div><div class="l">Expected total</div></div>
         <div class="t"><div class="v">{{ s.packed_total }}</div><div class="l">Packed</div></div>
         <div class="t"><div class="v">{{ s.missing_total }}</div><div class="l">Missing</div></div>
         <div class="t"><div class="v">{{ s.rejected_total }}</div><div class="l">Rejected</div></div>
-        <div class="t"><div class="v">₹{{ s.variance_total|floatformat:2 }}</div><div class="l">Variance ₹ (absorbed)</div></div>
+        <div class="t"><div class="v">{% money s.variance_total %}</div><div class="l">Variance ₹ (absorbed)</div></div>
     </div>
 
     <div class="panel">
         <h2>Per-worker snapshot <span class="muted">— frozen at finalize; the ledger stays the live truth</span></h2>
+        <div class="table-responsive">
         <table>
             <thead><tr><th>Worker</th><th class="num">Expected ₹</th><th class="num">Advance before ₹</th><th class="num">Recovered ₹</th><th class="num">Final payable ₹</th></tr></thead>
             <tbody>
             {% for i in items %}
                 <tr>
-                    <td>{{ i.worker.get_full_name|default:i.worker.email }}</td>
-                    <td class="num">{{ i.expected_earning|floatformat:2 }}</td>
-                    <td class="num">{{ i.advance_outstanding_before|floatformat:2 }}</td>
-                    <td class="num">{{ i.advance_recovered|floatformat:2 }}</td>
-                    <td class="num">{{ i.final_payable|floatformat:2 }}</td>
+                    <td data-label="Worker">{{ i.worker.get_full_name|default:i.worker.email }}</td>
+                    <td class="num" data-label="Expected ₹">{{ i.expected_earning|floatformat:2 }}</td>
+                    <td class="num" data-label="Advance before ₹">{{ i.advance_outstanding_before|floatformat:2 }}</td>
+                    <td class="num" data-label="Recovered ₹">{{ i.advance_recovered|floatformat:2 }}</td>
+                    <td class="num" data-label="Final payable ₹">{{ i.final_payable|floatformat:2 }}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     {% if recoveries %}
     <div class="panel">
         <h2>Advance recoveries</h2>
+        <div class="table-responsive">
         <table>
             <thead><tr><th>Worker</th><th>Advance</th><th class="num">Recovered ₹</th><th>State</th></tr></thead>
             <tbody>
             {% for r in recoveries %}
                 <tr>
-                    <td>{{ r.advance.worker.get_full_name|default:r.advance.worker.email }}</td>
-                    <td>#{{ r.advance_id }} · {{ r.advance.advance_date }}</td>
-                    <td class="num">{{ r.amount_recovered|floatformat:2 }}</td>
-                    <td>{% if r.reversed_at %}<span class="muted">reversed {{ r.reversed_at|date:"d M Y H:i" }}</span>{% else %}active{% endif %}</td>
+                    <td data-label="Worker">{{ r.advance.worker.get_full_name|default:r.advance.worker.email }}</td>
+                    <td data-label="Advance">#{{ r.advance_id }} · {{ r.advance.advance_date }}</td>
+                    <td class="num" data-label="Recovered ₹">{{ r.amount_recovered|floatformat:2 }}</td>
+                    <td data-label="State">{% if r.reversed_at %}<span class="muted">reversed {{ r.reversed_at|date:"d M Y H:i" }}</span>{% else %}active{% endif %}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
     {% endif %}
 
@@ -230,16 +292,16 @@
             <textarea name="notes" placeholder="Reason for reversal (kept on the ledger entries)"></textarea>
         </div>
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
-            <button type="submit" name="action" value="reverse" class="btn-danger"
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+            <button type="submit" name="action" value="reverse" class="btn btn-danger btn-lg"
                     onclick="return confirm('Reverse {{ s.reference }}? Earnings and recoveries are undone with compensating ledger entries.');">Reverse</button>
-            <button type="submit" name="action" value="supersede" class="btn-copper"
+            <button type="submit" name="action" value="supersede" class="btn btn-copper btn-lg"
                     onclick="return confirm('Reverse {{ s.reference }} and open a fresh draft to settle again?');">Reverse &amp; settle again</button>
         </div>
     </form>
     {% else %}
     <div class="sticky-bar">
-        <a class="btn-ghost" href="{% url 'expense:adda-settlement-list' %}">Back</a>
+        <a class="btn btn-ghost btn-lg" href="{% url 'expense:adda-settlement-list' %}">Back</a>
     </div>
     {% endif %}
     {% endif %}

@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-worker-ledger-entry
+type: database-guide
+status: active
+owner: handwritten
+scope: worker_ledger_entry (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: WorkerLedgerEntry — the money kitab
 
 ## TL;DR

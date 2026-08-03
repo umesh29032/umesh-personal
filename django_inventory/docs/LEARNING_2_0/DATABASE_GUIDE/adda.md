@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-adda
+type: database-guide
+status: active
+owner: handwritten
+scope: adda (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: Adda (+ AddaStageRecord) — the production batch
 
 ## TL;DR

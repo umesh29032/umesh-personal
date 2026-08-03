@@ -1,3 +1,13 @@
+---
+id: l2-living-documentation-system-future-agent-workflow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: documentation system (PKALS-LIVE)
+anchors: —
+verified: 2026-07-13
+---
+
 # FUTURE AGENT WORKFLOW — the 7-step loop
 
 ## TL;DR

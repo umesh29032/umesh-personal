@@ -40,6 +40,16 @@ PY
 echo "[entrypoint] applying migrations…"
 python manage.py migrate --noinput
 
+# Platform master data (stages · skills · stage-access · machine types).
+# Migrations alone seed only 4 of 21 stages and 2 of 10 skills, so without this
+# a fresh production database comes up UNABLE TO RUN AN ADDA — no worker can
+# open any stage. Safe on every boot: the command is idempotent (natural-key
+# get_or_create) and additive-only, so it fills gaps and NEVER overwrites an
+# edit made through the UI. Business data (products, rates, cloth, users) is
+# deliberately NOT seeded — that is the factory's own to enter.
+echo "[entrypoint] ensuring platform master data…"
+python manage.py seed_master_data --repair-access
+
 echo "[entrypoint] collecting static files…"
 python manage.py collectstatic --noinput
 

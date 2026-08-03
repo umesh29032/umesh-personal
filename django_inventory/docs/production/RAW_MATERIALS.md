@@ -1,4 +1,23 @@
+---
+id: production-raw-materials-design
+type: topic-canonical
+status: superseded
+owner: handwritten
+scope: raw_materials — 2026-05 design-era record
+anchors: config/raw_materials/models.py
+verified: 2026-07-13
+---
+
 # `raw_materials` — Cloth Inventory & Master Data
+
+> **⚠️ DESIGN-ERA DOCUMENT (2026-05) — superseded for live truth (pointer added 2026-07-13,
+> Phase-7 Q-A7 / finding F-C-03).** Known drift vs certified current state:
+> `TimeStampedModel` now lives in the `core` app (dedup 2026-06, ADR-precedent DB-integrity
+> PR2), and `ClothRoll.Status` now includes **DAMAGED** (roll-damage feature 2026-07-12,
+> OWN-E certified). **Live truth = [config/raw_materials/README.md](../../config/raw_materials/README.md)
+> (business view) + [docs/apps/raw_materials/GUIDE.md](../apps/raw_materials/GUIDE.md) (file
+> map) + the models themselves.** Kept in place as the design record (DOCUMENT_ARCHIVE_REVIEW
+> keeps the production tree; not in the Phase-6 archive register per DC-D2).
 
 ## Models
 

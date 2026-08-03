@@ -1,0 +1,39 @@
+{% extends "accounts/base.html" %}
+{# Block 3D — form-shell canon; @390-first #}
+{% block page_title %}Record usage — {{ marker.reference }}{% endblock %}
+{% block content %}
+<div class="pai-manual">
+  <div class="hero-strip">
+    <h1>Record usage — {{ marker.reference }}</h1>
+    <p>"{{ marker.label|default:marker.reference }}" kis Adda pe cut hua — plies aur repeats ke saath.</p>
+  </div>
+  {% if form.non_field_errors %}<div class="errors">
+    {% for e in form.non_field_errors %}<div>⚠ {{ e }}</div>{% endfor %}</div>{% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="panel">
+      <div class="panel-head"><span class="panel-num">1</span>
+        <span class="panel-title">The lay</span></div>
+      <div class="panel-body">
+        <label class="field">Adda
+          <select name="adda" required>
+            <option value="">— pick —</option>
+            {% for a in addas %}<option value="{{ a.pk }}">{{ a.code }} · {{ a.get_status_display }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">{{ form.plies.label }} {{ form.plies }}
+          {% for e in form.plies.errors %}<div class="errors">{{ e }}</div>{% endfor %}</label>
+        <label class="field">{{ form.repeats.label }} {{ form.repeats }}
+          {% for e in form.repeats.errors %}<div class="errors">{{ e }}</div>{% endfor %}</label>
+        <label class="field">{{ form.measured_width_mm.label }} {{ form.measured_width_mm }}
+          <small>{{ form.measured_width_mm.help_text }}</small></label>
+        <label class="field">Notes {{ form.notes }}</label>
+      </div>
+    </div>
+    <div class="sticky-actions">
+      <button type="submit" class="btn btn-primary">Record usage</button>
+      <a class="btn" href="{% url 'patterns_ai:marker-detail' marker.reference %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

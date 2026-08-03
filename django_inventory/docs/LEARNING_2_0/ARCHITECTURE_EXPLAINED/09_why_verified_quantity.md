@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-09-why-verified-quantity
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why verified_quantity exists
 
 **Problem:** Worker `reported_quantity` IMMUTABLE hai (uska claim, kabhi badalna

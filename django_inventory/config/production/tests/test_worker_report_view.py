@@ -28,11 +28,22 @@ def _mk_stage_env(*, stage_code, product_code, adda_code, rate='10'):
     stage, _ = Stage.objects.get_or_create(
         code=stage_code, defaults={'name': stage_code.title()})
     ws = WorkflowStage.objects.create(
-        product=product, stage=stage, order=1, cost_rate=Decimal(rate))
+        product=product, stage=stage, order=1, cost_rate=Decimal(rate),
+        credits_workers=True)   # A360 rule: non-payable freezes 0 — fixtures mean PAYABLE
     adda = Adda.objects.create(code=adda_code, product=product)
     sr = AddaStageRecord.objects.create(
         adda=adda, workflow_stage=ws, started_at=timezone.now())
     return product, stage, ws, adda, sr
+
+
+def _grant_stage_access(user, stage):
+    """C-3 (freeze closeout): the report view now requires LIVE Stage Access
+    on top of assignment — grant the persona a skill wired to the stage."""
+    from accounts.models import Skill
+    skill, _ = Skill.objects.get_or_create(
+        name='cutting_master', defaults={'label': 'Cutting Master'})
+    stage.access_by_skill.add(skill)
+    user.skills.add(skill)
 
 
 class WorkerReportViewTest(TestCase):
@@ -48,6 +59,7 @@ class WorkerReportViewTest(TestCase):
             product=self.product, label='M', display_order=1, is_active=True)
         self.worker = User.objects.create_user(email='wrv-worker@test', password='x')
         self.stranger = User.objects.create_user(email='wrv-stranger@test', password='x')
+        _grant_stage_access(self.worker, self.stage)
         self.task = WorkerStageTask.objects.create(
             stage_record=self.sr, worker=self.worker)
         self.url = reverse('production:worker-report', args=['WRV-001', 'cutting'])
@@ -202,7 +214,7 @@ class SyntheticHandlerOpenClosedTest(TestCase):
         def cost_quantity(self, record):
             return None
 
-        def contribution_schema(self, adda):
+        def contribution_schema(self, adda, worker=None):
             from production.models import ProductSize
             sizes = ProductSize.objects.filter(product=adda.product)
             return {
@@ -232,6 +244,7 @@ class SyntheticHandlerOpenClosedTest(TestCase):
         self.size = ProductSize.objects.create(
             product=self.product, label='JUMBO', display_order=1, is_active=True)
         self.worker = User.objects.create_user(email='syn-worker@test', password='x')
+        _grant_stage_access(self.worker, self.stage)
         self.task = WorkerStageTask.objects.create(
             stage_record=self.sr, worker=self.worker)
         self.url = reverse('production:worker-report',
@@ -289,9 +302,10 @@ class DashboardReportBadgeTest(TestCase):
         self.adda.status = Adda.Status.IN_PROGRESS
         self.adda.save(update_fields=['status'])
         self.worker = User.objects.create_user(email='bdg-worker@test', password='x')
+        _grant_stage_access(self.worker, self.stage)
         self.task = WorkerStageTask.objects.create(
             stage_record=self.sr, worker=self.worker)
-        self.url = reverse('inventory:user_dashboard')
+        self.url = reverse('inventory:my_dashboard')
 
     def _badge(self):
         self.client.force_login(self.worker)

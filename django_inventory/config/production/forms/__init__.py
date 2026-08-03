@@ -14,7 +14,6 @@ from .adda_forms import AddaCreateForm
 from .layering import (
     AttachRollForm,
     CompleteLayeringForm,
-    EditRollEntryForm,
     RemainingClothForm,
     StartLayeringForm,
 )
@@ -23,6 +22,7 @@ from .cutting import (
     CuttingStartForm,
 )
 from .cutting_pattern import PatternVerifyForm, SizeAllocationForm
+from .rate_forms import StageRateCorrectionForm
 
 
 __all__ = [
@@ -31,7 +31,6 @@ __all__ = [
     # Layering stage
     'StartLayeringForm',
     'AttachRollForm',
-    'EditRollEntryForm',
     'RemainingClothForm',
     'CompleteLayeringForm',
     # Cutting stage
@@ -43,4 +42,6 @@ __all__ = [
     # Cutting-pattern stage
     'PatternVerifyForm',
     'SizeAllocationForm',
+    # Stage rate correction (S1.1)
+    'StageRateCorrectionForm',
 ]

@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-02-why-workerstagecontribution
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why WorkerStageContribution exists
 
 **Problem:** Sirf "worker ne stage kiya" kaafi nahi — kitna banaya? kaunse

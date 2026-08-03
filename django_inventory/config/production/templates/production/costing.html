@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Manufacturing Costing{% endblock %}
 
@@ -13,7 +14,8 @@
     .costing .hero-strip p { margin: 4px 0 0; font-size: 12px; opacity: .8; }
     .costing .hero-strip .total .v { font-size: 24px; font-weight: 800; }
     .costing .hero-strip .total .l { font-size: 11px; opacity: .85; text-transform: uppercase; }
-    .costing .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    /* D-1: chrome inherited from canonical .card (base.html); page keeps only the table-bleed padding */
+    .costing .card { padding: 4px 0; }
     .costing table { width: 100%; border-collapse: collapse; }
     .costing th, .costing td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
     .costing th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
@@ -43,8 +45,13 @@
             <p style="font-size:11px;opacity:.85;margin-top:4px;">⚠ Cost (standard) and Worker Earnings (actual) are two views of the SAME labor — never add them together (ADR-0009).</p>
         </div>
         <div class="total">
-            <div class="v">₹{{ grand_cost|floatformat:2 }}</div>
+            <div class="v">{% money grand_cost %}</div>
             <div class="l">Total (shown Addas)</div>
+        </div>
+        {# RMX-D: the ADR-0009 Decision-2 grand line — material + settled + non-payable, from THE certified assembly #}
+        <div class="total">
+            <div class="v">{% money grand_full_cost %}</div>
+            <div class="l">Full cost (ADR-0009, shown Addas)</div>
         </div>
     </div>
 
@@ -65,8 +72,14 @@
                     <th>Stage</th>
                     <th>Status</th>
                     <th class="num">Pieces</th>
-                    <th class="num">Mfg Cost</th>
-                    <th class="num">Worker Earnings</th>
+                    {# A360/P-COST relabel: this column is STANDARD labor only (rate × output) — not full manufacturing cost #}
+                    <th class="num">Standard Labor (payable)</th>
+                    <th class="num">Non-payable priced</th>
+                    <th class="num">Actual Settled Labor</th>
+                    <th class="num">Variance (payable std − actual)</th>
+                    {# RMX-D: Model-B completion — values from cost_service.full_costs_for_addas (the A360 assembly) #}
+                    <th class="num">Material (net)</th>
+                    <th class="num">Full Cost (ADR-0009)</th>
                 </tr>
             </thead>
             <tbody>
@@ -79,15 +92,21 @@
                         <td data-label="Stage">{{ r.current_stage }}</td>
                         <td data-label="Status">{{ r.adda.get_status_display }}</td>
                         <td class="num" data-label="Pieces">{{ r.pieces }}</td>
-                        <td class="num" data-label="Mfg Cost">
-                            <span class="cost">₹{{ r.total_cost|floatformat:2 }}</span>
+                        <td class="num" data-label="Standard Labor (payable)">
+                            <span class="cost">{% money r.payable_cost %}</span>
                             {% if r.unpriced %}<div class="unpriced">{{ r.unpriced }} unpriced stage{{ r.unpriced|pluralize }}</div>{% endif %}
                             {% if r.unpriced_rolls %}<div class="unpriced">{{ r.unpriced_rolls }} unpriced roll{{ r.unpriced_rolls|pluralize }} — material cost incomplete</div>{% endif %}
                         </td>
-                        <td class="num" data-label="Worker Earnings">₹{{ r.worker_earnings|floatformat:2 }}</td>
+                        <td class="num" data-label="Non-payable priced">{% money r.nonpayable_cost %}</td>
+                        <td class="num" data-label="Actual Settled Labor">{% money r.worker_earnings %}</td>
+                        <td class="num" data-label="Variance (payable std − actual)">{% money r.variance %}</td>
+                        <td class="num" data-label="Material (net)">
+                            {% if r.has_material %}{% money r.material_net %}{% if r.material_unpriced_rolls %}<div class="unpriced">{{ r.material_unpriced_rolls }} unpriced roll{{ r.material_unpriced_rolls|pluralize }} — incomplete</div>{% endif %}{% else %}<span class="unpriced">not priced</span>{% endif %}
+                        </td>
+                        <td class="num" data-label="Full Cost (ADR-0009)"><strong>{% money r.full_cost %}</strong></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" class="empty">No Addas yet.</td></tr>
+                    <tr><td colspan="9" class="empty">No Addas yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

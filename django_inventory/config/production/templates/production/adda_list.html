@@ -3,25 +3,17 @@
 {% block page_title %}Addas{% endblock %}
 
 {% block extra_head %}
-<style>
-    .adda-list .filter-card {
-        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
-        padding: 14px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card); margin-bottom: 18px;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
+<style>    /* F-Select A: chrome from canonical .select-field--form. Filters fancify, so the
+       VISIBLE control is .fancy-select (the native <select> is hidden) — width must
+       sit on the wrap and the pad/font tokens on the trigger, else the field shrinks
+       to its label text. */
+    .adda-list .filter-card select,
+    .adda-list .filter-card .fancy-select { min-width: 150px; }
+    .adda-list .filter-card .fancy-select-trigger {
+        --select-field-padding: 9px 12px; --select-field-font: 13px;
     }
-    .adda-list .filter-card > * { flex-shrink: 0; }
-    .adda-list .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
-    .adda-list .filter-card label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--stone);
-    }
-    .adda-list .filter-card select {
-        padding: 9px 12px; min-width: 150px;
-        border: 1.5px solid #cfc0aa; border-radius: 10px;
-        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
-        font-size: 13px;
+    @media (max-width: 600px) {        .adda-list .filter-card select,
+        .adda-list .filter-card .fancy-select { width: 100%; min-width: 0; }
     }
 </style>
 {% endblock %}
@@ -39,23 +31,24 @@
 
     {% if messages %}{% for m in messages %}<div class="badge badge-active" style="display:block; padding:10px 14px; margin-bottom:12px; font-size:13px; border-radius:8px;">{{ m }}</div>{% endfor %}{% endif %}
 
+    {# Filter selects use FancySelect (no data-no-fancy): native <select> popup mispositions on mobile/DevTools emulation; custom dropdown positions correctly. #}
     <form method="get" class="filter-card">
-        <div class="field">
+        <div class="filter-field">
             <label>Status</label>
-            <select name="status" data-no-fancy>
+            <select name="status" class="select-field--form">
                 <option value="">All</option>
                 {% for val, label in status_choices %}<option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Current Stage</label>
-            <select name="stage" data-no-fancy>
+            <select name="stage" class="select-field--form">
                 <option value="">All</option>
                 {% for val, label in stage_types %}<option value="{{ val }}" {% if filters.stage == val %}selected{% endif %}>{{ label }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
-        <div class="field"><label>&nbsp;</label><a href="{% url 'production:adda-list' %}" class="btn btn-ghost">Reset</a></div>
+        <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="filter-field"><label>&nbsp;</label><a href="{% url 'production:adda-list' %}" class="btn btn-ghost">Reset</a></div>
     </form>
 
     <div class="card card-clip">

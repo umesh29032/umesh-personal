@@ -1,3 +1,21 @@
+{% if needs_lane_choice %}
+{# GAP-3: bare multi-lane URL (deep link / A360 embedded tab) — pick a lane, never a 500. #}
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">Choose a cutting lane</div></div>
+    <div class="panel-body">
+        <p class="panel-sub">{{ adda.code }} has {{ lanes|length }} cutting lanes — this console works one lane at a time.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for l in lanes %}
+            <a href="?stream={{ l.pk }}{% if request.GET.embedded %}&embedded=1{% endif %}"
+               style="font-size:14px;font-weight:700;padding:10px 16px;border-radius:10px;border:1px solid var(--border-card);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;">
+                {{ l.label|title }}{% if l.reason %} <span style="font-weight:400;color:var(--stone);font-size:12px;">&nbsp;— {{ l.reason|truncatechars:40 }}</span>{% endif %}
+            </a>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+
 {% comment %}
 YEH TEMPLATE KYU HAI?
 ─────────────────────
@@ -29,7 +47,7 @@ Legacy context (back-compat):
 {% comment %}PR16 — scoped table styles for cutting workspace.
 
 `.breakup-table` is normally scoped to `.form-shell` parent (see
-production/_form_styles.html). Cutting workspace doesn't use that
+shared/_form_styles.html). Cutting workspace doesn't use that
 wrapper, so we re-declare table styles here scoped to this template's
 content. Same look as form-shell tables.
 {% endcomment %}
@@ -200,7 +218,14 @@ Cutting master reviews + saves edits as the verified suggestion.
     </div>
     <div class="panel-body">
         <p class="panel-sub" style="background:rgba(184,115,51,0.08); padding:8px 12px; border-radius:8px; border-left:3px solid var(--copper);">
-            <strong>Informational only.</strong> System suggestion based on layering + pattern allocation. Cutting Master verifies physically. Final barcode generation uses the <strong>Actual Cutting Bundle Entry</strong> below — not this section.
+            <strong>Informational only.</strong>
+            {% if suggestion_source.kind == 'layout' %}
+              {# Phase 8C: the manufacturing contract feeds the numbers — marker content × plies #}
+              Suggestion from approved layout <strong>{{ suggestion_source.uids|join:", " }}</strong> × lay count (marker content × plies).
+            {% else %}
+              System suggestion based on layering + pattern allocation.
+            {% endif %}
+            Cutting Master verifies physically. Final barcode generation uses the <strong>Actual Cutting Bundle Entry</strong> below — not this section.
         </p>
         {% if breakup %}
             <p class="panel-sub">Available cutting pieces inventory. Pieces consumed into bundles reduce Available. <strong>Available = Count − Consumed.</strong></p>
@@ -247,7 +272,7 @@ Cutting master reviews + saves edits as the verified suggestion.
         {% elif suggestion %}
             <p class="panel-sub">Suggested breakup based on layered cloth + pattern allocations (editable). Click <strong>Save Suggested</strong> to lock as actual, then adjust.</p>
         {% else %}
-            <p class="panel-sub" style="margin:0;color:var(--stone);">No suggestion available yet (needs completed Layering + Cutting Pattern stages).</p>
+            <p class="panel-sub" style="margin:0;color:var(--stone);">No suggestion available yet (needs completed Layering + Pattern Design stages).</p>
         {% endif %}
 
         {% if can_edit_breakup %}
@@ -506,8 +531,11 @@ Each bundle: header card + nested item table + per-bundle add-item form.
     </div>
     <div class="panel-body">
         <p class="panel-sub" style="background:rgba(5,150,105,0.08); padding:8px 12px; border-radius:8px; border-left:3px solid #047857;">
-            <strong>Drives barcode generation.</strong> Step 1: Create a Bundle for a Size. Step 2: Inside that bundle add multiple Pattern × Color × Count items. Worker ties everything together.
+            <strong>Complete-product containers.</strong> A bundle holds every Component of a garment (per size). Bundling opens at the join — after every cutting lane is complete.
         </p>
+        {% if bundles_locked_until_join %}
+        <p class="panel-sub" style="color:var(--stone);">🔒 Bundling unlocks when every blocking lane is cut — record this lane's pieces above; bundles are made on the Adda page once the join fires.</p>
+        {% endif %}
 
         {% if can_edit_bundles %}
         <div class="cb-create-bundle">
@@ -956,10 +984,11 @@ Each bundle: header card + nested item table + per-bundle add-item form.
             {% endif %}
 
             <form method="post" action="{% url 'production:cutting-workspace-complete' adda.code %}"
-                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
+                  onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completion will be BLOCKED unless a Super Admin overrides with a reason (R3).\n\n{% endif %}{% endwith %}Complete cutting and generate barcodes from {{ bundle_total }} actual piece(s)?');"
                   style="margin-top:14px;">
                 {% csrf_token %}
                 {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+                {% include "production/_completion_override.html" %}
                 <button type="submit" class="btn btn-primary">Complete Cutting → Generate Barcodes</button>
             </form>
         {% else %}
@@ -1049,3 +1078,19 @@ panel exactly so backward-compat URLs keep working.
 {% include "production/_stage_panel_collapse.html" %}
 {% include "production/_autosave.html" %}
 </div>{# /ct-workspace-scope #}
+{% if active_lane %}
+{# streams: every POST in this panel carries its lane #}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form').forEach(function (f) {
+    if (!f.querySelector('input[name=stream]')) {
+      var h = document.createElement('input');
+      h.type = 'hidden'; h.name = 'stream'; h.value = '{{ active_lane.pk }}';
+      f.appendChild(h);
+    }
+  });
+});
+</script>
+{% endif %}
+
+{% endif %}{# /needs_lane_choice #}

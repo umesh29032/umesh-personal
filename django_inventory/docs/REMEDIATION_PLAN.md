@@ -1,3 +1,13 @@
+---
+id: docs-remediation-plan
+type: topic-canonical
+status: active
+owner: handwritten
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Architecture Remediation Plan — Kapil Enterprises ERP
 
 > Companion to [TARGET_ARCHITECTURE.md](TARGET_ARCHITECTURE.md).

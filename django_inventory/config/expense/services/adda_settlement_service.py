@@ -24,11 +24,22 @@ Lock order (deadlock-free, global, mirrors create_settlement — §11.5):
   → AddaSettlement row (double-finalize reject)
   → AddaStageRecord rows (freeze the quantity inputs)
   → per-worker WorkerProfile → that worker's WorkerAdvance rows.
+
+Production-truth lock domain (S1.1, M-3 / addendum):
+  WorkerStageTask → AddaStageRoleRate → WorkerStageContribution
+  (worker_task_service.complete_worker_task — disjoint from the settlement order above;
+  it never locks AddaSettlement/WorkerProfile/WorkerAdvance, and finalize never locks the
+  task / AddaStageRoleRate → no cross-domain wait).
+F1 (2026-06-14): stage_rate_service.rerate_stage_role is the ONE production-side op that
+DELIBERATELY joins the settlement serialization — it takes the advisory lock 5374 FIRST
+(then AddaStageRoleRate → WSC), exactly as finalize/reverse do, because re-rating is a
+settlement-boundary correction that must not race a finalize. All three acquire 5374
+first → still no deadlock.
 """
 from __future__ import annotations
 
 import logging
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
@@ -39,6 +50,8 @@ from expense.models import (
     StageWorkAssignment, WorkerAdvance, WorkerProfile,
 )
 from expense.services import ledger_service, payroll_service
+from expense.services._shared import next_reference, q_paisa
+from expense.services.settlement_resolver import settlement_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +60,7 @@ _REF_LOCK = 5374          # SHARED with settlement_service — one serialization
 
 
 def _q(amount) -> Decimal:
-    return Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    return q_paisa(amount)   # one rounding rule for all expense money (_shared)
 
 
 def _ensure_management(user):
@@ -58,17 +71,7 @@ def _ensure_management(user):
 
 def _next_reference() -> str:
     """ADST-0001, … — gap-tolerant; caller holds the advisory lock."""
-    last = (
-        AddaSettlement.objects.order_by('-id')
-        .values_list('reference', flat=True).first()
-    )
-    n = 0
-    if last and last.startswith('ADST-'):
-        try:
-            n = int(last.split('-', 1)[1])
-        except (ValueError, IndexError):
-            n = AddaSettlement.objects.count()
-    return f"ADST-{n + 1:04d}"
+    return next_reference(AddaSettlement, 'ADST')
 
 
 def _payable_stage_records(adda):
@@ -84,8 +87,15 @@ def _payable_stage_records(adda):
 
 def _settleable_lines(stage_records):
     """All COMPLETED contribution lines of payable stages, with the cross-era
-    guard applied. Returns (lines, skipped_era_a, skipped_era_b) where each line
-    is a WorkerStageContribution joined to its task."""
+    guard applied. Returns (lines, skipped_era_a, skipped_era_b, skipped_monthly)
+    where each line is a WorkerStageContribution joined to its task.
+
+    skipped_monthly (R4, PDD §27-D4): lines of workers whose CURRENT pay basis
+    is MONTHLY — structurally excluded HERE, the one funnel feeding preview,
+    queue and finalize, so finalize can never book them. Their settlement_line
+    stays NULL (never linked); salary is paid via Expenses (§21). Basis is read
+    at settlement time (owner P-1) — a later switch back to piece-rate makes
+    them settleable again, always visible in the draft preview first."""
     from production.models import WorkerStageContribution, WorkerStageTask
 
     sr_ids = [sr.pk for sr in stage_records]
@@ -94,7 +104,14 @@ def _settleable_lines(stage_records):
         .filter(task__stage_record_id__in=sr_ids,
                 task__status__in=(WorkerStageTask.Status.COMPLETED,
                                   WorkerStageTask.Status.VERIFIED))
+        # PA-16-1: include workflow_stage→stage on the join. The preview/queue
+        # consumers (_line_dict, settlement_queue, effective_pay_rate) read
+        # c.task.stage_record.workflow_stage.stage.name PER LINE — without this
+        # that was 2 extra queries (workflow_stage + stage) for every contribution
+        # line (a measured N+1 on the settlement-detail draft + the queue).
         .select_related('task', 'task__worker', 'task__stage_record',
+                        'settlement_line__adda_settlement',
+                        'task__stage_record__workflow_stage__stage',
                         'color', 'size', 'settlement_line')
     )
     # era-A coarse map: (worker_id, stage_record_id) pairs already credited by a
@@ -106,15 +123,25 @@ def _settleable_lines(stage_records):
                 adda_settlement__isnull=True)      # STRUCTURAL era marker (PR-C)
         .values_list('worker_id', 'stage_record_id')
     )
-    lines, skip_a, skip_b = [], [], []
+    # R4: one query resolves which candidate workers are currently MONTHLY
+    # (absent profile = piece_rate default — get_or_create semantics).
+    monthly_ids = set(
+        WorkerProfile.objects
+        .filter(user_id__in={c.task.worker_id for c in candidates},
+                pay_basis=WorkerProfile.PayBasis.MONTHLY)
+        .values_list('user_id', flat=True)
+    )
+    lines, skip_a, skip_b, skip_monthly = [], [], [], []
     for c in candidates:
         if c.settlement_line_id and c.settlement_line.voided_at is None:
             skip_b.append(c)                                  # era-B exact
         elif (c.task.worker_id, c.task.stage_record_id) in era_a_pairs:
             skip_a.append(c)                                  # era-A coarse
+        elif c.task.worker_id in monthly_ids:
+            skip_monthly.append(c)                            # R4 monthly (D4)
         else:
             lines.append(c)
-    return lines, skip_a, skip_b
+    return lines, skip_a, skip_b, skip_monthly
 
 
 @transaction.atomic
@@ -142,7 +169,8 @@ def create_draft(*, adda, user, notes='') -> AddaSettlement:
 
 def preview_lines(settlement):
     """Read-only helper for the draft screen: settleable lines + the skipped
-    (already-credited) ones so the UI can label the three classes (ADR-0007)."""
+    ones so the UI can label all four classes (ADR-0007 era-A/era-B + R4
+    monthly). Returns (lines, skip_a, skip_b, skip_monthly)."""
     stage_records = _payable_stage_records(settlement.adda)
     return _settleable_lines(stage_records)
 
@@ -155,10 +183,26 @@ def settlement_queue():
                 exactly what blocks the settlement)
     Fully-credited Addas (no uncredited lines) drop out of the queue — their
     history lives in the settlements list. Open drafts are attached so the UI
-    links to them instead of stacking duplicates."""
-    from production.models import Adda
+    links to them instead of stacking duplicates.
 
-    addas = (
+    OI-C1 (BOD-D, owner Option B 2026-07-18) — BATCHED read-path, IDENTICAL
+    output. The per-Adda _payable_stage_records + _settleable_lines calls were
+    an N+1 (measured 35 queries at today's volume; grows 1-4/Adda). Now: the
+    payable stage records come from ONE query (Meta ordering
+    ['adda', 'workflow_stage__order'] keeps each Adda's list in the exact
+    per-Adda order, so the waiting `incomplete` name order is unchanged) and
+    _settleable_lines — THE single funnel shared with preview/finalize,
+    untouched — runs ONCE over the union. Partitioning its result by adda is
+    provably identical to per-Adda calls: every per-line verdict depends only
+    on per-line/global facts (settlement_line state · exact
+    (worker_id, stage_record_id) era-A pair membership · the worker's global
+    pay basis), and the ready-entry consumers are order-insensitive
+    (len / sets / exact-Decimal sums). Query count is now volume-independent
+    (6 at any Adda count)."""
+    from production.models import Adda, AddaStageRecord
+    from production.services import cost_service
+
+    addas = list(
         Adda.objects
         .filter(stage_records__workflow_stage__credits_workers=True)
         .distinct().select_related('product').order_by('code')
@@ -167,29 +211,64 @@ def settlement_queue():
         d.adda_id: d for d in
         AddaSettlement.objects.filter(status=AddaSettlement.Status.DRAFT)
     }
+    # ONE query = every queue Adda's payable stage records (same filter +
+    # select_related as _payable_stage_records; Meta ordering groups per Adda
+    # in the identical order the per-Adda related-manager query produced).
+    payable_by_adda = {}
+    for sr in (AddaStageRecord.objects
+               .filter(adda__in=addas,
+                       workflow_stage__credits_workers=True)
+               .select_related('workflow_stage__stage')):
+        payable_by_adda.setdefault(sr.adda_id, []).append(sr)
+
+    # Split complete vs waiting first, then ONE _settleable_lines pass over the
+    # union of complete Addas' stage records (was 3 queries per Adda).
+    incomplete_by_adda = {}
+    union_srs = []
+    for adda in addas:
+        payable = payable_by_adda.get(adda.pk, [])
+        names = [sr.workflow_stage.stage.name for sr in payable
+                 if sr.completed_at is None]
+        if names:
+            incomplete_by_adda[adda.pk] = names
+        else:
+            union_srs.extend(payable)
+    lines_u, skip_a_u, skip_b_u, skip_m_u = _settleable_lines(union_srs)
+
+    def _group(items):
+        grouped = {}
+        for c in items:
+            grouped.setdefault(c.task.stage_record.adda_id, []).append(c)
+        return grouped
+    lines_map = _group(lines_u)
+    skip_a_map, skip_b_map, skip_m_map = _group(skip_a_u), _group(skip_b_u), _group(skip_m_u)
+
     ready, waiting = [], []
     for adda in addas:
-        payable = _payable_stage_records(adda)
-        incomplete = [sr.workflow_stage.stage.name for sr in payable
-                      if sr.completed_at is None]
-        if incomplete:
-            waiting.append({'adda': adda, 'incomplete': incomplete,
+        if adda.pk in incomplete_by_adda:
+            waiting.append({'adda': adda,
+                            'incomplete': incomplete_by_adda[adda.pk],
                             'draft': drafts.get(adda.pk)})
             continue
-        lines, skip_a, skip_b = _settleable_lines(payable)
+        lines = lines_map.get(adda.pk, [])
         if not lines:
-            continue                       # fully credited — nothing pending
+            continue           # fully credited / monthly-only — nothing payable
+        # PA-11-2: mirror the finalize money-boundary — apply the grouped→0 structural
+        # guard (effective_pay_rate) here too, else a stage grouped AFTER completion shows
+        # an overstated "expected" in the queue while finalize correctly books 0 (F2: the
+        # guard must apply ANYWHERE expected_* is recomputed).
         expected = sum(
-            _q((c.verified_quantity if c.verified_quantity is not None
-                else c.reported_quantity) * (c.expected_rate or _ZERO))
+            _q(settlement_quantity(c) * cost_service.effective_pay_rate(
+                c.task.stage_record.workflow_stage, c.expected_rate or _ZERO))
             for c in lines)
         ready.append({
             'adda': adda,
             'lines': len(lines),
             'workers': len({c.task.worker_id for c in lines}),
             'expected': _q(expected),
-            'skipped_era_a': len(skip_a),
-            'skipped_era_b': len(skip_b),
+            'skipped_era_a': len(skip_a_map.get(adda.pk, [])),
+            'skipped_era_b': len(skip_b_map.get(adda.pk, [])),
+            'skipped_monthly': len(skip_m_map.get(adda.pk, [])),
             'draft': drafts.get(adda.pk),
         })
     return {'ready': ready, 'waiting': waiting}
@@ -213,7 +292,8 @@ def discard_draft(*, settlement, user):
 
 
 @transaction.atomic
-def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None):
+def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None,
+                             reconciliation_override=None, only_worker=None):
     """The settlement money-write (§11.5). NO CASH — payment is a separate event.
 
     variance:  {worker_id: {'packed': int, 'missing': int, 'rejected': int,
@@ -222,6 +302,13 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
     recoveries: {advance_id: amount} — owner-chosen per-advance recovery,
                 guarded ≤ remaining under lock; advance's worker must be among
                 the settled workers.
+    only_worker: R7 (PDD §20 F&F) — settle ONLY this worker's lines; everyone
+                else's stay uncredited and settleable later (§11.8 partial
+                settlements). A pure FILTER on the funnel OUTPUT: every era /
+                monthly / verified-qty guard ran first, so protections are
+                untouched. Creates the mixed settled/unsettled-lines-on-one-SR
+                state — verified safe 2026-07-05 (all consumers line-granular;
+                reopen armor + rerate lock go conservative until reverse).
 
     Side effects (money / multi-write):
       • advisory xact lock 5374 → ADST row lock → stage-record locks →
@@ -254,16 +341,28 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
 
     adda = settlement.adda
     stage_records = _payable_stage_records(adda)
-    from production.models import AddaStageRecord
-    # Freeze quantity inputs (verified_quantity edits race) — row locks.
+    from production.models import AddaStageRecord, WorkerStageContribution
+    # Freeze the stage records (row locks).
     list(AddaStageRecord.objects.select_for_update()
          .filter(pk__in=[sr.pk for sr in stage_records]))
+    # PA-11-3: the settled quantity is resolved from WorkerStageContribution.verified_quantity
+    # (settlement_resolver) — which lives on WSC, NOT AddaStageRecord — so the SR lock above
+    # does NOT freeze it. Lock the WSC rows too (of=('self',), the SAME target
+    # set_verified_quantity locks) so a verified-quantity edit racing this finalize blocks
+    # until commit, then sees settlement_line stamped and refuses. Without this, a correction
+    # issued during the finalize window is a lost update and money books on the stale quantity.
+    # No deadlock: every settlement op takes 5374 first; set_verified takes only the WSC row.
+    list(WorkerStageContribution.objects.select_for_update(of=('self',))
+         .filter(task__stage_record__in=stage_records))
 
-    lines, skip_a, skip_b = _settleable_lines(stage_records)
+    lines, skip_a, skip_b, skip_monthly = _settleable_lines(stage_records)
+    if only_worker is not None:
+        lines = [c for c in lines if c.task.worker_id == only_worker.pk]
     if not lines:
         raise ValidationError(
             "Nothing to settle: no uncredited completed contributions on "
-            "payable stages (already-credited lines are excluded).")
+            "payable stages (already-credited and monthly workers' lines "
+            "are excluded).")
 
     when = timezone.now()
     by_worker: dict[int, list] = {}
@@ -310,9 +409,14 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         worker_expected = _ZERO
         first_swa = None
 
+        from production.services import cost_service
         for c in wlines:
-            qty = c.verified_quantity if c.verified_quantity is not None else c.reported_quantity
-            rate = c.expected_rate or _ZERO            # frozen at complete (Option B)
+            qty = settlement_quantity(c)               # resolver (S1) — default = verified ?? reported
+            # F2: grouped→0 STRUCTURAL guard at the MONEY boundary — a grouped member never
+            # pays, even if the frozen expected_rate is a stale non-zero (snapshot frozen
+            # before the stage was grouped). Grouped status wins over the frozen value.
+            rate = cost_service.effective_pay_rate(
+                c.task.stage_record.workflow_stage, c.expected_rate or _ZERO)
             amount = _q(qty * rate)
             # D-S grain (locked): ONE SWA per contribution line — dimension-true.
             swa = StageWorkAssignment.objects.create(
@@ -331,7 +435,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
             if amount > _ZERO:
                 ledger_service.log_credit(
                     worker=worker, category='stage_earning', amount=amount,
-                    entry_date=when.date(), created_by=user, assignment=swa,
+                    entry_date=timezone.localdate(when), created_by=user, assignment=swa,
                     notes=f"{settlement.reference} · {adda.code}",
                 )
             worker_expected += amount
@@ -341,7 +445,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         for adv, amt in cleaned_recoveries.get(wid, []):
             debit = ledger_service.log_debit(
                 worker=worker, category='advance_recovery', amount=amt,
-                entry_date=when.date(), created_by=user, advance=adv,
+                entry_date=timezone.localdate(when), created_by=user, advance=adv,
                 notes=f"{settlement.reference} recovery adv#{adv.id}",
             )
             PayrollSettlementItem.objects.create(
@@ -401,7 +505,82 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         "skipped_era_a=%s skipped_era_b=%s expected=%s",
         settlement.reference, adda.code, len(workers), len(lines),
         len(skip_a), len(skip_b), expected_total)
+
+    # M-6 reconciliation (S1.1 WARN → S5 configurable BLOCK). SWAs are written above, so
+    # reconcile reads the final allocated. Quantity-only (settled good vs produced output) —
+    # reads no rate/earning/cost. Block = over_allocated beyond tolerance, when ENFORCE on,
+    # without an audited super-admin override. Raising rolls back the whole atomic finalize
+    # (SWAs + ledger + items) → nothing books on a block.
+    from decimal import Decimal as _Dec
+
+    from django.conf import settings as _dj
+    from expense.services import reconciliation_service as _recon
+    _tol = _Dec(str(getattr(_dj, 'SETTLEMENT_RECONCILIATION_TOLERANCE', '0') or '0'))
+    over_rows = [
+        r for r in _recon.reconcile_stage_pay(adda=adda)
+        if r['flag'] == 'over_allocated' and (r['allocated_qty'] - r['output_qty']) > _tol
+    ]
+    _override = (reconciliation_override or '').strip()
+    if over_rows and getattr(_dj, 'ENFORCE_SETTLEMENT_RECONCILIATION', False):
+        _detail = '; '.join(
+            f"'{r['stage']}' settled {r['allocated_qty']} but produced {r['output_qty']} "
+            f"(over by {r['allocated_qty'] - r['output_qty']})" for r in over_rows)
+        if not _override:
+            raise ValidationError(
+                f"Cannot finalize {settlement.reference}: settled more than produced — "
+                f"{_detail}. Tolerance {_tol}. Correct the verified quantity (Review Reports), "
+                f"void the over-allocation, or finalize with a super-admin override (reason "
+                f"required).")
+        from accounts.services import ADMIN_ROLES, user_has_role
+        if not user_has_role(user, ADMIN_ROLES):
+            raise ValidationError(
+                f"Only a super admin can override a settlement-reconciliation block ({_detail}).")
+    _did_override = bool(over_rows and _override
+                         and getattr(_dj, 'ENFORCE_SETTLEMENT_RECONCILIATION', False))
+    record_reconciliation_evidence(
+        settlement, adda,
+        override_reason=(_override if _did_override else ''),
+        overridden_by=(user if _did_override else None))
     return settlement
+
+
+def record_reconciliation_evidence(settlement, adda, *, override_reason='', overridden_by=None) -> int:
+    """Persist append-only M-6 evidence (H2) for every stage where settled quantity
+    exceeds recorded output (the B-1 leak: paid > produced) + WARN-log it. S5: when a
+    super-admin overrode an ENFORCE_SETTLEMENT_RECONCILIATION block, the rows carry the
+    audited override_reason + overridden_by.
+
+    H1: scoped to SETTLEMENT_WARN_FLAGS (over_allocated only) — no_output_qty /
+    grouped_paid / unpriced_paid are different concerns and were noise. H2: the row
+    is PERSISTED (not log-scraped) so the soak's B-1 metric survives later
+    corrections/reversals. Returns the number of evidence rows written. S5 will gate
+    finalize on this signal (BLOCK + tolerance + audited override); S1.1 only records.
+    """
+    from expense.models import SettlementReconciliationEvidence
+    from expense.services import reconciliation_service as _recon
+    warn_rows = [
+        r for r in _recon.reconcile_stage_pay(adda=adda)
+        if r['flag'] in _recon.SETTLEMENT_WARN_FLAGS
+    ]
+    if not warn_rows:
+        return 0
+    # FK = the recon row's OWN stage record pk. Resolving via stage CODE broke
+    # on multi-lane Addas (N cutting SRs share one code → dict collapsed to an
+    # arbitrary lane and evidence pointed at the wrong SR) — OWN-C fix 2026-07-13.
+    created = SettlementReconciliationEvidence.objects.bulk_create([
+        SettlementReconciliationEvidence(
+            adda_settlement=settlement, stage_record_id=r['stage_record_id'],
+            flag=r['flag'], output_qty=r['output_qty'],
+            allocated_qty=r['allocated_qty'], qty_delta=r['qty_delta'],
+            override_reason=override_reason, overridden_by=overridden_by,
+        )
+        for r in warn_rows
+    ])
+    logger.warning(
+        "adda_settlement.reconciliation_warn ref=%s adda=%s flags=%s",
+        settlement.reference, adda.code,
+        [(r['stage'], r['flag'], str(r['qty_delta'])) for r in warn_rows])
+    return len(created)
 
 
 @transaction.atomic

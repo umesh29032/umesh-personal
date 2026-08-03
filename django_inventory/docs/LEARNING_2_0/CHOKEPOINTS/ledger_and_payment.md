@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-ledger-and-payment
+type: chokepoint
+status: active
+owner: handwritten
+scope: ledger_and_payment (chokepoint)
+anchors: —
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
 Two services. `ledger_service` = the ONLY pen that writes WorkerLedgerEntry
 (append-only; log_credit/log_debit/reverse_entry; balance = live SUM).
@@ -18,6 +28,16 @@ REVERSAL row with original `entry_date` copied (so monthly totals net
 in-period); `amount > 0` CHECK; balance = SUM(credit) − SUM(debit) always live.
 **Breaks if bypassed:** silent, permanent balance corruption — no reference,
 no reversal path.
+
+**PA-12 reversal-netting rule (for DERIVED payroll figures):** `worker_balance`
+(Σcredit−Σdebit) nets reversals automatically, but every DERIVED display figure
+(`payroll_service.payroll_totals`/`worker_summary` + `PayrollOverviewView`) must
+net reversals BY CATEGORY: earnings = Σ EARNING-category credits − Σ reversals OF
+earnings (NOT all-credits − all-reversals — a CREDIT/REVERSAL undoing a recovery
+is not earnings); settled = SETTLEMENT_PAYMENT debits − their reversals; advance
+recovered = Σ `PayrollSettlementItem.amount_recovered` WHERE `reversed_at IS NULL`.
+Drift here = a manager-visible figure that disagrees with the ledger after a
+settlement reversal (the overview must equal `worker_summary` must equal the ledger).
 
 ## settlement_service — payment-ONLY (V2-2 narrowed)
 **Owns / writes:** `PayrollSettlement` (+ its ledger `settlement_payment`

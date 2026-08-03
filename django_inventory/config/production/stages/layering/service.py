@@ -16,7 +16,6 @@ Public funcs (call order during a typical Adda):
   record_remaining_cloth(entry, weight, length, user)              # extra leftover piece
   remove_remaining_cloth(leftover, user)
   complete_layering(adda, ..., user)
-  sync_layering_workers_for_skill(user)                            # signal handler hook
 
 Side effects in save_layering_breakup / save_layering_draft / complete_layering:
   • LayeringRollEntry.layers_on_roll updated
@@ -29,7 +28,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -40,7 +39,6 @@ from production.models import (
     Adda, AddaStageRecord, LayeringRecord, LayeringRollEntry,
     RemainingClothOfClothRoll, WorkflowStage,
 )
-from production.services.adda_service import advance_to_next_stage
 
 # Absolute import — _shared stays in production/services/ (shared across stages);
 # this module moved into stages/layering/ (M2.8).
@@ -245,17 +243,34 @@ def _sync_roll_leftover(roll, leftover: RemainingClothOfClothRoll | None) -> Non
 # ── Worker assignment + retro-tag ────────────────────────────────────────────
 
 
+def _layering_workflow_stage(adda: Adda):
+    """Pointer-independent lookup (streams redesign): the flow's Layering
+    stage — lanes work in parallel, so `adda.current_stage` equality is no
+    longer the gate; the LANE's own record state is."""
+    ws = adda.product.workflow_stages.filter(
+        stage__code=STAGE_LAYERING).first()
+    if ws is None:
+        raise ValidationError("This product's flow has no Layering stage")
+    return ws
+
+
+# P19A C-1 fix (2026-07-20): the streams redesign inserted the helper above
+# BETWEEN this decorator and start_layering, so @transaction.atomic silently
+# decorated the read-only helper — start_layering ran in autocommit and
+# set_stage_workers' select_for_update raised TransactionManagementError (500)
+# on every roster update, with the SR/rate-snapshot writes already committed.
 @transaction.atomic
-def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecord:
+def start_layering(*, adda: Adda, worker_ids: list[int], user,
+                   stream=None) -> AddaStageRecord:
     """Manager refines workers. After Phase 4 semantic = "update workers".
 
     Adda creation already provisions the stage_record (auto-populated with
     skilled users). This function lets manager override that list.
     """
     _ensure_management(user)
-    stage = adda.current_stage
-    if stage is None or stage.stage_type != STAGE_LAYERING:
-        raise ValidationError("Adda is not at Layering stage")
+    from production.services.adda_service import resolve_stream
+    lane = resolve_stream(adda, stream)
+    stage = _layering_workflow_stage(adda)
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
     if not worker_ids:
@@ -272,10 +287,13 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
             "At least one assigned worker must have the 'cutting_master' skill"
         )
 
-    sr, created = AddaStageRecord.objects.get_or_create(
-        adda=adda, workflow_stage=stage,
-        defaults={'started_at': timezone.now()},
-    )
+    from production.services.adda_service import lane_stage_record
+    sr = lane_stage_record(adda, stage, lane, create=True,
+                           defaults={'started_at': timezone.now()})
+    created = getattr(sr, '_lane_created', False)
+    # S2: freeze the payable-rate snapshot at stage-start (idempotent; M-5/D-α).
+    from production.services.stage_rate_service import ensure_stage_role_rates
+    ensure_stage_role_rates(sr)
     if not created and sr.completed_at is not None:
         raise ValidationError("Layering stage already completed for this Adda")
     if not created and sr.started_at is None:
@@ -290,30 +308,10 @@ def start_layering(*, adda: Adda, worker_ids: list[int], user) -> AddaStageRecor
     return sr
 
 
-def sync_layering_workers_for_skill(user) -> int:
-    """Retro-tag: new skilled user → added to workers M2M on every active Layering.
-
-    Side effects:
-      • WorkerStageTask — ensures an active task for `user` on every active Layering stage_record
-      • Cross-app read: accounts.skills.user_has_skill (gate)
-    """
-    from accounts.skills import SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER, user_has_skill
-    if not user_has_skill(user, [SKILL_CUTTING_MASTER, SKILL_CUTTING_MASTER_HELPER]):
-        return 0
-
-    active_srs = AddaStageRecord.objects.filter(
-        workflow_stage__stage__code=STAGE_LAYERING,
-        started_at__isnull=False,
-        completed_at__isnull=True,
-        adda__status=Adda.Status.IN_PROGRESS,
-    )
-    count = 0
-    from production.services.worker_task_service import add_stage_worker
-    for sr in active_srs:
-        add_stage_worker(sr, user)   # additive dual-write (re-tag); not a full replace
-        count += 1
-    logger.info("layering.workers_retro_tag worker_id=%s tagged_stage_records=%s", user.pk, count)
-    return count
+# (C-1 freeze closeout 2026-07-05: `sync_layering_workers_for_skill` — the
+# Phase-4 retro-tag that auto-assigned every new skill-holder onto all active
+# layerings — was REMOVED. Manager assignment via set_stage_workers is the
+# ONLY roster source; see docs/RETRO_TAG_SYNC_AUDIT_2026_07_05.md.)
 
 
 # ── Roll attach / edit / detach ─────────────────────────────────────────────
@@ -328,7 +326,7 @@ def attach_roll_to_layering(
     weight_verified_kg: Decimal,
     notes: str = '',
     user,
-) -> LayeringRollEntry:
+    stream=None) -> LayeringRollEntry:
     """Worker attaches cloth roll. ClothRoll.status flips USED via shared service.
 
     Side effects:
@@ -532,6 +530,7 @@ def save_layering_draft(
     notes: str | None,
     per_entry_data: dict[int, dict],
     user,
+    stream=None,
 ) -> AddaStageRecord:
     """Save Section 04 draft state — header fields + per-row breakup in one call.
 
@@ -551,18 +550,28 @@ def save_layering_draft(
     """
     _ensure_can_manage(user)
 
-    stage = adda.current_stage
-    if stage is None or stage.stage_type != STAGE_LAYERING:
-        raise ValidationError("Adda is not at Layering stage")
+    from production.services.adda_service import resolve_stream
+    lane = resolve_stream(adda, stream)
+    stage = _layering_workflow_stage(adda)
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
 
-    try:
-        sr = AddaStageRecord.objects.get(adda=adda, workflow_stage=stage)
-    except AddaStageRecord.DoesNotExist:
+    from production.services.adda_service import lane_stage_record
+    sr = lane_stage_record(adda, stage, lane)
+    if sr is None:
         raise ValidationError("Layering stage hasn't been started yet")
     if sr.completed_at is not None:
         raise ValidationError("Layering stage already completed — draft locked")
+
+    # Worker-cert fix (V1.1, 2026-07-12): production role alone let ANY worker
+    # tamper drafts on any Adda. Draft = write surface → assigned worker
+    # (attach parity), helper skill (the Complete path drafts first), or mgmt.
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    from accounts.skills import SKILL_CUTTING_MASTER_HELPER, user_has_skill
+    if not (user_has_role(user, MANAGEMENT_ROLES)
+            or sr.is_worker_assigned(user)
+            or user_has_skill(user, SKILL_CUTTING_MASTER_HELPER)):
+        raise PermissionDenied("not assigned to this stage")
 
     # Save header drafts (any None = skip that field). Lax — partial drafts OK.
     dirty_header: list[str] = []
@@ -687,6 +696,46 @@ def remove_remaining_cloth(*, leftover: RemainingClothOfClothRoll, user) -> None
 
 
 @transaction.atomic
+def worker_layer_reconciliation(adda: Adda) -> dict | None:
+    """R2 (PDD §14): NON-BLOCKING reconciliation of layering production truth.
+
+    Compares Σ layers the assigned workers reported (WorkerStageContribution
+    good_quantity on COMPLETED/VERIFIED tasks — business truth begins at
+    complete) against the breakup-table `lay_count` on the LayeringRecord.
+    Pure read — never blocks, never writes (S5 warn-first philosophy; a real
+    BLOCK, if ever wanted, is a future flag like ENFORCE_* — not R2 scope).
+
+    Returns {'reported', 'lay_count', 'delta', 'mismatch'} or None when the
+    layering record doesn't exist yet (stage not completed).
+    """
+    from django.db.models import Sum
+    from production.models import WorkerStageContribution, WorkerStageTask
+
+    sr = (
+        AddaStageRecord.objects
+        .filter(adda=adda, workflow_stage__stage__code=STAGE_LAYERING)
+        .select_related('layering')
+        .first()
+    )
+    lr = getattr(sr, 'layering', None) if sr else None
+    if lr is None:
+        return None
+    done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+    reported = (
+        WorkerStageContribution.objects
+        .filter(task__stage_record=sr, task__status__in=done)
+        .aggregate(s=Sum('good_quantity'))['s'] or Decimal('0')
+    )
+    lay_count = Decimal(lr.lay_count)
+    return {
+        'reported': reported,
+        'lay_count': lay_count,
+        'delta': reported - lay_count,
+        'mismatch': reported != lay_count,
+    }
+
+
+@transaction.atomic
 def complete_layering(
     *,
     adda: Adda,
@@ -695,6 +744,8 @@ def complete_layering(
     per_entry_layers: dict[int, int],
     notes: str,
     user,
+    override_pending_reason: str | None = None,
+    stream=None,
 ) -> LayeringRecord:
     """Finalize Layering → advance to Cutting.
 
@@ -713,9 +764,9 @@ def complete_layering(
     _ensure_can_manage(user)
     _ensure_can_complete_layering(user)
 
-    stage = adda.current_stage
-    if stage is None or stage.stage_type != STAGE_LAYERING:
-        raise ValidationError("Adda is not at Layering stage")
+    from production.services.adda_service import resolve_stream
+    lane = resolve_stream(adda, stream)
+    stage = _layering_workflow_stage(adda)
     if adda.status != Adda.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
     if duration_minutes is None or int(duration_minutes) < 1:
@@ -727,7 +778,10 @@ def complete_layering(
     try:
         # WF-4: lock the stage row so a concurrent completer blocks here and then
         # sees completed_at set below — prevents double-advance / double-freeze.
-        sr = AddaStageRecord.objects.select_for_update().get(adda=adda, workflow_stage=stage)
+        from production.services.adda_service import lane_stage_record
+        sr = lane_stage_record(adda, stage, lane, for_update=True)
+        if sr is None:
+            raise AddaStageRecord.DoesNotExist
     except AddaStageRecord.DoesNotExist:
         raise ValidationError("Layering stage hasn't been started yet")
     if sr.completed_at is not None:
@@ -797,7 +851,21 @@ def complete_layering(
     )
     lr.rolls_used.set(roll_ids)
 
-    advance_to_next_stage(adda, user)
+    # R3: C3 guard + override live at the funnel (passthrough only).
+    # Streams: this LANE finished its lay — the lane funnel finalizes the
+    # SR and moves the coarse pointer / fires the join when it's time.
+    from production.services.adda_service import advance_lane
+    advance_lane(adda, stream=lane, leaving_sr=sr, user=user,
+                 override_pending_reason=override_pending_reason)
+
+    # R2 (PDD §14): reconciliation WARN — log-only here (view surfaces the
+    # user-visible message via worker_layer_reconciliation). NEVER blocks.
+    recon = worker_layer_reconciliation(adda)
+    if recon and recon['mismatch']:
+        logger.warning(
+            "layering.reconciliation_mismatch adda=%s reported=%s lay_count=%s delta=%s",
+            adda.code, recon['reported'], recon['lay_count'], recon['delta'])
+
     logger.info(
         "layering.complete adda=%s record=%s lay_count=%s rolls=%s total_colors=%s "
         "layer_length_m=%s duration_min=%s user_id=%s",

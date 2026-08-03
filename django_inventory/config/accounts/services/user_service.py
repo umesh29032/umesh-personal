@@ -8,9 +8,11 @@ chahiye yahan rehte hain, taaki koi path inhe bypass na kare:
   • platform ka aakhri active Super Admin kabhi orphan na ho   → delete_user()
   • Super Admin khud ko demote/deactivate/role-drop na kar paaye → self_edit_blockers()
 
-Plus the skill→layering retro-tag jo pehle `accounts/signals.py` (m2m_changed) mein
-tha — ab explicit service call (CLAUDE.md rule #4: no signals). Cross-app write ab
-greppable + ek hi jagah, transaction ke andar.
+(History: the skill→layering retro-tag — first an `accounts/signals.py`
+m2m_changed signal, then an explicit `sync_user_skills` call here — was
+REMOVED in the C-1 freeze closeout 2026-07-05. Manager assignment via the
+stage panels is the ONLY worker-roster source; accounts no longer writes
+into production at all. See docs/RETRO_TAG_SYNC_AUDIT_2026_07_05.md.)
 """
 from __future__ import annotations
 
@@ -94,19 +96,5 @@ def delete_user(user_to_delete: User, *, actor: User) -> None:
     user_to_delete.delete()
 
 
-def sync_user_skills(user: User) -> int:
-    """Retro-tag `user` onto active Layering rosters for their current skills.
-
-    Replaces the old `accounts/signals.py` m2m_changed signal (CLAUDE.md rule #4).
-    Call AFTER skills are saved on a user-management write path (Team Members
-    views + Django admin `save_related`). The cross-app write into production is
-    now an explicit, greppable call here instead of a hidden signal.
-    """
-    # P4.1: the ONE accounts->production edge, kept deliberately LAZY so the
-    # module-load graph stays acyclic (foundation-purity ast test passes). A full
-    # decouple is BLOCKED/low-value: the trigger is the User-management views AND
-    # `accounts.admin.save_related` (admin must live in accounts with the User model),
-    # so relocating to inventory would only move the violation or force a risky view/
-    # admin restructure. Kept as a single, explicit, greppable lazy call instead.
-    from production.services import sync_layering_workers_for_skill
-    return sync_layering_workers_for_skill(user)
+# (C-1 2026-07-05: `sync_user_skills` removed with the retro-tag — the P4.1
+# accounts→production edge is now GONE entirely, resolving REMEDIATION COUP-5.)

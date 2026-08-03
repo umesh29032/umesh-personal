@@ -1,3 +1,13 @@
+---
+id: l2-project-brain-decision-graph
+type: topic-canonical
+status: active
+owner: handwritten
+scope: navigation index
+anchors: —
+verified: 2026-07-13
+---
+
 # DECISION GRAPH — ADRs and how they depend on each other
 
 ## TL;DR

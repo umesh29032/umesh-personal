@@ -1,0 +1,52 @@
+{% extends "accounts/base.html" %}
+{# FE-1: composed from the STAGE FORM canon — shared/_form_styles form-shell
+   (.field cream inputs · .panel · .sticky-actions) + its hero pattern. #}
+{% block page_title %}{{ master_title }}{% endblock %}
+
+{% block extra_head %}
+{% include 'shared/_form_styles.html' %}
+<style>
+  .master-form { max-width: 560px; margin: 0 auto; }
+  .master-form .hero {
+      background: var(--hero-grad-deep);
+      color: #fff; border-radius: 16px; padding: 22px 26px; margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
+  }
+  .master-form .hero h1 {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 24px; font-weight: 600; color: #fff; margin: 0;
+  }
+  .master-form .hero p { margin: 4px 0 0; color: rgba(255,255,255,0.72); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="master-form form-shell">
+  <div class="hero">
+    <h1>{{ master_title }}</h1>
+    <p>A business master — rename or deactivate anytime; existing stages keep their history.</p>
+  </div>
+
+  {% if form.non_field_errors %}<div class="form-error" style="margin-bottom:14px;">{{ form.non_field_errors }}</div>{% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <section class="panel">
+      <div class="panel-body">
+        {% for f in form %}
+        <div class="field">
+          <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+          {{ f }}
+          {% if f.help_text %}<span class="help-text">{{ f.help_text }}</span>{% endif %}
+          {% if f.errors %}<div class="field-error">{{ f.errors|join:" " }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    <div class="sticky-actions">
+      <a class="btn btn-ghost" href="{% url back_url %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

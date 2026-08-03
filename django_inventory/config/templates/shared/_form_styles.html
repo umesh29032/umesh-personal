@@ -1,0 +1,166 @@
+{# Reusable form-shell CSS — har form page extra_head se include kare. .form-shell scoped #}
+<style>
+    .form-shell { max-width: 880px; margin: 0 auto; padding-bottom: 120px; }
+
+    .form-shell .hero {
+        background: var(--hero-grad-deep);
+        color: #fff; border-radius: var(--radius-2xl); padding: 26px 30px; margin-bottom: 22px;
+        box-shadow: 0 8px 32px rgba(14,11,9,0.20);
+        position: relative; overflow: hidden;
+    }
+    .form-shell .hero::before {
+        content:''; position:absolute; right:-100px; top:-100px;
+        width:280px; height:280px;
+        background: radial-gradient(circle, rgba(184,115,51,0.25), transparent 70%);
+    }
+    .form-shell .hero h1 {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 30px; font-weight: 600; color:#fff; margin: 0 0 6px; letter-spacing: -0.01em;
+        position: relative;
+    }
+    .form-shell .hero p { margin:0; color: rgba(255,255,255,0.72); font-size: var(--fs-md); max-width: 640px; position: relative; }
+    .form-shell .hero-chip {
+        display:inline-block; padding:3px 10px; margin-top:12px;
+        background: rgba(184,115,51,0.22); border: 1px solid rgba(184,115,51,0.4);
+        color:#d4924a; border-radius: var(--radius-lg);
+        font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.12em; position: relative;
+    }
+
+    .form-shell .panel {
+        background: var(--card-bg); border: 1px solid var(--border-card); border-radius: var(--radius-xl);
+        box-shadow: 0 2px 12px rgba(14,11,9,0.10);
+        margin-bottom: 18px;
+    }
+    .form-shell .panel-head { display:flex; align-items:center; gap:12px; padding:18px 22px 0; }
+    .form-shell .panel-num {
+        width:32px; height:32px; flex-shrink:0;
+        background: var(--copper); color:#fff;
+        font-weight:700; font-size:var(--fs-md);
+        display:flex; align-items:center; justify-content:center;
+        border-radius:var(--radius); box-shadow: 0 2px 6px rgba(184,115,51,0.35);
+    }
+    .form-shell .panel-title {
+        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-size: 20px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+    }
+    .form-shell .panel-body { padding: 18px 22px 22px; }
+    .form-shell .panel-sub { font-size: var(--fs-base); color: var(--stone); margin: 0 0 14px; }
+
+    .form-shell .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .form-shell .form-grid.cols-1 { grid-template-columns: 1fr; }
+    /* ── GLOBAL FORM FIELD (Forms owner; works WITHOUT .form-shell) — the ONLY .field owner.
+       .field (column) · .field-grid-2 / .field-row (layouts) · .inline-form .field (row modifier). */
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1/-1; }
+    .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .field-row { display: flex; gap: var(--space-4); }
+    .inline-form .field { flex: 1 1 140px; min-width: 120px; }
+    .field label {
+        font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--stone);
+    }
+    /* ── GLOBAL VALIDATION (Forms owner; works WITHOUT .form-shell). The ONLY two validation
+       classes: .field-error (inline per-field) + .form-error (form-level box, defined below).
+       base.html holds ZERO validation CSS. No banner / brown / scoped variants permitted. */
+    .field-error { color: var(--danger); font-size: var(--fs-sm); margin-top: 2px; }
+    .form-shell input,
+    .form-shell select,
+    /* PA-14-3: FancySelect/FancyDate replace the control with a BUTTON trigger —
+       tag rules miss it. Style the triggers with the same cream-input look so
+       every form-shell select/date matches its sibling inputs (FE-1 2026-07-05). */
+    .form-shell .fancy-select-trigger,
+    .form-shell .fancy-date-trigger,
+    .form-shell textarea {
+        width:100%; padding: var(--input-padding);
+        background: var(--input-bg); border: 1.5px solid var(--input-border); border-radius: var(--input-radius);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
+        font-size: var(--fs-md); color: var(--ink);
+        font-family: inherit;
+        text-align: left;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .form-shell input:focus,
+    .form-shell select:focus,
+    .form-shell textarea:focus {
+        outline:none; border-color: var(--input-border-focus); background: var(--input-bg-focus);
+        box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07), 0 0 0 3px var(--input-focus-ring);
+    }
+    html[data-theme="dark"] .form-shell input:focus,
+    html[data-theme="dark"] .form-shell select:focus,
+    html[data-theme="dark"] .form-shell textarea:focus { background: var(--cream-2); }
+
+    .form-error {
+        padding: 12px 16px; background: var(--danger-bg); color: var(--danger);
+        border-radius: var(--radius-md); margin-bottom: 18px; font-size: var(--fs-base);
+    }
+
+    /* Worker checkbox grid */
+    .form-shell .workers-grid, .workers-grid {
+        display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: var(--space-2) 10px;
+    }
+    .form-shell .worker-chip, .worker-chip {
+        display:flex; align-items:center; gap:var(--space-2);
+        padding: 9px 12px;
+        background: var(--cream); border: 1.5px solid var(--border-card); border-radius: var(--radius-md);
+        cursor:pointer; font-size: var(--fs-base); transition: background 0.15s, border-color 0.15s;
+    }
+    .form-shell .worker-chip:hover, .worker-chip:hover { border-color: var(--copper); }
+    .form-shell .worker-chip:has(input:checked), .worker-chip:has(input:checked) { background: rgba(184,115,51,0.10); border-color: var(--copper); }
+    .form-shell .worker-chip input, .worker-chip input { width: auto; padding: 0; margin: 0; box-shadow: none; border: none; }
+
+    .form-shell .sticky-actions {
+        position: sticky; bottom: 14px; z-index: 5;
+        margin: 22px 0 0; padding: 14px 18px;
+        background: rgba(250,247,242,0.78); backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-card); border-radius: var(--radius-xl);
+        box-shadow: 0 8px 24px rgba(14,11,9,0.10);
+        display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+    }
+    html[data-theme="dark"] .form-shell .sticky-actions { background: rgba(28,28,30,0.85); }
+
+    /* Filter row + quick-create panel (used by layering panel) */
+    .form-shell .roll-filters { padding: 12px 16px; background: var(--cream-2); border-radius: var(--radius-md); margin-bottom: 10px; }
+    .form-shell details.quick-create { background: var(--surface-2); border: 1px dashed var(--border-card); border-radius: var(--radius-md); padding: 12px 16px; }
+    .form-shell details.quick-create summary { cursor: pointer; font-size: var(--fs-md); font-weight: 700; color: var(--copper); list-style: none; }
+    .form-shell details.quick-create summary::after { content: ' ▾'; font-weight: 400; }
+    .form-shell details.quick-create[open] summary::after { content: ' ▴'; }
+
+    /* Section 04 breakup table + summary card (Layering stage) */
+    .form-shell .breakup-table-wrap { overflow-x: auto; margin-bottom: 14px; border: 1px solid var(--border-card); border-radius: var(--radius-md); }
+    .form-shell .breakup-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); min-width: 700px; }
+    .form-shell .breakup-table thead tr { background: var(--cream-2); }
+    .form-shell .breakup-table th { text-align: left; padding: 10px 14px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--stone); }
+    .form-shell .breakup-table td { padding: 10px 14px; border-top: 1px solid var(--border-subtle); vertical-align: middle; }
+    .form-shell .breakup-table .cell-mono { font-family: monospace; font-weight: 700; color: var(--ink); }
+    .form-shell .breakup-table input { width: 110px; padding: 7px 10px; font-size: var(--fs-base); }
+    .form-shell .stage-summary { background: var(--cream); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 14px 16px; margin: 14px 0; }
+    .form-shell .stage-summary-title { font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--stone); margin-bottom: 10px; }
+    .form-shell .stage-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+    .form-shell .stage-summary-grid > div { display: flex; flex-direction: column; }
+    .form-shell .stage-summary-grid .lbl { font-size: var(--fs-2xs); color: var(--stone); text-transform: uppercase; }
+    .form-shell .stage-summary-grid .val { font-size: 20px; font-weight: 700; color: var(--ink); font-family: 'Cormorant Garamond', Georgia, serif; }
+    .form-shell .stage-actions-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
+
+    @media (max-width: 600px) {
+        .form-shell .breakup-table { min-width: 0; }
+        .form-shell .breakup-table thead { display: none; }
+        .form-shell .breakup-table tr { display: block; margin-bottom: 12px; border: 1px solid var(--border-card); border-radius: var(--radius-md); overflow: hidden; }
+        .form-shell .breakup-table td { display: flex; justify-content: space-between; padding: 6px 12px; border-top: none; border-bottom: 1px solid var(--border-subtle); }
+        .form-shell .breakup-table td:last-child { border-bottom: none; }
+        .form-shell .breakup-table td::before { content: attr(data-label); font-size: var(--fs-2xs); text-transform: uppercase; color: var(--stone); margin-right: 8px; align-self: center; }
+    }
+
+    @media (max-width: 768px) { .form-shell .form-grid, .field-grid-2 { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+        .form-shell .hero { padding: 22px 20px; border-radius: var(--radius-lg); }
+        .form-shell .hero h1 { font-size: 24px; }
+        .form-shell .panel-head { padding: 16px 18px 0; }
+        .form-shell .panel-body { padding: 14px 18px 18px; }
+        .form-shell .sticky-actions {
+            position: sticky; bottom: 8px; flex-direction: column-reverse;
+        }
+        .form-shell .sticky-actions .btn { width: 100%; justify-content: center; }
+    }
+</style>

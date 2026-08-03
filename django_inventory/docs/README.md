@@ -1,3 +1,13 @@
+---
+id: readme
+type: topic-canonical
+status: active
+owner: handwritten
+scope: all — system-level
+anchors: —
+verified: 2026-07-13
+---
+
 # docs/ — documentation map (start here if you're lost)
 
 > **New here? → [START_HERE.md](START_HERE.md).** It routes you (new dev / owner /

@@ -1,3 +1,13 @@
+---
+id: learning-08-adda-lifecycle
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Adda lifecycle — the factory's unit of work
 
 ## What an Adda is

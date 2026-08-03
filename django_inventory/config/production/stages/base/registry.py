@@ -32,16 +32,43 @@ def register(handler):
     return handler
 
 
+def _generic_fallback(code: str):
+    """R10-B (frozen rule 11): any ACTIVE Stage row WITHOUT a bespoke package
+    is served by ONE GenericStageHandler instance — new operations are
+    configuration, not code. Instances are cached in the registry so every
+    dispatch site keeps its by-code lookup semantics. Lazy DB read (registry
+    loads at app-ready, before DB use elsewhere); returns None when the code
+    isn't a real active stage (callers keep their fail-closed behavior)."""
+    try:
+        from production.models import Stage
+        row = Stage.objects.filter(code=code, is_active=True).only(
+            'code', 'name').first()
+    except Exception:      # DB not ready (migrations/collectstatic) — no fallback
+        return None
+    if row is None:
+        return None
+    from production.stages.generic_stage.handler import GenericStageHandler
+    instance = GenericStageHandler(code=row.code, name=row.name)
+    _REGISTRY[code] = instance
+    return instance
+
+
 def get(code: str):
-    """Return the handler for `code`, or raise KeyError if none is registered."""
+    """Return the handler for `code` — bespoke first, else the generic
+    archetype for any active configured stage; KeyError otherwise."""
     try:
         return _REGISTRY[code]
     except KeyError:
+        instance = _generic_fallback(code)
+        if instance is not None:
+            return instance
         raise KeyError(f"No stage handler registered for {code!r}")
 
 
 def has(code: str) -> bool:
-    return code in _REGISTRY
+    if code in _REGISTRY:
+        return True
+    return _generic_fallback(code) is not None
 
 
 def all_handlers() -> dict:

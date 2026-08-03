@@ -1,0 +1,24 @@
+{% extends "accounts/base.html" %}
+{# M4 §18-d retirements (owner-confirmed): the pre-platform trio —
+   manual-marker recording, generate tool, marker research — leaves
+   NAVIGATION (pages stay live at their URLs). Home now points at the
+   platform: the Dashboard rail is the front door. #}
+{% block page_title %}Pattern Intelligence{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Pattern Intelligence</h1>
+  <p class="subtitle">The company's manufacturing knowledge — patterns
+  digitized once, verified by a human, reused forever.</p>
+</div>
+<div class="card" style="max-width:560px;">
+  <div class="card-body">
+    <h2 style="margin-top:0;">Start here</h2>
+    <p>Every product's pattern work lives on its Dashboard — Blueprint,
+    the Studio, the Digital Cutting Table, the Layout Library and
+    Manufacturing, one continuous journey.</p>
+    <a class="btn btn-primary" href="{% url 'patterns_ai:dashboard' %}">
+      Open the Pattern Dashboard →</a>
+    <a class="btn" href="{% url 'patterns_ai:mat-list' %}">Calibration mats →</a>
+  </div>
+</div>
+{% endblock %}

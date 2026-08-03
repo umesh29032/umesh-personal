@@ -4,7 +4,7 @@ Delegates every check to accounts.permission_service; keep new gates THERE,
 not as ad-hoc mixin logic (rule 6)."""
 from django.contrib.auth.mixins import UserPassesTestMixin
 
-from ..services import MANAGEMENT_ROLES, ROLE_SUPER_ADMIN, user_has_role
+from ..services import MANAGEMENT_ROLES, PRODUCTION_ROLES, ROLE_SUPER_ADMIN, user_has_role
 
 
 class ManagerOrAdminMixin(UserPassesTestMixin):
@@ -19,3 +19,11 @@ class SuperAdminOnlyMixin(UserPassesTestMixin):
 
     def test_func(self):
         return user_has_role(self.request.user, {ROLE_SUPER_ADMIN})
+
+
+class ProductionRoleMixin(UserPassesTestMixin):
+    """Production-floor read gate (super_admin / manager / worker) — one copy
+    for the four tracking view modules that used to each define their own."""
+
+    def test_func(self):
+        return user_has_role(self.request.user, PRODUCTION_ROLES)

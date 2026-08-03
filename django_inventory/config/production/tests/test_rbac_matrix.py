@@ -118,6 +118,12 @@ class StageViewSkillGateTests(TestCase):
         stage.access_by_role.clear()
         stage.access_by_skill.set([Skill.objects.get(name='cutting_master_helper')])
         self.adda = create_adda(self.admin, product=Product.objects.get(code='NIKKAR'))
+        # F-2 polish: creation no longer auto-assigns — the workspace gate is
+        # skill AND assignment (V2-1c-iv), so give the skill persona a task
+        # explicitly. This class still pins the SKILL half of the gate.
+        sr = self.adda.stage_records.get(workflow_stage__stage__code='layering')
+        from production.services.worker_task_service import set_stage_workers
+        set_stage_workers(sr, [self.skilled.pk])
         self.url = reverse('production:layering-workspace', kwargs={'code': self.adda.code})
 
     def test_management_bypasses(self):

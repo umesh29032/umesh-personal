@@ -13,12 +13,13 @@ this; only sibling expense services do (settlement/allocation flows).
 from __future__ import annotations
 
 import logging  # stdlib logging — module logger for ledger money writes
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
 
 from expense.models import WorkerLedgerEntry
+from expense.services._shared import q_paisa
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def _create_entry(*, worker, entry_type, category, amount, entry_date,
     """
     # str() first so a stray float can't sneak in a binary-expansion value;
     # quantize to paisa so every ledger row is exactly 2dp.
-    amt = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) if amount is not None else None
+    amt = q_paisa(amount) if amount is not None else None
     if amt is None or amt <= 0:
         raise ValidationError("Ledger amount must be greater than 0.")
     entry = WorkerLedgerEntry.objects.create(

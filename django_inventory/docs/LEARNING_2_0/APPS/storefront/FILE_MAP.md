@@ -1,3 +1,13 @@
+---
+id: l2-apps-storefront-file-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: storefront
+anchors: config/storefront/
+verified: 2026-07-13
+---
+
 # storefront — FILE_MAP
 
 ## TL;DR (1 min)

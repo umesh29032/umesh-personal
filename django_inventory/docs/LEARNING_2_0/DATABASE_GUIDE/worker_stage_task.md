@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-worker-stage-task
+type: database-guide
+status: active
+owner: handwritten
+scope: worker_stage_task (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: WorkerStageTask (WST) — participation truth
 
 ## TL;DR

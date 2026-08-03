@@ -6,8 +6,10 @@ advance_outstanding overstated), so add/change/delete are all disabled."""
 from django.contrib import admin
 
 from .models import (
-    PayrollSettlement, PayrollSettlementItem, StageWorkAssignment,
-    WorkerAdvance, WorkerLedgerEntry, WorkerProfile,
+    ExpenseGenerationRecord, ExpenseTemplate, ExpenseTemplateAmountAudit,
+    FactoryExpense, PayrollSettlement, PayrollSettlementItem,
+    StageWorkAssignment,
+    WorkerAdvance, WorkerLedgerEntry, WorkerPayBasisAudit, WorkerProfile,
     AddaSettlement, AddaSettlementItem,
 )
 
@@ -83,10 +85,36 @@ class PayrollSettlementAdmin(_MoneyReadOnlyAdmin):
 
 @admin.register(WorkerProfile)
 class WorkerProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'phone', 'joining_date', 'opening_advance', 'is_active')
-    list_filter = ('is_active',)
+    list_display = ('user', 'pay_basis', 'phone', 'joining_date',
+                    'opening_advance', 'is_active')
+    list_filter = ('is_active', 'pay_basis')
     search_fields = ('user__email', 'phone', 'bank_account_name')
     raw_id_fields = ('user',)
+    # R4: pay_basis changes ONLY via payroll_service.set_pay_basis (audited,
+    # super-admin-gated) — admin must not offer an unaudited side door.
+    readonly_fields = ('pay_basis',)
+
+
+@admin.register(FactoryExpense)
+class FactoryExpenseAdmin(_MoneyReadOnlyAdmin):
+    """R5: create/void ONLY via expense_service (append-only posture) —
+    admin is inspection-only, same as every money table."""
+    list_display = ('expense_date', 'category', 'amount', 'worker',
+                    'entered_by', 'voided_at')
+    list_filter = ('category',)
+    search_fields = ('notes', 'worker__email', 'entered_by__email')
+    raw_id_fields = ('worker', 'entered_by', 'voided_by')
+
+
+@admin.register(WorkerPayBasisAudit)
+class WorkerPayBasisAuditAdmin(_MoneyReadOnlyAdmin):
+    """R4: append-only audit — inspection only, sole writer is
+    payroll_service.set_pay_basis."""
+    list_display = ('worker', 'old_basis', 'new_basis', 'changed_by',
+                    'unsettled_lines_at_change', 'created_at')
+    list_filter = ('new_basis',)
+    search_fields = ('worker__email',)
+    raw_id_fields = ('worker', 'changed_by')
 
 
 @admin.register(AddaSettlement)
@@ -105,3 +133,36 @@ class AddaSettlementItemAdmin(_MoneyReadOnlyAdmin):
     list_display = ('adda_settlement', 'worker', 'expected_earning',
                     'advance_recovered', 'final_payable', 'settled_at')
     search_fields = ('adda_settlement__reference', 'worker__email')
+
+
+# ── Monthly Expense Engine (MEE-A) — same inspection-only posture: the three
+#    engine tables are written ONLY by the expense_service family (MEE-B). ──
+
+@admin.register(ExpenseTemplate)
+class ExpenseTemplateAdmin(_MoneyReadOnlyAdmin):
+    """Recurring-expense config — lifecycle + audited amount changes via the
+    service only; admin inspects."""
+    list_display = ('label', 'category', 'amount', 'frequency', 'worker',
+                    'start_date', 'end_date', 'is_active')
+    list_filter = ('category', 'is_active')
+    search_fields = ('label', 'worker__email')
+    raw_id_fields = ('worker', 'created_by')
+
+
+@admin.register(ExpenseGenerationRecord)
+class ExpenseGenerationRecordAdmin(_MoneyReadOnlyAdmin):
+    """Idempotency coverage (template × period → generated FactoryExpense)."""
+    list_display = ('template', 'period_key', 'expense', 'generated_by',
+                    'superseded_at', 'created_at')
+    list_filter = ('period_key',)
+    search_fields = ('template__label', 'period_key')
+    raw_id_fields = ('template', 'expense', 'generated_by', 'supersedes')
+
+
+@admin.register(ExpenseTemplateAmountAudit)
+class ExpenseTemplateAmountAuditAdmin(_MoneyReadOnlyAdmin):
+    """Append-only amount-change trail (owner ruling 2026-07-18)."""
+    list_display = ('template', 'old_amount', 'new_amount', 'changed_by',
+                    'reason', 'created_at')
+    search_fields = ('template__label', 'reason')
+    raw_id_fields = ('template', 'changed_by')

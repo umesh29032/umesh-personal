@@ -1,0 +1,22 @@
+{% extends "accounts/base.html" %}
+{% block page_title %}Marker saved{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>✅ {{ marker.reference }} saved</h1>
+  <p class="subtitle">{{ marker.product.code }} · {{ marker.get_origin_display }} ·
+  usable width {{ marker.usable_width_mm }} mm ·
+  {{ marker.get_construction_display }}</p>
+</div>
+<div class="card" style="max-width:560px;">
+  <div class="card-body">
+    <p><strong>{{ marker.label|default:"(no floor name)" }}</strong></p>
+    <p>Photo: {{ marker.photo.original_filename }}
+       ({{ marker.photo.size_bytes }} bytes ·
+       sha {{ marker.photo.sha256|slice:":12" }}…)</p>
+    <p>Status: {{ marker.get_status_display }} — usage and outcomes attach from
+    the cut-planning flow (next blocks).</p>
+    <a class="btn btn-primary" href="{% url 'patterns_ai:manual-marker-new' %}">+ Record another</a>
+    <a class="btn" href="{% url 'patterns_ai:home' %}">Home</a>
+  </div>
+</div>
+{% endblock %}

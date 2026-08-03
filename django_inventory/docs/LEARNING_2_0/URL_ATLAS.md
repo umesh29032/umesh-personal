@@ -1,3 +1,13 @@
+---
+id: l2-url-atlas
+type: topic-canonical
+status: active
+owner: handwritten
+scope: all routes (interim canonical)
+anchors: —
+verified: 2026-07-13
+---
+
 # URL ATLAS — every route, grouped by app
 
 ## TL;DR (1 min)
@@ -36,9 +46,9 @@ every route in the app, grouped, with view + gate + purpose.
 | `addas/<code>/stage/<type>/` | StagePanelView | skill+assignment | embedded stage panel |
 | `addas/<code>/report/<type>/` | WorkerReportView | assignment | **worker phone report** → worker_task_service |
 | `addas/<code>/review-reports/` | AddaReportReviewView | management | **P1 verified-qty correction** |
-| `addas/<code>/layering/*` (12) | Layering* | skill+assignment | layering console (start/attach/entries/leftovers/complete/reopen) → stage services |
+| `addas/<code>/layering/*` (9) | Layering* | skill+assignment | layering console (start/attach/entries/leftovers/complete/reopen) → stage services. _(RCP-2A 2026-07-18: 3 orphan legacy endpoints removed — entry-update · full-create-roll · remove-remaining; superseded by the workspace flows)_ |
 | `addas/<code>/pattern/*` (10) | Pattern* | skill+assignment | cutting-pattern console (evidence/verify/sizes/complete/reopen) |
-| `addas/<code>/cutting/*` (16) | Cutting* | skill+assignment | cutting workspace (breakup/bundles/items/**allocate**/complete/reopen) |
+| `addas/<code>/cutting/*` (14) | Cutting* | skill+assignment | cutting workspace (breakup/bundles/items/**allocate**/complete/reopen). _(RCP-2A 2026-07-18: 2 orphan legacy endpoints removed — bundle add-item · bundle item-save)_ |
 | `addas/<code>/barcode-gen/*` (5) | BarcodeGen* | skill+assignment | barcode generation → barcode_service ranges |
 | `stages/*` | Stage CRUD | perm-gated | global Stage library |
 

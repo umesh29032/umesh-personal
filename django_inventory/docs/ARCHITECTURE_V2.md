@@ -1,11 +1,29 @@
+---
+id: docs-architecture-v2
+type: truth-lock
+status: active
+owner: frozen
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Architecture V2 — Adda Production Tracking & Settlement
 
-> Status (updated 2026-06-12): **EVERYTHING THROUGH V2-3 IS BUILT, COMMITTED, AND LIVE-PROVEN.**
-> V2-1a→1d (worker truth; legacy M2M dropped, migration 0035) · V2-2 (§11 AddaSettlement —
-> finalize/reverse/supersede + management UI) · V2-3 (settlement-FIRST cutover executed:
-> `LEDGER_CREDIT_AT_ALLOCATION` default False, env True = rollback lever; settlement-money armor;
-> Expected→Earned→Paid worker visibility) · C-1 money-truth hardening (ADR-0009/0010).
-> Remaining on this doc's roadmap: soak-gated era-A deletion PR, then Missing/Alter modules.
+> Status (updated 2026-06-14): **V2-1a→1d + V2-2 + V2-3 BUILT & COMMITTED**, AND the
+> **PRODUCTION-TRUTH FOUNDATION (S1, S1.1, S3, S4, F1-F4, S5) is COMPLETE & COMMITTED** (prod
+> migrations 0037→0042, expense 0010/0011; 641 tests green). V2-1a→1d (worker truth; legacy
+> M2M dropped, migration 0035) · V2-2 (§11 AddaSettlement — finalize/reverse/supersede +
+> management UI; the AddaSettlement/AddaSettlementItem tables ARE built — the "design only"
+> note inside §11 is historical) · V2-3 (settlement-FIRST cutover: `LEDGER_CREDIT_AT_ALLOCATION`
+> default False, env True = rollback lever) · C-1 money-truth hardening (ADR-0009/0010).
+> **The foundation layer this doc predates — AddaStageRoleRate (S1), good/alter/missing (S3),
+> allocation_dimensions + StagePoolSnapshot + WorkerStageAllocation (S4), M-6 finalize BLOCK
+> (S5) — is summarized in §2.1 below; full current-state in
+> [FOUNDATION_STATUS_SUMMARY_2026_06_14.md](FOUNDATION_STATUS_SUMMARY_2026_06_14.md) and the
+> governing design [PRE_S1_DESIGN_ADDENDUM.md](PRE_S1_DESIGN_ADDENDUM.md).**
+> Remaining: **S6** (reported_quantity drop, irreversible, post-deploy soak-gated), then the
+> soak-gated era-A deletion PR + Missing/Alter modules.
 > First-read for new developers: [docs/PROJECT_KNOWLEDGE_MAP.md](PROJECT_KNOWLEDGE_MAP.md).
 > Ledger cutover for V2-2 is decided: **ADR 0007 (Option A — coexist; cross-era double-credit guard;
 > `LEDGER_CREDIT_AT_ALLOCATION` rollback flag).** This is a production-execution
@@ -56,19 +74,61 @@ notes ; created/updated (audit)
 ```
 task (FK)
 color (FK, nullable)   size (FK, nullable)       ← capture from day one (un-backfillable)
-reported_quantity      (worker-entered; locked after submit)
+reported_quantity      (worker-entered; locked after submit; S3: dual-written = good, renamed-not-dropped @S6)
+good_quantity          (S3, NOT NULL = the PAYABLE good; what settlement pays via the resolver)
+alter_quantity         (S3, default 0; immutable count observation, future Alter module)
+missing_quantity       (S3, default 0; immutable count observation, future Missing module)
 verified_quantity      (nullable; only manager/supervisor/super_admin may set/correct)
-expected_rate          (FROZEN at complete = WorkflowStage rate snapshot at that instant)
-expected_earning       (FROZEN at complete = reported_quantity × expected_rate)
+role_snapshot (FK Role, nullable)  ← S1: the worker's role FROZEN at complete (the rate is resolved against THIS)
+expected_rate          (FROZEN at complete = AddaStageRoleRate frozen rate for (stage_record, role_snapshot); S1)
+expected_earning       (FROZEN at complete = good_quantity × expected_rate)   ← S3 reads good, not reported
+settlement_line (FK expense.StageWorkAssignment, nullable)  ← stamped at finalize; per-row era-B provenance
 bundle_item (FK, nullable)   ← optional piece-precision (cutting today; any stage later)
 created/updated (audit)
 ```
+> **S3 (migration 0039) split the payable grain:** `good_quantity` (NOT NULL) is the payable
+> truth; `alter`/`missing` are immutable observations; `reported_quantity` is dual-written = good
+> (kept for legacy reads, renamed at S6). The settlement resolver + `expected_earning` + payroll +
+> worker display all read **good**, never reported. **S1 (migration 0037)** made `expected_rate`
+> resolve from `AddaStageRoleRate` (frozen per (stage_record, role) at first completion), not a
+> raw WorkflowStage.cost_rate copy. See §2.1.
 - Worker reports N lines (Red-M:120, Blue-L:80). Multi-color/size per worker per stage = native.
 - Simple stage = one line (`color/size = null`). Task total = `Σ lines` (derived, never stored).
 - Worker **cannot edit after submit**; corrections set `verified_quantity` (manager only).
 - **`expected_*` are operational visibility ONLY** — frozen at complete, NEVER mutated by later
   rate changes, and **NOT money**: no ledger entry, not a payable. They answer "what this worker
   is on track to earn" during production. Real money is decided at settlement (§5–§6).
+
+### 2.1 Production-truth foundation layer (S1–S5, COMMITTED 2026-06-14 — post-dates this doc's original §2)
+The foundation that this V2 doc predates. Governing design: [PRE_S1_DESIGN_ADDENDUM.md](PRE_S1_DESIGN_ADDENDUM.md)
++ [S4_DESIGN_CORRECTION_ADDENDUM_2026_06_14.md](S4_DESIGN_CORRECTION_ADDENDUM_2026_06_14.md);
+current-state narrative: [FOUNDATION_STATUS_SUMMARY_2026_06_14.md](FOUNDATION_STATUS_SUMMARY_2026_06_14.md).
+
+- **`AddaStageRoleRate`** (S1, prod 0037) — frozen RESOLVED payable rate per `(stage_record, role)`,
+  snapshotted at stage-start, locked at first completion (M1 = per (stage,role)), `edit_until_lock`
+  before lock. `complete`/settlement read THIS (not the live workflow). `RateCorrectionAudit` (S1.1,
+  prod 0038) + super-admin `rerate_stage_role` correct it until settlement (F1: serialized with
+  finalize on advisory lock 5374; F2: grouped→0 structural; F4: re-floated on reopen).
+- **good/alter/missing** (S3, prod 0039) — see §2 schema above. The payable-grain split; RC-3
+  constraint swap; resolver reads good.
+- **`WorkflowStage.allocation_dimensions`** {NONE, QUANTITY, COLOR_SIZE} (S4, prod 0040) — PIECE-POOL
+  grain ONLY, **orthogonal** to `credits_workers` (settlement) and `cost_method` (costing); the
+  piece-pool starts at CUTTING (pre-piece stages = NONE).
+- **`StagePoolSnapshot`** (S4, prod 0041, downstream-only) + **`WorkerStageAllocation`** (S4, prod
+  0042, **production-truth, NO money**, append-only) — the pool + draw-down in `pool_service`
+  (advisory lock classid 5375, disjoint from settlement's bigint 5374; never locks AddaStageRecord).
+  Cutting's pool good = `AddaProductSizeColorPieceBreakdown` (single source, NOT duplicated), via
+  handler-dispatched `pool_good`. **All S4 is service+tests-only and INERT in the current 4-stage
+  flow** (no piece-consumer downstream of cutting yet).
+- **Enforcement (both default OFF, soak-gated — ENFORCEMENT_ROLLOUT_RUNBOOK):**
+  `ENFORCE_ALLOCATION_BOUND` (S4 P4: complete-time `Σ(good+alter+missing) ≤ Σ allocated`) +
+  `ENFORCE_SETTLEMENT_RECONCILIATION` (S5 M-6: finalize refuses settled-more-than-produced beyond
+  tolerance, super-admin audited override → `SettlementReconciliationEvidence`, expense 0010/0011).
+- **Reopen** (S4 P5) — `_downstream_consumer_guard` refuses upstream reopen while a downstream
+  non-voided allocation or completed contribution exists (transitive; reverse-first; actionable).
+- 🔒 **Four independent concerns** (allocation / cost_method / earning / settlement) hold throughout;
+  `WorkerStageAllocation` is never money; **settlement is the only money boundary**; golden ₹225
+  byte-identical across every phase.
 
 ### Financial layer (REUSE + extend) — ONE source of truth: the ledger
 > **The single financial source of truth is `WorkerLedgerEntry`. It is written ONLY at Adda

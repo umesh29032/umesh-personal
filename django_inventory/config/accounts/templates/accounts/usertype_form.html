@@ -18,7 +18,7 @@
             <div class="user-hero-actions"><a href="{% url 'accounts:usertype_list' %}" class="hero-btn hero-btn-ghost">← Back</a></div>
         </div>
     </div>
-    {% if form.non_field_errors %}<div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>{% endif %}
+    {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
     <form method="post">
         {% csrf_token %}
         <section class="panel">
@@ -55,4 +55,5 @@
     </form>
 </div>
 <style>{% include 'accounts/_user_form_styles.html' %}</style>
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 {% endblock %}

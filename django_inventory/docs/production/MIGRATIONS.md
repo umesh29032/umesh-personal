@@ -1,3 +1,13 @@
+---
+id: production-migrations
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Migrations & Seed Data Plan
 
 ## Migration order

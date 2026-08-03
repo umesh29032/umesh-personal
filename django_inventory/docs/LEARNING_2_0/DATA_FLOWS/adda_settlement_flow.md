@@ -1,3 +1,13 @@
+---
+id: l2-data-flows-adda-settlement-flow
+type: data-flow
+status: active
+owner: handwritten
+scope: adda_settlement_flow (data-flow)
+anchors: —
+verified: 2026-07-13
+---
+
 # Data flow: Adda Settlement (finalize)
 
 ## TL;DR

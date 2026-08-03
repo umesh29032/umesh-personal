@@ -79,6 +79,123 @@ class Adda(TimeStampedModel):
             total=Sum('total_pieces'),
         )['total'] or 0
 
+    # ── Deletion safety (owner rule 2026-07-22): an Adda is the factory's heart.
+    # Money/earning truth is immutable (ADR-0002 append-only ledger, ADR-0009
+    # cost-truth): a batch workers earned from, that was settled, or that shipped
+    # barcodes is PERMANENT record — deleting it would erase financial history.
+    # Such batches are ABANDONED via `cancel_adda` (status→CANCELLED), NEVER
+    # erased. Only a genuinely empty/early batch (created by mistake, no earnings)
+    # may be hard-deleted — and only by super_admin, through `delete_adda`.
+    def deletion_block_reason(self) -> str:
+        """Human reason this Adda must NOT be hard-deleted ('' = safe to delete).
+
+        Enforced in `delete()` below so admin / shell / service paths ALL obey
+        one rule. `delete_adda` re-checks this before tearing anything down.
+        """
+        if self.status == self.Status.COMPLETED:
+            return "it is completed — finished batches are permanent record"
+        # Any FINISHED stage = physical work done (cloth laid / pieces cut) →
+        # history, abandon via cancel. Keeps the deletable set to pristine
+        # "created-by-mistake" batches (teardown below stays safe + bounded).
+        if self.stage_records.filter(completed_at__isnull=False).exists():
+            return "work has been completed on one of its stages — it is history now"
+        # expense app (money) — lazy import avoids a production→expense cycle.
+        from expense.models import AddaSettlement, StageWorkAssignment
+        if AddaSettlement.objects.filter(adda=self).exists():
+            return "it has a settlement — money history can never be deleted"
+        if StageWorkAssignment.objects.filter(stage_record__adda=self).exists():
+            return "workers have earning records on it — settle then cancel"
+        # payable worker production (good>0) = real work happened → history.
+        from production.models import WorkerStageAllocation, WorkerStageContribution
+        if WorkerStageContribution.objects.filter(
+                task__stage_record__adda=self, good_quantity__gt=0).exists():
+            return "workers have reported production on it — it is history now"
+        if WorkerStageAllocation.objects.filter(
+                stage_record__adda=self, voided_at__isnull=True).exists():
+            return "workers are allocated work on it — reverse allocations first"
+        # generated barcodes = production output already in tracking downstream.
+        if self.barcode_batches.exists():
+            return "barcodes were generated for it — it has entered tracking"
+        return ""
+
+    @property
+    def can_delete(self) -> bool:
+        """True = safe to hard-delete (no money/earning/barcode footprint)."""
+        return self.deletion_block_reason() == ""
+
+    def delete(self, *args, **kwargs):
+        # Defense-in-depth backstop: refuse an unsafe delete on EVERY path, even
+        # a raw shell `adda.delete()`. ValidationError (not silent) — deliberate
+        # business rule, distinct from the DB-level PROTECT that guards children.
+        reason = self.deletion_block_reason()
+        if reason:
+            from django.core.exceptions import ValidationError
+            raise ValidationError(
+                f"Adda {self.code} cannot be deleted because {reason}. "
+                f"Use Cancel to abandon it instead.")
+        return super().delete(*args, **kwargs)
+
+
+class CuttingStream(TimeStampedModel):
+    """One fabric group's independent pre-production LANE inside one Adda
+    (frozen: docs/PRE_PRODUCTION_ARCHITECTURE_FINAL_REVIEW.md +
+    docs/CUTTING_STREAM_LIFECYCLE.md).
+
+    Identity ONLY — no status column: a lane's completion is DERIVED at
+    read from its cutting stage record's completed_at (derive-at-read
+    law). sequence=1 lanes are DERIVED from the Blueprint's fabric
+    groups at Adda creation; sequence>1 lanes are DECLARED management
+    acts with a mandatory reason (shortage/recut/additional/split-lay/
+    color-lot — reasons are data). Rows are append-only; the single
+    permitted mutation is the cancel-if-empty escape (cancelled_at +
+    reason, only while the lane has zero started stage records;
+    derived sequence-1 lanes are never cancellable).
+    """
+
+    adda = models.ForeignKey(Adda, on_delete=models.PROTECT,
+                             related_name='cutting_streams')
+    # Sanctioned denorm of the Blueprint's group string (the same
+    # pattern ApprovedLayoutUsage already carries) — the engine never
+    # interprets it; it is a label + join key.
+    fabric_group = models.CharField(max_length=32)
+    sequence = models.PositiveSmallIntegerField(default=1)
+    # blocking = the group holds >=1 MANDATORY Blueprint piece; only
+    # blocking lanes gate the pre-production join.
+    is_blocking = models.BooleanField(default=True)
+    # '' for derived sequence-1 lanes; MANDATORY for declared lanes.
+    reason = models.CharField(max_length=200, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_reason = models.CharField(max_length=200, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['adda', 'fabric_group', 'sequence'],
+                name='prod_stream_unique_lane'),
+            # declared lanes carry their reason (lifecycle §3)
+            models.CheckConstraint(
+                name='prod_stream_declared_requires_reason',
+                check=models.Q(sequence=1) | ~models.Q(reason='')),
+            # cancellation always carries its reason (lifecycle §9.4)
+            models.CheckConstraint(
+                name='prod_stream_cancel_requires_reason',
+                check=models.Q(cancelled_at__isnull=True)
+                      | ~models.Q(cancel_reason='')),
+        ]
+        ordering = ['adda', 'fabric_group', 'sequence']
+
+    def __str__(self):
+        return f'{self.adda.code} · {self.fabric_group} · lane {self.sequence}'
+
+    @property
+    def label(self) -> str:
+        """Operator-facing lane label — fabric first, lane no. only >1."""
+        base = self.fabric_group.replace('_', ' ')
+        return base if self.sequence == 1 else f'{base} (lane {self.sequence})'
+
 
 class AddaStageRecord(TimeStampedModel):
     """Stage records ka polymorphic parent.
@@ -100,6 +217,12 @@ class AddaStageRecord(TimeStampedModel):
     # hard-deleted. (No code path deletes an Adda; this only guards admin/manual.)
     adda = models.ForeignKey(Adda, on_delete=models.PROTECT, related_name='stage_records')
     workflow_stage = models.ForeignKey(WorkflowStage, on_delete=models.PROTECT, related_name='+')
+    # Pre-production lanes (frozen redesign 2026-07-11): the trio stages
+    # (layering / cutting_pattern / cutting) carry their CuttingStream;
+    # every other stage keeps NULL and its one-row-per-stage truth.
+    stream = models.ForeignKey(
+        CuttingStream, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='stage_records')
     # started_at = jab manager ne workers assign kar ke stage kick off ki.
     # null=True kyun? Legacy rows (pre-layering-workspace) sirf complete pe banti thi —
     # unhe NULL hi rakhna safe hai. Naye rows mein service hamesha set karti hai.
@@ -143,7 +266,20 @@ class AddaStageRecord(TimeStampedModel):
     cost_frozen_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        unique_together = [('adda', 'workflow_stage')]
+        # Postgres treats NULLs as distinct, so the lane-scoped and the
+        # classic one-row-per-stage truths need SEPARATE conditional
+        # constraints (a plain unique_together would let NULL-stream
+        # rows duplicate).
+        constraints = [
+            models.UniqueConstraint(
+                fields=['adda', 'workflow_stage', 'stream'],
+                condition=models.Q(stream__isnull=False),
+                name='prod_sr_unique_per_lane'),
+            models.UniqueConstraint(
+                fields=['adda', 'workflow_stage'],
+                condition=models.Q(stream__isnull=True),
+                name='prod_sr_unique_no_lane'),
+        ]
         ordering = ['adda', 'workflow_stage__order']
         # Activity timelines + per-stage KPI dashboards.
         # (adda, -started_at) → "iss Adda ki stage history latest first"
@@ -151,6 +287,9 @@ class AddaStageRecord(TimeStampedModel):
         indexes = [
             models.Index(fields=['adda', '-started_at']),
             models.Index(fields=['workflow_stage', 'completed_at']),
+            # stalled-stage digest/list + A360: open stages by age
+            # (completed_at IS NULL AND started_at < cutoff ORDER BY started_at)
+            models.Index(fields=['completed_at', 'started_at']),
         ]
         # Frozen cost snapshots are never negative. NULL = unpriced (passes the
         # CHECK); 0.00 = priced-but-billed-elsewhere (grouped). Quantity/rate same.

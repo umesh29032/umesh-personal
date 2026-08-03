@@ -29,7 +29,7 @@ from django.conf import settings
 from django.db import models
 
 # Shared base — created_at/updated_at. Single source in core (was duplicated per app).
-from core.models import TimeStampedModel
+from core.models import ActiveManager, TimeStampedModel
 
 
 class StageWorkAssignment(TimeStampedModel):
@@ -357,6 +357,21 @@ class PayrollSettlementItem(TimeStampedModel):
         'expense.WorkerLedgerEntry', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',
     )
+    # R7 (PDD §27-D5): an F&F WRITE-OFF is a recovery line with NO ledger
+    # debit — the residual loan is forgiven, not paid from payable. The
+    # outstanding SUM is unchanged math (Σ non-reversed amount_recovered), so
+    # a write-off zeroes the advance while the payable ledger stays untouched.
+    # Audit lives ON the row (reason + who); reversal = the same reversed_at
+    # stamp as any recovery. Written ONLY by settlement_service (rule 5).
+    write_off_reason = models.CharField(max_length=200, blank=True)
+    written_off_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='advance_write_offs',
+    )
+
+    @property
+    def is_write_off(self):
+        return bool(self.write_off_reason)
 
     class Meta:
         indexes = [models.Index(fields=['advance'])]
@@ -365,6 +380,14 @@ class PayrollSettlementItem(TimeStampedModel):
             models.CheckConstraint(
                 check=models.Q(amount_recovered__gt=0),
                 name='expense_settlementitem_recovered_positive',
+            ),
+            # R7: write-off coherence — reason and actor together or not at all.
+            models.CheckConstraint(
+                check=(
+                    (models.Q(write_off_reason='') & models.Q(written_off_by__isnull=True))
+                    | (~models.Q(write_off_reason='') & models.Q(written_off_by__isnull=False))
+                ),
+                name='expense_settlementitem_writeoff_coherent',
             ),
             # XOR: parented to exactly ONE of (legacy payment, adda settlement).
             models.CheckConstraint(
@@ -387,13 +410,28 @@ class WorkerProfile(TimeStampedModel):
     """Per-worker payroll metadata (D4). NO stored totals — those stay derived.
 
     Auto-created on demand (`get_or_create`) so existing workers need no backfill.
-    `opening_advance` seeds Advance Outstanding for loans given before the system.
+    WP-A (audit 2026-07-05): `opening_advance` is INFORMATIONAL ONLY — no money
+    math reads it (outstanding = Σ WorkerAdvance − recovered). To make a
+    pre-system loan recoverable, record it as a dated WorkerAdvance.
+    WP-B: `is_active` here is a legacy display flag — account state lives on
+    `User.is_active` (F&F flips THAT); UI reads the User flag.
     """
+
+    class PayBasis(models.TextChoices):
+        # R4 (PDD §27-D4): pay basis is a property of the WORKER, never the
+        # stage. Monthly workers keep reporting production (analytics) but
+        # their contributions are structurally excluded from settlement lines;
+        # salary is paid via Expenses (PDD §21 → R5). Absent profile = default
+        # = piece_rate, so no backfill is ever needed.
+        PIECE_RATE = 'piece_rate', 'Piece Rate'
+        MONTHLY = 'monthly', 'Monthly Salary'
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name='worker_profile',
     )
+    pay_basis = models.CharField(
+        max_length=20, choices=PayBasis.choices, default=PayBasis.PIECE_RATE)
     phone = models.CharField(max_length=20, blank=True)
     bank_account_name = models.CharField(max_length=120, blank=True)
     bank_account_number = models.CharField(max_length=40, blank=True)
@@ -407,6 +445,87 @@ class WorkerProfile(TimeStampedModel):
 
     def __str__(self):
         return f"Profile · {self.user}"
+
+
+class FactoryExpense(TimeStampedModel):
+    """Factory running cost (R5, PDD §21). Append-only posture: create/void,
+    NEVER edit — a mistake is voided with a mandatory reason (super-admin) and
+    re-entered. Sole writer: `expense_service`. NOT a general ledger — never
+    touches WorkerLedgerEntry or any balance.
+
+    🔒 ADR-0011 (owner, 2026-07-05): monthly salaries recorded here are
+    FACTORY-LEVEL costs — NEVER allocated into per-Adda manufacturing cost
+    (no allocation model is decided; a future allocation phase must not
+    rewrite this table). `worker` is AUDIT-ONLY ("whose salary?") — joining it
+    into pay/cost computations is out of bounds.
+    """
+
+    class Category(models.TextChoices):
+        # PDD §21-locked set — extending it = PDD revision, not a code tweak.
+        RENT = 'rent', 'Rent'
+        ELECTRICITY = 'electricity', 'Electricity'
+        SALARY = 'salary', 'Salary'
+        OTHER = 'other', 'Other'
+
+    category = models.CharField(max_length=20, choices=Category.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    expense_date = models.DateField()
+    notes = models.TextField(blank=True)
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='factory_expenses_entered',
+    )
+    # P-1: required when category=salary (service-enforced), hidden otherwise.
+    worker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='salary_expenses',
+    )
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='factory_expenses_voided',
+    )
+    void_reason = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['-expense_date', '-created_at']
+        constraints = [
+            # DB-level floor — a zero/negative expense corrupts monthly totals.
+            models.CheckConstraint(check=models.Q(amount__gt=0),
+                                   name='factoryexpense_amount_positive'),
+        ]
+
+    def __str__(self):
+        return f"{self.get_category_display()} · ₹{self.amount} · {self.expense_date}"
+
+
+class WorkerPayBasisAudit(TimeStampedModel):
+    """Append-only audit of pay-basis changes (R4, owner P-3: financial
+    investigations must never depend on application logs). Sole writer:
+    `payroll_service.set_pay_basis` — never UPDATE/DELETE a row."""
+
+    # PROTECT — audit rows outlive everything; never cascade away history.
+    worker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='pay_basis_audits',
+    )
+    old_basis = models.CharField(max_length=20, choices=WorkerProfile.PayBasis.choices)
+    new_basis = models.CharField(max_length=20, choices=WorkerProfile.PayBasis.choices)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='pay_basis_changes_made',
+    )
+    # How many uncredited contribution lines existed at the moment of the
+    # change — the set whose settlement treatment flips (owner R4 addendum:
+    # warn + explicit confirm). Recorded so investigations can see what the
+    # admin confirmed over.
+    unsettled_lines_at_change = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"PayBasis {self.worker}: {self.old_basis}→{self.new_basis}"
 
 
 # ── V2-2: Adda-centric settlement (ARCHITECTURE_V2 §11, ADR-0007/0008) ────────
@@ -553,3 +672,202 @@ class AddaSettlementItem(TimeStampedModel):
 
     def __str__(self):
         return f"{self.adda_settlement_id}/{self.worker_id}: payable {self.final_payable}"
+
+
+class SettlementReconciliationEvidence(TimeStampedModel):
+    """Append-only persisted M-6 reconciliation evidence (S1.1, H2 + addendum D-β).
+
+    Written at finalize for every stage where settled quantity exceeded recorded
+    output (the B-1 leak: paid > produced). PERSISTED — not log-scraped — so the
+    staging soak's B-1-frequency / RC-6 metric survives later corrections or
+    reversals that would clean a live re-run of reconcile_stage_pay. One row per
+    flagged (settlement, stage). S5 will gate finalize on this signal (BLOCK +
+    tolerance + audited override); S1.1 only records it.
+    """
+    # PROTECT — settlements are never hard-deleted (void/supersede instead), and
+    # the evidence must outlive any later correction.
+    adda_settlement = models.ForeignKey(
+        AddaSettlement, on_delete=models.PROTECT, related_name='reconciliation_evidence',
+    )
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='+',
+    )
+    flag = models.CharField(max_length=32)   # 'over_allocated' (extensible)
+    output_qty = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    allocated_qty = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # output − allocated; negative = over-allocated (the leak). Null if no output qty.
+    qty_delta = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    # S5: when ENFORCE_SETTLEMENT_RECONCILIATION blocked this finalize and a super-admin
+    # overrode it, the audited reason + actor (append-only). Blank/null on a normal WARN row.
+    override_reason = models.TextField(blank=True)
+    overridden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['flag', 'created_at'])]
+
+    def __str__(self):
+        return f"recon {self.adda_settlement_id}/{self.stage_record_id}: {self.flag} Δ{self.qty_delta}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Monthly Expense Engine (Campaign Phase 16 MEE-A; U14-approved migration 0015;
+# charter = PDD amendment register entry 7). Responsibilities are LOCKED
+# (owner 2026-07-18) and must never overlap:
+#   FactoryExpense              = the ONLY money history (existing, untouched)
+#   ExpenseTemplate             = configuration (mutable amount, audited)
+#   ExpenseGenerationRecord     = orchestration (idempotency coverage)
+#   ExpenseTemplateAmountAudit  = audit history (append-only)
+# Sole writers = the expense_service family (functions land at MEE-B behind
+# the Money-Write census addendum; at MEE-A no writer exists).
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class ExpenseTemplate(TimeStampedModel):
+    """Owner-defined recurring-expense template (MEE-D1 charter). Stable
+    identity: the row is never replaced — `amount` is MUTABLE via the audited
+    service function only (owner ruling 2026-07-18; every change writes an
+    ExpenseTemplateAmountAudit row). Soft-state lifecycle (deactivate, never
+    delete). `worker` mirrors FactoryExpense's P-1 rule and stays AUDIT-ONLY
+    (ADR-0011); worker is IMMUTABLE after create (service-enforced) — a
+    different worker = a new template."""
+
+    class Frequency(models.TextChoices):
+        # V1 = MONTHLY only (charter). New frequencies enter ONLY via PDD
+        # change-control — adding a value here without an owner entry is drift.
+        MONTHLY = 'monthly', 'Monthly'
+
+    label = models.CharField(max_length=100)   # human name, descriptive only
+    # Same choices OBJECT as the money history — §21 locked set, no second enum.
+    category = models.CharField(max_length=20, choices=FactoryExpense.Category.choices)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    worker = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        null=True, blank=True, related_name='expense_templates',
+    )
+    frequency = models.CharField(max_length=20, choices=Frequency.choices,
+                                 default=Frequency.MONTHLY)
+    start_date = models.DateField()             # anchor: first eligible period
+    end_date = models.DateField(null=True, blank=True)   # optional expiry
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)        # carried onto generated rows
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='expense_templates_created',
+    )
+
+    objects = models.Manager()
+    active = ActiveManager()    # the house soft-archive pattern (14 callsites)
+
+    class Meta:
+        ordering = ['category', 'label']
+        constraints = [
+            # DB-level floor — mirrors factoryexpense_amount_positive.
+            models.CheckConstraint(check=models.Q(amount__gt=0),
+                                   name='expensetemplate_amount_positive'),
+            # P-1 as a BICONDITIONAL: salary ⇒ worker AND non-salary ⇒ no worker.
+            models.CheckConstraint(
+                check=(models.Q(category='salary', worker__isnull=False)
+                       | ~models.Q(category='salary') & models.Q(worker__isnull=True)),
+                name='expensetemplate_salary_iff_worker'),
+            models.CheckConstraint(
+                check=(models.Q(end_date__isnull=True)
+                       | models.Q(end_date__gte=models.F('start_date'))),
+                name='expensetemplate_end_after_start'),
+            # PG partial unique — ONE ACTIVE salary template per worker
+            # (double-salary templates structurally impossible; M-3 still
+            # guards the manual+generated row composition at generation time).
+            models.UniqueConstraint(
+                fields=['worker'],
+                condition=models.Q(category='salary', is_active=True),
+                name='expensetemplate_one_active_salary_per_worker'),
+        ]
+
+    def __str__(self):
+        return f"{self.label} ({self.get_category_display()} ₹{self.amount}/{self.frequency})"
+
+
+class ExpenseGenerationRecord(TimeStampedModel):
+    """Idempotency coverage: one CURRENT row per (template, period) — the
+    partial unique below IS the idempotency law. `period_key` is
+    frequency-agnostic ("2026-07" for monthly; future frequencies reuse this
+    table unchanged). Regeneration after a void = a NEW row with a mandatory
+    reason superseding the old (`superseded_at` set — the settlement
+    supersession pattern); history is never deleted. generated_at =
+    created_at (TimeStampedModel)."""
+
+    template = models.ForeignKey(ExpenseTemplate, on_delete=models.PROTECT,
+                                 related_name='generation_records')
+    period_key = models.CharField(max_length=20)
+    # OneToOne — each coverage row ⇄ exactly one generated money row.
+    expense = models.OneToOneField(FactoryExpense, on_delete=models.PROTECT,
+                                   related_name='generation_record')
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='expense_generations_triggered',
+    )
+    supersedes = models.ForeignKey(
+        'self', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='superseded_by',
+    )
+    superseded_at = models.DateTimeField(null=True, blank=True)
+    regeneration_reason = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['template', 'period_key'])]
+        constraints = [
+            # THE idempotency law: one current coverage per template-period
+            # (PG partial unique; superseded history rows exempt by condition).
+            models.UniqueConstraint(
+                fields=['template', 'period_key'],
+                condition=models.Q(superseded_at__isnull=True),
+                name='expensegeneration_one_current_per_period'),
+            # Reasoned regeneration — supersedes set ⇒ reason non-empty.
+            models.CheckConstraint(
+                check=(models.Q(supersedes__isnull=True)
+                       | ~models.Q(regeneration_reason='')),
+                name='expensegeneration_regen_needs_reason'),
+        ]
+
+    def __str__(self):
+        return f"{self.template_id} @ {self.period_key} → FE#{self.expense_id}"
+
+
+class ExpenseTemplateAmountAudit(TimeStampedModel):
+    """Append-only amount-change trail (owner ruling 2026-07-18: template
+    identity stable + every amount change historically traceable) — the
+    WorkerPayBasisAudit / RateCorrectionAudit house pattern. Historical
+    periods keep their generated amount STRUCTURALLY (it is frozen on the
+    FactoryExpense row) — this table answers "who changed what, when, why"."""
+
+    template = models.ForeignKey(ExpenseTemplate, on_delete=models.PROTECT,
+                                 related_name='amount_audits')
+    old_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    new_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='expense_template_amount_changes',
+    )
+    reason = models.CharField(max_length=200)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            # Auditability as a constraint (the RateCorrectionAudit pattern).
+            models.CheckConstraint(check=~models.Q(reason=''),
+                                   name='expenseamountaudit_reason_required'),
+            # A no-op "change" is not an audit event.
+            models.CheckConstraint(
+                check=~models.Q(old_amount=models.F('new_amount')),
+                name='expenseamountaudit_amounts_differ'),
+            models.CheckConstraint(
+                check=models.Q(old_amount__gt=0, new_amount__gt=0),
+                name='expenseamountaudit_amounts_positive'),
+        ]
+
+    def __str__(self):
+        return f"tpl#{self.template_id}: ₹{self.old_amount} → ₹{self.new_amount}"

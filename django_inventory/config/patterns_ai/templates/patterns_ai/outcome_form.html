@@ -1,0 +1,33 @@
+{% extends "accounts/base.html" %}
+{% block page_title %}Record outcome{% endblock %}
+{% block content %}
+<div class="pai-manual">
+  <div class="hero-strip">
+    <h1>Record outcome</h1>
+    <p>{{ usage.marker.reference }} on {{ usage.adda.code }} —
+       {{ usage.plies }} plies × {{ usage.repeats }} repeats.
+       Sirf FACTS: sab optional, jitna pata hai utna bharo (honest-NULL).</p>
+  </div>
+  {% if form.non_field_errors %}<div class="errors">
+    {% for e in form.non_field_errors %}<div>⚠ {{ e }}</div>{% endfor %}</div>{% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="panel">
+      <div class="panel-head"><span class="panel-num">1</span>
+        <span class="panel-title">Raw facts</span></div>
+      <div class="panel-body">
+        <label class="field">{{ form.fabric_in_m.label }} {{ form.fabric_in_m }}
+          <small>{{ form.fabric_in_m.help_text }}</small>
+          {% for e in form.fabric_in_m.errors %}<div class="errors">{{ e }}</div>{% endfor %}</label>
+        <label class="field">{{ form.garments_cut.label }} {{ form.garments_cut }}</label>
+        <label class="field">{{ form.garments_packed.label }} {{ form.garments_packed }}</label>
+        <label class="field">{{ form.leftover_m.label }} {{ form.leftover_m }}</label>
+      </div>
+    </div>
+    <div class="sticky-actions">
+      <button type="submit" class="btn btn-primary">Record outcome</button>
+      <a class="btn" href="{% url 'patterns_ai:marker-detail' usage.marker.reference %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

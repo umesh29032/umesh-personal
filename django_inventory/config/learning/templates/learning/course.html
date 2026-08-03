@@ -1,0 +1,42 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}{{ course.title }} — Learn{% endblock %}
+{% block page_title %}{{ course.title }}{% endblock %}
+
+{% block content %}
+<div class="learn-page" style="--lp-accent:{{ course.accent }}">
+  <div class="learn-hero">
+    <span class="lp-eyebrow"><a href="{% url 'learning:index' %}" class="lp-back">← All courses</a></span>
+    <h1>{{ course.icon }} {{ course.title }}</h1>
+    <p>{{ course.tagline }}</p>
+  </div>
+
+  <div class="lp-meta" style="margin-bottom:14px">
+    <span class="lp-chip lp-chip--accent">{{ count }} chapters</span>
+    <span class="lp-chip">{{ course.level }}</span>
+    <span class="lp-chip">read in order</span>
+  </div>
+
+  <div class="lp-bar"><i style="width:{{ progress.percent }}%"></i></div>
+  <span class="lp-pct" style="margin-bottom:14px">{{ progress.done }} of {{ progress.total }} chapters complete · {{ progress.percent }}%</span>
+
+  <ul class="lp-list">
+    {% for ch in chapters %}
+    <li>
+      <a class="lp-row {% if ch.is_overview %}lp-row--overview{% endif %}{% if ch.slug in progress.done_slugs %} lp-row--done{% endif %}"
+         href="{% url 'learning:chapter' course.slug ch.slug %}">
+        <span class="lp-num">{{ ch.number }}</span>
+        <span class="lp-t">{{ ch.title }}</span>
+        {% with st=states|default_if_none:'' %}{% endwith %}
+        {% if ch.slug in progress.done_slugs %}
+          <span class="lp-tick" title="completed">✓</span>
+        {% elif states|length and ch.slug in states %}
+          <span class="lp-tick lp-tick--doing" title="in progress">◐</span>
+        {% else %}
+          <span class="lp-tick lp-tick--todo" title="not started">○</span>
+        {% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "accounts/base.html" %}
+{# P2 — phone capture wizard: piece flat ON the commissioned mat #}
+{% block page_title %}Capture — {{ piece.pattern.name }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-capture .rule { background:#fdf7e7; border:1px solid #eadfc0;
+    border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:14px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-capture">
+  <div class="page-header">
+    <h1>Capture · {{ piece.pattern.name }}</h1>
+    <p class="subtitle">{{ piece.product.code }} — photo goes through the
+    metrology gate; a refused photo records its reasons and you retake.</p>
+  </div>
+  <div class="rule">
+    Piece flat ON the mat · whole mat in frame · phone as flat as you can ·
+    no shadows across the piece. The gate refuses blurry/tilted/off-mat
+    shots — by design.
+  </div>
+  <form method="post" enctype="multipart/form-data" class="card"
+        style="padding:20px; max-width:560px;">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="field">
+      <label>Size</label>
+      {# M2 §2.5: the Studio's phone hand-off preselects the size #}
+      <select name="size" required>
+        {% for s in sizes %}<option value="{{ s.pk }}"{% if s.pk == preselect_size %} selected{% endif %}>{{ s.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Calibration mat</label>
+      <select name="mat" required>
+        {% for m in mats %}<option value="{{ m.pk }}">{{ m.mat_code }}{% if m.name %} · {{ m.name }}{% endif %}</option>
+        {% empty %}<option value="">— no ACTIVE mat; commission one first —</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Pattern photo</label>
+      <input type="file" name="photo" accept="image/*" capture="environment" required>
+      {{ form.photo.errors }}
+    </div>
+    <input type="hidden" name="source" value="camera">
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <a class="btn" href="{% url 'patterns_ai:piece-detail' piece.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Capture & extract</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

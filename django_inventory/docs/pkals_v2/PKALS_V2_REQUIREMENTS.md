@@ -1,3 +1,13 @@
+---
+id: docs-pkals-v2-pkals-v2-requirements
+type: topic-canonical
+status: active
+owner: handwritten
+scope: docs
+anchors: —
+verified: 2026-07-18
+---
+
 # PKALS v2 — REQUIREMENTS (Discovery, design-only)
 
 > **Status: PROPOSAL. Nothing implemented.** PKALS v1 is frozen + released

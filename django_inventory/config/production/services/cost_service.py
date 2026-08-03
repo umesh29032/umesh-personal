@@ -174,6 +174,39 @@ def role_rate_for(workflow_stage, role):
     return rr.cost_rate if rr is not None else None
 
 
+def resolved_payable_rate(workflow_stage, role):
+    """The FROZEN payable rate a worker of `role` earns on this stage — the single
+    source for both the AddaStageRoleRate snapshot (Foundation S2) and the
+    complete-time freeze in complete_worker_task. Encodes the full resolution:
+      grouped MEMBER stage (cost_billed_at set) → 0 (paid via the payer; never twice)
+      else → per-role override (role_rate_for) → else stage base ws.cost_rate → else 0.
+    NOTE: the grouped-member → 0 short-circuit MUST come first — role_rate_for
+    returns None for a grouped member, which would otherwise fall through to the
+    base rate (a second payment). Same order as the legacy complete-time logic."""
+    if workflow_stage.cost_billed_at_id is not None:
+        return Decimal('0')
+    return role_rate_for(workflow_stage, role) or workflow_stage.cost_rate or Decimal('0')
+
+
+def effective_pay_rate(workflow_stage, candidate_rate):
+    """F2 (hostile-review fix 2026-06-14) — the STRUCTURAL grouped→0 guard, applied
+    ANYWHERE a contribution's expected_rate / expected_earning is (re)computed: complete,
+    rerate, and the settlement money-boundary. A grouped MEMBER stage (cost_billed_at set)
+    must NEVER pay (C-1 / ADR-0009 double-pay prevention), so grouped status WINS over any
+    candidate rate — including a STALE non-zero AddaStageRoleRate snapshot frozen before the
+    stage was grouped. This is a hard structural invariant, not a business preference.
+    A360 follow-up (owner rule, 2026-07-05): a NON-PAYABLE stage
+    (`credits_workers=False`) behaves EXACTLY like a grouped member — rate 0,
+    expected 0, no earning anywhere — instead of freezing a non-zero
+    expectation the settlement funnel would never pay and UIs had to hide.
+    ONE consistent rule across freeze / rerate / settlement / dashboards.
+    Returns 0 for a grouped member or non-payable stage; otherwise the candidate
+    unchanged (rate-freezing intact for non-structural edits — M-5)."""
+    if workflow_stage.cost_billed_at_id is not None or not workflow_stage.credits_workers:
+        return Decimal('0')
+    return candidate_rate
+
+
 def adda_cost_summary(adda) -> dict:
     """Per-Adda manufacturing-cost rollup (Q3/Q4/Q8). Honest-NULL: surfaces how
     many stages are unpriced rather than coercing NULL→0 (which would silently
@@ -201,3 +234,195 @@ def adda_cost_summary(adda) -> dict:
         if sr.completed_at is not None and sr.processing_cost is None
     )
     return {'stages': stages, 'total_cost': total, 'unpriced_count': unpriced}
+
+
+def _material_value_expr(weight_field, price_field):
+    """The ONE Decision-5 valuation expression (SQL side): weight × purchase
+    ₹/kg — 2dp × 2dp ⇒ 4dp scale, matching the original Python derive's
+    Decimal arithmetic exactly (byte-parity requirement, RMX-C)."""
+    from django.db.models import DecimalField, ExpressionWrapper, F
+    return ExpressionWrapper(
+        weight_field * F(price_field),
+        output_field=DecimalField(max_digits=14, decimal_places=4))
+
+
+def material_costs_for_addas(adda_ids):
+    """RMX-C (Phase 17, charter = PDD entry 8): the BULK material arm — the
+    M13 per-Adda derive's exact rules as three GROUPED aggregates (entries +
+    remnants + leftover-ins by adda). ONE valuation implementation;
+    `material_cost_for_adda` delegates here (INERT; the original loop
+    algorithm lives on inside the parity test as the independent reference —
+    the queue-batching precedent). Returns {adda_id: {'consumed', 'remnant',
+    'net', 'unpriced_rolls', 'leftover_in', 'has_material'}} with a row for
+    EVERY requested id (empty Addas get the zero shape). READ-ONLY."""
+    from decimal import Decimal
+
+    from django.db.models import Count, F, Q, Sum, Value
+    from django.db.models.functions import Coalesce, NullIf
+    from production.models import LayeringRollEntry, RemainingClothOfClothRoll
+
+    zero = Decimal('0.00')
+    adda_ids = list(adda_ids)
+    out = {pk: {'consumed': zero, 'remnant': zero, 'net': zero,
+                'unpriced_rolls': 0, 'leftover_in': zero,
+                'has_material': False} for pk in adda_ids}
+
+    # Parity note: the original Python used `weight_verified_kg or roll.weight_kg`
+    # — Decimal 0.00 is FALSY there, so a zero verified weight falls back to the
+    # roll weight. NullIf(…, 0) replicates that exactly on the SQL side.
+    entry_val = _material_value_expr(
+        Coalesce(NullIf(F('weight_verified_kg'), Value(Decimal('0'))),
+                 F('roll__weight_kg')),
+        'roll__cost_per_kg')
+    for r in (LayeringRollEntry.objects
+              .filter(stage_record__adda_id__in=adda_ids)
+              .values('stage_record__adda')
+              .annotate(v=Sum(entry_val, filter=Q(roll__cost_per_kg__isnull=False)),
+                        u=Count('id', filter=Q(roll__cost_per_kg__isnull=True)))):
+        row = out[r['stage_record__adda']]
+        row['consumed'] += r['v'] or zero
+        row['unpriced_rolls'] += r['u']
+
+    remnant_val = _material_value_expr(
+        F('remaining_weight_kg'), 'layering_entry__roll__cost_per_kg')
+    for r in (RemainingClothOfClothRoll.objects
+              .filter(layering_entry__stage_record__adda_id__in=adda_ids)
+              .values('layering_entry__stage_record__adda')
+              .annotate(v=Sum(remnant_val,
+                              filter=Q(layering_entry__roll__cost_per_kg__isnull=False)))):
+        out[r['layering_entry__stage_record__adda']]['remnant'] += r['v'] or zero
+
+    # V1.1 item-2 (locked C-1 rule): leftovers REUSED by an Adda count as its
+    # material at the SOURCE roll's ₹/kg — never re-priced; the source Adda is
+    # already net of the remnant it gave away ⇒ across Addas the intake value
+    # is counted exactly once.
+    lo_val = _material_value_expr(F('remaining_weight_kg'), 'roll__cost_per_kg')
+    for r in (RemainingClothOfClothRoll.objects
+              .filter(consumed_in_adda_id__in=adda_ids, is_consumed=True)
+              .values('consumed_in_adda')
+              .annotate(v=Sum(lo_val, filter=Q(roll__cost_per_kg__isnull=False)),
+                        u=Count('id', filter=Q(roll__cost_per_kg__isnull=True)))):
+        row = out[r['consumed_in_adda']]
+        row['leftover_in'] += r['v'] or zero
+        row['consumed'] += r['v'] or zero
+        row['unpriced_rolls'] += r['u']
+
+    for row in out.values():
+        row['net'] = row['consumed'] - row['remnant']
+        row['has_material'] = row['consumed'] > 0 or row['unpriced_rolls'] > 0
+    return out
+
+
+def material_cost_for_adda(adda):
+    """M13 (2026-07-12): MATERIAL cost as a pure derive — Σ consumed roll value
+    (verified kg × roll ₹/kg) minus remnant value, over the Adda's roll
+    entries. Honest-NULL law: a consumed roll without a purchase price makes
+    the figure INCOMPLETE (counted in `unpriced_rolls`, never as ₹0).
+    Returns {'consumed', 'remnant', 'net', 'unpriced_rolls', 'has_material'}.
+    Nothing stored — reconstructable by any auditor from raw tables.
+    RMX-C (2026-07-18): delegates to the bulk arm — one valuation
+    implementation (INERT, parity-pinned against the original loop)."""
+    return material_costs_for_addas([adda.pk])[adda.pk]
+
+
+def full_costs_for_addas(adda_ids):
+    """RMX-C (Phase 17): THE Decision-2 assembly (ADR-0009), extracted from
+    the live A360 implementation — ONE assembly for every consumer (A360, the
+    Manufacturing Costing surface, tests). Per adda: full_cost = material.net
+    + settled_total (Σ non-voided SWA earning snapshots — the Decision-3
+    source, never WSC.expected_*) + processing_cost of NON-payable priced
+    stage records. Decision 1 honored: the PAYABLE standard is NOT a
+    component (never summed with settled labor). Honest-NULL flags pass
+    through untouched. READ-ONLY; constant query count."""
+    from decimal import Decimal
+
+    from django.db.models import Q, Sum
+    from expense.models import StageWorkAssignment
+    from production.models import AddaStageRecord
+
+    zero = Decimal('0.00')
+    adda_ids = list(adda_ids)
+    material = material_costs_for_addas(adda_ids)
+    settled = {
+        r['stage_record__adda']: r['s'] or zero for r in
+        StageWorkAssignment.objects
+        .filter(stage_record__adda_id__in=adda_ids, voided_at__isnull=True)
+        .values('stage_record__adda')
+        .annotate(s=Sum('earning_amount_snapshot'))
+    }
+    nonpayable = {
+        r['adda']: r['s'] or zero for r in
+        AddaStageRecord.objects
+        .filter(adda_id__in=adda_ids, processing_cost__isnull=False,
+                workflow_stage__credits_workers=False)
+        .values('adda').annotate(s=Sum('processing_cost'))
+    }
+    out = {}
+    for pk in adda_ids:
+        mat = material[pk]
+        s = settled.get(pk, zero)
+        np_ = nonpayable.get(pk, zero)
+        out[pk] = {'material': mat, 'settled_total': s,
+                   'nonpayable_priced': np_,
+                   'full_cost': mat['net'] + s + np_}
+    return out
+
+
+def full_cost_for_adda(adda):
+    """Single-Adda convenience over the ONE assembly (RMX-C)."""
+    return full_costs_for_addas([adda.pk])[adda.pk]
+
+
+def material_consumption_in_period(year: int, month: int) -> dict:
+    """RMX-C (Phase 17): CONSUMPTION-in-period — the per-Adda derive's
+    valuation law TIME-SLICED (one law, two windows): + layering entries
+    attached in the period − remnants weighed back in the period + stored
+    leftovers reused in the period, every value at the SOURCE roll's purchase
+    ₹/kg (Decision 5; never re-priced). Honest-NULL: unpriced events COUNTED,
+    never ₹0. Period = local-calendar month over the event timestamps
+    (attached_at / created_at / consumed_at). Σ over all periods ≡ Σ over all
+    Addas of material_cost_for_adda(..)['net'] — the standing one-rupee-once
+    reconciliation identity (test-pinned). READ-ONLY; three aggregates."""
+    from datetime import datetime as _dt
+    from decimal import Decimal
+
+    from django.core.exceptions import ValidationError
+    from django.db.models import Count, F, Q, Sum, Value
+    from django.db.models.functions import Coalesce, NullIf
+    from django.utils import timezone as _tz
+    from production.models import LayeringRollEntry, RemainingClothOfClothRoll
+
+    if not (1 <= month <= 12 and 2000 <= year <= 2100):
+        raise ValidationError("Invalid period (expected a real year/month).")
+    zero = Decimal('0.00')
+    start = _tz.make_aware(_dt(year, month, 1))
+    ny, nm = (year + 1, 1) if month == 12 else (year, month + 1)
+    end = _tz.make_aware(_dt(ny, nm, 1))
+
+    entry_val = _material_value_expr(
+        Coalesce(NullIf(F('weight_verified_kg'), Value(Decimal('0'))),
+                 F('roll__weight_kg')),
+        'roll__cost_per_kg')
+    e = (LayeringRollEntry.objects
+         .filter(attached_at__gte=start, attached_at__lt=end)
+         .aggregate(v=Sum(entry_val, filter=Q(roll__cost_per_kg__isnull=False)),
+                    u=Count('id', filter=Q(roll__cost_per_kg__isnull=True))))
+    remnant_val = _material_value_expr(
+        F('remaining_weight_kg'), 'layering_entry__roll__cost_per_kg')
+    r = (RemainingClothOfClothRoll.objects
+         .filter(created_at__gte=start, created_at__lt=end)
+         .aggregate(v=Sum(remnant_val,
+                          filter=Q(layering_entry__roll__cost_per_kg__isnull=False))))
+    lo_val = _material_value_expr(F('remaining_weight_kg'), 'roll__cost_per_kg')
+    lo = (RemainingClothOfClothRoll.objects
+          .filter(is_consumed=True, consumed_at__gte=start, consumed_at__lt=end)
+          .aggregate(v=Sum(lo_val, filter=Q(roll__cost_per_kg__isnull=False)),
+                     u=Count('id', filter=Q(roll__cost_per_kg__isnull=True))))
+
+    consumed = (e['v'] or zero) + (lo['v'] or zero)
+    remnant = r['v'] or zero
+    return {'period_key': f"{year:04d}-{month:02d}",
+            'consumed': consumed, 'remnant_returned': remnant,
+            'leftover_in': lo['v'] or zero,
+            'total': consumed - remnant,
+            'unpriced_events': e['u'] + lo['u']}

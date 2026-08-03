@@ -127,6 +127,31 @@ class TaskChokepointTest(TestCase):
         t = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w1)
         self.assertEqual(t.status, WorkerStageTask.Status.COMPLETED)
 
+    def test_set_never_cancels_a_completed_task_on_roster_edit(self):
+        """PA-10-2: a worker who already COMPLETED their task (frozen contributions)
+        must NOT be cancelled when a manager re-edits the roster mid-stage. The stage
+        is still OPEN (complete_worker_task never stamps sr.completed_at), so the
+        manager dropping that worker reaches set_stage_workers' cancel path — which
+        would otherwise orphan the worker's payable contribution from settlement."""
+        set_stage_workers(self.sr, [self.w1.pk, self.w2.pk])
+        # w2 completes their task + has a frozen contribution; STAGE stays open.
+        w2_task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w2)
+        w2_task.status = WorkerStageTask.Status.COMPLETED
+        w2_task.completed_at = timezone.now()
+        w2_task.save(update_fields=['status', 'completed_at'])
+        WorkerStageContribution.objects.create(
+            task=w2_task, reported_quantity=Decimal('7'), good_quantity=Decimal('7'))
+        # Manager re-edits roster to drop w2.
+        set_stage_workers(self.sr, [self.w1.pk])
+        w2_task.refresh_from_db()
+        self.assertEqual(w2_task.status, WorkerStageTask.Status.COMPLETED)  # NOT cancelled
+        self.assertEqual(w2_task.contributions.count(), 1)                  # truth intact
+        # An ASSIGNED worker dropped in the same call IS still cancelled (regression).
+        set_stage_workers(self.sr, [self.w1.pk, self.w3.pk])
+        set_stage_workers(self.sr, [self.w1.pk])
+        w3_task = WorkerStageTask.objects.get(stage_record=self.sr, worker=self.w3)
+        self.assertEqual(w3_task.status, WorkerStageTask.Status.CANCELLED)
+
     # (V2-1d Step 0) the WORKER_TASK_DUAL_WRITE kill-switch test retired with the
     # mechanism it characterized: task writes are unconditional now.
 
@@ -181,19 +206,23 @@ class ContributionModelTest(TestCase):
         self.worker = User.objects.create_user(email='cn-worker@test', password='x')
         self.task = WorkerStageTask.objects.create(stage_record=self.sr, worker=self.worker)
 
-    def test_reported_quantity_must_be_positive(self):
+    def test_gam_sum_must_be_positive(self):
+        # S3 (RC-3): legacy reported>0 check replaced by good/alter/missing each ≥ 0
+        # AND sum > 0. A row that observed NOTHING (all zero) is rejected.
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 WorkerStageContribution.objects.create(
-                    task=self.task, reported_quantity=Decimal('0'))
+                    task=self.task, reported_quantity=Decimal('0'),
+                    good_quantity=Decimal('0'),
+                    alter_quantity=Decimal('0'), missing_quantity=Decimal('0'))
 
     def test_multiple_lines_per_task(self):
-        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('120'))
-        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('80'))
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('120'), good_quantity=Decimal('120'))
+        WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('80'), good_quantity=Decimal('80'))
         self.assertEqual(self.task.contributions.count(), 2)
 
     def test_expected_fields_null_until_frozen(self):
-        c = WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('5'))
+        c = WorkerStageContribution.objects.create(task=self.task, reported_quantity=Decimal('5'), good_quantity=Decimal('5'))
         # Option B: no money at report time — expected_* freeze only at complete (V2-1c-ii).
         self.assertIsNone(c.expected_rate)
         self.assertIsNone(c.expected_earning)
@@ -203,7 +232,7 @@ class ContributionModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 WorkerStageContribution.objects.create(
-                    task=self.task, reported_quantity=Decimal('5'),
+                    task=self.task, reported_quantity=Decimal('5'), good_quantity=Decimal('5'),
                     verified_quantity=Decimal('-1'))
 
 
@@ -215,7 +244,8 @@ class LifecycleServiceTest(TestCase):
         self.product = Product.objects.create(code='LC', name='LC Product')
         self.stage = Stage.objects.create(code='lc_stage', name='LC Stage')
         self.ws = WorkflowStage.objects.create(
-            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'),
+            credits_workers=True)   # A360 rule: non-payable freezes 0 — this fixture means PAYABLE
         self.adda = Adda.objects.create(code='LC-001', product=self.product)
         self.sr = AddaStageRecord.objects.create(
             adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())
@@ -237,6 +267,16 @@ class LifecycleServiceTest(TestCase):
     def test_report_zero_qty_rejected(self):
         with self.assertRaises(ValidationError):
             report_contributions(self.task, [{'reported_quantity': '0'}], actor=self.worker)
+
+    def test_report_non_numeric_qty_rejected_gracefully(self):
+        # PA-07-1: a non-numeric quantity (tampered POST, or a locale comma "1,5" on a
+        # phone) must surface as a ValidationError (the view shows a message), NOT a
+        # bare decimal.InvalidOperation that the view's `except ValidationError` misses
+        # → 500. Cover both an alpha string and a comma-decimal.
+        for bad in ('abc', '1,5', '1.2.3'):
+            with self.assertRaises(ValidationError):
+                report_contributions(
+                    self.task, [{'reported_quantity': bad}], actor=self.worker)
 
     def test_complete_freezes_expected_no_ledger(self):
         report_contributions(self.task, [{'reported_quantity': '5'}], actor=self.worker)
@@ -279,7 +319,8 @@ class DraftTest(TestCase):
         self.product = Product.objects.create(code='DR', name='DR Product')
         self.stage = Stage.objects.create(code='dr_stage', name='DR Stage')
         self.ws = WorkflowStage.objects.create(
-            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'))
+            product=self.product, stage=self.stage, order=1, cost_rate=Decimal('10'),
+            credits_workers=True)   # A360 rule: non-payable freezes 0 — this fixture means PAYABLE
         self.adda = Adda.objects.create(code='DR-001', product=self.product)
         self.sr = AddaStageRecord.objects.create(
             adda=self.adda, workflow_stage=self.ws, started_at=timezone.now())

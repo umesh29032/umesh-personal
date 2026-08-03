@@ -16,12 +16,30 @@ from __future__ import annotations
 
 import logging
 
+from allauth.account.adapter import DefaultAccountAdapter
 from allauth.exceptions import ImmediateHttpResponse
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.contrib import messages
 from django.shortcuts import redirect
 
 security_logger = logging.getLogger("accounts.security")
+
+
+class RestrictedAccountAdapter(DefaultAccountAdapter):
+    """Hard-disable local email/password signup (S2 fix, 2026-07-12).
+
+    PA-02-OPEN-SIGNUP removed the native /app/ signup routes, but the allauth
+    mount still exposed /accounts/signup/ with allauth's default adapter
+    (is_open_for_signup=True) — any anonymous visitor could create a live,
+    active User. This closes the local half the same way
+    RestrictedSocialAccountAdapter closes the social half: pre-provisioned
+    users only. Everything else (login, password reset emails) stays default.
+    """
+
+    def is_open_for_signup(self, request):
+        # allauth CloseableSignupMixin: False ⇒ GET *and* POST render
+        # account/signup_closed.html — no form processed, no User created.
+        return False
 
 
 class RestrictedSocialAccountAdapter(DefaultSocialAccountAdapter):

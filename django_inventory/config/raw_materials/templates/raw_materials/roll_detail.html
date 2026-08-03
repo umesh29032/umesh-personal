@@ -6,7 +6,7 @@
 <style>
     .roll-detail { max-width: 800px; margin: 0 auto; }
     .roll-detail .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position:relative; overflow:hidden;
@@ -64,6 +64,8 @@
                 <dt>Status</dt><dd>
                     {% if roll.status == 'used' %}
                         <span class="badge badge-inactive">Used</span>
+                    {% elif roll.status == 'damaged' %}
+                        <span class="badge badge-inactive" style="color:#a33;border-color:#a33;">✕ Damaged</span>
                     {% else %}
                         <span class="badge badge-active">● Available</span>
                     {% endif %}
@@ -133,6 +135,23 @@
             <a href="{% url 'raw_materials:roll-assign' roll.pk %}" class="btn btn-ghost">Assign to Adda</a>
         {% endif %}
         <a href="{% url 'tracking:roll-history' roll.pk %}" class="btn btn-ghost">View History</a>
+        {% if can_mark_damaged %}
+        <form method="post" action="{% url 'raw_materials:roll-damage' roll.pk %}" style="margin:0;"
+              onsubmit="var r=prompt('Why is this roll damaged? (water / supplier / fungus / transport…)'); if(!r){return false;} this.reason.value=r; return true;">
+            {% csrf_token %}
+            <input type="hidden" name="reason" value="">
+            <button type="submit" class="btn btn-ghost" style="color:#a33;border-color:#a33;min-height:44px;">✕ Mark damaged</button>
+        </form>
+        {% endif %}
+        {% if can_restore_damaged %}
+        <form method="post" action="{% url 'raw_materials:roll-damage' roll.pk %}" style="margin:0;"
+              onsubmit="var r=prompt('Why is this roll usable again?'); if(!r){return false;} this.reason.value=r; return true;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="restore">
+            <input type="hidden" name="reason" value="">
+            <button type="submit" class="btn btn-ghost" style="min-height:44px;">Restore to stock</button>
+        </form>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

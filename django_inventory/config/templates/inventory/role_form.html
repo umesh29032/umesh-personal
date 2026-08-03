@@ -3,8 +3,22 @@
 
 {% block page_title %}{% if object %}Edit{% else %}New{% endif %} Role{% endblock %}
 
+{% block extra_head %}
+<style>
+/* Mobile: identity 2-col grid collapses; inputs must shrink (input intrinsic min-width overflows 1fr tracks) */
+.role-form .sf-input { min-width: 0; }
+/* Header-row typography moved off inline so no raw font-size:Npx inline (DS-LINT ratchet). */
+.role-form .perm-head { font-size: 10px; }
+@media (max-width: 600px) {
+    .role-form .identity-grid { grid-template-columns: 1fr !important; }
+    /* Permission matrix: label column narrows so 4 checkbox cols fit 390px */
+    .role-form .perm-grid { grid-template-columns: minmax(90px, 1.4fr) repeat(4, 1fr) !important; }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 880px; margin: 0 auto;">
+<div class="role-form" style="max-width: 880px; margin: 0 auto;">
     <div class="page-header">
         <div class="page-header-text">
             <h1>{% if object %}Edit Role{% else %}New Role{% endif %}</h1>
@@ -28,7 +42,7 @@
 
         <div class="form-section">
             <div class="form-section-title"><span class="form-section-num">1</span> Identity</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div class="identity-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                 <div class="form-group"><label class="form-label">Name *</label>{{ form.name }}</div>
                 <div class="form-group"><label class="form-label">Code *</label>{{ form.code }}</div>
                 <div class="form-group" style="grid-column:1/-1;"><label class="form-label">Description</label>{{ form.description }}</div>
@@ -62,7 +76,7 @@
 
                 <div style="display:grid; grid-template-columns:1fr; gap:10px;">
                     {# Header row: visible only when section has at least one model #}
-                    <div style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; padding:0 4px; font-size:10px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; color:var(--text-secondary);">
+                    <div class="perm-grid perm-head" style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; padding:0 4px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; color:var(--text-secondary);">
                         <div>Model</div>
                         <div style="text-align:center;">View</div>
                         <div style="text-align:center;">Add</div>
@@ -71,7 +85,7 @@
                     </div>
 
                     {% for model_label, perms in models %}
-                    <div style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; align-items:center; padding:8px 4px; border-top:1px solid var(--border-subtle);">
+                    <div class="perm-grid" style="display:grid; grid-template-columns:minmax(140px, 1.4fr) repeat(4, 1fr); gap:8px; align-items:center; padding:8px 4px; border-top:1px solid var(--border-subtle);">
                         <div style="font-size:13px; color:var(--text-primary); font-weight:500;">{{ model_label }}</div>
                         {% for perm in perms %}
                         <div style="text-align:center;">

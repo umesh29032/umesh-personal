@@ -1,3 +1,13 @@
+---
+id: l2-data-flows-costing-flow
+type: data-flow
+status: active
+owner: handwritten
+scope: costing_flow (data-flow)
+anchors: —
+verified: 2026-07-13
+---
+
 # Data flow: Costing (standard-cost freeze)
 
 ## TL;DR

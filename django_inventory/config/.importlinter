@@ -18,6 +18,11 @@ root_packages =
     tracking
     expense
     storefront
+    machines
+    patterns_ai
+    devseed
+    verification
+    bod
 
 # ── Contract 1: foundation apps depend on nothing higher ─────────────────────
 [importlinter:contract:foundation-purity]
@@ -33,12 +38,11 @@ forbidden_modules =
     expense
     inventory
     storefront
-# accounts.services.user_service does a LAZY (function-body) production import for
-# the skill→layering retro-tag — intentional, not an import-load cycle.
+# (C-1 freeze closeout 2026-07-05: the accounts→production retro-tag edge was
+# REMOVED — its ignore rule is gone and the contract is now STRICTER.)
 # accounts/tests.py imports inventory.Role inside setUp to exercise the
 # permission-cache against a seeded role — test-only, not a runtime layering edge.
 ignore_imports =
-    accounts.services.user_service -> production.services
     accounts.tests -> inventory.models
 
 # ── Contract 2: acyclic layering (top imports down, never up) ─────────────────
@@ -48,11 +52,21 @@ ignore_imports =
 # writes tracking rows (downward). The old tracking→production ignore block is
 # GONE — the relocated code made it unnecessary.
 # core (bottom) ← accounts ← raw_materials ← tracking ← production ← apps
+# devseed (Phase 12, SEED-D1): the dev-only seeder sits TOPMOST — it imports
+# every app's services; nothing may ever import devseed.
+# verification (Phase 13, VER-D1): the read-only engine sits directly below
+# devseed — devseed imports its shared assertion library (SEED-D6); the engine
+# reads every domain app for checks; no domain app may import verification.
 [importlinter:contract:acyclic-layers]
 name = Acyclic app layering (target)
 type = layers
+# bod (Phase 15, BOD-D2): the owner command center is a READ-ONLY window over
+# domain services — it sits alongside verification (independent siblings below
+# devseed); no domain app may import bod.
 layers =
-    storefront : expense : inventory
+    devseed
+    verification : bod
+    storefront : expense : inventory : machines : patterns_ai
     production
     tracking
     raw_materials
@@ -68,5 +82,28 @@ layers =
 #     history logging) — relocation candidates, same pattern as P4.2.
 #   • *.tests → higher apps — test fixtures, noise; clean up opportunistically.
 ignore_imports =
-    accounts.services.user_service -> production.services
     accounts.tests -> inventory.models
+    # R10 sanctioned function-level machine reads (machine_code stamp + ⚙ chip):
+    production.services.worker_task_service -> machines.models
+    production.stages.generic_stage.handler -> machines.models
+    production.stages.generic_stage.views_ctx -> machines.models
+    # VER-A sanctioned upward edges into devseed (Phase 13, VER-D1/SEED-D6):
+    # test-only single-implementation proof + verify_feature's FUNCTION-LEVEL
+    # lazy registry read (dev-only command; polarity refuses before the import
+    # can run anywhere devseed is absent). Runtime layering stays devseed→
+    # verification only.
+    verification.tests.test_shared_library -> devseed
+    verification.tests.test_shared_library -> devseed.core
+    verification.tests.test_shared_library -> devseed.guard
+    verification.tests.test_dev_world -> devseed.core
+    verification.tests.test_dev_world -> devseed.scenarios.minimal_money
+    # VER-B: dev-world checks read devseed content/registry/extracted-truth at
+    # FUNCTION level only (dev-only checks; polarity refuses where devseed is
+    # absent; single-source law — goldens are never duplicated into the engine).
+    verification.checks.dev_world -> devseed.core
+    verification.checks.dev_world -> devseed.scenarios
+    verification.checks.dev_world -> devseed.tests.test_golden_journeys
+    # VER-C: verify_all dev composition reads the registry at FUNCTION level
+    # (prod composition never touches devseed); + test-only fixture seeding.
+    verification.checks.compose -> devseed.scenarios
+    verification.tests.test_production -> devseed.core

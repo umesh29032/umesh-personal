@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-stage-completion
+type: request-journey
+status: active
+owner: handwritten
+scope: stage_completion (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Stage Completion (+ cost freeze + auto-cancel)
 
 ## TL;DR (1 min)

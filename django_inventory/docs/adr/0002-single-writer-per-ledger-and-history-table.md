@@ -1,3 +1,13 @@
+---
+id: docs-adr-0002-single-writer-per-ledger-and-history-table
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0002 — Exactly one writer service per ledger / audit table
 
 **Status:** Accepted (CLAUDE.md rule #5)

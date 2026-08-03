@@ -1,0 +1,39 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}Interview &amp; Switch Prep — Learn{% endblock %}
+{% block page_title %}Interview Prep{% endblock %}
+
+{% block content %}
+<div class="learn-page learn-page--interview">
+  <div class="learn-hero">
+    <span class="lp-eyebrow"><a href="{% url 'learning:index' %}" class="lp-back">← All courses</a></span>
+    <h1>🎤 Interview &amp; Switch Prep</h1>
+    <p>{{ total }} questions harvested from every chapter of every course, grouped by
+       level. Tap a question to reveal the answer — then open the chapter that
+       teaches it properly.</p>
+  </div>
+
+  {% comment %}Jump bar — real anchors, so Ctrl+click still works.{% endcomment %}
+  <div class="lp-levelbar">
+    {% for g in groups %}
+      <a href="#lvl-{{ g.anchor }}">{{ g.level }} · {{ g.count }}</a>
+    {% endfor %}
+  </div>
+
+  {% for g in groups %}
+    {% if g.count %}
+    <h2 id="lvl-{{ g.anchor }}" class="lp-h2--level">
+      {{ g.level }} <span class="lp-chip">{{ g.count }} questions</span>
+    </h2>
+    {% for q in g.questions %}
+    <details class="lp-q">
+      <summary>{{ q.question }}</summary>
+      <div class="lp-a">{{ q.answer }}</div>
+      <a class="lp-src" href="{% url 'learning:chapter' q.course.slug q.chapter.slug %}">
+        📖 {{ q.course.title }} — {{ q.chapter.title }}
+      </a>
+    </details>
+    {% endfor %}
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

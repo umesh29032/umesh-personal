@@ -2,6 +2,9 @@
 
 {% block page_title %}Barcodes · {{ adda.code }}{% endblock %}
 
+{# A2→TC-1: adopt the canonical DataTable engine (search/sort/paginate). Vendor is per-page (not global). Export forms live in .card-header, OUTSIDE the table — unaffected. #}
+{% block extra_head %}{% include 'shared/_datatables_vendor_css.html' %}{% endblock %}
+
 {% block content %}
 {# Batches-level view (PR6 2026-05-28). Per-piece BatchBarcode rows lazy-created on scan; #}
 {# range info lives on BarcodeBatch. #}
@@ -17,16 +20,17 @@
     <div class="card card-clip">
         <div class="card-header">
             <div class="card-title">Batches (per Color × Size)</div>
+            {% if is_management %}
+            {# V1.1 Item 3: exports = management-only (endpoints 403 for workers too). #}
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
                 <a href="{% url 'tracking:barcode-export' adda.code %}" class="btn btn-ghost">Quick CSV</a>
-                {# Manifest-tracked exports (PR-D 2026-05-29). Refused if barcode_generation stage not complete. #}
-                <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export CSV</button></form>
-                <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export XLSX</button></form>
-                <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">+ Export PDF</button></form>
+                {# Manifest-tracked exports (PR-D 2026-05-29). Refused if barcode_generation stage not complete. Owner: shared/_export_buttons.html (Phase G S1). #}
+                {% include 'shared/_export_buttons.html' with adda_code=adda.code csv_label='+ Export CSV' xlsx_label='+ Export XLSX' pdf_label='+ Export PDF' %}
             </div>
+            {% endif %}
         </div>
         <div class="table-responsive">
-            <table class="tbl">
+            <table id="barcodes-dt" class="tbl">
                 <thead><tr><th>Size</th><th>Color</th><th>Start</th><th>End</th><th>Pieces</th></tr></thead>
                 <tbody>
                 {% for batch in batches %}
@@ -42,7 +46,8 @@
                     <td data-label="Pieces">{{ batch.total_pieces }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" style="padding:24px; text-align:center; color:var(--stone);">No barcode batches yet. Complete Cutting to generate.</td></tr>
+                {# Barcode Generation is its OWN stage, not part of Cutting — completing Cutting lands here. #}
+                <tr><td colspan="5" style="padding:24px; text-align:center; color:var(--stone);">No barcode batches yet. Barcodes are generated in the Barcode Generation stage.</td></tr>
                 {% endfor %}
                 </tbody>
                 {% if batches %}
@@ -54,4 +59,18 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{# A2→TC-1: all 5 columns are data (no Actions) → default sortable. `<tfoot>` Total row preserved (verify no DataTables column-mismatch). #}
+{% block extra_scripts %}
+{% include 'shared/_datatables_vendor_js.html' %}
+<script>
+$(function () {
+    initFancyDataTable('#barcodes-dt', {
+        pageLength: 25,
+        itemName: 'batches',
+        searchPlaceholder: 'Filter batches…'
+    });
+});
+</script>
 {% endblock %}

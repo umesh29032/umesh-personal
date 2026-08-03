@@ -88,7 +88,7 @@ class AddaSettlementModelTests(TestCase):
         task = WorkerStageTask.objects.create(
             stage_record=self.sr, worker=self.worker)
         c = WorkerStageContribution.objects.create(
-            task=task, reported_quantity=Decimal('10'))
+            task=task, reported_quantity=Decimal('10'), good_quantity=Decimal('10'))
         self.assertIsNone(c.settlement_line)        # NULL until settled
         swa = StageWorkAssignment.objects.create(
             stage_record=self.sr, worker=self.worker,

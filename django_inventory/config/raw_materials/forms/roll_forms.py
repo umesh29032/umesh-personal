@@ -56,10 +56,14 @@ class BulkRollForm(forms.Form):
     # C-1 (ADR-0009): PURCHASE price — a fact, never a market/replacement price.
     # Stays optional (owner: honest-NULL over placeholder prices); unpriced
     # consumed rolls are surfaced loudly on the costing dashboard instead.
+    # PA-08-1: min_value=0 → DecimalField adds a MinValueValidator so a negative
+    # cost is a graceful field error. Without it the negative slips past this
+    # forms.Form (no model-constraint validation, unlike a ModelForm) and only
+    # trips the DB CheckConstraint at INSERT → uncaught IntegrityError → 500.
     cost_per_kg = forms.DecimalField(
-        required=False, max_digits=10, decimal_places=2,
+        required=False, min_value=0, max_digits=10, decimal_places=2,
         help_text='Purchase price per kg (leave blank if unknown — never guess)',
-        widget=forms.NumberInput(attrs={**_BASE_INPUT_ATTRS, 'step': '0.01', 'placeholder': '0.00'}),
+        widget=forms.NumberInput(attrs={**_BASE_INPUT_ATTRS, 'step': '0.01', 'min': '0', 'placeholder': '0.00'}),
     )
 
     def __init__(self, *args, user, raw_breakup=None, **kwargs):
@@ -149,9 +153,12 @@ class AssignRollForm(forms.Form):
     in-progress Layering Addas ka. Form import time pe production app pe depend nahi karta.
     """
 
+    # PA-08-2: min_value=0 (same reason as BulkRollForm.cost_per_kg) — a negative
+    # weight here is a plain forms.Form value that otherwise reaches the DB
+    # CheckConstraint at assign → uncaught IntegrityError → 500.
     weight_kg = forms.DecimalField(
-        max_digits=8, decimal_places=2,
-        widget=forms.NumberInput(attrs={**_BASE_INPUT_ATTRS, 'step': '0.01', 'placeholder': 'KG'}),
+        min_value=0, max_digits=8, decimal_places=2,
+        widget=forms.NumberInput(attrs={**_BASE_INPUT_ATTRS, 'step': '0.01', 'min': '0', 'placeholder': 'KG'}),
     )
     width_inch = forms.ChoiceField(
         choices=WIDTH_CHOICES,   # 36..44 inch

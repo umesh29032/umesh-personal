@@ -42,6 +42,13 @@ class AddaAdmin(admin.ModelAdmin):
     search_fields = ('code',)
     readonly_fields = ('code', 'started_at')
 
+    # Owner rule 2026-07-22: deletion is channelled through the gated
+    # `delete_adda` service + confirm page (super-admin, safe-only), never raw
+    # admin. Blocking it here also removes the old M-5 ProtectedError-500 surface
+    # (a raw admin delete of any real Adda hit a PROTECT FK and 500'd).
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(ProductSize)
 class ProductSizeAdmin(admin.ModelAdmin):

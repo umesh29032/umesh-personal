@@ -1,3 +1,13 @@
+---
+id: learning-04-service-layer
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Service layer — the architecture's load-bearing wall
 
 ## The pattern

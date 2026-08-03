@@ -32,6 +32,10 @@ class RoleCreateView(LoginRequiredMixin, SuperAdminOnlyMixin, CreateView):
         ctx['perm_sections'] = permissions_sectioned_for_role_editor()
         return ctx
 
+    def form_valid(self, form):  # PA-05A-3: success feedback (parity with other CRUD)
+        messages.success(self.request, f"Role '{form.instance.name}' created.")
+        return super().form_valid(form)
+
 
 class RoleUpdateView(LoginRequiredMixin, SuperAdminOnlyMixin, UpdateView):
     model = Role
@@ -46,6 +50,10 @@ class RoleUpdateView(LoginRequiredMixin, SuperAdminOnlyMixin, UpdateView):
         ctx['selected_perm_ids'] = set(self.object.permissions.values_list('pk', flat=True))
         return ctx
 
+    def form_valid(self, form):  # PA-05A-3: success feedback (parity with other CRUD)
+        messages.success(self.request, f"Role '{form.instance.name}' updated.")
+        return super().form_valid(form)
+
 
 class RoleDeleteView(LoginRequiredMixin, SuperAdminOnlyMixin, DeleteView):
     model = Role
@@ -56,8 +64,11 @@ class RoleDeleteView(LoginRequiredMixin, SuperAdminOnlyMixin, DeleteView):
         if self.object.is_system:
             messages.error(self.request, f"Cannot delete system role '{self.object.name}'.")
             return redirect('inventory:role_list')
-        if self.object.users.exists():
-            messages.error(self.request, f"'{self.object.name}' is still assigned to users. Reassign them first.")
+        # PA-05A-2: guard BOTH the primary role FK (`users`) AND the extra_roles
+        # M2M (`extra_users`). Without the extra_users check, deleting a role that
+        # is only stacked as an extra_role silently strips it from those users.
+        if self.object.users.exists() or self.object.extra_users.exists():
+            messages.error(self.request, f"'{self.object.name}' is still assigned to users (primary or extra role). Reassign them first.")
             return redirect('inventory:role_list')
         return super().form_valid(form)
 

@@ -1,0 +1,107 @@
+{% extends "accounts/base.html" %}
+{# FE-1: composed from canon — SKILLS CRUD page chrome (.page-header + .kpis/.kpi
+   + .card) + BADGE family for statuses + form-shell partial for the inline assign
+   controls. Summary-card rows (one line per machine, expand for actions) kept —
+   that's the mobile density rule, now in tokens. #}
+{% block page_title %}Machines{% endblock %}
+
+{% block extra_head %}
+{% include 'shared/_form_styles.html' %}
+<style>
+  /* page-scoped (rule 10) — only TRUE extras beyond the canon */
+  .machine-list .m-card { margin-bottom: 10px; }
+  .machine-list .m-card > summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center;
+      gap: 10px; padding: 14px 16px; flex-wrap: wrap;
+  }
+  .machine-list .m-card > summary::-webkit-details-marker { display: none; }
+  .machine-list .m-code { font-weight: 700; color: var(--ink); font-family: monospace; }
+  .machine-list .m-type { color: var(--stone); font-size: var(--fs-sm, 13px); }
+  .machine-list .m-holder { margin-left: auto; font-size: var(--fs-sm, 13px); color: var(--text-secondary); }
+  .machine-list .m-body { padding: 0 16px 14px; border-top: 1px dashed var(--border-subtle); }
+  .machine-list .assign-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 10px; }
+  .machine-list .assign-row .field { margin: 0; min-width: 200px; flex: 1; }
+  @media (max-width: 600px) {
+      .machine-list .m-holder { margin-left: 0; width: 100%; }
+      .machine-list .assign-row { flex-direction: column; align-items: stretch; }
+      .machine-list .assign-row .field { min-width: 0; width: 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="machine-list form-shell">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1>Machines</h1>
+      <p>Physical machines · who holds them right now. Stages define WHAT runs on each machine type.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'machines:add' %}">+ Add Machine</a>
+  </div>
+
+  {# counts — canonical KPI cards (Skills-list pattern) #}
+  <div class="kpis" style="margin-bottom: 20px;">
+    <div class="kpi"><div class="kpi-accent" style="background: var(--copper);"></div>
+      <div class="kpi-label">Total</div><div class="kpi-value">{{ counts.total }}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background: var(--status-success-text);"></div>
+      <div class="kpi-label">Active</div><div class="kpi-value">{{ counts.active }}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background: var(--status-warning-text);"></div>
+      <div class="kpi-label">Maintenance</div><div class="kpi-value">{{ counts.maintenance }}</div></div>
+    <div class="kpi"><div class="kpi-accent" style="background: var(--status-info-text);"></div>
+      <div class="kpi-label">Assigned now</div><div class="kpi-value">{{ counts.assigned_now }}</div></div>
+  </div>
+
+  {% for m in machines %}
+  <details class="card m-card">
+    <summary>
+      <span class="m-code">{{ m.code }}</span>
+      <span class="m-type">{{ m.name }} · {{ m.machine_type.name }}</span>
+      {% if m.status == 'active' %}<span class="badge badge-active">Active</span>
+      {% elif m.status == 'maintenance' %}<span class="badge" style="background: var(--status-warning-bg); color: var(--status-warning-text);">Maintenance</span>
+      {% else %}<span class="badge badge-inactive">Inactive</span>{% endif %}
+      <span class="m-holder">
+        {% if m.open_assignment %}👤 {{ m.open_assignment.worker.get_full_name|default:m.open_assignment.worker.email }}{% if m.open_assignment.adda %} · {{ m.open_assignment.adda.code }}{% endif %}
+        {% else %}— free{% endif %}
+      </span>
+    </summary>
+    <div class="m-body">
+      {% if m.notes %}<p class="help-text" style="margin:10px 0 0;">{{ m.notes }}</p>{% endif %}
+      {% if m.open_assignment %}
+        <p class="help-text" style="margin:10px 0 0;">
+          Held since {{ m.open_assignment.start_at|date:"d M H:i" }}{% if m.open_assignment.adda %} on {{ m.open_assignment.adda.code }}{% endif %}.
+        </p>
+        <form method="post" action="{% url 'machines:release' m.open_assignment.pk %}" style="margin-top:10px;"
+              onsubmit="return confirm('Release {{ m.code }} from {{ m.open_assignment.worker.email }}?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost">Release</button>
+        </form>
+      {% elif m.status == 'active' %}
+        <form method="post" action="{% url 'machines:assign' m.pk %}" class="assign-row">
+          {% csrf_token %}
+          <div class="field">
+            <label>Worker</label>
+            <select name="worker" required>
+              <option value="">— pick worker —</option>
+              {% for w in workers %}<option value="{{ w.pk }}">{{ w.get_full_name|default:w.email }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Adda (optional)</label>
+            <select name="adda">
+              <option value="">—</option>
+              {% for a in addas %}<option value="{{ a.pk }}">{{ a.code }}</option>{% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Assign</button>
+        </form>
+      {% else %}
+        <p class="help-text" style="margin:10px 0 0;">Set status to Active to assign an operator.</p>
+      {% endif %}
+      <p style="margin:12px 0 0;"><a class="action-link" href="{% url 'machines:edit' m.pk %}">✎ Edit machine</a></p>
+    </div>
+  </details>
+  {% empty %}
+  <div class="empty-state"><p>No machines yet — add the first one.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "accounts/base.html" %}
+{# P2 — version detail: per-size geometry grid, confirm (grain+tape), exports #}
+{% block page_title %}{{ piece.pattern.name }} v{{ version.version_no }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-version .gcard:target { outline:2px solid var(--copper, #b87333); outline-offset:2px; }
+  .pai-version .vbadge { padding:2px 10px; border-radius:10px; font-size:13px; }
+  .pai-version .v-confirmed { background:#d9efe1; color:#20603c; }
+  .pai-version .v-draft { background:#fdf3d8; color:#7a5c10; }
+  .pai-version .v-superseded, .pai-version .v-rejected { background:#eee; color:#666; }
+  .pai-version .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:14px; }
+  .pai-version .gcard { background:#fff; border:var(--border-card, 1px solid #e5e0d5);
+    border-radius:12px; padding:14px; }
+  .pai-version .gcard svg { width:100%; height:auto; }
+  .pai-version .trust { font-size:12px; padding:2px 8px; border-radius:10px; }
+  .pai-version .t-measured { background:#d9efe1; color:#20603c; }
+  .pai-version .t-photo_calibrated { background:#e3ecfa; color:#2a4d86; }
+  .pai-version .t-uncalibrated { background:#fdf3d8; color:#7a5c10; }
+  .pai-version .confirm-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px; }
+  .pai-version .exports { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-version">
+  <div class="page-header">
+    <h1>{{ piece.pattern.name }} · v{{ version.version_no }}
+      <span class="vbadge v-{{ version.status }}">{{ version.get_status_display }}</span></h1>
+    <p class="subtitle">{{ piece.product.code }}
+      {% if version.confirmed_at %} · confirmed by
+        {{ version.confirmed_by.get_full_name|default:version.confirmed_by }}
+        on {{ version.confirmed_at|date:"Y-m-d H:i" }}{% endif %}
+      {% if version.superseded_by %} · superseded by v{{ version.superseded_by.version_no }}{% endif %}
+      {% if version.status_reason %} · {{ version.status_reason }}{% endif %}</p>
+  </div>
+  <p><a class="btn" href="{% url 'patterns_ai:piece-detail' piece.pk %}">← {{ piece.pattern.name }}</a>
+  {% if is_draft %}
+    <a class="btn btn-primary" href="{% url 'patterns_ai:pattern-capture' piece.pk %}">📷 Capture another size</a>
+  {% endif %}</p>
+
+  {% if is_draft %}<form method="post" action="{% url 'patterns_ai:version-confirm' version.pk %}">{% csrf_token %}{% endif %}
+
+  <div class="grid">
+    {% for r in rows %}
+    <div class="gcard" id="size-{{ r.row.size_id }}">
+      <h3>{{ r.row.size.label }}
+        <span class="trust t-{{ r.row.trust_grade }}">{{ r.row.get_trust_grade_display }}</span></h3>
+      {{ r.svg|safe }}
+      <p class="muted">
+        {% if r.grain %}grain {{ r.grain.angle_cdeg }} c°{% else %}grain: not set{% endif %}
+        · tol {{ r.row.chord_tolerance_um }} µm
+        {% if r.row.copied_from %} · copied from v{{ r.row.copied_from.version.version_no }}{% endif %}
+        {% if r.row.source_extraction %} · extraction #{{ r.row.source_extraction_id }}{% endif %}
+        {% if r.row.tape_acceptance.width_mm %}
+          · tape {{ r.row.tape_acceptance.width_mm }}×{{ r.row.tape_acceptance.height_mm }} mm
+          (Δ {{ r.row.tape_acceptance.delta_w_mm }}/{{ r.row.tape_acceptance.delta_h_mm }})
+        {% endif %}
+      </p>
+      {% if is_draft %}
+      <div class="confirm-row">
+        <input type="text" name="grain_{{ r.row.size_id }}"
+               placeholder="grain ° (req.)" inputmode="decimal"
+               {% if r.grain %}value="{% widthratio r.grain.angle_cdeg 100 1 %}"{% endif %}>
+        <input type="text" name="tape_w_{{ r.row.size_id }}" placeholder="tape W mm" inputmode="decimal">
+        <input type="text" name="tape_h_{{ r.row.size_id }}" placeholder="tape H mm" inputmode="decimal">
+      </div>
+      <div class="exports">
+        <a class="btn" href="{% url 'patterns_ai:geometry-edit' r.row.pk %}">✏ edit</a>
+      </div>
+      {% else %}
+      <div class="exports">
+        <a class="btn" href="{% url 'patterns_ai:geometry-svg' r.row.pk %}">SVG</a>
+        <a class="btn" href="{% url 'patterns_ai:geometry-dxf' r.row.pk %}">DXF</a>
+        <a class="btn" href="{% url 'patterns_ai:geometry-print' r.row.pk %}">Gate-1 print</a>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="gcard"><p class="muted">No size geometry yet — capture a
+      size or import a DXF.</p></div>
+    {% endfor %}
+  </div>
+
+  {% if is_draft %}
+    {% if rows %}
+    <div class="card" style="padding:16px; margin-top:16px;">
+      <p class="muted">Confirm makes this version PERMANENT: grain (degrees)
+      is mandatory per size; tape numbers are optional — when given they must
+      match within 2 mm and upgrade that size to <strong>Measured</strong>.</p>
+      <button type="submit" class="btn btn-primary">Confirm v{{ version.version_no }}</button>
+    </div>
+    {% endif %}
+  </form>
+  <form method="post" action="{% url 'patterns_ai:version-reject' version.pk %}"
+        onsubmit="return this.reason.value.trim() !== '' || (alert('reason required'), false);"
+        style="display:flex; gap:8px; margin-top:10px;">
+    {% csrf_token %}
+    <input type="text" name="reason" placeholder="reject reason (mandatory)" maxlength="200">
+    <button type="submit" class="btn btn-danger">Reject draft</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,3 +1,13 @@
+---
+id: production-barcode-generation
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Barcode Generation Stage
 
 Stage 4 of production flow (optional per-product).

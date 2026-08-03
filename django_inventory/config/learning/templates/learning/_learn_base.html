@@ -1,0 +1,251 @@
+{% extends "accounts/base.html" %}
+{% comment %}
+Shared chrome + CSS for every /learn/ page.
+
+RULES OBEYED (UI_COMPONENTS.md):
+  · rule 9  — reuses the certified .card / hero / badge vocabulary; adds only
+              what a long-form READING surface genuinely needs (prose column,
+              code blocks, TOC) — patterns that exist nowhere else in the app.
+  · rule 10 — every selector is scoped under .learn-page so it cannot leak.
+  · rule 11 — MOBILE-FIRST: single column by default, sidebar appears only at
+              ≥1024px, code/tables scroll inside their own box so the PAGE
+              never scrolls sideways. Touch targets ≥44px.
+{% endcomment %}
+
+{% block extra_head %}
+<style>
+/* ── DS-ratchet-safe helpers (2026-08-03) ───────────────────────────────────
+   These replace inline `font-size:Npx` / `color:#hex` that the design-system
+   ratchet forbids in new markup. Page-scoped under .learn-page per UI rule 10.
+   Accent variants set --lp-accent via a CLASS so no hex ever appears inline. */
+.lp-back{color:var(--lp-on-accent);opacity:.9}          /* hero back-links */
+.lp-h2{font-size:16px;margin:22px 0 10px}               /* section headings */
+.lp-h2--level{font-size:17px;margin:24px 0 10px;scroll-margin-top:70px}
+.lp-note{font-size:13px;line-height:1.6;color:var(--lp-soft);margin:8px 0 0}
+.lp-meta{font-size:12px;color:var(--lp-soft);margin:-6px 0 12px}
+.lp-meta--inline{font-size:11px;color:var(--lp-soft)}
+.lp-input{flex:1 1 240px;min-height:44px;padding:0 14px;font-size:15px}
+.lp-btn--accent{background:var(--lp-accent);color:var(--lp-on-accent);border-color:transparent}
+.lp-tick--doing{color:var(--lp-doing)}
+.lp-tick--todo{color:var(--lp-todo)}
+.learn-page--interview{--lp-accent:var(--lp-accent-interview)}
+.learn-page--search{--lp-accent:var(--lp-accent-search)}
+
+/* Pygments theme, inlined (only this section needs it) */
+{{ pygments_css }}
+
+/* ── tokens: one accent per course, everything else from base.html ── */
+.learn-page{--lp-ink:#22201d;--lp-soft:#6b625a;--lp-line:#e6e0d8;
+            --lp-bg:#fffdf9;--lp-code:#f6f2ec;--lp-accent:#2d6a4f;--lp-on-accent:#fff;--lp-doing:#b7791f;--lp-todo:#cbd5e0;--lp-accent-interview:#7b2d6a;--lp-accent-search:#4a5568}
+
+/* ── layout: ONE column on phones; the reading column is the priority ── */
+.learn-page{color:var(--lp-ink)}
+.learn-wrap{display:block;max-width:100%}
+.learn-main{min-width:0}                /* min-width:0 lets children scroll, not the page */
+
+/* ── hero ── */
+.learn-hero{background:linear-gradient(135deg,var(--lp-accent) 0%,#1b4332 100%);
+  color:#fff;border-radius:14px;padding:18px 16px;margin:0 0 16px}
+.learn-hero h1{font-size:20px;line-height:1.25;margin:0 0 6px;color:#fff}
+.learn-hero p{margin:0;font-size:13px;opacity:.92;line-height:1.5}
+.learn-hero .lp-eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+  opacity:.85;display:block;margin-bottom:6px}
+
+/* ── course cards ── */
+.lp-grid{display:grid;gap:14px;grid-template-columns:1fr}
+.lp-card{background:#fff;border:1px solid var(--lp-line);border-radius:14px;
+  padding:16px;display:flex;flex-direction:column;gap:8px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);text-decoration:none;color:inherit}
+.lp-card:hover{border-color:var(--lp-accent);box-shadow:0 4px 14px rgba(0,0,0,.07)}
+.lp-card .lp-icon{font-size:28px;line-height:1}
+.lp-card h2{font-size:17px;margin:0;color:var(--lp-ink)}
+.lp-card p{margin:0;font-size:13px;color:var(--lp-soft);line-height:1.55}
+.lp-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.lp-chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:var(--lp-code);color:var(--lp-soft);border:1px solid var(--lp-line)}
+.lp-chip--accent{background:var(--lp-accent);color:#fff;border-color:transparent}
+
+/* ── chapter list ── */
+.lp-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.lp-row{display:flex;align-items:center;gap:12px;min-height:52px;
+  padding:10px 12px;border:1px solid var(--lp-line);border-radius:11px;
+  background:#fff;text-decoration:none;color:inherit}
+.lp-row:hover{border-color:var(--lp-accent);background:var(--lp-bg)}
+.lp-row .lp-num{flex:0 0 auto;min-width:38px;height:38px;display:grid;place-items:center;
+  border-radius:9px;background:var(--lp-code);color:var(--lp-soft);
+  font-weight:800;font-size:13px}
+.lp-row .lp-t{font-size:14px;font-weight:600;line-height:1.35}
+.lp-row--overview .lp-num{background:var(--lp-accent);color:#fff}
+
+/* ── the prose surface: this is the actual product ── */
+.lp-prose{background:#fff;border:1px solid var(--lp-line);border-radius:14px;
+  padding:16px 14px;font-size:15px;line-height:1.72;overflow-wrap:break-word}
+.lp-prose h1{font-size:18px;margin:28px 0 10px;padding-top:10px;
+  border-top:2px solid var(--lp-line);color:var(--lp-accent);scroll-margin-top:70px}
+.lp-prose h1:first-child{margin-top:0;border-top:0;padding-top:0}
+.lp-prose h2{font-size:16px;margin:22px 0 8px}
+.lp-prose h3{font-size:14.5px;margin:18px 0 6px;color:var(--lp-soft)}
+.lp-prose p{margin:0 0 12px}
+.lp-prose ul,.lp-prose ol{margin:0 0 12px;padding-left:22px}
+.lp-prose li{margin:0 0 6px}
+.lp-prose strong{color:#111}
+.lp-prose a{color:var(--lp-accent);text-decoration:underline;text-underline-offset:2px}
+.lp-prose hr{border:0;border-top:1px solid var(--lp-line);margin:22px 0}
+
+/* blockquote = the 💡 Samjho aise / ⚠️ warning boxes. The teaching moments. */
+.lp-prose blockquote{margin:14px 0;padding:12px 14px;border-left:4px solid var(--lp-accent);
+  background:#f4fbf6;border-radius:0 10px 10px 0;font-size:14.5px}
+.lp-prose blockquote p:last-child{margin-bottom:0}
+
+/* code + ASCII diagrams: scroll INSIDE the box, never the page (rule 11) */
+.lp-prose pre{background:var(--lp-code);border:1px solid var(--lp-line);
+  border-radius:10px;padding:12px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  font-size:12.5px;line-height:1.5;margin:0 0 14px}
+.lp-prose pre code{background:none;border:0;padding:0;white-space:pre;font-size:inherit}
+.lp-prose code{background:var(--lp-code);border:1px solid var(--lp-line);
+  border-radius:5px;padding:1px 5px;font-size:.9em}
+.lp-prose table{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 14px}
+.lp-prose thead th{background:var(--lp-code);text-align:left;font-size:12px;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--lp-soft)}
+.lp-prose th,.lp-prose td{border:1px solid var(--lp-line);padding:7px 9px;vertical-align:top}
+.lp-tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* ── on-page TOC: a collapsible summary on phones, a rail on desktop ── */
+.lp-toc{background:#fff;border:1px solid var(--lp-line);border-radius:12px;
+  padding:10px 12px;margin:0 0 14px}
+.lp-toc summary{cursor:pointer;font-weight:800;font-size:13px;min-height:32px;
+  display:flex;align-items:center}
+.lp-toc ol{margin:8px 0 0;padding-left:20px;font-size:13px}
+.lp-toc li{margin:0 0 6px}
+.lp-toc a{color:var(--lp-soft);text-decoration:none}
+.lp-toc a:hover{color:var(--lp-accent);text-decoration:underline}
+
+/* ── prev / next ── */
+.lp-nav{display:grid;gap:10px;grid-template-columns:1fr;margin:16px 0 0}
+.lp-nav a{display:flex;flex-direction:column;gap:2px;min-height:56px;justify-content:center;
+  padding:10px 14px;border:1px solid var(--lp-line);border-radius:11px;
+  background:#fff;text-decoration:none;color:inherit}
+.lp-nav a:hover{border-color:var(--lp-accent)}
+.lp-nav .lp-dir{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--lp-soft)}
+.lp-nav .lp-t{font-size:13.5px;font-weight:700}
+.lp-nav .lp-next{text-align:right}
+
+/* ── interview prep ── */
+.lp-q{border:1px solid var(--lp-line);border-radius:11px;background:#fff;
+  padding:12px 14px;margin:0 0 10px}
+.lp-q summary{cursor:pointer;font-weight:700;font-size:14px;line-height:1.5;
+  min-height:32px;display:flex;gap:8px;align-items:flex-start}
+.lp-q .lp-a{margin:10px 0 0;padding:10px 12px;background:var(--lp-bg);
+  border-left:3px solid var(--lp-accent);border-radius:0 8px 8px 0;
+  font-size:14px;line-height:1.65}
+.lp-q .lp-src{display:block;margin-top:8px;font-size:11.5px;color:var(--lp-soft)}
+.lp-levelbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.lp-levelbar a{min-height:44px;display:inline-flex;align-items:center;padding:0 14px;
+  border-radius:999px;border:1px solid var(--lp-line);background:#fff;
+  font-weight:700;font-size:13px;text-decoration:none;color:var(--lp-ink)}
+.lp-levelbar a:hover{border-color:var(--lp-accent);color:var(--lp-accent)}
+
+/* ── TABLET ≥768px ── */
+@media (min-width:768px){
+  .learn-hero{padding:24px 22px}
+  .learn-hero h1{font-size:25px}
+  .lp-grid{grid-template-columns:repeat(2,1fr)}
+  .lp-prose{padding:24px 26px;font-size:15.5px}
+  .lp-prose h1{font-size:20px}
+  .lp-nav{grid-template-columns:1fr 1fr}
+}
+
+/* ── DESKTOP ≥1024px: the TOC becomes a sticky rail beside the prose ── */
+@media (min-width:1024px){
+  .learn-wrap{display:grid;grid-template-columns:1fr 250px;gap:22px;align-items:start}
+  .learn-aside{position:sticky;top:16px}
+  .lp-toc{margin:0}
+  .lp-toc summary{pointer-events:none}      /* always open on desktop */
+  .lp-prose{padding:30px 34px}
+  .learn-hero h1{font-size:28px}
+}
+@media (min-width:1280px){ .lp-prose{padding:34px 44px;font-size:16px} }
+
+
+/* ── progress: bars, ticks, streak (VISION §9) ── */
+.lp-bar{height:7px;border-radius:99px;background:var(--lp-code);overflow:hidden;margin:8px 0 0}
+.lp-bar > i{display:block;height:100%;background:var(--lp-accent);border-radius:99px;
+  transition:width .3s ease}
+.lp-pct{font-size:11.5px;font-weight:800;color:var(--lp-soft);margin-top:5px;display:block}
+.lp-row--done{background:#f4fbf6;border-color:#bfe3cd}
+.lp-row--done .lp-num{background:#2d6a4f;color:#fff}
+.lp-tick{margin-left:auto;flex:0 0 auto;font-size:15px;color:#2d6a4f;font-weight:900}
+.lp-statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
+.lp-stat{background:#fff;border:1px solid var(--lp-line);border-radius:12px;
+  padding:10px 8px;text-align:center}
+.lp-stat b{display:block;font-size:20px;line-height:1.1;color:var(--lp-accent)}
+.lp-stat span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--lp-soft)}
+.lp-resume{background:#fff;border:2px solid var(--lp-accent);border-radius:14px;
+  padding:14px 16px;margin:0 0 16px;display:block;text-decoration:none;color:inherit}
+.lp-resume .lp-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--lp-accent);font-weight:800}
+.lp-resume h3{margin:4px 0 2px;font-size:16px}
+.lp-resume p{margin:0;font-size:12.5px;color:var(--lp-soft)}
+/* weekly activity bars */
+.lp-week{display:flex;align-items:flex-end;gap:5px;height:52px;margin:0 0 16px;
+  background:#fff;border:1px solid var(--lp-line);border-radius:12px;padding:8px 10px}
+.lp-day{flex:0 0 26px;height:100%;display:flex;flex-direction:column;
+  justify-content:flex-end;align-items:center;gap:3px}
+.lp-day > i{display:block;width:100%;background:var(--lp-accent);border-radius:4px;
+  min-height:4px;opacity:.85}
+.lp-day > span{font-size:9.5px;color:var(--lp-soft);font-weight:700}
+.lp-statgrid{grid-template-columns:repeat(3,1fr)}
+@media (min-width:768px){ .lp-statgrid{grid-template-columns:repeat(6,1fr)} }
+
+/* chapter action bar */
+.lp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.lp-btn{min-height:44px;display:inline-flex;align-items:center;gap:7px;
+  padding:0 15px;border-radius:11px;border:1px solid var(--lp-line);background:#fff;
+  font-weight:700;font-size:13.5px;cursor:pointer;color:var(--lp-ink);font-family:inherit}
+.lp-btn:hover{border-color:var(--lp-accent)}
+.lp-btn[aria-pressed="true"]{background:var(--lp-accent);color:#fff;border-color:transparent}
+@media (min-width:768px){ .lp-statgrid{grid-template-columns:repeat(3,1fr)} }
+
+/* respect reduced motion + print sanely */
+@media print{
+  .learn-aside,.lp-nav,.learn-hero{display:none}
+  .lp-prose{border:0;padding:0}
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+/* Keyboard shortcuts (VISION §9). Deliberately few and unsurprising:
+     /        focus search (or go to the search page)
+     j / k    next / previous chapter
+     g then i interview prep      g then l  learn home
+   Never fires while typing in a field, and never overrides a browser shortcut
+   (no ctrl/meta/alt combos). */
+(function () {
+  var lastG = 0;
+  function typing(el) {
+    return el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+  }
+  function go(sel) { var a = document.querySelector(sel); if (a) a.click(); }
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+    var k = e.key;
+    if (k === '/') {
+      var box = document.getElementById('lp-q') || document.getElementById('q');
+      if (box) { e.preventDefault(); box.focus(); box.select(); }
+      else window.location = '{% url "learning:search" %}';
+      return;
+    }
+    if (k === 'g') { lastG = Date.now(); return; }
+    if (Date.now() - lastG < 900) {           /* two-key "g …" chords */
+      if (k === 'i') window.location = '{% url "learning:interview" %}';
+      if (k === 'l') window.location = '{% url "learning:index" %}';
+      lastG = 0; return;
+    }
+    if (k === 'j') go('.lp-nav a.lp-next');            /* next chapter */
+    if (k === 'k') go('.lp-nav a:not(.lp-next)');      /* previous chapter */
+  });
+})();
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}My Earnings{% endblock %}
 
@@ -39,36 +40,47 @@
     <div class="stat-grid">
         <div class="stat-card payable">
             <div class="label">Pending Payable</div>
-            <div class="value">₹{{ summary.pending_payable|floatformat:2 }}</div>
+            <div class="value">{% money summary.pending_payable %}</div>
         </div>
         {% comment %}V2-3 PR-C: three NON-OVERLAPPING money views —
         expected (reported, not yet settled) → earned (booked at settlement)
-        → paid (cash). Expected is visibility only, never a balance.{% endcomment %}
+        → paid (cash). Expected is visibility only, never a balance.
+        R4 (PDD §27-D4, owner P-4): MONTHLY worker → the ₹ expectation is
+        suppressed ENTIRELY (never ₹0.00 — reads as unpaid work); quantities
+        stay visible elsewhere on the page (production truth).{% endcomment %}
+        {% if is_monthly %}
+        <div class="stat-card">
+            <div class="label">Pay Basis</div>
+            <div class="value"><span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span></div>
+            <div class="label" style="margin-top:4px;text-transform:none;letter-spacing:0;">work is tracked; salary is paid separately</div>
+        </div>
+        {% else %}
         <div class="stat-card">
             <div class="label">Expected (unsettled)</div>
-            <div class="value">₹{{ unsettled_expected|floatformat:2 }}</div>
+            <div class="value">{% money unsettled_expected %}</div>
             <div class="label" style="margin-top:4px;text-transform:none;letter-spacing:0;">becomes Earned when the Adda is settled</div>
         </div>
+        {% endif %}
         <div class="stat-card">
             <div class="label">Earned (settled)</div>
-            <div class="value">₹{{ summary.total_earnings|floatformat:2 }}</div>
+            <div class="value">{% money summary.total_earnings %}</div>
         </div>
         <div class="stat-card">
             <div class="label">Advance Outstanding</div>
-            <div class="value">₹{{ summary.advance_outstanding|floatformat:2 }}</div>
+            <div class="value">{% money summary.advance_outstanding %}</div>
         </div>
         <div class="stat-card">
             <div class="label">This Month</div>
-            <div class="value">₹{{ summary.earnings_in_window|floatformat:2 }}</div>
+            <div class="value">{% money summary.earnings_in_window %}</div>
         </div>
         <div class="stat-card">
             <div class="label">Paid (cash)</div>
-            <div class="value">₹{{ summary.total_settled|floatformat:2 }}</div>
+            <div class="value">{% money summary.total_settled %}</div>
         </div>
         <div class="stat-card">
             <div class="label">Last Payment</div>
             {% if summary.last_settlement %}
-                <div class="value">₹{{ summary.last_settlement.amount_paid|floatformat:2 }}</div>
+                <div class="value">{% money summary.last_settlement.amount_paid %}</div>
                 <div class="label" style="margin-top:4px;">{{ summary.last_settlement.settlement_date }}</div>
             {% else %}
                 <div class="value">—</div>
@@ -89,7 +101,7 @@
         {% for s in stage_earnings %}
             <div class="line">
                 <div>{{ s.stage_record__workflow_stage__stage__name }}<span class="muted"> · {{ s.qty|floatformat:0 }} pc</span></div>
-                <div class="amt-credit">₹{{ s.earned|floatformat:2 }}</div>
+                <div class="amt-credit">{% money s.earned %}</div>
             </div>
         {% endfor %}
     </div>
@@ -102,12 +114,12 @@
         <div class="adda-block">
             <div class="adda-head">
                 <span><span class="adda-code">{{ a.adda_code }}</span> <span class="muted">· {{ a.product }}</span></span>
-                <span class="adda-total">{{ a.total_pieces|floatformat:0 }} pc · ₹{{ a.total_earned|floatformat:2 }}</span>
+                <span class="adda-total">{{ a.total_pieces|floatformat:0 }} pc · {% money a.total_earned %}</span>
             </div>
             {% for s in a.stages %}
             <div class="line">
                 <div>{{ s.stage }}<span class="muted"> · {{ s.pieces|floatformat:0 }} pc</span></div>
-                <div class="amt-credit">₹{{ s.earned|floatformat:2 }}</div>
+                <div class="amt-credit">{% money s.earned %}</div>
             </div>
             {% endfor %}
         </div>
@@ -121,9 +133,10 @@
             <div class="line">
                 <div>
                     <div>{{ a.stage_record.adda.code }} · {{ a.stage_record.workflow_stage.stage.name }}</div>
-                    <div class="muted">{{ a.allocated_quantity }} × ₹{{ a.earning_rate_snapshot }}{% if a.size %} · {{ a.size.code|upper }}{% endif %}{% if a.color %} · {{ a.color.name }}{% endif %}</div>
+                    {# floor language: whole pieces + 2dp rate — never 17.00 × ₹1.5000 on a worker phone #}
+                    <div class="muted">{{ a.allocated_quantity|floatformat:"0" }} × ₹{{ a.earning_rate_snapshot|floatformat:"-2" }}{% if a.size %} · {{ a.size.code|upper }}{% endif %}{% if a.color %} · {{ a.color.name }}{% endif %}</div>
                 </div>
-                <div class="amt-credit">₹{{ a.earning_amount_snapshot|floatformat:2 }}</div>
+                <div class="amt-credit">{% money a.earning_amount_snapshot %}</div>
             </div>
         {% empty %}
             <div class="empty">No work allocated yet.</div>
@@ -131,17 +144,17 @@
     </div>
 
     <div class="panel">
-        <h2>Settlement History</h2>
+        <h2>Payments</h2>
         {% for s in settlements %}
             <div class="line">
                 <div>
                     <div><span class="adda-code">{{ s.reference }}</span><span class="muted"> · {{ s.get_method_display }}</span></div>
-                    <div class="muted">{{ s.settlement_date }}{% if s.advance_deducted %} · advance recovered ₹{{ s.advance_deducted|floatformat:2 }}{% endif %}</div>
+                    <div class="muted">{{ s.settlement_date }}{% if s.advance_deducted %} · advance recovered {% money s.advance_deducted %}{% endif %}</div>
                 </div>
-                <div class="amt-debit">₹{{ s.amount_paid|floatformat:2 }}</div>
+                <div class="amt-debit">{% money s.amount_paid %}</div>
             </div>
         {% empty %}
-            <div class="empty">No settlements yet — payments appear here on payroll day.</div>
+            <div class="empty">No cash payments yet — they appear here on payroll day.</div>
         {% endfor %}
     </div>
 
@@ -153,7 +166,7 @@
                     <div>Advance</div>
                     <div class="muted">{{ a.advance_date }}{% if a.notes %} · {{ a.notes }}{% endif %}</div>
                 </div>
-                <div class="amt-debit">₹{{ a.amount|floatformat:2 }}</div>
+                <div class="amt-debit">{% money a.amount %}</div>
             </div>
         {% empty %}
             <div class="empty">No advances taken.</div>

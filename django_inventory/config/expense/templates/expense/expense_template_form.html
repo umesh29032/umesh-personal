@@ -1,0 +1,78 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}New Recurring Template{% endblock %}
+
+{% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# canonical .field — same shell as Record Expense #}
+<style>
+    /* Composed 1:1 from the factory_expense_form canon (rule 10, page-scoped). */
+    .expense-form { max-width: 640px; margin: 0 auto; }
+    .expense-form .panel { padding: 20px 22px; margin-bottom: 80px; }
+    .expense-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .expense-form input, .expense-form select, .expense-form textarea {
+        width: 100%; padding: 11px 13px; font-size: 14px;
+        background: var(--cream); border: 1.5px solid var(--border-subtle);
+        border-radius: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.04);
+    }
+    .expense-form input:focus, .expense-form select:focus, .expense-form textarea:focus { outline: none; border-color: var(--copper); }
+    .expense-form .errs { color: #b91c1c; font-size: 12px; margin-top: 4px; }
+    .expense-form .hint { font-size: 11px; color: var(--stone); margin-top: 4px; }
+    .expense-form .sticky-bar {
+        position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px);
+        border-top: 1px solid var(--border-subtle); padding: 14px 0; margin-top: -64px;
+        display: flex; justify-content: flex-end; gap: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="expense-form">
+    <div class="hero-strip copper">
+        <h1>New Recurring Template</h1>
+        <p>Define it once — each month generates an ordinary Factory Expense through the certified path. Amounts change only with an audited reason; covered months never re-price.</p>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <div class="panel">
+            {% if form.non_field_errors %}<div class="errs">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+                <div class="field" {% if field.name == 'worker' %}id="worker-field"{% endif %}>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.name == 'worker' %}<div class="hint">Required for salary — WHOSE salary (audit only; one active salary template per worker; generation stops automatically if the worker becomes inactive).</div>{% endif %}
+                    {% if field.name == 'start_date' %}<div class="hint">Anchor: the first month generated, and the day-of-month used for each generated expense (31st clamps to shorter months).</div>{% endif %}
+                    {% if field.errors %}<div class="errs">{{ field.errors|striptags }}</div>{% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        <div class="sticky-bar">
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:expense-template-list' %}">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">Create Template</button>
+        </div>
+    </form>
+</div>
+{{ worker_salaries|json_script:"worker-salaries" }}
+<script>
+// Same P-1/L-3 sugar as Record Expense: worker picker follows the category;
+// picking a worker prefills an EMPTY amount from User.salary (reference only).
+// The SERVICE enforces the real rules.
+(function () {
+    var cat = document.getElementById('id_category');
+    var wf = document.getElementById('worker-field');
+    var worker = document.getElementById('id_worker');
+    var amount = document.getElementById('id_amount');
+    var salaries = JSON.parse(document.getElementById('worker-salaries').textContent || '{}');
+    if (!cat || !wf) return;
+    function sync() { wf.style.display = (cat.value === 'salary') ? '' : 'none'; }
+    cat.addEventListener('change', sync);
+    sync();
+    if (worker && amount) {
+        worker.addEventListener('change', function () {
+            if (cat.value === 'salary' && !amount.value && salaries[worker.value]) {
+                amount.value = salaries[worker.value];
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

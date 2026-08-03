@@ -1,3 +1,13 @@
+---
+id: root-about-this-project
+type: topic-canonical
+status: active
+owner: handwritten
+scope: all — system-level
+anchors: —
+verified: 2026-07-13
+---
+
 # About this project — Kapil Enterprises Inventory
 
 A narrative companion to [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) and [docs/PROJECT_KNOWLEDGE_MAP.md](docs/PROJECT_KNOWLEDGE_MAP.md).

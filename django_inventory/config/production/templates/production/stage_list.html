@@ -6,7 +6,7 @@
 <style>
     .stage-list { max-width: 1100px; margin: 0 auto; }
     .stage-list .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px;
         padding: 26px 30px; margin-bottom: 22px;
         position: relative; overflow: hidden;
@@ -25,6 +25,8 @@
         font-weight: 700; font-size: 13px; text-decoration: none;
         display: inline-flex; align-items: center; gap: 6px;
     }
+    /* FE-3: ghost variant (masters links) — token-only modifier, no inline styles */
+    .stage-list .add-btn--ghost { background: transparent; color: var(--copper); border: 1px solid var(--copper); }
     .stage-list .add-btn:hover { background: #d4924a; }
 
     .stage-list .stage-card {
@@ -108,12 +110,17 @@
             <p>Global library of production stages. Each stage carries its own
             skill + role access rules. Drag into a Product flow on the Product page.</p>
         </div>
-        {% if can_add_stage %}
-        <a href="{% url 'production:stage-add' %}" class="add-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            New Stage
-        </a>
-        {% endif %}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            {# R10-C data-driven masters — the owner edits classifications as rows #}
+            <a href="{% url 'production:stage-category-list' %}" class="add-btn add-btn--ghost">Categories</a>
+            <a href="{% url 'production:machine-type-list' %}" class="add-btn add-btn--ghost">Machine Types</a>
+            {% if can_add_stage %}
+            <a href="{% url 'production:stage-add' %}" class="add-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                New Stage
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     {% if messages %}

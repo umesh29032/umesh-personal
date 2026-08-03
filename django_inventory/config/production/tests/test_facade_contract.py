@@ -24,7 +24,7 @@ EXPECTED = frozenset({
     'start_layering', 'complete_layering', 'reopen_layering', 'get_layering_snapshot',
     'attach_roll_to_layering', 'detach_roll_from_layering', 'update_layering_roll_entry',
     'save_layering_breakup', 'save_layering_draft', 'record_remaining_cloth',
-    'remove_remaining_cloth', 'sync_layering_workers_for_skill',
+    'remove_remaining_cloth',
     # Cutting
     'start_cutting', 'complete_cutting', 'complete_cutting_from_bundles',
     'complete_cutting_legacy', 'reopen_cutting', 'get_cutting_snapshot',

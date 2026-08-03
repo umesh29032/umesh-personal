@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # ARCHITECTURE EXPLAINED — the WHY, for a junior dev
 
 ## TL;DR (1 min)

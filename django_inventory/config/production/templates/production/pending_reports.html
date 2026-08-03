@@ -1,0 +1,74 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Pending Reports{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* F-3 pending-reports drill-down — mobile-first card grid, no horizontal scroll. */
+    .pending-list .sub { color: var(--stone); font-size: 13px; margin-bottom: 18px; }
+    .pending-cards {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+    }
+    .pending-card {
+        display: block; text-decoration: none; color: var(--ink);
+        background: var(--card-bg); border: 1px solid var(--border-card);
+        border-left: 5px solid var(--warning); border-radius: 14px; padding: 16px 18px;
+        box-shadow: var(--shadow-card); transition: transform .15s, border-color .15s;
+    }
+    .pending-card:hover { transform: translateY(-1px); border-color: var(--copper); }
+    .pending-card .code { font-family: monospace; font-weight: 700; font-size: 15px; }
+    .pending-card .age { float: right; font-weight: 700; font-size: 20px; color: var(--warning); line-height: 1; }
+    .pending-card .meta {
+        margin-top: 10px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px;
+    }
+    .pending-card .meta dt { color: var(--stone); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; font-weight: 700; }
+    .pending-card .meta dd { margin: 0; }
+    .pending-card .pill {
+        display: inline-block; margin-top: 10px; font-size: 10px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .08em; padding: 2px 8px; border-radius: 999px;
+        background: var(--surface-2); color: var(--stone);
+    }
+    .pending-empty {
+        text-align: center; padding: 48px 20px; color: var(--stone);
+        background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px;
+    }
+    .pending-empty .big { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--ink); margin-bottom: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pending-list">
+    <div class="page-header">
+        <div class="page-header-text"><h1>Pending Reports</h1></div>
+        <a href="{% url 'production:dashboard' %}" class="btn btn-ghost">← Operations</a>
+    </div>
+    <p class="sub">
+        {% if is_management %}Workers assigned to an open stage who haven't submitted yet — who's holding up each Adda.{% else %}Your assigned work that still needs a report.{% endif %}
+        Oldest waiting first.
+    </p>
+
+    {% if rows %}
+    <div class="pending-cards">
+        {% for r in rows %}
+        <a class="pending-card" href="{% url 'production:adda-detail' r.adda.code %}">
+            <span class="age">{{ r.age_display }}</span>
+            <span class="code">{{ r.adda.code }}</span>
+            <dl class="meta">
+                <dt>Stage</dt><dd>{{ r.stage }}</dd>
+                {# floor name first — management surfaces show names, not emails #}
+                <dt>Worker</dt><dd>{{ r.worker.get_full_name|default:r.worker.email }}</dd>
+                <dt>Assigned</dt><dd>{{ r.assigned|date:"d M Y, H:i" }}</dd>
+            </dl>
+            <span class="pill">{{ r.status }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="pending-empty">
+        <div class="big">All caught up 🎉</div>
+        <div>{% if is_management %}No worker has an unsubmitted report on an open stage.{% else %}You have no pending reports.{% endif %}</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "accounts/base.html" %}
+{# Phase 2 — the PATTERN BLUEPRINT module (STEP 1, frozen resp. #1):
+   the product's structural DNA. Piece rows w/ ALL rules editable
+   (count · required/optional · pair · fold · grain · fabric group) +
+   the atomic "+ Add Pattern Definition". NEVER geometry/images/DXF. #}
+{% block page_title %}{% if product %}{{ product.code }} · Pattern Blueprint{% else %}Pattern Blueprint{% endif %}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-bp { max-width: 860px; margin: 0 auto; }
+  .pai-bp .head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:4px 0 4px; }
+  .pai-bp .head h1 { font-family:'Cormorant Garamond', serif; font-size:26px; color:var(--ink); margin:0; }
+  .pai-bp .sub { font-size:12.5px; color:var(--stone); margin-bottom:16px; }
+  .pai-bp .bp-row { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card); padding:12px 16px; margin-bottom:10px; }
+  .pai-bp .bp-row.unreg { border-style:dashed; background:#fdfaf3; box-shadow:none; }
+  .pai-bp .bp-line1 { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .pai-bp .bp-name { font-size:15px; font-weight:800; color:var(--ink); }
+  .pai-bp .bp-chip { font-size:10px; padding:1px 7px; border-radius:999px; background:#eee;
+    color:#555; text-transform:uppercase; letter-spacing:0.05em; }
+  .pai-bp .bp-chip.req { background:#d9efe1; color:#20603c; }
+  .pai-bp .bp-chip.opt { background:#fdf3d8; color:#7a5c10; }
+  .pai-bp form.rules { display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-top:10px; }
+  .pai-bp label.f { display:flex; flex-direction:column; gap:3px;
+    font-size:10px; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--stone); font-weight:700; }
+  .pai-bp select, .pai-bp input[type=number], .pai-bp input[type=text] {
+    padding:7px 10px; border:1.5px solid var(--border-card); border-radius:8px;
+    background:var(--cream); font-size:13px; }
+  .pai-bp input[type=number] { width:76px; }
+  .pai-bp label.c { display:flex; gap:6px; align-items:center; font-size:12px;
+    color:var(--ink); padding-bottom:8px; }
+  .pai-bp .btn-mini { padding:7px 12px; font-size:12px; border-radius:8px;
+    cursor:pointer; border:1px solid var(--border-subtle); background:#fff; min-height:38px; }
+  .pai-bp .btn-mini.danger { color:#b91c1c; border-color:rgba(185,28,28,0.35); }
+  .pai-bp .panel { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card); padding:16px 18px; margin:18px 0 14px; }
+  .pai-bp .panel-title { font-family:'Cormorant Garamond', serif; font-size:18px;
+    margin-bottom:10px; color:var(--ink); }
+  .pai-bp .chooser a { display:block; padding:14px 16px; margin-bottom:8px;
+    background:var(--card-bg); border:1px solid var(--border-card); border-radius:12px;
+    box-shadow:var(--shadow-card); color:var(--ink); text-decoration:none; font-size:14px; }
+  @media (max-width:640px) {
+    .pai-bp form.rules { flex-direction:column; align-items:stretch; }
+    .pai-bp input[type=number] { width:100%; }
+    .pai-bp .btn-mini { min-height:44px; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-bp">
+{% if not product %}
+  <div class="head"><h1>Pattern Blueprint</h1></div>
+  <p class="sub">Pick a product to define its garment structure.</p>
+  <div class="chooser">
+    {% for p in all_products %}
+      <a href="?product={{ p.pk }}"><strong>{{ p.code }}</strong> · {{ p.name }}</a>
+    {% empty %}<p class="sub">No active products yet.</p>{% endfor %}
+  </div>
+{% else %}
+  <div class="head">
+    <a class="btn" href="{% url 'patterns_ai:dashboard' %}?product={{ product.pk }}">← Dashboard</a>
+    <h1>{{ product.name }} · Pattern Blueprint</h1>
+  </div>
+  <p class="sub">STEP 1 — the product's structural DNA: which pattern
+    pieces exist and their rules. No geometry here — designs are prepared
+    per size in the <a href="{% url 'patterns_ai:piece-list' %}?product={{ product.pk }}">Pattern Manager (STEP 2) →</a></p>
+
+  {% if messages %}{% for m in messages %}
+    <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:12px;">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  {% for piece in pieces %}
+  <div class="bp-row">
+    <div class="bp-line1">
+      <span class="bp-name">{{ piece.pattern.name }}</span>
+      {% if piece.is_optional %}<span class="bp-chip opt">optional</span>
+      {% else %}<span class="bp-chip req">required</span>{% endif %}
+      {% if piece.is_pair %}<span class="bp-chip">pair</span>{% endif %}
+      {% if piece.on_fold %}<span class="bp-chip">fold</span>{% endif %}
+      {% if piece.on_fold and piece.is_pair %}<span class="bp-chip" style="background:#fff6e5;color:#a26a00;"
+        title="M4.5 advisory: a fold piece is symmetric by construction — a pair of it is just two of it">⚠ fold+pair?</span>{% endif %}
+      <span class="bp-chip">{{ piece.get_fabric_group_display }}</span>
+      <span style="flex:1;"></span>
+      <form method="post" onsubmit="return confirm('Remove {{ piece.pattern.name }} from the Blueprint?');">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="action" value="remove">
+        <input type="hidden" name="piece" value="{{ piece.pk }}">
+        <button type="submit" class="btn-mini danger">Remove</button>
+      </form>
+    </div>
+    <form method="post" class="rules">
+      {% csrf_token %}
+      <input type="hidden" name="product" value="{{ product.pk }}">
+      <input type="hidden" name="action" value="set_rules">
+      <input type="hidden" name="piece" value="{{ piece.pk }}">
+      <label class="f">Fabric group
+        <select name="fabric_group">
+          {% for v, lbl in fabric_groups %}
+            <option value="{{ v }}" {% if piece.fabric_group == v %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="f">Grain rule
+        <select name="grain_rule">
+          {% for v, lbl in grain_rules %}
+            <option value="{{ v }}" {% if piece.grain_rule == v %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="c"><input type="checkbox" name="is_pair" value="1"
+        {% if piece.is_pair %}checked{% endif %}> pair</label>
+      <label class="c"><input type="checkbox" name="on_fold" value="1"
+        {% if piece.on_fold %}checked{% endif %}> fold</label>
+      {# M2 adr-c.2 metadata slots (UI freeze §2.2/§3): advisory, never block #}
+      <label class="f">Notches (expected)
+        <input type="number" inputmode="numeric" name="expected_notches" min="0"
+               value="{{ piece.expected_notches|default_if_none:'' }}" placeholder="—"></label>
+      <label class="f">Seam allowance mm
+        <input type="number" inputmode="decimal" name="seam_allowance_mm" min="0" step="0.1"
+               value="{{ piece.seam_allowance_mm|default_if_none:'' }}" placeholder="—"></label>
+      <button type="submit" class="btn-mini">Save rules</button>
+    </form>
+    <form method="post" class="rules" style="margin-top:6px;">
+      {% csrf_token %}
+      <input type="hidden" name="product" value="{{ product.pk }}">
+      <input type="hidden" name="piece" value="{{ piece.pk }}">
+      <label class="f">Pieces / garment
+        <input type="number" inputmode="numeric" name="pieces_count" min="1"
+               value="{{ piece.assignment.pieces_count|default:1 }}"></label>
+      <button type="submit" name="action" value="set_count" class="btn-mini">Save count</button>
+      {% if piece.is_optional %}
+        <button type="submit" name="action" value="set_optional" class="btn-mini">make required</button>
+        <input type="hidden" name="is_optional" value="0">
+      {% else %}
+        <button type="submit" name="action" value="set_optional" class="btn-mini">make optional</button>
+        <input type="hidden" name="is_optional" value="1">
+      {% endif %}
+    </form>
+  </div>
+  {% empty %}
+    {% if not unregistered %}
+    <div class="bp-row unreg"><div class="bp-line1">
+      <span class="bp-name">No pattern pieces yet</span></div>
+      <p class="sub" style="margin:6px 0 0;">Add the first piece below —
+        every Product Size will inherit this structure.</p>
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  {% for a in unregistered %}
+  <div class="bp-row unreg">
+    <div class="bp-line1">
+      <span class="bp-name">{{ a.pattern.name }}</span>
+      <span class="bp-chip">not registered</span>
+      <span class="bp-chip">×{{ a.pieces_count }}</span>
+      <span style="flex:1;"></span>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="action" value="register">
+        <input type="hidden" name="pattern" value="{{ a.pattern.pk }}">
+        <button type="submit" class="btn-mini">Register — set rules</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="panel">
+    <div class="panel-title">+ Add Pattern Definition</div>
+    <form method="post" class="rules" style="margin-top:0;">
+      {% csrf_token %}
+      <input type="hidden" name="product" value="{{ product.pk }}">
+      <input type="hidden" name="action" value="add">
+      <label class="f" style="flex:1; min-width:200px;">Piece name
+        <input type="text" name="name" required placeholder="e.g. Front Panel"></label>
+      <label class="f">Pieces / garment
+        <input type="number" inputmode="numeric" name="pieces_count" value="1" min="1"></label>
+      <label class="f">Fabric group
+        <select name="fabric_group">
+          {% for v, lbl in fabric_groups %}<option value="{{ v }}">{{ lbl }}</option>{% endfor %}
+        </select></label>
+      <label class="f">Grain rule
+        <select name="grain_rule">
+          {% for v, lbl in grain_rules %}
+            <option value="{{ v }}" {% if v == 'two_way' %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="c"><input type="checkbox" name="is_pair" value="1"> pair</label>
+      <label class="c"><input type="checkbox" name="on_fold" value="1"> fold</label>
+      <label class="c"><input type="checkbox" name="is_optional" value="1"> optional</label>
+      <button type="submit" class="btn btn-primary">+ Add</button>
+    </form>
+    <p class="sub" style="margin:8px 0 0;">One action — library entry,
+      product assignment and the piece row are created together.</p>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

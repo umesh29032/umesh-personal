@@ -1,0 +1,102 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Generate Recurring Expenses{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Page-scoped (rule 10) — month-nav + table canon from factory_expense_list. */
+    .expense-generate .month-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .expense-generate .month-nav .label { font-weight: 700; font-size: 15px; }
+    .expense-generate h2 { font-size: 15px; margin: 18px 0 8px; }
+    .expense-generate .skip-why { font-size: 12px; color: var(--stone); }
+    .expense-generate details.regen-box input { padding: 8px 10px; font-size: 13px; background: var(--cream); border: 1.5px solid var(--border-subtle); border-radius: 8px; width: 100%; max-width: 260px; margin: 6px 0; display: block; min-height: 40px; }
+    .expense-generate .confirm-bar { position: sticky; bottom: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(8px); border-top: 1px solid var(--border-subtle); padding: 14px 0; display: flex; justify-content: flex-end; gap: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="expense-generate">
+    <div class="hero-strip copper">
+        <h1>Generate Recurring Expenses</h1>
+        <p>Preview first, then confirm — one row per template per month, through the certified expense writer. Re-running a covered month creates nothing. Skips always say why.</p>
+    </div>
+
+    <div class="month-nav">
+        {% if month == 1 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"-1" }}-12">‹ Prev</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 11 %}0{% endif %}{{ month|add:"-1" }}">‹ Prev</a>
+        {% endif %}
+        <span class="label">{{ month_value }}</span>
+        {% if month == 12 %}
+        <a class="btn btn-ghost" href="?month={{ year|add:"1" }}-01">Next ›</a>
+        {% else %}
+        <a class="btn btn-ghost" href="?month={{ year }}-{% if month < 9 %}0{% endif %}{{ month|add:"1" }}">Next ›</a>
+        {% endif %}
+        <a class="btn btn-ghost" href="{% url 'expense:expense-template-list' %}?month={{ month_value }}">Templates</a>
+    </div>
+
+    <h2>Will be created ({{ receipt.to_create|length }})</h2>
+    <div class="table-responsive">
+        <table>
+            <thead><tr><th>Template</th><th>Category</th><th class="num">Amount ₹</th><th>Worker</th><th>Expense date</th></tr></thead>
+            <tbody>
+            {% for row in receipt.to_create %}
+                <tr>
+                    <td data-label="Template">{{ row.template.label }}</td>
+                    <td data-label="Category">{{ row.template.get_category_display }}</td>
+                    <td data-label="Amount ₹" class="num">{{ row.amount }}</td>
+                    <td data-label="Worker">{% if row.worker %}{{ row.worker.get_full_name|default:row.worker.email }}{% else %}—{% endif %}</td>
+                    <td data-label="Expense date">{{ row.expense_date }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">Nothing to create for {{ month_value }}.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2>Skipped ({{ skipped_rows|length }})</h2>
+    <div class="table-responsive">
+        <table>
+            <thead><tr><th>Template</th><th>Why</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for row in skipped_rows %}
+                <tr>
+                    <td data-label="Template">{{ row.t.label }}</td>
+                    <td data-label="Why" class="skip-why">{{ row.why }}</td>
+                    <td data-label="Action">
+                        {% if row.regen %}
+                        {# Regenerate = SA + mandatory reason; only while the covering expense is voided (service-enforced). #}
+                        <details class="regen-box">
+                            <summary class="btn btn-ghost">Regenerate…</summary>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="regenerate">
+                                <input type="hidden" name="template_id" value="{{ row.t.pk }}">
+                                <input type="hidden" name="month" value="{{ month_value }}">
+                                <input type="text" name="reason" placeholder="Reason (required, audited)" required>
+                                <button type="submit" class="btn btn-copper"
+                                        onclick="return confirm('Regenerate “{{ row.t.label }}” for {{ month_value }} at the CURRENT template amount?');">Confirm regenerate</button>
+                            </form>
+                        </details>
+                        {% else %}—{% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="3">No skips.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if receipt.to_create %}
+    <form method="post" class="confirm-bar">
+        {% csrf_token %}
+        <a class="btn btn-ghost btn-lg" href="{% url 'expense:expense-template-list' %}?month={{ month_value }}">Cancel</a>
+        <button type="submit" class="btn btn-copper btn-lg"
+                onclick="return confirm('Create {{ receipt.to_create|length }} expense(s) for {{ month_value }}?');">Confirm — create {{ receipt.to_create|length }} expense(s)</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{# Operations-dashboard machines tile (R10-A) — one summary line, links to the register. #}
+{% if show %}
+{# host-coupled: .digest-tile classes are scoped in adda_dashboard.html (the only include site) #}
+<a class="digest-tile" href="{% url 'machines:list' %}">
+    <span class="digest-label">Machines</span>
+    <span class="digest-value">{{ counts.assigned_now }}/{{ counts.active }}</span>
+    <span class="digest-sub">assigned / active{% if counts.maintenance %} · {{ counts.maintenance }} in maintenance{% endif %}</span>
+</a>
+{% endif %}

@@ -97,9 +97,12 @@ class ExpenseViewTests(TestCase):
         self.client.force_login(self.mgr)
         url = reverse('expense:worker-profile', args=[self.worker.pk])
         self.assertEqual(self.client.get(url).status_code, 200)
+        # PA-06-2: bank fields are now format-validated — use realistic values
+        # (9–18 digit account + valid 11-char IFSC) so this still exercises the
+        # manager-can-edit path rather than tripping the new validators.
         resp = self.client.post(url, {
-            'phone': '9990001112', 'bank_account_name': 'W Test', 'bank_account_number': '123',
-            'bank_ifsc': 'HDFC0001', 'upi_id': 'w@upi', 'joining_date': '', 'opening_advance': '0',
+            'phone': '9990001112', 'bank_account_name': 'W Test', 'bank_account_number': '123456789',
+            'bank_ifsc': 'HDFC0001234', 'upi_id': 'w@upi', 'joining_date': '', 'opening_advance': '0',
             'is_active': 'on', 'notes': '',
         })
         self.assertEqual(resp.status_code, 302)

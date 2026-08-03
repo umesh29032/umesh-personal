@@ -1,0 +1,110 @@
+{% extends "accounts/base.html" %}
+{% comment %}AE-3 — worker "My Assigned Work" (mobile-first factory screen).
+One card per active bundle allocation across every in-progress Adda. The worker never
+picks colour/size/bundle — each card deep-links to its own quantity-only report. Data =
+bundle_service.my_assigned_work (read-model). No money math here (expected_earning is the
+already-frozen visibility number).{% endcomment %}
+
+{% block title %}My Assigned Work{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Page-scoped (rule 10) under .my-work — factory screen: big cards, 44px targets. */
+  .my-work{max-width:760px;margin:0 auto;padding-bottom:32px;}
+  .my-work .hero{background:linear-gradient(135deg,#1c1a2e,#5a3b1e);color:#fff;border-radius:16px;padding:18px 20px;margin-bottom:16px;}
+  .my-work .hero h1{font-size:22px;margin:0 0 4px;}
+  .my-work .hero p{margin:0;opacity:.85;font-size:14px;}
+  /* Workload summary */
+  .mw-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;}
+  .mw-summary .cell{background:var(--cream,#f7f0e6);border:1.5px solid var(--border-subtle,#e0d6c6);border-radius:12px;padding:10px 12px;text-align:center;}
+  .mw-summary .cell .lbl{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--stone,#7a6a58);}
+  .mw-summary .cell .val{display:block;font-size:20px;font-weight:800;color:var(--ink,#2a2118);}
+  .mw-summary .cell.wide{grid-column:1 / -1;}
+  .mw-stages{font-size:13px;color:var(--stone,#7a6a58);margin:-8px 0 18px;}
+  /* Bundle cards */
+  .mw-card{border:1.5px solid var(--border-subtle,#e0d6c6);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:var(--surface,#fff);}
+  .mw-card .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .mw-card .swatch{width:20px;height:20px;border-radius:6px;border:1px solid #0002;flex-shrink:0;}
+  .mw-card .bundle{font-size:18px;font-weight:800;color:var(--ink,#2a2118);}
+  .mw-card .adda{font-size:12px;color:var(--stone,#7a6a58);}
+  .mw-card .status{margin-left:auto;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px;font-weight:700;}
+  .mw-card .status.ready{background:#e8f0ff;color:#2a52be;}
+  .mw-card .status.in_progress{background:#fff2d9;color:#a8632a;}
+  .mw-card .status.done{background:#e6f4ea;color:#1e7a3d;}
+  .mw-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0;}
+  .mw-grid .g{text-align:center;}
+  .mw-grid .g .lbl{display:block;font-size:10px;text-transform:uppercase;color:var(--stone,#7a6a58);}
+  .mw-grid .g .v{display:block;font-size:17px;font-weight:700;}
+  .mw-progress{height:8px;border-radius:6px;background:var(--cream-2,#ede3d4);overflow:hidden;margin:4px 0 12px;}
+  .mw-progress i{display:block;height:100%;background:var(--copper,#a8632a);}
+  .mw-card .cta{display:block;width:100%;min-height:48px;line-height:48px;text-align:center;border-radius:12px;background:var(--copper,#a8632a);color:#fff;font-weight:700;text-decoration:none;font-size:16px;}
+  .mw-card .cta.done{background:var(--cream-2,#ede3d4);color:var(--stone,#7a6a58);}
+  .mw-empty{text-align:center;color:var(--stone,#7a6a58);padding:40px 16px;}
+  .mw-empty .mw-empty-icon{font-size:32px;margin:0;}
+  @media (max-width:520px){.mw-summary{grid-template-columns:repeat(2,1fr);}.mw-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="my-work">
+  <div class="hero">
+    <h1>My Assigned Work</h1>
+    <p>Aapke bundles — tap a card to report. Colour &amp; size already chosen for you.</p>
+  </div>
+
+  {% comment %}
+  Workload summary (owner extra requirement).
+  AUDIT-2 F1: the summary stays, but WITHOUT Allocated/Remaining. Blind
+  reporting means a worker must not be shown the target quantity before they
+  report it, otherwise the number can simply be copied back. What remains is
+  the worker's OWN achievement (bundles, completed, earnings) — theirs to see
+  by the Expected→Earned→Paid visibility rule. Per-bundle targets appear only
+  after that bundle is done (see the card grid below).
+  {% endcomment %}
+  <div class="mw-summary">
+    <div class="cell"><span class="lbl">Active bundles</span><span class="val">{{ summary.bundles }}</span></div>
+    <div class="cell"><span class="lbl">Completed</span><span class="val">{{ summary.completed|floatformat:"-2" }}</span></div>
+    <div class="cell"><span class="lbl">Expected earnings</span><span class="val">₹{{ summary.expected|floatformat:2 }}</span></div>
+  </div>
+  {% if summary.stages %}<p class="mw-stages">Current stage{{ summary.stages|pluralize }}: {{ summary.stages|join:" · " }}</p>{% endif %}
+
+  {# ── One independent card per bundle ── #}
+  {% for c in cards %}
+  <div class="mw-card">
+    <div class="top">
+      {% if c.color.hex_code %}<span class="swatch" style="background:{{ c.color.hex_code }}"></span>{% endif %}
+      <span class="bundle">{{ c.color.name|default:"—" }}{% if c.size %} · {{ c.size.label }}{% endif %}</span>
+      <span class="status {{ c.status }}">{% if c.status == 'ready' %}Ready{% elif c.status == 'in_progress' %}In progress{% else %}Done{% endif %}</span>
+    </div>
+    <div class="adda">{{ c.stage_name }} · Adda {{ c.adda_code }}{% if c.mode == 'partial' %} · partial{% endif %}</div>
+    <div class="mw-grid">
+      {% comment %}
+      AUDIT-2 F1: Allocated/Remaining are the TARGET — revealing them before the
+      work is reported breaks blind reporting, so they appear only once this
+      bundle is done. `remaining` is floored at 0 for display: a legacy
+      over-report (reported > allocated) used to render as e.g. "-4".
+      {% endcomment %}
+      {% if c.status == 'done' %}
+      <div class="g"><span class="lbl">Allocated</span><span class="v">{{ c.allocated|floatformat:"-2" }}</span></div>
+      {% endif %}
+      <div class="g"><span class="lbl">Completed</span><span class="v">{{ c.completed|floatformat:"-2" }}</span></div>
+      {% if c.status == 'done' %}
+      <div class="g"><span class="lbl">Remaining</span><span class="v">{% if c.remaining > 0 %}{{ c.remaining|floatformat:"-2" }}{% else %}0{% endif %}</span></div>
+      {% endif %}
+      <div class="g"><span class="lbl">Expected</span><span class="v">₹{{ c.expected_earning|floatformat:2 }}</span></div>
+    </div>
+    {% if c.allocated and c.status == 'done' %}<div class="mw-progress"><i style="width:{% widthratio c.completed c.allocated 100 %}%"></i></div>{% endif %}
+    {% if c.status == 'done' %}
+      <a class="cta done" href="{% url 'production:worker-report' c.adda_code c.stage_code %}?color={{ c.color_id }}&size={{ c.size_id }}{% if c.stream_id %}&stream={{ c.stream_id }}{% endif %}">View report</a>
+    {% else %}
+      <a class="cta" href="{% url 'production:worker-report' c.adda_code c.stage_code %}?color={{ c.color_id }}&size={{ c.size_id }}{% if c.stream_id %}&stream={{ c.stream_id }}{% endif %}">{% if c.status == 'in_progress' %}Continue{% else %}Start{% endif %} · report work</a>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div class="mw-empty">
+    <p class="mw-empty-icon">🧵</p>
+    <p>No bundles assigned to you yet.<br>Jab manager aapko kaam dega, woh yahan dikhega.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

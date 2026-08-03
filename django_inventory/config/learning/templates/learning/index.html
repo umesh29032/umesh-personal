@@ -1,0 +1,169 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}Learn — Kapil Enterprises{% endblock %}
+{% block page_title %}Learn{% endblock %}
+
+{% block content %}
+<div class="learn-page">
+  <div class="learn-hero">
+    <span class="lp-eyebrow">Engineering courses</span>
+    <h1>Learn how this factory was built</h1>
+    <p>Every course is taught from <strong>this project's own code and data</strong> —
+       real queries, real outputs, real deploy files. Start at chapter 01 with zero
+       prior knowledge; finish able to explain the system in an interview.</p>
+  </div>
+
+  <form method="get" action="{% url 'learning:search' %}" class="lp-actions" role="search">
+    <input type="search" name="q" placeholder="🔍 Search every chapter…  (press /)"
+           id="lp-q"
+           class="lp-input" border:1px solid var(--lp-line);border-radius:11px;
+                  background:var(--lp-bg);box-shadow:inset 0 1px 2px rgba(0,0,0,.05);
+                  font-family:inherit;color:var(--lp-ink)">
+    <button type="submit" class="lp-btn">Search</button>
+  </form>
+
+  {% if resume %}
+  <a class="lp-resume" href="{% url 'learning:chapter' resume.course.slug resume.chapter.slug %}"
+     style="--lp-accent:{{ resume.course.accent }}">
+    <span class="lp-kicker">▶ Continue learning</span>
+    <h3>{{ resume.chapter.title }}</h3>
+    <p>{{ resume.course.title }} · {{ resume.progress.done }}/{{ resume.progress.total }} chapters done</p>
+    <div class="lp-bar"><i style="width:{{ resume.progress.percent }}%"></i></div>
+  </a>
+  {% endif %}
+
+  <div class="lp-statgrid">
+    <div class="lp-stat"><b>{{ dash.stats.completed }}</b><span>chapters done</span></div>
+    <div class="lp-stat"><b>{{ dash.stats.streak }}</b><span>day streak</span></div>
+    <div class="lp-stat"><b>{{ dash.stats.time_spent|default:"0m" }}</b><span>time spent</span></div>
+    <div class="lp-stat"><b>{{ dash.stats.learning_days|default:0 }}</b><span>learning days</span></div>
+    <div class="lp-stat"><b>{{ dash.stats.courses_started|default:0 }}</b><span>courses started</span></div>
+    <div class="lp-stat"><b>{{ dash.stats.bookmarks }}</b><span>bookmarks</span></div>
+  </div>
+
+  {% if dash.week %}
+  <div class="lp-week">
+    {% for d in dash.week %}
+    <div class="lp-day" title="{{ d.date }} · {{ d.count }} lesson{{ d.count|pluralize }}">
+      <i style="height:{% if d.count %}{% widthratio d.count 6 100 %}{% else %}4{% endif %}%"></i>
+      <span>{{ d.label|slice:":1" }}</span>
+    </div>
+    {% endfor %}
+    <span class="lp-pct" style="align-self:center;margin:0 0 0 8px">last 7 days</span>
+  </div>
+  {% endif %}
+
+  {% if dash.recommended %}
+  <a class="lp-resume" href="{% url 'learning:chapter' dash.recommended.course.slug dash.recommended.chapter.slug %}"
+     style="--lp-accent:{{ dash.recommended.course.accent }};border-style:dashed">
+    <span class="lp-kicker">✨ Recommended next</span>
+    <h3>{{ dash.recommended.chapter.title }}</h3>
+    <p>{{ dash.recommended.course.title }} · {{ dash.recommended.progress.percent }}% done — finish this course first</p>
+  </a>
+  {% endif %}
+
+  {% if dash.active %}
+  <h2 class="lp-h2">▶ Active courses</h2>
+  <ul class="lp-list">
+    {% for a in dash.active %}
+    <li><a class="lp-row" href="{% url 'learning:course' a.course.slug %}"
+           style="flex-direction:column;align-items:stretch;gap:6px;padding:12px 14px">
+      <span style="display:flex;gap:8px;align-items:center">
+        <span class="lp-t">{{ a.course.icon }} {{ a.course.title }}</span>
+        <span class="lp-chip" style="margin-left:auto">{{ a.remaining }} left</span>
+      </span>
+      <span class="lp-bar"><i style="width:{{ a.progress.percent }}%"></i></span>
+      <span class="lp-pct">{{ a.progress.done }}/{{ a.progress.total }} · {{ a.progress.percent }}% · {{ a.time }} spent</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if dash.completed %}
+  <h2 class="lp-h2">🏆 Completed courses</h2>
+  <ul class="lp-list">
+    {% for c in dash.completed %}
+    <li><a class="lp-row lp-row--done" href="{% url 'learning:course' c.course.slug %}">
+      <span class="lp-num">✓</span>
+      <span class="lp-t">{{ c.course.title }}</span>
+      <span class="lp-tick">100%</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if dash.recent %}
+  <h2 class="lp-h2">🕘 Recently opened</h2>
+  <ul class="lp-list">
+    {% for r in dash.recent %}
+    <li><a class="lp-row" href="{% url 'learning:chapter' r.course.slug r.chapter.slug %}">
+      <span class="lp-num">{% if r.state == 'done' %}✓{% elif r.state == 'reading' %}◐{% else %}○{% endif %}</span>
+      <span class="lp-t">{{ r.chapter.title }}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="lp-grid">
+    {% for item in courses %}
+    <a class="lp-card" href="{% url 'learning:course' item.course.slug %}"
+       style="--lp-accent:{{ item.course.accent }}">
+      <span class="lp-icon">{{ item.course.icon }}</span>
+      <h2>{{ item.course.title }}</h2>
+      <p>{{ item.course.tagline }}</p>
+      <div class="lp-meta">
+        <span class="lp-chip lp-chip--accent">{{ item.count }} chapters</span>
+        <span class="lp-chip">{{ item.course.level }}</span>
+      </div>
+      <div class="lp-bar"><i style="width:{{ item.progress.percent }}%"></i></div>
+      <span class="lp-pct">{{ item.progress.done }} of {{ item.progress.total }} done · {{ item.progress.percent }}%</span>
+    </a>
+    {% endfor %}
+
+    <a class="lp-card learn-page--interview" href="{% url 'learning:interview' %}">
+      <span class="lp-icon">🎤</span>
+      <h2>Interview &amp; Switch Prep</h2>
+      <p>Every interview question from every chapter, in one place, grouped
+         Junior → Mid → Senior → Staff — each with its answer and a link to the
+         chapter that teaches it.</p>
+      <div class="lp-meta">
+        <span class="lp-chip lp-chip--accent">{{ interview_total }} questions</span>
+        <span class="lp-chip">with answers</span>
+      </div>
+    </a>
+
+    {% for rp in revision_pages %}
+    <a class="lp-card" href="{% url 'learning:revision' rp.slug %}" style="--lp-accent:{{ rp.accent }}">
+      <span class="lp-icon">{{ rp.icon }}</span>
+      <h2>{{ rp.title }}</h2>
+      <p>{{ rp.blurb }}</p>
+      <div class="lp-meta">
+        <span class="lp-chip lp-chip--accent">generated</span>
+        <span class="lp-chip">all chapters</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if bookmarks %}
+  <h2 class="lp-h2">★ Your bookmarks</h2>
+  <ul class="lp-list">
+    {% for b in bookmarks %}
+    <li><a class="lp-row" href="{% url 'learning:chapter' b.course.slug b.chapter.slug %}">
+      <span class="lp-num">★</span><span class="lp-t">{{ b.chapter.title }}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <details class="lp-toc" style="margin-top:16px">
+    <summary>How this works (and why it can never go stale)</summary>
+    <p class="lp-note">
+      These pages <strong>render the markdown files in <code>docs/</code> directly</strong>.
+      There is no second copy of the content, so the courses and the engineering
+      docs can never drift apart. Edit a <code>.md</code> file and this site
+      changes with it. Every chapter link is a normal URL — Ctrl+click (or
+      long-press) to open chapters in their own tabs.
+    </p>
+  </details>
+</div>
+{% endblock %}

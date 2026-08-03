@@ -1,3 +1,13 @@
+---
+id: l2-architecture-validation-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: learning — architecture validation
+anchors: —
+verified: 2026-07-13
+---
+
 # ARCHITECTURE VALIDATION — a review for future senior developers
 
 > Not "what" (that's GUIDE/FILE_MAP) and not the junior "why" (that's

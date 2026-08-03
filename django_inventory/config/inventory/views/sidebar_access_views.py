@@ -15,7 +15,6 @@ from collections import defaultdict
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db import transaction
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
@@ -24,6 +23,7 @@ from accounts.models import Skill
 
 from ..models import Role, SidebarItemRule
 from ..services import ROLE_SUPER_ADMIN, user_has_role
+from ..services.sidebar_service import save_sidebar_rules
 
 
 class _SuperAdminOnly(UserPassesTestMixin):
@@ -78,19 +78,16 @@ class SidebarAccessListView(LoginRequiredMixin, _SuperAdminOnly, TemplateView):
         })
         return ctx
 
-    @transaction.atomic
     def post(self, request, *args, **kwargs):
-        rules = list(SidebarItemRule.objects.all())
-        for rule in rules:
-            role_ids = [
-                int(x) for x in request.POST.getlist(f'roles_{rule.id}') if x.isdigit()
-            ]
-            skill_ids = [
-                int(x) for x in request.POST.getlist(f'skills_{rule.id}') if x.isdigit()
-            ]
-            rule.allowed_roles.set(
-                Role.objects.filter(id__in=role_ids).exclude(code=ROLE_SUPER_ADMIN)
+        # View = parse-only (Law 4, RCP-1A F1): POST checkbox lists → primitive
+        # mapping → the service owns the transactional multi-row write.
+        assignments = {
+            rule_id: (
+                [int(x) for x in request.POST.getlist(f'roles_{rule_id}') if x.isdigit()],
+                [int(x) for x in request.POST.getlist(f'skills_{rule_id}') if x.isdigit()],
             )
-            rule.allowed_skills.set(Skill.objects.filter(id__in=skill_ids))
+            for rule_id in SidebarItemRule.objects.values_list('id', flat=True)
+        }
+        save_sidebar_rules(assignments)
         messages.success(request, 'Sidebar access rules saved.')
         return redirect(reverse_lazy('inventory:sidebar-access'))

@@ -15,6 +15,9 @@ service:
   • Same export_code se re-download → fresh regeneration from live data
 
 GATING:
+  V1.1 Item 3 (2026-07-12): har public export fn MANAGEMENT_ROLES check karta
+  hai (defense-in-depth — front gate views me ManagerOrAdminMixin; yeh backstop
+  future callers ko protect karta hai). Workers kabhi export nahi kar sakte.
   Sirf tab export ho sakta hai jab barcode_generation stage complete hai.
   Cutting-only flows (legacy NIKKAR-style) bhi support — woh CuttingRecord
   via Adda dhoondh ke barcode_gen_record substitute karte hain (TODO note
@@ -35,15 +38,22 @@ from __future__ import annotations
 import csv
 import io
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 from production.models import Adda, BarcodeGenerationRecord
 from tracking.models import BarcodeBatch, BarcodeExportBatch
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
+
+def _ensure_management_role(user) -> None:
+    """Exports = management-only (V1.1 Item 3). Same role source as the view
+    mixin (MANAGEMENT_ROLES) — this is the defense-in-depth backstop."""
+    if not user_has_role(user, MANAGEMENT_ROLES):
+        raise PermissionDenied("Exports are restricted to management roles.")
 
 def _ensure_barcode_stage_complete(adda: Adda) -> BarcodeGenerationRecord:
     """Refuse export unless barcode_generation stage is complete.
@@ -77,7 +87,7 @@ def _next_export_code() -> str:
     throughput. For factory floor scale (few exports/day) this is sufficient.
     Future hardening: dedicated Postgres sequence per year.
     """
-    year = timezone.now().year
+    year = timezone.localdate().year
     prefix = f'EXP-{year}-'
     last = (
         BarcodeExportBatch.objects
@@ -146,6 +156,19 @@ _HEADERS = [
     'bundle', 'size', 'color', 'piece_seq',
 ]
 
+# PA-13-6: CSV/XLSX formula-injection neutralization. A cell whose text starts with
+# a formula trigger (=,+,-,@,tab,CR) is executed when the manifest is opened in
+# Excel/LibreOffice. `size`/`color` are free user text (ClothColor.name / ProductSize
+# .label have no char validator), so prefix any such cell with a single quote → shown
+# literally, never evaluated. System-generated cells (barcode/adda/…) are unaffected.
+_FORMULA_TRIGGERS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(value):
+    if isinstance(value, str) and value and value[0] in _FORMULA_TRIGGERS:
+        return "'" + value
+    return value
+
 
 def _render_csv_bytes(adda: Adda) -> bytes:
     """Render export as CSV bytes."""
@@ -153,7 +176,7 @@ def _render_csv_bytes(adda: Adda) -> bytes:
     writer = csv.writer(buf)
     writer.writerow(_HEADERS)
     for row in _iter_export_rows(adda):
-        writer.writerow([row[k] for k in _HEADERS])
+        writer.writerow([_csv_safe(row[k]) for k in _HEADERS])
     return buf.getvalue().encode('utf-8')
 
 
@@ -165,7 +188,7 @@ def _render_xlsx_bytes(adda: Adda) -> bytes:
     ws.title = adda.code[:31]  # XLSX sheet name max 31 chars
     ws.append(_HEADERS)
     for row in _iter_export_rows(adda):
-        ws.append([row[k] for k in _HEADERS])
+        ws.append([_csv_safe(row[k]) for k in _HEADERS])
     # Auto-size columns roughly (header length + small pad)
     for i, h in enumerate(_HEADERS, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = max(12, len(h) + 2)
@@ -246,6 +269,7 @@ def _render_pdf_summary_bytes(adda: Adda) -> bytes:
 @transaction.atomic
 def generate_csv(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
     """CSV export — gate check + manifest row + bytes return."""
+    _ensure_management_role(user)
     rec = _ensure_barcode_stage_complete(adda)
     total = _count_total_labels(adda)
     if total == 0:
@@ -264,6 +288,7 @@ def generate_csv(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
 @transaction.atomic
 def generate_xlsx(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
     """Excel export — gate check + manifest row + bytes return."""
+    _ensure_management_role(user)
     rec = _ensure_barcode_stage_complete(adda)
     total = _count_total_labels(adda)
     if total == 0:
@@ -286,6 +311,7 @@ def generate_pdf_summary(adda: Adda, user) -> tuple[BarcodeExportBatch, bytes]:
     NOT per-piece labels — that's vendor PDF or factory printer queue.
     This PDF is the manifest/sign-off summary.
     """
+    _ensure_management_role(user)
     rec = _ensure_barcode_stage_complete(adda)
     total = _count_total_labels(adda)
     if total == 0:
@@ -325,13 +351,14 @@ def list_exports(adda: Adda):
     )
 
 
-def regenerate_for_export(export_batch: BarcodeExportBatch) -> bytes:
+def regenerate_for_export(export_batch: BarcodeExportBatch, user) -> bytes:
     """Re-download bytes for an existing export (current barcode data).
 
     Note: if barcodes were reopened + regenerated since the original export,
     the file content will differ from the original download. Manifest
     total_labels remains frozen at first export (audit invariant).
     """
+    _ensure_management_role(user)
     adda = export_batch.adda
     method = export_batch.export_method
     if method == BarcodeExportBatch.ExportMethod.CSV:

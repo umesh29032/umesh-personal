@@ -4,7 +4,7 @@
 {% block page_title %}Layering · {{ adda.code }}{% endblock %}
 
 {% block extra_head %}
-{% include 'production/_form_styles.html' %}
+{% include 'shared/_form_styles.html' %}
 <style>
     /* Workspace page wrapper — delegates body to _stage_panel_layering.html partial.
        Page-scoped CSS only for hero + pipeline + chip / row styles that the partial uses. */
@@ -29,7 +29,6 @@
     .layering-ws .roll-row details { margin-top: 8px; }
     .layering-ws .roll-row summary { cursor: pointer; font-size: 12px; color: var(--copper); font-weight: 600; }
     .layering-ws .inline-form { margin-top: 10px; display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
-    .layering-ws .inline-form .field { flex: 1 1 140px; min-width: 120px; }
     .layering-ws .roll-row .row-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px; }
 
     /* Roll info chip — pill with full identity (id · type · color · width). Wider than monospace-only. */

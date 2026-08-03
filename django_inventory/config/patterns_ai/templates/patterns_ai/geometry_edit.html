@@ -1,0 +1,186 @@
+{% extends "accounts/base.html" %}
+{# P2 — draft-only vertex editor: vanilla JS drag on inline SVG; server re-validates #}
+{% block page_title %}Edit geometry — {{ row.size.label }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-edit #editor-wrap { background:#fff; border:var(--border-card, 1px solid #e5e0d5);
+    border-radius:12px; padding:14px; }
+  .pai-edit svg { width:100%; height:auto; touch-action:none; }
+  .pai-edit .vertex { fill:#fff; stroke:#a33; stroke-width:1.5; cursor:grab; }
+  .pai-edit .vertex:hover { fill:#fdd; }
+  .pai-edit .notch { fill:#7c3aed; stroke:#fff; stroke-width:1; cursor:pointer; }
+  .pai-edit .fold-line { stroke:#0d9488; stroke-width:4; stroke-dasharray:16 8;
+    vector-effect:non-scaling-stroke; cursor:pointer; }
+  .pai-edit .bar { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+  .pai-edit #notch-toggle.on { background:#7c3aed; color:#fff; }
+  .pai-edit #fold-toggle.on { background:#0d9488; color:#fff; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-edit">
+  <div class="page-header">
+    <h1>Edit · {{ version.piece.pattern.name }} v{{ version.version_no }} · {{ row.size.label }}</h1>
+    <p class="subtitle">Drag vertices (drafts only — confirmed geometry is
+    immutable). The server re-validates winding/closure/µm on save.</p>
+  </div>
+  <div id="editor-wrap"></div>
+  <form method="post" id="save-form">
+    {% csrf_token %}
+    <input type="hidden" name="outer_um" id="outer_um">
+    <input type="hidden" name="notches" id="notches_json">
+    <input type="hidden" name="fold_edge" id="fold_edge_json">
+    <div class="bar">
+      <label>Grain (degrees, y-up):
+        <input type="text" name="grain_deg_display" id="grain_deg" inputmode="decimal"
+               style="width:90px;" placeholder="e.g. 90"></label>
+      <input type="hidden" name="grain_cdeg" id="grain_cdeg">
+      {# adr-c.2: notch markers — click canvas to place, click a notch to remove #}
+      <button type="button" class="btn" id="notch-toggle">◆ Notch mode</button>
+      <span id="notch-count" style="font-size:12px;color:#6b6257;"></span>
+      {# adr-c.3: fold edge — fold mode, click a VERTICAL outline edge #}
+      <button type="button" class="btn" id="fold-toggle">⇋ Fold edge</button>
+      <span id="fold-state" style="font-size:12px;color:#6b6257;"></span>
+      <span style="flex:1;"></span>
+      <a class="btn" href="{% url 'patterns_ai:version-detail' version.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Save draft geometry</button>
+    </div>
+  </form>
+</div>
+<script>
+(function () {
+  const geo = JSON.parse('{{ geometry_json|escapejs }}');
+  const outer = geo.outer.map(p => [p[0], p[1]]);   // integer um, y-up
+  const W = Math.max(...outer.map(p => p[0])), H = Math.max(...outer.map(p => p[1]));
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  const pad = Math.max(W, H) * 0.05;
+  svg.setAttribute('viewBox', `${-pad} ${-pad} ${W + 2*pad} ${H + 2*pad}`);
+  const poly = document.createElementNS(NS, 'polygon');
+  poly.setAttribute('fill', '#f6efe0'); poly.setAttribute('stroke', '#7a5c2e');
+  poly.setAttribute('stroke-width', Math.max(W, H) / 400);
+  svg.appendChild(poly);
+  const handles = [];
+  const r = Math.max(W, H) / 80;
+  function sy(yUm) { return H - yUm; }              // y-up um -> y-down svg
+  function redraw() {
+    poly.setAttribute('points', outer.map(p => `${p[0]},${sy(p[1])}`).join(' '));
+    handles.forEach((c, i) => { c.setAttribute('cx', outer[i][0]); c.setAttribute('cy', sy(outer[i][1])); });
+  }
+  outer.forEach((p, i) => {
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', r); c.setAttribute('class', 'vertex'); c.dataset.i = i;
+    svg.appendChild(c); handles.push(c);
+  });
+  let drag = null;
+  function evtPoint(evt) {
+    const pt = svg.createSVGPoint();
+    const t = evt.touches ? evt.touches[0] : evt;
+    pt.x = t.clientX; pt.y = t.clientY;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  svg.addEventListener('pointerdown', e => {
+    if (e.target.classList.contains('vertex')) { drag = +e.target.dataset.i; e.preventDefault(); }
+  });
+  svg.addEventListener('pointermove', e => {
+    if (drag === null) return;
+    const p = evtPoint(e);
+    outer[drag] = [Math.round(p.x), Math.round(H - p.y)];
+    redraw(); e.preventDefault();
+  });
+  window.addEventListener('pointerup', () => { drag = null; });
+  redraw();
+  document.getElementById('editor-wrap').appendChild(svg);
+
+  // ── adr-c.2 notch mode: click canvas = place, click a notch = remove ──
+  const notches = ((geo.features || {}).notches || [])
+    .map(n => ({x_um: n.x_um, y_um: n.y_um}));
+  let notchMode = false;
+  const nBtn = document.getElementById('notch-toggle');
+  const nCount = document.getElementById('notch-count');
+  function drawNotches() {
+    svg.querySelectorAll('.notch').forEach(el => el.remove());
+    notches.forEach((n, i) => {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('r', r * 0.9); c.setAttribute('class', 'notch');
+      c.setAttribute('cx', n.x_um); c.setAttribute('cy', sy(n.y_um));
+      c.dataset.n = i; svg.appendChild(c);
+    });
+    nCount.textContent = notches.length + ' notch(es)';
+  }
+  nBtn.addEventListener('click', () => {
+    notchMode = !notchMode; nBtn.classList.toggle('on', notchMode);
+  });
+
+  // ── adr-c.3 fold-edge mode: click a VERTICAL outline edge to mark;
+  //    click the marked fold line to clear (server re-validates) ──
+  let foldEdge = ((geo.features || {}).fold_edge) || null;
+  let foldMode = false;
+  const fBtn = document.getElementById('fold-toggle');
+  const fState = document.getElementById('fold-state');
+  function drawFold() {
+    svg.querySelectorAll('.fold-line').forEach(el => el.remove());
+    if (foldEdge) {
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('class', 'fold-line');
+      l.setAttribute('x1', foldEdge.p1_um[0]);
+      l.setAttribute('y1', sy(foldEdge.p1_um[1]));
+      l.setAttribute('x2', foldEdge.p2_um[0]);
+      l.setAttribute('y2', sy(foldEdge.p2_um[1]));
+      svg.appendChild(l);
+    }
+    fState.textContent = foldEdge ? 'fold edge marked' : '';
+  }
+  fBtn.addEventListener('click', () => {
+    foldMode = !foldMode; fBtn.classList.toggle('on', foldMode);
+    if (foldMode) fState.textContent = foldEdge
+      ? 'click the marked edge to clear'
+      : 'click a VERTICAL outline edge';
+  });
+  function nearestVerticalEdge(p) {
+    let best = null, bestD = 1e18;
+    for (let i = 0; i < outer.length; i++) {
+      const a = outer[i], b = outer[(i + 1) % outer.length];
+      if (a[0] !== b[0] || a[1] === b[1]) continue;   // vertical only
+      const midY = (a[1] + b[1]) / 2;
+      const d = Math.abs(p.x - a[0]) + Math.abs((H - p.y) - midY) * 0.2;
+      if (d < bestD) { bestD = d; best = {p1_um: [...a], p2_um: [...b]}; }
+    }
+    return best;
+  }
+  svg.addEventListener('click', e => {
+    if (e.target.classList.contains('fold-line')) {
+      foldEdge = null; drawFold(); return;
+    }
+    if (foldMode && !e.target.classList.contains('vertex')
+        && !e.target.classList.contains('notch')) {
+      const cand = nearestVerticalEdge(evtPoint(e));
+      if (!cand) {
+        fState.textContent = 'no vertical outline edge found';
+        return;
+      }
+      foldEdge = cand; drawFold(); return;
+    }
+    if (e.target.classList.contains('notch')) {
+      notches.splice(+e.target.dataset.n, 1); drawNotches(); return;
+    }
+    if (!notchMode || e.target.classList.contains('vertex')) return;
+    const p = evtPoint(e);
+    notches.push({x_um: Math.round(p.x), y_um: Math.round(H - p.y)});
+    drawNotches();
+  });
+  drawNotches();
+  drawFold();
+
+  const grain = (geo.features || {}).grain;
+  if (grain && grain.angle_cdeg != null)
+    document.getElementById('grain_deg').value = grain.angle_cdeg / 100;
+  document.getElementById('save-form').addEventListener('submit', () => {
+    document.getElementById('outer_um').value = JSON.stringify(outer);
+    document.getElementById('notches_json').value = JSON.stringify(notches);
+    document.getElementById('fold_edge_json').value = JSON.stringify(foldEdge);
+    const d = document.getElementById('grain_deg').value.trim();
+    document.getElementById('grain_cdeg').value = d === '' ? '' : Math.round(parseFloat(d) * 100);
+  });
+})();
+</script>
+{% endblock %}

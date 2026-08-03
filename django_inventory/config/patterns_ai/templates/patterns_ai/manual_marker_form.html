@@ -1,0 +1,75 @@
+{% extends "accounts/base.html" %}
+{# Block 3B — composed from the STAGE FORM canon (form-shell: hero + numbered panel + cream inputs + sticky CTA); mobile-first @390 #}
+{% block page_title %}Record manual marker{% endblock %}
+{% block extra_head %}
+<style>
+  /* page-scoped (rule 10): .pai-manual only */
+  .pai-manual .hero-strip { margin-bottom: 16px; }
+  .pai-manual .panel { max-width: 640px; }
+  .pai-manual .field { margin-bottom: 14px; }
+  .pai-manual input[type=file] { padding: 10px; background: var(--cream, #fdf6ec); border-radius: 8px; width: 100%; }
+  .pai-manual .errors { color: #b3261e; margin: 8px 0; }
+  .pai-manual .sticky-actions { position: sticky; bottom: 0; padding: 12px 0; background: inherit; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-manual">
+  <div class="hero-strip">
+    <h1>Record a manual marker</h1>
+    <p>Chalk layout ki photo + width + lay — permanent memory ban jayega.</p>
+  </div>
+  {% if form.non_field_errors %}
+    <div class="errors">{% for e in form.non_field_errors %}<div>⚠ {{ e }}</div>{% endfor %}</div>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <div class="panel">
+      <div class="panel-head"><span class="panel-num">1</span>
+        <span class="panel-title">Which product &amp; layout</span></div>
+      <div class="panel-body">
+        <label class="field">Product
+          <select name="product" required>
+            <option value="">— pick —</option>
+            {% for p in products %}<option value="{{ p.pk }}">{{ p.code }} · {{ p.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">{{ form.label.label }}
+          {{ form.label }}{% for e in form.label.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+        </label>
+        <label class="field">{{ form.usable_width_mm.label }}
+          {{ form.usable_width_mm }}
+          <small>{{ form.usable_width_mm.help_text }}</small>
+          {% for e in form.usable_width_mm.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+        </label>
+        <label class="field">{{ form.construction.label }}
+          {{ form.construction }}
+        </label>
+        <label class="field">{{ form.ratio_text.label }}
+          {{ form.ratio_text }}
+          <small>{{ form.ratio_text.help_text }}</small>
+          {% for e in form.ratio_text.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+        </label>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="panel-num">2</span>
+        <span class="panel-title">The photo</span></div>
+      <div class="panel-body">
+        <label class="field">{{ form.source.label }}
+          {{ form.source }}
+        </label>
+        <label class="field">{{ form.photo.label }}
+          <input type="file" name="photo" accept="image/*" capture="environment" required>
+          <small>{{ form.photo.help_text }}</small>
+          {% for e in form.photo.errors %}<div class="errors">{{ e }}</div>{% endfor %}
+        </label>
+        <label class="field">Notes {{ form.notes }}</label>
+      </div>
+    </div>
+    <div class="sticky-actions">
+      <button type="submit" class="btn btn-primary">Save manual marker</button>
+      <a class="btn" href="{% url 'patterns_ai:home' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

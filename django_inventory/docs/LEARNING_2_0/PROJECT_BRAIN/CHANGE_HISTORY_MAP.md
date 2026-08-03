@@ -1,3 +1,13 @@
+---
+id: l2-project-brain-change-history-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: navigation index
+anchors: —
+verified: 2026-07-13
+---
+
 # CHANGE HISTORY MAP — phase → what changed → files/docs
 
 ## TL;DR

@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Kapil Enterprises — Premium quality kids garments. Hosiery, pants, t-shirts and more. Trusted since 2024.">
+    <meta name="theme-color" content="#130428">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Kapil Enterprises — Premium Kids Garments">
+    <meta property="og:description" content="Hosiery, comfort pants and vibrant t-shirts — crafted on our own factory floor, every batch traceable roll to rack.">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23130428'/%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='none' stroke='%23b87333' stroke-width='2'/%3E%3Ctext x='32' y='42' font-family='Georgia,serif' font-size='26' font-weight='600' fill='%23d4924a' text-anchor='middle'%3EKE%3C/text%3E%3C/svg%3E">
     <title>Kapil Enterprises — Premium Kids Garments</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -452,6 +457,163 @@
             margin-top: 4px;
         }
 
+        /* ── Hero atelier composition — CSS-art fallback when no showcase cards exist ── */
+        .hero-atelier {
+            position: relative;
+            height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .atelier-ring {
+            position: absolute;
+            width: 400px; height: 400px;
+            border: 1px solid rgba(184,115,51,0.28);
+            border-radius: 50%;
+            animation: atelierSpin 40s linear infinite;
+        }
+        /* orbiting copper spark riding the ring */
+        .atelier-ring::before {
+            content: '';
+            position: absolute;
+            top: -4px; left: 50%;
+            width: 8px; height: 8px;
+            margin-left: -4px;
+            border-radius: 50%;
+            background: var(--copper-l);
+            box-shadow: 0 0 12px rgba(212,146,74,0.9);
+        }
+        .atelier-ring--dash {
+            width: 310px; height: 310px;
+            border: 1px dashed rgba(255,255,255,0.14);
+            animation: atelierSpinRev 60s linear infinite;
+        }
+        .atelier-ring--dash::before { display: none; }
+        @keyframes atelierSpin    { to { transform: rotate(360deg); } }
+        @keyframes atelierSpinRev { to { transform: rotate(-360deg); } }
+        .atelier-core {
+            width: 190px; height: 190px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            box-shadow: 0 24px 70px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        .atelier-mono {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 62px;
+            font-weight: 300;
+            color: var(--copper-l);
+            line-height: 1;
+            letter-spacing: 0.02em;
+        }
+        .atelier-est {
+            font-family: 'Syne', sans-serif;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.45);
+        }
+        .atelier-chip {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+            animation: atelierFloat 6s ease-in-out infinite;
+        }
+        .atelier-chip svg { width: 26px; height: 26px; color: var(--copper-l); flex-shrink: 0; }
+        .atelier-chip strong {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: #faf7f2;
+            line-height: 1.25;
+        }
+        .atelier-chip span {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255,255,255,0.5);
+        }
+        .atelier-chip--1 { top: 8%;  right: 4%;  animation-delay: 0s; }
+        .atelier-chip--2 { left: 0;  top: 46%;   animation-delay: 1.6s; }
+        .atelier-chip--3 { bottom: 6%; right: 12%; animation-delay: 3.2s; }
+        @keyframes atelierFloat {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-12px); }
+        }
+
+        /* ── Scroll cue — bottom-center of hero ── */
+        .hero-scroll-cue {
+            position: absolute;
+            bottom: 22px; left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            z-index: 2;
+            opacity: 0;
+            animation: fadeIn 1s 1.6s ease forwards;
+        }
+        .hero-scroll-cue span {
+            font-family: 'Syne', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.35);
+        }
+        .hero-scroll-mouse {
+            width: 22px; height: 34px;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            border-radius: 12px;
+            position: relative;
+        }
+        .hero-scroll-mouse::before {
+            content: '';
+            position: absolute;
+            top: 6px; left: 50%;
+            width: 3px; height: 7px;
+            margin-left: -1.5px;
+            border-radius: 2px;
+            background: var(--copper-l);
+            animation: scrollWheel 1.8s ease-in-out infinite;
+        }
+        @keyframes scrollWheel {
+            0%   { transform: translateY(0); opacity: 1; }
+            70%  { transform: translateY(10px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 0; }
+        }
+
+        /* ── Card image micro-interactions: zoom + light sweep on hover ── */
+        .cat-card-img img, .product-card-img img { transition: transform 0.5s cubic-bezier(0.22,1,0.36,1); }
+        .cat-card:hover .cat-card-img img, .product-card:hover .product-card-img img { transform: scale(1.06); }
+        .cat-card-img::after, .product-card-img::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.28) 50%, transparent 60%);
+            transform: translateX(-120%);
+            transition: transform 0.7s ease;
+            pointer-events: none;
+        }
+        .cat-card:hover .cat-card-img::after, .product-card:hover .product-card-img::after { transform: translateX(120%); }
+
         /* ══════════════════════════════════════════════════════════════
            CATEGORIES SECTION
         ══════════════════════════════════════════════════════════════ */
@@ -504,7 +666,9 @@
 
         .cat-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            /* auto-fit + capped track + center → 1 lonely card sits centered, full data still fills 4-across */
+            grid-template-columns: repeat(auto-fit, minmax(240px, 285px));
+            justify-content: center;
             gap: 20px;
         }
 
@@ -578,7 +742,8 @@
 
         .product-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(250px, 292px));
+            justify-content: center;
             gap: 24px;
         }
 
@@ -838,6 +1003,396 @@
         }
 
         /* ══════════════════════════════════════════════════════════════
+           SCROLL PROGRESS + REVEAL-ON-SCROLL (vanilla IntersectionObserver)
+        ══════════════════════════════════════════════════════════════ */
+        /* thin copper bar under navbar — width driven by JS scroll % */
+        .scroll-progress {
+            position: fixed;
+            top: 0; left: 0;
+            height: 2px;
+            width: 0;
+            z-index: 1001;
+            background: linear-gradient(to right, var(--copper-d), var(--copper-l));
+            pointer-events: none;
+        }
+
+        /* JS adds .reveal (so no-JS users see everything); .in-view animates it in */
+        .reveal {
+            opacity: 0;
+            transform: translateY(26px);
+            transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1);
+            transition-delay: var(--rd, 0s);
+        }
+        .reveal.in-view { opacity: 1; transform: none; }
+
+        /* fixed navbar = 72px → anchored sections need breathing room on jump */
+        section[id] { scroll-margin-top: 84px; }
+
+        /* ── Lenis smooth-scroll host rules (library-recommended) ── */
+        html.lenis, html.lenis body { height: auto; }
+        .lenis.lenis-smooth { scroll-behavior: auto !important; }
+
+        /* ── GSAP-owned elements: JS drives transform, CSS keeps the rest ── */
+        [data-tilt] { transition-property: box-shadow, background, border-color; will-change: transform; }
+        [data-magnetic] { transition-property: background, box-shadow, border-color, color; }
+
+        /* ── Cross-document View Transition (MPA morph, Chrome/Edge 126+ & Safari 18+; others just navigate) ── */
+        @view-transition { navigation: auto; }
+        @media (prefers-reduced-motion: reduce) {
+            @view-transition { navigation: none; }
+        }
+        /* brand mark morphs into the login monogram across navigation */
+        .nav-brand-mark { view-transition-name: ke-brand; }
+
+        /* ── Particle canvas (created by ke-particles.js inside .hero) ── */
+        .hero .ke-particles {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* ── Spotlight cards — copper glow tracks the cursor (overlay injected by JS) ── */
+        /* host must be positioned or the absolute glow anchors to an ancestor (why-card has no
+           position of its own — about-panel already relative, rule is harmless there) */
+        [data-spotlight] { position: relative; }
+        .spotlight-glow {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s;
+            background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(212,146,74,0.16), transparent 65%);
+            z-index: 1;
+        }
+        [data-spotlight]:hover .spotlight-glow { opacity: 1; }
+
+        /* ── Border beam — a light runs the About panel's border (typed custom property → smooth conic spin) ── */
+        @property --beam {
+            syntax: '<angle>';
+            inherits: false;
+            initial-value: 0deg;
+        }
+        .beam-border {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1.5px;
+            background: conic-gradient(from var(--beam),
+                transparent 0deg, transparent 250deg,
+                rgba(212,146,74,0.9) 310deg, rgba(245,237,224,0.85) 330deg, transparent 360deg);
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            animation: beamSpin 7s linear infinite;
+            pointer-events: none;
+            z-index: 2;
+        }
+        @keyframes beamSpin { to { --beam: 360deg; } }
+        /* decorative paint-loop: skip on touch devices (battery) and under reduced motion
+           (explicit none — the global 0.01ms kill would still restart an infinite loop every frame) */
+        @media (pointer: coarse), (prefers-reduced-motion: reduce) {
+            .beam-border { animation: none; }
+        }
+
+        /* trailing cursor ring (fine pointers only; created by home-motion.js) */
+        .cursor-ring {
+            position: fixed;
+            top: 0; left: 0;
+            width: 36px; height: 36px;
+            margin: -18px 0 0 -18px;
+            border: 1.5px solid rgba(184,115,51,0.55);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 2000;
+            opacity: 0;   /* hidden until first mousemove (js adds .is-live) — no corner ghost on load */
+            transition: width 0.25s, height 0.25s, margin 0.25s, border-color 0.25s, background 0.25s, opacity 0.3s;
+        }
+        .cursor-ring.is-live { opacity: 1; }
+        .cursor-ring.is-active {
+            width: 56px; height: 56px;
+            margin: -28px 0 0 -28px;
+            border-color: rgba(212,146,74,0.9);
+            background: rgba(184,115,51,0.08);
+        }
+        @media (pointer: coarse) { .cursor-ring { display: none; } }
+
+        /* film grain over hero (same noise texture family as the login panel) */
+        .hero-grain {
+            position: absolute;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* aurora drift — slow ambient motion on the hero glows (killed by reduced-motion) */
+        @keyframes auroraDrift1 {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(-50px, 36px) scale(1.12); }
+        }
+        @keyframes auroraDrift2 {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(44px, -30px) scale(1.15); }
+        }
+        .hero-glow-1 { animation: auroraDrift1 16s ease-in-out infinite alternate; }
+        .hero-glow-2 { animation: auroraDrift2 20s ease-in-out infinite alternate; }
+
+        /* nav link underline sweep */
+        .nav-links a:not(.nav-cta) { position: relative; padding-bottom: 3px; }
+        .nav-links a:not(.nav-cta)::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 1.5px;
+            background: var(--copper);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.25s cubic-bezier(0.22,1,0.36,1);
+        }
+        .nav-links a:not(.nav-cta):hover::after { transform: scaleX(1); }
+
+        /* shine sweep on primary CTAs */
+        .btn-hero-primary { position: relative; overflow: hidden; }
+        .btn-hero-primary::before {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 40%;
+            left: 0;
+            background: linear-gradient(105deg, transparent, rgba(255,255,255,0.35), transparent);
+            transform: translateX(-150%) skewX(-18deg);
+            transition: transform 0.6s ease;
+            pointer-events: none;
+        }
+        .btn-hero-primary:hover::before { transform: translateX(320%) skewX(-18deg); }
+
+        /* ══════════════════════════════════════════════════════════════
+           MARQUEE RIBBON — infinite craft strip (CSS-only loop)
+        ══════════════════════════════════════════════════════════════ */
+        .marquee {
+            background: var(--ink);
+            border-top: 1px solid rgba(184,115,51,0.35);
+            border-bottom: 1px solid rgba(184,115,51,0.35);
+            overflow: hidden;
+            padding: 15px 0;
+        }
+        .marquee-track {
+            display: flex;
+            width: max-content;
+            animation: marqueeScroll 30s linear infinite;
+        }
+        .marquee:hover .marquee-track { animation-play-state: paused; }
+        .marquee-group {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .marquee-group span {
+            font-family: 'Syne', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: rgba(250,247,242,0.55);
+            white-space: nowrap;
+            padding: 0 26px;
+        }
+        .marquee-group i {
+            font-style: normal;
+            color: var(--copper-l);
+            font-size: 11px;
+        }
+        @keyframes marqueeScroll {
+            to { transform: translateX(-50%); }
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           ABOUT / OUR STORY — public, editorial split + process timeline
+        ══════════════════════════════════════════════════════════════ */
+        .about {
+            padding: 96px 0;
+            background: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .about-inner {
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            gap: 64px;
+            align-items: start;
+        }
+        .about-copy .section-tag { margin-bottom: 14px; }
+        .about-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(32px, 4vw, 48px);
+            font-weight: 300;
+            color: var(--ink);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+            margin-bottom: 18px;
+        }
+        .about-title em { font-style: italic; color: var(--copper); }
+        .about-lede {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 20px;
+            font-style: italic;
+            color: var(--ink-4);
+            line-height: 1.5;
+            margin-bottom: 18px;
+        }
+        .about-copy > p {
+            font-size: 14px;
+            color: var(--stone);
+            line-height: 1.85;
+            margin-bottom: 16px;
+        }
+        .about-copy > p strong { color: var(--ink-3); font-weight: 600; }
+
+        .about-values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 26px 0;
+        }
+        .about-value {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--page-bg);
+            border: 1px solid var(--cream-3);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink-3);
+        }
+        .about-value svg {
+            width: 16px; height: 16px;
+            color: var(--copper);
+            flex-shrink: 0;
+        }
+
+        .about-quote {
+            border-left: 3px solid var(--copper);
+            padding: 4px 0 4px 18px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 18px;
+            font-style: italic;
+            color: var(--ink-3);
+            line-height: 1.5;
+        }
+
+        /* right: dark process panel — same purple family as hero, thread timeline */
+        .about-panel {
+            background: linear-gradient(160deg, #130428 0%, #240a52 55%, #100324 100%);
+            border-radius: 20px;
+            padding: 40px 36px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .about-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.02) 28px, rgba(255,255,255,0.02) 29px),
+                repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.02) 28px, rgba(255,255,255,0.02) 29px);
+            pointer-events: none;
+        }
+        .about-panel::after {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 320px; height: 320px;
+            background: radial-gradient(circle, rgba(184,115,51,0.2) 0%, transparent 65%);
+            pointer-events: none;
+        }
+        .about-panel-tag {
+            position: relative;
+            z-index: 1;
+            font-family: 'Syne', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--copper-l);
+            margin-bottom: 26px;
+        }
+        .process-list {
+            position: relative;
+            z-index: 1;
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+        }
+        .process-step {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 16px;
+            position: relative;
+            padding-bottom: 26px;
+        }
+        .process-step:last-child { padding-bottom: 0; }
+        /* connecting thread between step markers */
+        .process-step:not(:last-child)::before {
+            content: '';
+            position: absolute;
+            left: 21.5px;
+            top: 44px;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(to bottom, rgba(184,115,51,0.6), rgba(184,115,51,0.15));
+            /* --draw scrubbed 0→1 by ScrollTrigger (thread draws in); default 1 = full line without JS */
+            transform: scaleY(var(--draw, 1));
+            transform-origin: top;
+        }
+        .process-num {
+            width: 44px; height: 44px;
+            border: 1.5px solid var(--copper);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--copper-l);
+            background: rgba(184,115,51,0.08);
+            flex-shrink: 0;
+        }
+        .process-step h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 20px;
+            font-weight: 600;
+            color: #faf7f2;
+            margin: 2px 0 4px;
+        }
+        .process-step p {
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            line-height: 1.6;
+        }
+        .about-panel-foot {
+            position: relative;
+            z-index: 1;
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .about-panel-foot svg { width: 18px; height: 18px; color: var(--copper-l); flex-shrink: 0; }
+        .about-panel-foot p {
+            font-size: 12px;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.6;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
            RESPONSIVE
         ══════════════════════════════════════════════════════════════ */
         @media (max-width: 1024px) {
@@ -845,6 +1400,10 @@
             .hero-showcase { max-width: 500px; }
             .product-grid { grid-template-columns: repeat(3, 1fr); }
             .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+            .about-inner { grid-template-columns: 1fr; gap: 44px; }
+            .about-panel { max-width: 620px; }
+            /* width:100% — auto margins on a grid item otherwise shrink it to content width */
+            .hero-atelier { width: 100%; max-width: 520px; margin: 0 auto; height: 440px; }
         }
 
         @media (max-width: 768px) {
@@ -857,6 +1416,7 @@
             .product-grid { grid-template-columns: repeat(2, 1fr); }
             .why-grid { grid-template-columns: 1fr; }
             .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+            .about { padding: 72px 0; }
         }
 
         @media (max-width: 480px) {
@@ -872,6 +1432,24 @@
             .showcase-grid { grid-template-columns: 1fr; }
             .showcase-card:first-child { grid-row: auto; }
             .footer-bottom { flex-direction: column; text-align: center; }
+            .about { padding: 56px 0; }
+            .about-values { grid-template-columns: 1fr; }
+            .about-panel { padding: 28px 20px 24px; }
+            .marquee-group span { font-size: 11px; padding: 0 18px; }
+            .hero-atelier { height: 380px; }
+            .atelier-ring { width: 270px; height: 270px; }
+            .atelier-ring--dash { width: 210px; height: 210px; }
+            .atelier-core { width: 140px; height: 140px; }
+            .atelier-mono { font-size: 44px; }
+            .atelier-chip { padding: 9px 12px; gap: 9px; }
+            .atelier-chip svg { width: 20px; height: 20px; }
+            .atelier-chip strong { font-size: 11.5px; white-space: nowrap; }
+            .atelier-chip span { font-size: 10px; white-space: nowrap; }
+            /* triangulate chips into corners so the medallion stays clear on narrow screens */
+            .atelier-chip--1 { top: 2%; left: 2%; right: auto; }
+            .atelier-chip--2 { top: 40%; left: auto; right: 0; }
+            .atelier-chip--3 { bottom: 2%; left: 6%; right: auto; }
+            .hero-scroll-cue { display: none; }
         }
 
         /* Reduced motion */
@@ -950,6 +1528,7 @@
 <!-- ══════════════════════════════════════════════════════════════
      NAVBAR — Dynamic nav links from backend
 ══════════════════════════════════════════════════════════════ -->
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
 <nav class="navbar" id="navbar">
     <div class="container navbar-inner">
         <a href="{% url 'public_home' %}" class="nav-brand">
@@ -968,6 +1547,7 @@
             {% for link in nav_links %}
             <a href="{{ link.url }}">{{ link.label }}</a>
             {% endfor %}
+            <a href="#about">About</a>
             <a href="{% url 'accounts:login' %}" class="nav-cta">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/>
@@ -996,6 +1576,7 @@
             {% for link in nav_links %}
             <a href="{{ link.url }}" onclick="closeMobileMenu()">{{ link.label }}</a>
             {% endfor %}
+            <a href="#about">About</a>
             <a href="{% url 'accounts:login' %}" class="mob-cta">Sign In</a>
         </div>
     </div>
@@ -1009,6 +1590,7 @@
     <div class="hero-thread"></div>
     <div class="hero-glow-1"></div>
     <div class="hero-glow-2"></div>
+    <div class="hero-grain"></div>
     <div class="hero-deco">K</div>
 
     <div class="container hero-inner">
@@ -1075,9 +1657,61 @@
                 {% endfor %}
             </div>
         </div>
+        {% else %}
+        {# CSS-art atelier composition — hero right side is never empty, even with zero showcase rows #}
+        <div class="hero-atelier" aria-hidden="true">
+            <div class="atelier-ring"></div>
+            <div class="atelier-ring atelier-ring--dash"></div>
+            <div class="atelier-core">
+                <span class="atelier-mono">KE</span>
+                <span class="atelier-est">Est. 2024</span>
+            </div>
+            <div class="atelier-chip atelier-chip--1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"/></svg>
+                <div><strong>Hosiery &amp; Tees</strong><span>Soft on little skin</span></div>
+            </div>
+            <div class="atelier-chip atelier-chip--2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                <div><strong>Quality Checked</strong><span>Every single stage</span></div>
+            </div>
+            <div class="atelier-chip atelier-chip--3">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <div><strong>50+ Designs</strong><span>Sizes 2Y – 14Y</span></div>
+            </div>
+        </div>
         {% endif %}
     </div>
+
+    <div class="hero-scroll-cue" aria-hidden="true">
+        <div class="hero-scroll-mouse"></div>
+        <span>Scroll</span>
+    </div>
 </section>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     MARQUEE RIBBON — craft strip (two identical groups = seamless loop)
+══════════════════════════════════════════════════════════════ -->
+<div class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+        <div class="marquee-group">
+            <span>Premium Hosiery <i>✦</i></span>
+            <span>Kids T-Shirts <i>✦</i></span>
+            <span>Comfort Pants <i>✦</i></span>
+            <span>Fair Craftsmanship <i>✦</i></span>
+            <span>Batch Traceability <i>✦</i></span>
+            <span>Made in India <i>✦</i></span>
+        </div>
+        <div class="marquee-group">
+            <span>Premium Hosiery <i>✦</i></span>
+            <span>Kids T-Shirts <i>✦</i></span>
+            <span>Comfort Pants <i>✦</i></span>
+            <span>Fair Craftsmanship <i>✦</i></span>
+            <span>Batch Traceability <i>✦</i></span>
+            <span>Made in India <i>✦</i></span>
+        </div>
+    </div>
+</div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
@@ -1211,6 +1845,90 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
+     ABOUT / OUR STORY — public detail page-section (no login needed)
+══════════════════════════════════════════════════════════════ -->
+<section class="about" id="about">
+    <div class="container">
+        <div class="about-inner">
+            <div class="about-copy">
+                <div class="section-tag">Our Story</div>
+                <h2 class="about-title">The Craft Behind<br><em>Every Stitch</em></h2>
+                <p class="about-lede">Kapil Enterprises is a kids' garment manufacturer — hosiery, comfortable pants and vibrant t-shirts, made on our own factory floor.</p>
+                <p>Every garment we ship starts as a <strong>roll of cloth</strong> chosen by hand. From there it moves across cutting tables, through the skilled hands of our stitching teams, and past a finishing bench where every piece is checked before it's packed. Nothing leaves the floor unseen.</p>
+                <p>We believe good garments come from <strong>good working conditions</strong> — our artisans are paid fair piece-rates for the work they actually do, tracked openly stage by stage. The same care that goes into the pay goes into the product.</p>
+                <p>Behind the scenes, our own <strong>in-house inventory system</strong> follows every meter of cloth and every production batch in real time — so when you order from us, we know exactly where your garments are and when they'll be ready.</p>
+                <div class="about-values">
+                    <div class="about-value">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        Fair piece-rate pay
+                    </div>
+                    <div class="about-value">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        Full batch traceability
+                    </div>
+                    <div class="about-value">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        Quality checked every stage
+                    </div>
+                    <div class="about-value">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        Made in India
+                    </div>
+                </div>
+                <div class="about-quote">"Every garment leaves our floor with a story we can trace — from roll to rack."</div>
+            </div>
+
+            <div class="about-panel" data-spotlight>
+                <div class="beam-border" aria-hidden="true"></div>
+                <div class="about-panel-tag">How a garment is made</div>
+                <ol class="process-list reveal-stagger">
+                    <li class="process-step">
+                        <div class="process-num">1</div>
+                        <div>
+                            <h4>Fabric Selection</h4>
+                            <p>Cloth rolls are inspected and logged — every meter accounted for before it touches a table.</p>
+                        </div>
+                    </li>
+                    <li class="process-step">
+                        <div class="process-num">2</div>
+                        <div>
+                            <h4>Pattern &amp; Cutting</h4>
+                            <p>Layered cutting by size and color, planned so fabric waste stays at a minimum.</p>
+                        </div>
+                    </li>
+                    <li class="process-step">
+                        <div class="process-num">3</div>
+                        <div>
+                            <h4>Stitching</h4>
+                            <p>Skilled artisan teams assemble each piece, with work recorded at every stage.</p>
+                        </div>
+                    </li>
+                    <li class="process-step">
+                        <div class="process-num">4</div>
+                        <div>
+                            <h4>Finishing &amp; Quality Check</h4>
+                            <p>Every garment is inspected; anything less than right is corrected before it moves on.</p>
+                        </div>
+                    </li>
+                    <li class="process-step">
+                        <div class="process-num">5</div>
+                        <div>
+                            <h4>Pack &amp; Dispatch</h4>
+                            <p>Counted, packed and dispatched — with the full batch history behind every carton.</p>
+                        </div>
+                    </li>
+                </ol>
+                <div class="about-panel-foot">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    <p>Powered by our in-house inventory system — every roll, batch and stage tracked end to end.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════════
      CTA BANNER — Dynamic from HomePageConfig
 ══════════════════════════════════════════════════════════════ -->
 <section class="cta-banner">
@@ -1283,11 +2001,45 @@
 </footer>
 
 <script>
-    // Navbar scroll effect
+    // Navbar scroll effect + scroll progress bar (one passive listener)
     const navbar = document.getElementById('navbar');
+    const progressBar = document.getElementById('scrollProgress');
     window.addEventListener('scroll', () => {
         navbar.classList.toggle('scrolled', window.scrollY > 20);
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        progressBar.style.width = max > 0 ? (window.scrollY / max * 100) + '%' : '0';
     }, { passive: true });
+
+    // Reveals + all scroll choreography live in storefront/js/home-motion.js
+    // (GSAP path with IntersectionObserver fallback — ONE owner, no double-animation).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Hero stat count-up — parses "500+" style values, animates the number part
+    function countUp(el) {
+        const m = el.textContent.trim().match(/^([^\d]*)([\d,]+)(.*)$/);
+        if (!m) return;
+        const target = parseInt(m[2].replace(/,/g, ''), 10);
+        if (!target || target > 1000000) return;
+        const start = performance.now(), dur = 1200;
+        function tick(now) {
+            const p = Math.min((now - start) / dur, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+            el.textContent = m[1] + Math.round(target * eased).toLocaleString('en-IN') + m[3];
+            if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    }
+    if (!reduceMotion && 'IntersectionObserver' in window) {
+        const statIo = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    countUp(entry.target);
+                    statIo.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.5 });
+        document.querySelectorAll('.stat-value').forEach(el => statIo.observe(el));
+    }
 
     // Mobile menu
     function toggleMobileMenu() {
@@ -1306,6 +2058,14 @@
         });
     });
 </script>
+
+{# Motion stack — vendored (GSAP 3.13 free incl. SplitText/ScrollTrigger since Webflow acquisition; Lenis smooth scroll). defer = execute in order after parse, before DOMContentLoaded. #}
+<script src="{% static 'storefront/vendor/gsap.min.js' %}" defer></script>
+<script src="{% static 'storefront/vendor/ScrollTrigger.min.js' %}" defer></script>
+<script src="{% static 'storefront/vendor/SplitText.min.js' %}" defer></script>
+<script src="{% static 'storefront/vendor/lenis.min.js' %}" defer></script>
+<script src="{% static 'storefront/js/ke-particles.js' %}" defer></script>
+<script src="{% static 'storefront/js/home-motion.js' %}" defer></script>
 
 </body>
 </html>

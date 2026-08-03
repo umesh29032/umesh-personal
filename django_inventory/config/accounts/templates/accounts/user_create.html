@@ -29,7 +29,7 @@
     </div>
 
     {% if form.non_field_errors %}
-        <div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>
+        <div class="form-error">{{ form.non_field_errors }}</div>
     {% endif %}
 
     <form method="post" id="userForm">
@@ -215,8 +215,8 @@
         </div>
 
         <div class="sticky-actions">
-            <a href="{% url 'accounts:user_list' %}" class="btn-ghost">Cancel</a>
-            <button type="submit" class="btn-copper">Create User</button>
+            <a href="{% url 'accounts:user_list' %}" class="btn btn-ghost btn-lg">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">Create User</button>
         </div>
     </form>
 </div>
@@ -257,5 +257,6 @@ updateRolePreview();
 
 <style>
 {% include 'accounts/_user_form_styles.html' %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 </style>
 {% endblock %}

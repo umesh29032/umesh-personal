@@ -1,3 +1,13 @@
+---
+id: production-production-app
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # `production` — Products, Adda, Workflows, Stage Records
 
 ## Models

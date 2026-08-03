@@ -1,0 +1,179 @@
+{% extends "accounts/base.html" %}
+{% block page_title %}Design System · Styleguide{% endblock %}
+
+{# Living styleguide — renders every token + primitive + component from the design system.
+   The "Storybook-lite": one page to eyeball/verify the whole system. Consumes ONLY tokens +
+   primitives + the shared _form_styles partial — defines NO component CSS of its own
+   (only page-scoped .sg-* layout helpers, rule 10/11). Change a token/primitive → this updates. #}
+{% block extra_head %}
+{% include 'shared/_form_styles.html' %}
+<style>
+  .styleguide { max-width: 1100px; margin: 0 auto; }
+  .sg-section { margin: 0 0 40px; }
+  .sg-section > h2 {
+      font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: 600;
+      color: var(--ink); margin: 0 0 4px; border-bottom: 1px solid var(--border-card); padding-bottom: 8px;
+  }
+  .sg-section > .sg-note { font-size: 12px; color: var(--stone); margin: 0 0 16px; }
+  .sg-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .sg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .sg-swatch { border: 1px solid var(--border-card); border-radius: var(--radius); overflow: hidden; font-size: 11px; }
+  .sg-swatch .chip { height: 48px; }
+  .sg-swatch .meta { padding: 6px 8px; background: var(--surface); color: var(--text-secondary); }
+  .sg-swatch .meta code { font-size: 10px; color: var(--ink); }
+  .sg-box { display: flex; align-items: center; justify-content: center; background: var(--copper); color: #fff; font-size: 11px; font-weight: 700; }
+  .sg-scale { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+  .sg-scale > div { text-align: center; font-size: 10px; color: var(--stone); }
+  .sg-type > div { margin-bottom: 6px; color: var(--ink); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="styleguide">
+  <div class="page-header">
+    <div class="page-header-text">
+      <h1>Design System — Styleguide</h1>
+      <p>Live gallery of every token, primitive and shared component. One owner per concern; change a token/primitive and everything here moves.</p>
+    </div>
+  </div>
+
+  {# ───────── TOKENS ───────── #}
+  <div class="sg-section">
+    <h2>Color tokens</h2>
+    <p class="sg-note">base.html <code>:root</code> — single source. Dark theme overrides the same names.</p>
+    <div class="sg-grid">
+      <div class="sg-swatch"><div class="chip" style="background:var(--ink)"></div><div class="meta"><code>--ink</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--copper)"></div><div class="meta"><code>--copper</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--copper-d)"></div><div class="meta"><code>--copper-d</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--copper-l)"></div><div class="meta"><code>--copper-l</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--cream)"></div><div class="meta"><code>--cream</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--stone)"></div><div class="meta"><code>--stone</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--smoke)"></div><div class="meta"><code>--smoke</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--page-bg)"></div><div class="meta"><code>--page-bg</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--status-success-bg)"></div><div class="meta"><code>--status-success-bg</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--status-warning-bg)"></div><div class="meta"><code>--status-warning-bg</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--status-danger-bg)"></div><div class="meta"><code>--status-danger-bg</code></div></div>
+      <div class="sg-swatch"><div class="chip" style="background:var(--status-info-bg)"></div><div class="meta"><code>--status-info-bg</code></div></div>
+    </div>
+  </div>
+
+  <div class="sg-section">
+    <h2>Radius scale</h2>
+    <div class="sg-scale">
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius-sm)"></div>sm 6</div>
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius)"></div>base 8</div>
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius-md)"></div>md 10</div>
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius-lg)"></div>lg 12</div>
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius-xl)"></div>xl 14</div>
+      <div><div class="sg-box" style="width:60px;height:60px;border-radius:var(--radius-pill)"></div>pill</div>
+    </div>
+  </div>
+
+  <div class="sg-section">
+    <h2>Spacing scale (4px grid)</h2>
+    <div class="sg-scale">
+      <div><div class="sg-box" style="width:var(--space-1);height:32px"></div>1·4</div>
+      <div><div class="sg-box" style="width:var(--space-2);height:32px"></div>2·8</div>
+      <div><div class="sg-box" style="width:var(--space-3);height:32px"></div>3·12</div>
+      <div><div class="sg-box" style="width:var(--space-4);height:32px"></div>4·16</div>
+      <div><div class="sg-box" style="width:var(--space-5);height:32px"></div>5·20</div>
+      <div><div class="sg-box" style="width:var(--space-6);height:32px"></div>6·24</div>
+      <div><div class="sg-box" style="width:var(--space-8);height:32px"></div>8·32</div>
+    </div>
+  </div>
+
+  <div class="sg-section">
+    <h2>Type scale</h2>
+    <div class="sg-type">
+      <div style="font-size:var(--fs-3xl);font-weight:var(--fw-bold)">Aa — 3xl 36 / bold</div>
+      <div style="font-size:var(--fs-2xl);font-weight:var(--fw-semibold)">Aa — 2xl 28 / semibold</div>
+      <div style="font-size:var(--fs-xl)">Aa — xl 22</div>
+      <div style="font-size:var(--fs-lg)">Aa — lg 18</div>
+      <div style="font-size:var(--fs-md)">Aa — md 14</div>
+      <div style="font-size:var(--fs-base)">Aa — base 13</div>
+      <div style="font-size:var(--fs-sm)">Aa — sm 12</div>
+      <div style="font-size:var(--fs-xs)">Aa — xs 11</div>
+    </div>
+  </div>
+
+  {# ───────── BUTTONS ───────── #}
+  <div class="sg-section">
+    <h2>Buttons</h2>
+    <p class="sg-note">Owner: base.html <code>.btn</code> + modifiers. <code>class="btn btn-primary"</code>.</p>
+    <div class="sg-row">
+      <button class="btn btn-primary">Primary</button>
+      <button class="btn btn-ghost">Ghost</button>
+      <button class="btn btn-danger">Danger</button>
+      <button class="btn btn-copper">Copper</button>
+      <button class="btn btn-filter">Filter</button>
+      <button class="btn btn-clear">Clear</button>
+    </div>
+    <p class="sg-note">Geometry-B (comfortable) — <code>.btn-lg</code>:</p>
+    <div class="sg-row">
+      <button class="btn btn-copper btn-lg">Copper · lg</button>
+      <button class="btn btn-ghost btn-lg">Ghost · lg</button>
+      <button class="btn btn-danger btn-lg">Danger · lg</button>
+    </div>
+    <p class="sg-note">Action affordances:</p>
+    <div class="sg-row">
+      <a href="#" class="action-link">Edit</a>
+      <a href="#" class="action-link action-link-danger">Delete</a>
+      <a href="#" class="action-icon" aria-label="open">→</a>
+    </div>
+  </div>
+
+  {# ───────── CARDS ───────── #}
+  <div class="sg-section">
+    <h2>Cards & stats</h2>
+    <p class="sg-note">Owner: base.html <code>.card</code> / <code>.kpi</code> / <code>.stat-card</code>.</p>
+    <div class="sg-row" style="align-items:stretch">
+      <div class="card" style="flex:1;min-width:200px"><div class="card-header"><div class="card-title">Card</div></div><div style="padding:16px">Body content inside a <code>.card</code>.</div></div>
+      <div class="kpi" style="min-width:160px"><div>Metric</div><div style="font-size:22px;font-weight:700">128</div></div>
+      <div class="stat-card payable" style="min-width:140px"><div class="label">Payable</div><div class="value">₹360</div></div>
+    </div>
+  </div>
+
+  {# ───────── BADGES / PILLS ───────── #}
+  <div class="sg-section">
+    <h2>Badges</h2>
+    <div class="sg-row">
+      <span class="badge badge-active">● Active</span>
+      <span class="badge badge-inactive">Archived</span>
+    </div>
+  </div>
+
+  {# ───────── FORMS ───────── #}
+  <div class="sg-section">
+    <h2>Forms — <code>.form-shell</code></h2>
+    <p class="sg-note">Owner: shared/_form_styles.html. Cream inputs · numbered panels · field-error · worker-chip multiselect.</p>
+    <div class="form-shell" style="padding-bottom:0">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-num">1</div><div class="panel-title">Sample panel</div></div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="field"><label>Text input</label><input type="text" placeholder="cream input, r10"></div>
+            <div class="field"><label>Select</label><select><option>Option A</option><option>Option B</option></select></div>
+            <div class="field full"><label>With error</label><input type="text" value="bad value"><div class="field-error">This field has an error.</div></div>
+          </div>
+          <div class="form-error" style="margin-top:14px">Form-level error box (non-field errors).</div>
+          <p class="sg-note" style="margin-top:16px">Worker-chip multiselect:</p>
+          <div class="workers-grid">
+            <label class="worker-chip"><input type="checkbox" checked> Worker A</label>
+            <label class="worker-chip"><input type="checkbox"> Worker B</label>
+            <label class="worker-chip"><input type="checkbox"> Worker C</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="sg-note">Class-based input — <code>.sf-input</code>:</p>
+    <div class="sg-row"><input class="sf-input" type="text" placeholder="sf-input" style="max-width:280px"></div>
+  </div>
+
+  {# ───────── EMPTY STATE ───────── #}
+  <div class="sg-section">
+    <h2>Empty state</h2>
+    <div class="empty-state"><h3>No rows yet</h3><p>Owner: base.html <code>.empty-state</code>.</p><a href="#" class="btn btn-primary">+ Add</a></div>
+  </div>
+
+</div>
+{% endblock %}

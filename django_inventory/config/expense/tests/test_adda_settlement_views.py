@@ -71,6 +71,12 @@ class AccessTests(_Base):
             self.assertEqual(self.client.get(url).status_code, 403)
             self.assertEqual(self.client.post(url).status_code, 403)
 
+    def test_management_get_on_start_returns_405_not_500(self):
+        # P0-1 regression: settlement-start is POST-only. A management GET
+        # (bookmark/refresh) must 405, never 500 (template-less TemplateView).
+        url = reverse('expense:adda-settlement-start', args=[self.adda.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+
 
 class QueueAndDraftTests(_Base):
     def test_queue_shows_ready_adda_and_start_creates_draft(self):
@@ -198,6 +204,18 @@ class CutoverLeverTests(_Base):
                                 worker=self.w1, allocated_quantity=Decimal('5'))
         self.assertEqual(WorkerLedgerEntry.objects.count(), 0)
 
+    def test_setting_absent_falls_back_to_settlement_first(self):
+        # P0-3 / E-2: if LEDGER_CREDIT_AT_ALLOCATION is removed entirely, the
+        # getattr fallback MUST be settlement-first (refuse), never allocation-era.
+        from django.conf import settings as dj_settings
+        with override_settings():
+            del dj_settings.LEDGER_CREDIT_AT_ALLOCATION  # simulate total absence
+            self.assertFalse(getattr(dj_settings, 'LEDGER_CREDIT_AT_ALLOCATION', False))
+            with self.assertRaisesMessage(ValidationError, 'Adda'):
+                allocate_stage_work(user=self.mgmt, stage_record=self.sr_pay,
+                                    worker=self.w1, allocated_quantity=Decimal('5'))
+        self.assertEqual(WorkerLedgerEntry.objects.count(), 0)
+
     @override_settings(LEDGER_CREDIT_AT_ALLOCATION=True)
     def test_symmetric_guard_blocks_allocation_after_settlement(self):
         self._contribute(self.w1, 10)
@@ -214,3 +232,28 @@ class CutoverLeverTests(_Base):
             user=self.mgmt, stage_record=self.sr_pay, worker=self.w1,
             allocated_quantity=Decimal('10'))
         self.assertIsNone(swa.adda_settlement_id)        # era-A marker stays NULL
+
+
+class FinalizeInputParseTests(TestCase):
+    """PA-05B-1: _parse_finalize_inputs must raise ValidationError (graceful, the
+    view catches it) — NOT an unhandled ValueError (500) — on tampered keys where
+    the worker-id / advance-id segment is non-numeric."""
+
+    def _parse(self, post):
+        from django.test import RequestFactory
+        from expense.views import AddaSettlementDetailView
+        req = RequestFactory().post('/x/', post)
+        return AddaSettlementDetailView._parse_finalize_inputs(req)
+
+    def test_malformed_variance_worker_id_raises_validationerror(self):
+        with self.assertRaises(ValidationError):
+            self._parse({'var_abc_packed': '5'})
+
+    def test_malformed_recovery_advance_id_raises_validationerror(self):
+        with self.assertRaises(ValidationError):
+            self._parse({'recover_abc': '100'})
+
+    def test_valid_inputs_parse_correctly(self):
+        variance, recoveries = self._parse({'var_7_packed': '5', 'recover_3': '100'})
+        self.assertEqual(variance, {7: {'packed': 5}})
+        self.assertEqual(recoveries, {3: Decimal('100')})

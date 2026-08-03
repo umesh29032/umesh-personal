@@ -165,6 +165,8 @@ class _BgWorkflowFixture(TestCase):
             adda=self.adda, size_id=self.s_m.id, color_id=self.red.id,
             pattern_id=self.front.id, count=20, user=self.admin,
         )
+        # GAP-5: completion (the join) first; bundles are post-join containers.
+        complete_cutting(adda=self.adda, user=self.admin)
         bundle = create_bundle(
             adda=self.adda, size_id=self.s_m.id, user=self.admin,
         )
@@ -173,7 +175,6 @@ class _BgWorkflowFixture(TestCase):
             selections=[{'breakup_id': b_front_m.id, 'take_count': 20}],
             user=self.admin,
         )
-        complete_cutting(adda=self.adda, user=self.admin)
         self.adda.refresh_from_db()
         # Adda now at barcode_generation stage (cutting completed; bg in workflow)
         self.assertEqual(self.adda.current_stage_id, self.bg_wf.id)

@@ -1,18 +1,27 @@
-"""Payroll read service — aggregations + per-worker access scoping. No writes.
+"""Payroll read service — aggregations + per-worker access scoping.
 
 Everything here is derived live from the ledger (never a stored total).
+TWO writes live here: `set_pay_basis` (R4) — the SOLE writer of
+WorkerPayBasisAudit — and `update_payout_profile` (RCP-1A F3, 2026-07-18) —
+THE WorkerProfile payout-details writer incl. the displayed-₹ field
+`opening_advance` (single-writer discipline, CLAUDE rule 5).
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 
 from accounts.services import MANAGEMENT_ROLES, user_has_perm, user_has_role
 from expense.models import (
     PayrollSettlement, PayrollSettlementItem, StageWorkAssignment,
-    WorkerAdvance, WorkerLedgerEntry,
+    WorkerAdvance, WorkerLedgerEntry, WorkerPayBasisAudit, WorkerProfile,
 )
+
+logger = logging.getLogger(__name__)
 
 _ZERO = Decimal('0.00')
 _ET = WorkerLedgerEntry.EntryType
@@ -20,6 +29,28 @@ _CAT = WorkerLedgerEntry.Category
 # Credit categories that count as real earnings. Other credits (e.g. a REVERSAL
 # credit written when a settlement payment is undone) must NOT inflate earnings.
 _EARNING_CATS = (_CAT.STAGE_EARNING, _CAT.PRODUCTION_EARNING)
+
+
+def payroll_totals() -> dict:
+    """Factory-wide totals for the operations digest (P1-1). Same definitions as
+    the payroll overview, aggregated at the DB (derived live, never stored):
+      • pending_payable  = Σ ledger credits − Σ debits
+      • advance_exposure = Σ advances given − Σ recovered
+    """
+    led = WorkerLedgerEntry.objects.aggregate(
+        credits=Sum('amount', filter=Q(entry_type=_ET.CREDIT)),
+        debits=Sum('amount', filter=Q(entry_type=_ET.DEBIT)),
+    )
+    pending_payable = (led['credits'] or _ZERO) - (led['debits'] or _ZERO)
+    given = WorkerAdvance.objects.aggregate(s=Sum('amount'))['s'] or _ZERO
+    # PA-12-A: exclude REVERSED recoveries (reversed_at set), exactly like
+    # advance_remaining/advance_outstanding/outstanding_advances. Without it, a
+    # reversed settlement's recovery still counts as recovered → factory-wide
+    # advance_exposure is understated after any settlement reversal.
+    recovered = (PayrollSettlementItem.objects.filter(reversed_at__isnull=True)
+                 .aggregate(s=Sum('amount_recovered'))['s'] or _ZERO)
+    return {'pending_payable': pending_payable,
+            'advance_exposure': given - recovered}
 
 
 # ── Advances (separate loan pool, derived — never stored) ──────────────────
@@ -56,7 +87,13 @@ def outstanding_advances(worker):
     advs = WorkerAdvance.objects.filter(worker=worker).order_by('advance_date', 'id')
     recovered_map = {
         r['advance']: r['s'] for r in
-        PayrollSettlementItem.objects.filter(advance__worker=worker)
+        # PA-11-1: exclude REVERSED recoveries (reversed_at set) — exactly like
+        # advance_remaining / advance_outstanding. Without this filter a reversed
+        # recovery still counts as recovered here, so after a settlement reversal the
+        # restored advance is under-reported (or, if fully recovered-then-reversed,
+        # drops out at the remaining>0 gate below) and the owner can't re-recover it.
+        PayrollSettlementItem.objects.filter(advance__worker=worker,
+                                             reversed_at__isnull=True)
         .values('advance').annotate(s=Sum('amount_recovered'))
     }
     out = []
@@ -66,6 +103,38 @@ def outstanding_advances(worker):
         if remaining > _ZERO:
             out.append({'advance': a, 'amount': a.amount,
                         'recovered': rec, 'remaining': remaining})
+    return out
+
+
+def outstanding_advances_bulk(workers):
+    """PA-16-2: batched `outstanding_advances` for MANY workers in 2 queries.
+
+    The settlement-draft screen showed one worker's outstanding advances each
+    (per-advance recovery inputs), calling outstanding_advances() in a loop →
+    2 queries PER worker (a measured N+1 on a money-approval page). This returns
+    {worker_id: [{advance, amount, recovered, remaining}]} with the SAME row shape
+    and the SAME reversed_at filter, computed in 2 queries total regardless of the
+    worker count. Workers with no positive-remaining advance are absent from the map.
+    """
+    ids = [getattr(w, 'pk', w) for w in workers]
+    if not ids:
+        return {}
+    advs = (WorkerAdvance.objects.filter(worker_id__in=ids)
+            .order_by('advance_date', 'id'))
+    recovered_map = {
+        r['advance']: r['s'] for r in
+        PayrollSettlementItem.objects.filter(advance__worker_id__in=ids,
+                                             reversed_at__isnull=True)
+        .values('advance').annotate(s=Sum('amount_recovered'))
+    }
+    out: dict = {}
+    for a in advs:
+        rec = recovered_map.get(a.id, _ZERO)
+        remaining = a.amount - rec
+        if remaining > _ZERO:
+            out.setdefault(a.worker_id, []).append(
+                {'advance': a, 'amount': a.amount,
+                 'recovered': rec, 'remaining': remaining})
     return out
 
 
@@ -224,17 +293,18 @@ def worker_assignments(worker, *, limit=None):
 
 def worker_production_stats(worker) -> dict:
     """Adda counts + pieces produced for a worker (Q1/Q2) — PRODUCTION truth
-    (V2-3 PR-C, owner D-V3.3): pieces = Σ reported_quantity on the worker's
-    completed/verified tasks, independent of settlement timing. Adda buckets
-    come from assignment truth (non-cancelled tasks). Pre-V2-1c allocations
-    that never had contributions are not counted — this is a productivity
+    (V2-3 PR-C, owner D-V3.3): pieces = Σ good_quantity on the worker's
+    completed/verified tasks (S3 — payable-good, so productivity follows what
+    settlement pays; good == reported in the thin slice), independent of settlement
+    timing. Adda buckets come from assignment truth (non-cancelled tasks). Pre-V2-1c
+    allocations that never had contributions are not counted — this is a productivity
     view, not a money view (the ledger is)."""
     from production.models import Adda, WorkerStageContribution, WorkerStageTask
     done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
     pieces = (
         WorkerStageContribution.objects
         .filter(task__worker=worker, task__status__in=done)
-        .aggregate(s=Sum('reported_quantity'))['s'] or _ZERO
+        .aggregate(s=Sum('good_quantity'))['s'] or _ZERO
     )
     base = (WorkerStageTask.objects.filter(worker=worker)
             .exclude(status=WorkerStageTask.Status.CANCELLED))
@@ -251,21 +321,18 @@ def worker_production_stats(worker) -> dict:
     }
 
 
-def unsettled_expected(worker):
-    """Option B visibility (V2-3 PR-C): Σ frozen `expected_earning` of the
-    worker's completed-but-UNCREDITED contribution lines — what a future Adda
-    settlement would book. NEVER money (balances always come from the ledger).
-
-    Non-overlapping with "Earned" by construction — excludes lines already
-    credited era-B (active settlement_line; a VOIDED line counts as unsettled
-    again, mirroring the settlement guard) or era-A (non-voided allocation SWA
-    on the same worker+stage, the same coarse pair rule the settlement uses)."""
+def _uncredited_lines(worker):
+    """The worker's completed-but-UNCREDITED contribution lines — excludes
+    lines already credited era-B (active settlement_line; a VOIDED line counts
+    as unsettled again, mirroring the settlement guard) or era-A (non-voided
+    allocation SWA on the same worker+stage, the same coarse pair rule the
+    settlement uses). Shared by `unsettled_expected` + the R4 pay-basis
+    warning, so both always agree on what "unsettled" means."""
     from production.models import WorkerStageContribution, WorkerStageTask
     done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
     lines = (
         WorkerStageContribution.objects
-        .filter(task__worker=worker, task__status__in=done,
-                expected_earning__isnull=False)
+        .filter(task__worker=worker, task__status__in=done)
         .filter(Q(settlement_line__isnull=True)
                 | Q(settlement_line__voided_at__isnull=False))
         .select_related('task')
@@ -276,8 +343,124 @@ def unsettled_expected(worker):
                 adda_settlement__isnull=True)
         .values_list('stage_record_id', flat=True)
     )
-    return sum((c.expected_earning for c in lines
-                if c.task.stage_record_id not in era_a_srs), _ZERO)
+    return [c for c in lines if c.task.stage_record_id not in era_a_srs]
+
+
+def unsettled_expected(worker):
+    """Option B visibility (V2-3 PR-C): Σ frozen `expected_earning` of the
+    worker's completed-but-UNCREDITED contribution lines — what a future Adda
+    settlement would book. NEVER money (balances always come from the ledger).
+    Non-overlapping with "Earned" by construction (see `_uncredited_lines`)."""
+    return sum((c.expected_earning for c in _uncredited_lines(worker)
+                if c.expected_earning is not None), _ZERO)
+
+
+def unsettled_contribution_count(worker) -> int:
+    """R4: how many uncredited contribution lines the worker has — the exact
+    set whose settlement treatment flips with a pay-basis change (owner R4
+    addendum: warn + explicit confirm before changing)."""
+    return len(_uncredited_lines(worker))
+
+
+# ── R4 (PDD §27-D4): pay basis — worker-level, never the stage ──────────────
+
+def is_monthly(worker) -> bool:
+    """Current pay basis, settlement-time semantics (owner P-1): read live,
+    never snapshotted per contribution. Absent profile = piece-rate default."""
+    return WorkerProfile.objects.filter(
+        user=worker, pay_basis=WorkerProfile.PayBasis.MONTHLY).exists()
+
+
+@transaction.atomic
+def set_pay_basis(worker, new_basis, *, actor, confirmed=False):
+    """THE pay-basis chokepoint (sole writer of WorkerPayBasisAudit).
+
+    Guards, in order:
+      • super_admin only (owner P-2) — a money-structure lever, manager is
+        read-only; PermissionDenied otherwise.
+      • valid basis + actually a change (no audit noise for no-ops).
+      • owner R4 addendum: if the worker has unsettled contribution lines,
+        require `confirmed=True` — warning + explicit confirmation, NOT a hard
+        block. The refusal message carries the count for the UI to show.
+    Writes profile (row-locked get_or_create) + append-only audit row that
+    records the unsettled count the admin confirmed over.
+    """
+    from accounts.services import ROLE_SUPER_ADMIN
+    if not user_has_role(actor, {ROLE_SUPER_ADMIN}):
+        raise PermissionDenied("Only a Super Admin can change a worker's pay basis.")
+    if new_basis not in WorkerProfile.PayBasis.values:
+        raise ValidationError("Unknown pay basis.")
+    # Serialize against settlement finalize/reverse (they hold this same lock
+    # for their whole transaction) — same F1 pattern as rerate_stage_role.
+    # Without it, a basis flip could commit between finalize's
+    # _settleable_lines read and its money write, booking lines for a worker
+    # who is monthly by commit time. pay basis is a settlement-boundary op.
+    from django.db import connection
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cur:
+            cur.execute('SELECT pg_advisory_xact_lock(%s)', [5374])
+    # select_for_update: serialize concurrent basis changes AND pin the row a
+    # concurrent settlement finalize would read (settlement-time semantics).
+    profile, _ = WorkerProfile.objects.select_for_update().get_or_create(user=worker)
+    if profile.pay_basis == new_basis:
+        raise ValidationError("Pay basis is already set to that value.")
+    unsettled = unsettled_contribution_count(worker)
+    if unsettled and not confirmed:
+        raise ValidationError(
+            f"This worker has {unsettled} unsettled contribution line(s). "
+            "Changing the pay basis changes how those lines settle "
+            f"({'they will be EXCLUDED from settlement' if new_basis == WorkerProfile.PayBasis.MONTHLY else 'they will become PAYABLE at their frozen rates'}). "
+            "Tick the confirmation to proceed.")
+    old_basis = profile.pay_basis
+    profile.pay_basis = new_basis
+    profile.save(update_fields=['pay_basis', 'updated_at'])
+    WorkerPayBasisAudit.objects.create(
+        worker=worker, old_basis=old_basis, new_basis=new_basis,
+        changed_by=actor, unsettled_lines_at_change=unsettled)
+    logger.info("pay_basis.change worker=%s %s->%s by=%s unsettled=%s",
+                worker.pk, old_basis, new_basis, actor.pk, unsettled)
+    return profile
+
+
+@transaction.atomic
+def update_payout_profile(worker, *, actor, phone='', bank_account_name='',
+                          bank_account_number='', bank_ifsc='', upi_id='',
+                          joining_date=None, opening_advance=None,
+                          is_active=True, notes=''):
+    """THE WorkerProfile payout-details writer (RCP-1A F3, 2026-07-18).
+
+    `opening_advance` is a DISPLAYED money fact (WP-A: informational — no
+    computation reads it; recoverable pre-system advances go through
+    `record_advance` as dated WorkerAdvance rows). F3 ruling: a management-
+    facing ₹ figure still follows the pay-basis precedent (service chokepoint,
+    never a bare form.save() in a view) — consistency + future-proofing if it
+    ever becomes computational. Guards:
+      • re-validated >= 0 here (never trust the form — mirrors set_pay_basis);
+      • row-locked get_or_create (serialize vs concurrent settlement reads);
+      • every opening_advance change audit-LOGGED old→new with actor (an
+        append-only audit ROW like WorkerPayBasisAudit = a new table = U14
+        owner-gated follow-up; the log trail is the interim record).
+    `pay_basis` is deliberately NOT accepted — `set_pay_basis` (P-2 gate +
+    audit row) stays the sole basis writer.
+    """
+    if opening_advance is None or opening_advance < 0:
+        raise ValidationError("Opening advance must be zero or more.")
+    profile, _ = WorkerProfile.objects.select_for_update().get_or_create(user=worker)
+    old_advance = profile.opening_advance
+    profile.phone = phone
+    profile.bank_account_name = bank_account_name
+    profile.bank_account_number = bank_account_number
+    profile.bank_ifsc = bank_ifsc
+    profile.upi_id = upi_id
+    profile.joining_date = joining_date
+    profile.opening_advance = opening_advance
+    profile.is_active = is_active
+    profile.notes = notes
+    profile.save()
+    if old_advance != opening_advance:
+        logger.info("opening_advance.change worker=%s %s->%s by=%s",
+                    worker.pk, old_advance, opening_advance, actor.pk)
+    return profile
 
 
 def worker_stage_earnings(worker):

@@ -9,9 +9,12 @@ Auth flow:
   /app/verify-otp/ → OTP login step 2 (code entry)
   /app/login/password/ → alternative password login
 
-Signup flow:
-  /app/signup/         → email + password form
-  /app/signup/verify/  → OTP verification step
+Self-registration: DISABLED (Production Audit PA-02-OPEN-SIGNUP, owner decision
+2026-06-14). This is an internal ERP — "pre-provisioned users only". Accounts are
+created by a Super Admin (/app/users/add/) or by linking a pre-provisioned Google
+address. The SignupView/SignupVerifyView/ResendSignupOTPView classes remain in
+views.py (unrouted) so signup can be re-enabled deliberately if invite/allowlist
+onboarding is ever scoped — just restore the three routes + imports below.
 
 Password reset flow:
   /app/forgot-password/        → email entry
@@ -21,10 +24,12 @@ from django.urls import path
 from .views import (
     LoginView, VerifyOTPView, HomeView, LogoutView, ResendOTPView,
     UserListView, UserCreateView, UserUpdateView, UserDeleteView, PasswordLoginView,
-    SignupView, SignupVerifyView, ForgotPasswordView, ResetPasswordVerifyView, ResendSignupOTPView,
+    ForgotPasswordView, ResetPasswordVerifyView,
     SkillListView, SkillCreateView, SkillUpdateView, SkillDeleteView,
     UserTypeListView, UserTypeCreateView, UserTypeUpdateView, UserTypeDeleteView,
 )
+# SignupView, SignupVerifyView, ResendSignupOTPView intentionally NOT imported —
+# native self-signup is disabled (PA-02-OPEN-SIGNUP). Classes still live in views.py.
 
 app_name = "accounts"
 
@@ -41,10 +46,9 @@ urlpatterns = [
     path("home/", HomeView.as_view(), name="home"),            # immediately bounces to inventory
     path("logout/", LogoutView.as_view(), name="logout"),      # POST-only (CSRF protection)
 
-    # ── Self-registration ─────────────────────────────────────────────────────
-    path("signup/", SignupView.as_view(), name="signup"),
-    path("signup/verify/", SignupVerifyView.as_view(), name="signup_verify"),
-    path("signup/resend-otp/", ResendSignupOTPView.as_view(), name="signup_resend_otp"),
+    # ── Self-registration: DISABLED (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ──
+    # Internal ERP = pre-provisioned users only. To re-enable, restore the three
+    # signup routes + their imports above. Views remain in views.py (unrouted).
 
     # ── Password reset ────────────────────────────────────────────────────────
     path("forgot-password/", ForgotPasswordView.as_view(), name="forgot_password"),

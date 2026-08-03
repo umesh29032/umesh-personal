@@ -1,0 +1,447 @@
+{% extends "accounts/base.html" %}
+{# M2 — PATTERN INTELLIGENCE STUDIO · WORK MODE (UI freeze §2.4/§2.5/§4).
+   One piece × size. Three panes: EVIDENCE STACK (left) · PROPOSAL
+   CANVAS + COMPARE (center) · INSPECTOR (right). Desktop-first
+   precision workspace (owner carve-out); phone owns only the capture
+   hand-off. Every write = parse → gate → single writer. #}
+{% block page_title %}{{ piece.pattern.name }} · {{ size.label }} · Studio{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-work { max-width: 1280px; margin: 0 auto; }
+  .pai-work .rail-nav { display:flex; justify-content:space-between; font-size:12px; margin-bottom:8px; }
+  .pai-work .rail-nav a { color:var(--copper); text-decoration:none; font-weight:700; }
+  .pai-work .head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .pai-work .head h1 { font-family:'Cormorant Garamond', serif; font-size:24px; color:var(--ink); margin:0; }
+  .pai-work .head .sub { font-size:12px; color:var(--stone); }
+  .pai-work .panes { display:grid; grid-template-columns: 300px 1fr 320px; gap:14px; align-items:start; }
+  .pai-work .pane { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card); padding:14px; }
+  .pai-work .pane h2 { font-size:12px; font-weight:800; color:var(--stone);
+    text-transform:uppercase; letter-spacing:0.06em; margin:0 0 10px; }
+  /* evidence stack */
+  .pai-work .ev { border:1px solid var(--border-card); border-radius:10px; padding:10px; margin-bottom:8px; }
+  .pai-work .ev .k { font-size:12.5px; font-weight:800; color:var(--ink); }
+  .pai-work .ev .s { font-size:11px; margin-top:2px; }
+  .pai-work .ev .s.proposed { color:#20603c; } .pai-work .ev .s.refused { color:#a33028; }
+  .pai-work .ev .s.received { color:var(--stone); }
+  .pai-work .ev .conf { font-size:11px; color:var(--stone); }
+  .pai-work .ev .row-acts { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .pai-work .ev .row-acts a, .pai-work .ev .row-acts button { font-size:11.5px; font-weight:700;
+    padding:6px 10px; border-radius:8px; border:1px solid var(--border-card);
+    background:var(--card-bg); color:var(--ink); text-decoration:none; cursor:pointer; }
+  .pai-work .ev .row-acts .use { background:var(--copper); color:#fff; border-color:var(--copper); }
+  .pai-work details.add { margin-bottom:10px; }
+  .pai-work details.add summary { cursor:pointer; font-size:13px; font-weight:800; color:var(--copper);
+    padding:8px 0; list-style:none; }
+  .pai-work details.add .menu { display:flex; flex-direction:column; gap:8px; }
+  .pai-work .add-block { border:1px dashed var(--border-card); border-radius:10px; padding:10px; }
+  .pai-work .add-block .t { font-size:12px; font-weight:800; color:var(--ink); margin-bottom:6px; }
+  .pai-work .add-block input[type=file], .pai-work .add-block input[type=number] {
+    font-size:12px; width:100%; margin-bottom:6px; background:var(--input-bg, #fbf6ea);
+    border:1px solid var(--border-card); border-radius:8px; padding:7px 8px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06); }
+  .pai-work .add-block button { font-size:12px; font-weight:700; padding:7px 12px; border-radius:8px;
+    border:none; background:var(--copper); color:#fff; cursor:pointer; }
+  .pai-work .add-block.off { opacity:0.6; }
+  .pai-work .add-block.off .t { color:var(--stone); }
+  .pai-work .add-block .why { font-size:11px; color:var(--stone); }
+  /* canvas */
+  .pai-work .canvas-card svg { width:100%; height:auto; max-height:520px; display:block; }
+  .pai-work .canvas-empty { font-size:12.5px; color:var(--stone); padding:40px 10px; text-align:center; }
+  .pai-work .cmp-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+  .pai-work .cmp-table th, .pai-work .cmp-table td { padding:6px 8px; border-bottom:1px solid var(--border-card); text-align:left; }
+  .pai-work .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+  /* inspector */
+  .pai-work .meta-chips { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  .pai-work .meta-chips span { font-size:11px; font-weight:700; padding:3px 9px;
+    border-radius:10px; background:#faf7f0; color:var(--ink); border:1px solid var(--border-card); }
+  .pai-work .insp-line { font-size:12px; color:var(--ink); margin:4px 0; }
+  .pai-work .insp-line b { font-weight:800; }
+  .pai-work .conf-panel { border:1px solid var(--border-card); border-radius:10px; padding:10px; margin:10px 0; }
+  .pai-work .conf-panel .big { font-size:20px; font-weight:800; color:var(--ink); }
+  .pai-work .publish-box { border:1px solid var(--border-card); border-radius:10px; padding:10px; margin-top:10px; }
+  .pai-work .publish-box .rowline { font-size:11.5px; margin:6px 0; }
+  .pai-work .publish-box input { width:70px; font-size:12px; padding:5px 6px;
+    background:var(--input-bg, #fbf6ea); border:1px solid var(--border-card); border-radius:6px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06); }
+  .pai-work .publish-box button { width:100%; margin-top:8px; font-size:13px; font-weight:800;
+    padding:10px; border:none; border-radius:8px; background:#20603c; color:#fff; cursor:pointer; }
+  .pai-work .qr-panel { text-align:center; }
+  .pai-work .qr-panel svg { width:170px; height:170px; margin:6px auto; display:block; background:#fff; padding:6px; border-radius:8px; }
+  .pai-work .qr-panel .lnk { font-size:10.5px; word-break:break-all; color:var(--stone); }
+  /* M8 — plain-photo evidence set */
+  .pai-work .ev-thumb { width:100%; max-height:110px; object-fit:cover;
+    border-radius:8px; border:1px solid var(--border-card); margin:4px 0; }
+  .pai-work .m-chips { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0; }
+  .pai-work .m-chip { font-size:10px; font-weight:700; padding:2px 7px;
+    border-radius:999px; background:#f1ece0; color:var(--stone);
+    border:1px solid var(--border-card); }
+  .pai-work .m-chip.v { background:#e8eef7; color:#2b4a75; }
+  .pai-work .m-row { display:flex; gap:4px; margin-top:4px; }
+  .pai-work .m-row input { flex:1; min-width:0; font-size:12px; padding:6px;
+    background:var(--input-bg, #fbf6ea); border:1px solid var(--border-card);
+    border-radius:6px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.06); }
+  .pai-work .build-box { border:1px solid var(--border-card); border-radius:10px;
+    padding:10px; margin-top:10px; background:#faf7ef; }
+  .pai-work .build-box .prim-row { display:flex; align-items:center; gap:6px;
+    font-size:11.5px; padding:5px 2px; cursor:pointer; }
+  .pai-work .xchk { width:100%; border-collapse:collapse; font-size:11.5px; }
+  .pai-work .xchk th, .pai-work .xchk td { text-align:left; padding:3px 4px;
+    border-bottom:1px solid var(--border-card); }
+  .pai-work .xchk th { font-size:10px; text-transform:uppercase;
+    letter-spacing:0.05em; color:var(--stone); }
+  @media (max-width:1000px) {
+    .pai-work .panes { grid-template-columns:1fr; }
+    .pai-work .pane { order:2; }
+    .pai-work .pane.center { order:1; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-work">
+  <div class="rail-nav">
+    <a href="{% url 'patterns_ai:studio' %}?product={{ product.pk }}&amp;size={{ size.code }}">← Shelf ({{ size.label }})</a>
+    <a href="{% url 'patterns_ai:dashboard' %}?product={{ product.pk }}">Dashboard</a>
+  </div>
+  <div class="head">
+    <h1>{{ piece.pattern.name }} · {{ size.label }}</h1>
+    <span class="sub">{{ product.code }} · Pattern Intelligence Studio — evidence → proposal → review → verify → publish</span>
+  </div>
+
+  <div class="panes">
+    {# ══ LEFT · EVIDENCE STACK (freeze §2.4 + §7 contract) ══ #}
+    <div class="pane">
+      <h2>Evidence stack ({{ evidence_count }})</h2>
+      <details class="add" {% if not stack %}open{% endif %}>
+        <summary>＋ Add evidence ▾</summary>
+        <div class="menu">
+          <div class="add-block">
+            <div class="t">📷 Photo (calibration mat)</div>
+            <div class="why">Shoot on the phone — scan the code in the panel on the right.</div>
+          </div>
+          <form class="add-block" method="post" enctype="multipart/form-data" id="plain-form">
+            {% csrf_token %}<input type="hidden" name="action" value="add_plain_photo">
+            <div class="t">🖼 Photo (plain background)</div>
+            <div class="why">No mat needed — piece flat on a plain table, margin all around, tape BESIDE the piece. Your tape numbers are the scale.</div>
+            <input type="file" name="evidence_file" accept="image/*" required>
+            <select name="view" style="width:100%;margin-top:4px;">
+              <option value="top_full">Top — full piece</option>
+              <option value="folded">Folded</option>
+              <option value="closeup">Close-up</option>
+              <option value="edge">Edge</option>
+              <option value="corner">Corner</option>
+              <option value="reference">Reference</option>
+              <option value="other">Other</option>
+            </select>
+            <div id="m-rows">
+              <div class="m-row"><input name="m_name" placeholder="width" list="m-names"><input name="m_mm" inputmode="decimal" placeholder="mm"></div>
+              <div class="m-row"><input name="m_name" placeholder="height" list="m-names"><input name="m_mm" inputmode="decimal" placeholder="mm"></div>
+            </div>
+            <datalist id="m-names">
+              <option value="width"></option><option value="height"></option>
+              <option value="diagonal"></option><option value="waist"></option>
+              <option value="hip"></option><option value="bottom"></option>
+            </datalist>
+            <button type="button" id="m-add" class="btn btn-ghost" style="min-height:30px;font-size:11px;">＋ measurement</button>
+            <div class="why">width + height (mm) are needed before Build — any other tape number becomes a cross-check.</div>
+            <button type="submit">Add photo to the evidence set</button>
+          </form>
+          <form class="add-block" method="post" enctype="multipart/form-data">
+            {% csrf_token %}<input type="hidden" name="action" value="add_dxf">
+            <div class="t">DXF file</div>
+            <input type="file" name="evidence_file" accept=".dxf" required>
+            <button type="submit">Add DXF evidence</button>
+          </form>
+          <form class="add-block" method="post" enctype="multipart/form-data">
+            {% csrf_token %}<input type="hidden" name="action" value="add_svg">
+            <div class="t">SVG file</div>
+            <input type="file" name="evidence_file" accept=".svg" required>
+            <button type="submit">Add SVG evidence</button>
+          </form>
+          <form class="add-block" method="post">
+            {% csrf_token %}<input type="hidden" name="action" value="add_dims">
+            <div class="t">Manual dimensions</div>
+            <input type="number" name="width_mm" step="0.1" min="1" placeholder="width mm" required>
+            <input type="number" name="height_mm" step="0.1" min="1" placeholder="height mm" required>
+            <button type="submit">Construct starting shape</button>
+          </form>
+          {# honest-unavailable slots (ladder rule — they say why) #}
+          <div class="add-block off"><div class="t">PDF / PNG</div>
+            <div class="why">arrives with a later runtime upgrade — use DXF, SVG or a mat photo.</div></div>
+          <div class="add-block off"><div class="t">AI service</div>
+            <div class="why">no external AI service is configured yet.</div></div>
+        </div>
+      </details>
+
+      {% for e in stack %}
+        <div class="ev">
+          <div class="k">
+            {% if e.ev.kind == 'photo' %}📷{% elif e.ev.kind == 'photo_plain' %}🖼{% elif e.ev.kind == 'dxf' %}📐{% elif e.ev.kind == 'svg' %}🖋{% else %}✎{% endif %}
+            {{ e.ev.get_kind_display }} <span style="font-weight:400;color:var(--stone);">#{{ e.ev.pk }}</span>
+          </div>
+          <div class="s {{ e.ev.status }}">
+            {% if e.ev.status == 'proposed' %}proposal ready{% if e.proposal.status != 'proposed' %} · {{ e.proposal.get_status_display }}{% endif %}
+            {% elif e.ev.status == 'refused' %}refused — {{ e.ev.refusal_reason }}
+            {% else %}received{% endif %}
+          </div>
+          {% if e.view %}
+            {% if e.ev.file %}<img class="ev-thumb" src="{{ e.ev.file.url }}" alt="evidence {{ e.ev.pk }}" loading="lazy">{% endif %}
+            <div class="m-chips"><span class="m-chip v">{{ e.view }}</span>
+              {% for m in e.measurements %}<span class="m-chip">{{ m.name }} {{ m.mm }}mm</span>{% endfor %}
+            </div>
+          {% endif %}
+          {% if e.confidence and e.confidence.overall %}
+            <div class="conf">confidence {{ e.confidence.overall }} · {{ e.confidence.label }} <span title="display only — never auto-accepts">ⓘ</span></div>
+          {% endif %}
+          {% if e.stats %}<div class="conf">{{ e.stats.w_mm }}×{{ e.stats.h_mm }} mm · {{ e.stats.vertices }} pts</div>{% endif %}
+          {% if e.proposal and e.proposal.geometry %}
+            <div class="row-acts">
+              <a href="?proposal={{ e.proposal.pk }}">View</a>
+              <label style="font-size:11px;display:inline-flex;align-items:center;gap:4px;">
+                <input type="checkbox" class="cmp-box" value="{{ e.proposal.pk }}"> compare</label>
+              {% if e.proposal.status == 'proposed' %}
+                <form method="post" style="display:inline;">{% csrf_token %}
+                  <input type="hidden" name="action" value="use_proposal">
+                  <input type="hidden" name="proposal" value="{{ e.proposal.pk }}">
+                  <button type="submit" class="use">Use this proposal</button>
+                </form>
+                <button type="button" class="rej-btn" data-p="{{ e.proposal.pk }}">Reject…</button>
+              {% endif %}
+            </div>
+          {% endif %}
+        </div>
+      {% empty %}
+        <p style="font-size:12px;color:var(--stone);">The stack is empty — add the first evidence above, or send a photo from the phone.</p>
+      {% endfor %}
+      <button type="button" id="cmp-go" class="btn btn-ghost" style="width:100%;margin-top:4px;min-height:38px;">Compare selected</button>
+
+      {% if plain_photos %}
+        {# M8 owner-frozen step: Build Geometry From Evidence — ONE proposal from the whole set #}
+        <div class="build-box">
+          <h2>Build geometry from evidence</h2>
+          <p style="font-size:11px;color:var(--stone);margin:0 0 6px;">Pick the PRIMARY photo (full piece, margin all around, tape beside it). Every stated measurement in the set becomes scale or a cross-check.</p>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="build_from_evidence">
+            {% for e in plain_photos %}
+              <label class="prim-row">
+                <input type="radio" name="primary" value="{{ e.ev.pk }}" {% if forloop.first %}checked{% endif %}>
+                #{{ e.ev.pk }} · {{ e.view }}{% if e.measurements %} · {{ e.measurements|length }} measurement{{ e.measurements|length|pluralize }}{% endif %}
+              </label>
+            {% endfor %}
+            <button type="submit" class="use" style="width:100%;margin-top:6px;min-height:38px;">📐 Build geometry from evidence</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    {# ══ CENTER · PROPOSAL CANVAS + COMPARE ══ #}
+    <div class="pane center canvas-card">
+      {% if compare_svg %}
+        <h2>Compare — {{ compare_rows|length }} proposals overlaid</h2>
+        {{ compare_svg|safe }}
+        <table class="cmp-table">
+          <tr><th></th><th>source</th><th>w×h mm</th><th>area cm²</th><th>pts</th><th>conf.</th></tr>
+          {% for c in compare_rows %}
+            <tr><td><span class="dot" style="background:{{ c.color }};"></span></td>
+              <td>{{ c.confidence.label }} #{{ c.p.pk }}</td>
+              <td>{{ c.stats.w_mm }}×{{ c.stats.h_mm }}</td>
+              <td>{{ c.stats.area_cm2 }}</td><td>{{ c.stats.vertices }}</td>
+              <td>{{ c.confidence.overall|default:'—' }}</td></tr>
+          {% endfor %}
+        </table>
+        <p style="font-size:11.5px;color:var(--stone);margin-top:8px;">Pick ONE with “Use this proposal” — comparison informs, it never auto-selects.</p>
+      {% elif canvas_svg %}
+        <h2>Proposal #{{ selected.pk }} · {{ sel_confidence.label }}</h2>
+        {{ canvas_svg|safe }}
+        {% if selected.status == 'proposed' %}
+          <p style="font-size:11.5px;color:var(--stone);">Review the outline against the real piece, then accept it into the working draft (one-shot decision).</p>
+        {% endif %}
+      {% elif this_draft_row %}
+        <h2>Working draft v{{ draft.version_no }}</h2>
+        <div class="canvas-empty">Draft geometry for this size exists — refine it in the outline editor (inspector →), then Verify &amp; Publish.</div>
+      {% else %}
+        <div class="canvas-empty">No proposal selected. Add evidence on the left — every source becomes a reviewable proposal on the same contract.</div>
+      {% endif %}
+    </div>
+
+    {# ══ RIGHT · INSPECTOR ══ #}
+    <div class="pane">
+      <h2>Inspector</h2>
+      <div class="meta-chips">
+        <span>{{ piece.get_fabric_group_display }}</span>
+        <span>grain {{ piece.get_grain_rule_display }}</span>
+        {% if piece.is_pair %}<span>pair</span>{% endif %}
+        {% if piece.on_fold %}<span>fold</span>{% endif %}
+        {% if piece.is_optional %}<span>optional</span>{% endif %}
+        {% if piece.expected_notches is not None %}
+          <span>notches {{ actual_notches|default:0 }}/{{ piece.expected_notches }} expected</span>
+        {% endif %}
+        {% if piece.seam_allowance_mm %}<span>seam {{ piece.seam_allowance_mm }} mm</span>{% endif %}
+      </div>
+
+      {% if has_fold_edge %}
+        <div class="insp-line"><b>Fold:</b> fold edge marked ⇋ — fold-capable pattern</div>
+      {% endif %}
+
+      {# M4.5 R2-C — one-shot capability proposals (deterministic; the expert owns the answer) #}
+      {% if fold_proposal %}
+        <div class="conf-panel" style="border-color:#0d9488;">
+          <h2 style="margin-bottom:4px;">Fold edge detected — proposal</h2>
+          <div class="insp-line">This piece is marked ON FOLD in the Blueprint.
+            A vertical fold edge was found (match {{ fold_proposal.match_pct }} — display only).</div>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="accept_fold_edge">
+            <input type="hidden" name="fold_edge" value='{"p1_um": [{{ fold_proposal.p1_um.0 }}, {{ fold_proposal.p1_um.1 }}], "p2_um": [{{ fold_proposal.p2_um.0 }}, {{ fold_proposal.p2_um.1 }}]}'>
+            <button type="submit" class="btn btn-ghost" style="width:100%;">✓ Accept fold edge</button>
+          </form>
+          <div class="insp-line" style="color:var(--stone);">or mark it yourself in the outline editor (⇋ Fold edge).</div>
+        </div>
+      {% elif symmetry_proposal %}
+        <details class="conf-panel" style="border-color:#0d9488;">
+          <summary style="cursor:pointer;font-size:12px;font-weight:800;color:#0d9488;">Is this a HALF pattern (cut on fold)?</summary>
+          <div class="insp-line">A straight vertical edge was found. If the
+            physical cardboard is a half-pattern whose fold line is that
+            edge, mark it fold-capable — asked once, permanent knowledge.
+            (Only you can tell — a pocket has straight edges too.)</div>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="mark_fold_capable">
+            <input type="hidden" name="fold_edge" value='{"p1_um": [{{ symmetry_proposal.p1_um.0 }}, {{ symmetry_proposal.p1_um.1 }}], "p2_um": [{{ symmetry_proposal.p2_um.0 }}, {{ symmetry_proposal.p2_um.1 }}]}'>
+            <button type="submit" class="btn btn-ghost" style="width:100%;">✓ Yes — mark fold-capable</button>
+          </form>
+        </details>
+      {% endif %}
+
+      {% if confirmed_row %}
+        <div class="insp-line"><b>Published:</b> v{{ confirmed.version_no }} · {{ confirmed_row.get_trust_grade_display }}</div>
+      {% else %}
+        <div class="insp-line"><b>Published:</b> nothing yet for {{ size.label }}</div>
+      {% endif %}
+      {% if this_draft_row %}
+        <div class="insp-line"><b>Draft:</b> v{{ draft.version_no }} · {{ this_draft_row.stats.w_mm }}×{{ this_draft_row.stats.h_mm }} mm</div>
+        <a class="btn btn-ghost" style="width:100%;text-align:center;margin:6px 0;" href="{% url 'patterns_ai:geometry-edit' this_draft_row.row.pk %}">Refine outline (editor)</a>
+      {% elif confirmed_row and not draft %}
+        <form method="post">{% csrf_token %}
+          <input type="hidden" name="action" value="start_next_version">
+          <button type="submit" class="btn btn-ghost" style="width:100%;margin:6px 0;">Reopen in Studio (new version, copy-forward)</button>
+        </form>
+      {% endif %}
+
+      {% if sel_confidence %}
+        <div class="conf-panel">
+          <h2 style="margin-bottom:4px;">Confidence — display only</h2>
+          <div class="big">{{ sel_confidence.overall|default:'—' }}</div>
+          <div class="insp-line">{{ sel_confidence.label }} — informs your choice; never a gate, never auto-accepts.</div>
+        </div>
+      {% endif %}
+
+      {% if sel_cross_checks %}
+        {# M8: stated tape vs extracted outline — advisory, the human judges #}
+        <div class="conf-panel">
+          <h2 style="margin-bottom:4px;">Tape cross-checks</h2>
+          <table class="xchk">
+            <tr><th>tape</th><th>stated</th><th>outline</th><th>Δ mm</th></tr>
+            {% for c in sel_cross_checks %}
+              <tr><td>{{ c.name }}</td><td>{{ c.stated }}</td>
+                <td>{{ c.derived|default:'—' }}</td>
+                <td>{% if c.derived %}{{ c.delta_mm }}{% else %}stated only{% endif %}</td></tr>
+            {% endfor %}
+          </table>
+          <div class="insp-line">Outline width/height land ON your tape by construction; the diagonal is the honest disagreement signal. Judge against the photo.</div>
+        </div>
+      {% endif %}
+
+      {# Verify & Publish (tape dialog §2.4 — confirms the WHOLE draft, honestly listed) #}
+      {% if draft and draft_rows %}
+        <div class="publish-box">
+          <h2>Verify &amp; Publish — draft v{{ draft.version_no }}</h2>
+          <p style="font-size:11px;color:var(--stone);margin:0 0 6px;">Publishing confirms every size on this draft (versions are piece-level). Tape ±2 mm gate; matching tape ⇒ trust “measured”.</p>
+          <form method="post">{% csrf_token %}
+            <input type="hidden" name="action" value="publish">
+            {% for d in draft_rows %}
+              <div class="rowline" {% if d.is_this %}style="font-weight:800;"{% endif %}>
+                {{ d.row.size.label }} · {{ d.stats.w_mm }}×{{ d.stats.h_mm }} mm
+                <br>grain° <input name="grain_{{ d.row.size_id }}" value="{{ d.grain_deg }}" inputmode="decimal">
+                tape w <input name="tape_w_{{ d.row.size_id }}" inputmode="decimal" placeholder="mm">
+                h <input name="tape_h_{{ d.row.size_id }}" inputmode="decimal" placeholder="mm">
+              </div>
+            {% endfor %}
+            <button type="submit">✓ Verify &amp; Publish</button>
+          </form>
+        </div>
+      {% endif %}
+
+      {# phone hand-off (§2.5): the ONE mobile-native Studio step #}
+      <details style="margin-top:12px;" id="qr-details">
+        <summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--copper);">📱 Capture on the phone…</summary>
+        <div class="qr-panel">
+          {% if qr_svg %}{{ qr_svg|safe }}{% endif %}
+          <div class="lnk">{{ capture_url }}</div>
+          <p style="font-size:11px;color:var(--stone);">Lay the piece FLAT on the commissioned mat — whole piece + mat border in frame. The stack refreshes here when the phone uploads.</p>
+        </div>
+      </details>
+
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;font-size:13px;font-weight:800;color:var(--copper);">Reference image…</summary>
+        {% if piece.reference_image_id %}
+          <p style="font-size:11px;color:var(--stone);">Reference set (display-only — never a geometry source).</p>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">{% csrf_token %}
+          <input type="hidden" name="action" value="set_reference">
+          <input type="file" name="reference" accept="image/*" style="font-size:11px;width:100%;margin:6px 0;">
+          <button type="submit" class="btn btn-ghost" style="width:100%;">Set reference</button>
+        </form>
+      </details>
+    </div>
+  </div>
+</div>
+
+{# reject dialog + compare builder + evidence poll — session-only UI glue #}
+<form method="post" id="rej-form" style="display:none;">{% csrf_token %}
+  <input type="hidden" name="action" value="reject_proposal">
+  <input type="hidden" name="proposal" id="rej-id">
+  <input type="hidden" name="reason" id="rej-reason">
+</form>
+<script>
+(function () {
+  'use strict';
+  document.querySelectorAll('.rej-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var why = prompt('Reject this proposal — reason (recorded):');
+      if (!why) return;
+      document.getElementById('rej-id').value = b.dataset.p;
+      document.getElementById('rej-reason').value = why;
+      document.getElementById('rej-form').submit();
+    });
+  });
+  var go = document.getElementById('cmp-go');
+  if (go) go.addEventListener('click', function () {
+    var ids = Array.prototype.map.call(
+      document.querySelectorAll('.cmp-box:checked'),
+      function (c) { return c.value; });
+    if (ids.length < 2) { alert('tick two or more proposals to compare.'); return; }
+    var u = new URL(window.location.href);
+    u.searchParams.set('compare', ids.join(','));
+    window.location.href = u.toString();
+  });
+  // M8: extra tape-measurement rows on the plain-photo form
+  var mAdd = document.getElementById('m-add');
+  if (mAdd) mAdd.addEventListener('click', function () {
+    var row = document.createElement('div');
+    row.className = 'm-row';
+    row.innerHTML = '<input name="m_name" placeholder="name" list="m-names">'
+                  + '<input name="m_mm" inputmode="decimal" placeholder="mm">';
+    document.getElementById('m-rows').appendChild(row);
+  });
+  // phone hand-off poll: reload when the stack grows (freeze §2.5 "live")
+  var qr = document.getElementById('qr-details');
+  var base = {{ evidence_count }};
+  if (qr) setInterval(function () {
+    if (!qr.open) return;
+    fetch('{% url "patterns_ai:studio-evidence-count" piece.pk size.pk %}')
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.count > base) window.location.reload(); })
+      .catch(function () {});
+  }, 5000);
+})();
+</script>
+{% endblock %}

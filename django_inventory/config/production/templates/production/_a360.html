@@ -1,0 +1,141 @@
+{% comment %}
+A360 — the per-Adda management overview (plan v2, 2026-07-05). READ-ONLY.
+Rendered ONLY when ctx carries `a360` (management-gated in the view — workers
+never receive the data; this include is inert without it). Stage-generic:
+every row iterates handler/flow data — NO stage names in this template.
+Mobile-first single column (rule 11); page-scoped styles (rule 10).
+{% endcomment %}
+{% if a360 %}
+<div class="a360">
+    <div class="a360-head">
+        <h2>Adda 360 <span class="a360-tag">management overview</span></h2>
+        <div class="a360-pct">{{ a360.progress_done }}/{{ a360.progress_total }} stages · {{ a360.progress_pct }}%</div>
+    </div>
+
+    {# ── Stage Progress + Health (🔴 = THE single stalled predicate) ── #}
+    <div class="a360-chips">
+        {% if a360.category_progress %}
+        {# R10-B: category rollup — one chip per business process (flat chips return on single-category flows) #}
+        {% for c in a360.category_progress %}
+        <span class="a360-chip {% if c.active %}a360-active{% elif c.done == c.total %}a360-done{% else %}a360-pending{% endif %}">
+            {% if c.done == c.total %}✅{% elif c.active %}🟡{% else %}⚪{% endif %}
+            {{ c.label }} {{ c.done }}/{{ c.total }}
+        </span>
+        {% endfor %}
+        {% else %}
+        {% for p in a360.progress %}
+        <span class="a360-chip a360-{{ p.health }}">
+            {% if p.health == 'done' %}✅{% elif p.health == 'active' %}🟡{% elif p.health == 'blocked' %}🔴{% else %}⚪{% endif %}
+            {{ p.label }}
+        </span>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    {# ── Money strip ── #}
+    <div class="a360-strip">
+        <div class="a360-stat"><span class="l">Expected (uncredited)</span><strong>₹{{ a360.expected_uncredited }}</strong></div>
+        <div class="a360-stat"><span class="l">Settled</span><strong>₹{{ a360.settled_total }}</strong></div>
+        <div class="a360-stat"><span class="l">Standard labor</span><strong>₹{{ a360.std_labor }}</strong></div>
+        <div class="a360-stat"><span class="l">Variance (std − actual)</span><strong>₹{{ a360.variance }}</strong></div>
+    </div>
+
+    {% comment %}Mobile-density lock (owner 2026-07-05): summaries first —
+    the strip + chips above are the always-visible scan layer; every section
+    below is COLLAPSED by default and its summary line alone answers the
+    business question. Details are one tap away, never repeated.{% endcomment %}
+    {# ── Cost panel (ADR-0009 duality, correctly labeled — P-COST) ── #}
+    <details class="a360-sec">
+        <summary>Cost per stage <small class="muted">std ₹{{ a360.std_labor }} · settled ₹{{ a360.settled_total }} — never added (ADR-0009)</small></summary>
+        {% for r in a360.cost_rows %}
+        <div class="a360-row">
+            <span>{{ r.label }} <small class="muted">{{ r.method }}</small></span>
+            <span>std {% if r.cost is None %}<em class="muted">unpriced</em>{% else %}₹{{ r.cost }}{% endif %}
+                  · settled ₹{{ r.settled }}
+                  {% if r.recon and r.recon != 'ok' %}<span class="a360-flag">{{ r.recon }}</span>{% endif %}</span>
+        </div>
+        {% endfor %}
+        <div class="a360-row a360-foot">
+            <span>Full cost (ADR-0009)</span>
+            <span>{% if a360.has_material %}material ₹{{ a360.material_net }} <small class="muted">(net of remnant ₹{{ a360.material_remnant }})</small>{% if a360.material_unpriced_rolls %} <span class="a360-flag">{{ a360.material_unpriced_rolls }} unpriced roll{{ a360.material_unpriced_rolls|pluralize }} — incomplete</span>{% endif %}{% else %}<em class="muted">material: not priced</em>{% endif %}
+                  + actual ₹{{ a360.settled_total }} + non-payable processing ₹{{ a360.nonpayable_priced }}
+                  = <strong>₹{{ a360.full_cost }}</strong>{% if a360.cost_per_garment %} <small class="muted">· ₹{{ a360.cost_per_garment }} / garment ({{ a360.garment_sets }} sets)</small>{% endif %}</span>
+        </div>
+    </details>
+
+    {# ── Worker board: Progress FIRST, then Contribution ── #}
+    <details class="a360-sec">
+        <summary>Workers <small class="muted">{{ a360.workers_count }} on this Adda · {{ a360.active_count }} with open tasks</small></summary>
+        {% for st in a360.board %}
+        <div class="a360-stage">
+            <div class="a360-stage-head">{{ st.label }}
+                <small class="muted">assigned {{ st.counts.assigned }} · active {{ st.counts.in_progress }} · completed {{ st.counts.completed }}{% if st.counts.verified %} · verified {{ st.counts.verified }}{% endif %}</small>
+            </div>
+            {% for w in st.workers %}
+            <div class="a360-row">
+                <span>{{ w.worker.get_full_name|default:w.worker.email }}
+                    <span class="a360-status a360-st-{{ w.status }}">{{ w.status_display }}</span>
+                    {% if w.is_monthly %}<span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span>{% endif %}</span>
+                <span>{{ w.reported|floatformat:"-2" }} {{ st.unit }}{% if w.verified %} · verified {{ w.verified|floatformat:"-2" }}{% endif %}{% if w.share_pct %} · {{ w.share_pct }}% of stage{% endif %}{% if w.expected is not None and w.expected > 0 %} · exp ₹{{ w.expected }}{% endif %}{% if w.settled_lines %} · {{ w.settled_lines }} settled{% endif %}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% empty %}
+        <div class="a360-row muted">No worker activity yet.</div>
+        {% endfor %}
+        {% if a360.workers_rollup %}
+        <div class="a360-stage">
+            <div class="a360-stage-head">Per-worker (this Adda) <small class="muted">quantities stay per-stage — units differ across stages</small></div>
+            {% for w in a360.workers_rollup %}
+            <div class="a360-row">
+                <span>{{ w.worker.get_full_name|default:w.worker.email }}{% if w.is_monthly %} <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span>{% endif %}</span>
+                <span>{% if w.active_stage %}active: {{ w.active_stage }} ({{ w.active_status }}){% else %}no open task{% endif %} · stages: {{ w.stages|join:", " }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="a360-links"><a href="{% url 'production:adda-report-review' adda.code %}">Review &amp; correct quantities →</a></div>
+    </details>
+
+    {# ── Stage Timeline (filtered existing AddaHistory; full log linked) ── #}
+    <details class="a360-sec">
+        <summary>Stage timeline <small class="muted">{{ a360.timeline_count }} event{{ a360.timeline_count|pluralize }}</small></summary>
+        {% for ev in a360.timeline %}
+        <div class="a360-row">
+            <span>{{ ev.created_at|date:"d M H:i" }} · {{ ev.get_change_type_display }}
+                {% if ev.stage_from %}<small class="muted">{{ ev.stage_from.stage.name }}{% if ev.stage_to %} → {{ ev.stage_to.stage.name }}{% endif %}</small>{% endif %}</span>
+            <span class="muted">{{ ev.actor.get_full_name|default:ev.actor.email }}</span>
+        </div>
+        {% empty %}
+        <div class="a360-row muted">No stage events yet.</div>
+        {% endfor %}
+        <div class="a360-links"><a href="{% url 'tracking:adda-history' adda.code %}">Full history →</a></div>
+    </details>
+</div>
+<style>
+    /* A360 — page-scoped (rule 10), mobile-first. */
+    .a360 { background: var(--card-bg, #fff); border: 1px solid var(--border-card, #cfc0aa); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+    .a360-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .a360-head h2 { margin: 0; font-size: 17px; }
+    .a360-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--stone); font-weight: 600; }
+    .a360-pct { font-weight: 700; font-size: 13px; }
+    .a360-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+    .a360-chip { border: 1px solid var(--border-subtle); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; background: var(--cream); min-height: 30px; display: inline-flex; align-items: center; gap: 4px; }
+    .a360-blocked { border-color: #fca5a5; background: #fef2f2; }
+    .a360-active { border-color: #f6ce8f; background: #fffbeb; }
+    .a360-strip { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+    .a360-stat { background: var(--cream-2); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 8px 12px; min-width: 130px; }
+    .a360-stat .l { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--stone); }
+    .a360-sec { border-top: 1px dashed var(--border-subtle); padding: 8px 0; }
+    .a360-sec summary { cursor: pointer; font-weight: 700; font-size: 13px; min-height: 32px; display: flex; align-items: center; }
+    .a360-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px dashed var(--border-subtle); font-size: 13px; flex-wrap: wrap; }
+    .a360-row:last-child { border-bottom: 0; }
+    .a360-foot { font-weight: 600; }
+    .a360-stage { margin: 8px 0; }
+    .a360-stage-head { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+    .a360-status { font-size: 11px; border-radius: 999px; padding: 1px 8px; background: var(--cream-2); border: 1px solid var(--border-subtle); }
+    .a360-flag { font-size: 11px; color: #b45309; background: #fffbeb; border: 1px solid #f6ce8f; border-radius: 999px; padding: 1px 8px; }
+    .a360-links { margin-top: 6px; font-size: 13px; }
+    .a360 .muted { color: var(--stone); }
+</style>
+{% endif %}

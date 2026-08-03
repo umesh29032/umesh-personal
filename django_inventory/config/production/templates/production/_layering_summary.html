@@ -38,14 +38,15 @@ Renders nothing if state == 'absent'.
     {% endif %}
 {% elif snap.state == 'completed' %}
     {% if style == 'compact' %}
-        <span class="ls-pill ls-done">✓ {{ snap.lay_count }} layers · {{ snap.layer_length }} m · {{ snap.duration_min }} min{% if snap.total_fabric_used %} · {{ snap.total_fabric_used|floatformat:2 }} m fabric{% endif %}</span>
+        {# legacy/fixture records can miss numbers — never print a literal "None" #}
+        <span class="ls-pill ls-done">✓ Done{% if snap.lay_count %} · {{ snap.lay_count }} layers{% endif %}{% if snap.layer_length %} · {{ snap.layer_length }} m{% endif %}{% if snap.duration_min %} · {{ snap.duration_min }} min{% endif %}{% if snap.total_fabric_used %} · {{ snap.total_fabric_used|floatformat:2 }} m fabric{% endif %}</span>
     {% else %}
         <div class="ls-card ls-done-card">
             <div class="ls-card-title">Layering — Completed {{ snap.completed_at|date:"d M Y H:i" }}{% if snap.completed_by %} by {{ snap.completed_by.get_full_name|default:snap.completed_by.email }}{% endif %}</div>
             <div class="ls-card-grid">
-                <div><span class="lbl">Lay Count</span><span class="val">{{ snap.lay_count }}</span></div>
-                <div><span class="lbl">Layer Length</span><span class="val">{{ snap.layer_length }} m</span></div>
-                <div><span class="lbl">Duration</span><span class="val">{{ snap.duration_min }} min</span></div>
+                <div><span class="lbl">Lay Count</span><span class="val">{{ snap.lay_count|default:"—" }}</span></div>
+                <div><span class="lbl">Layer Length</span><span class="val">{% if snap.layer_length %}{{ snap.layer_length }} m{% else %}—{% endif %}</span></div>
+                <div><span class="lbl">Duration</span><span class="val">{% if snap.duration_min %}{{ snap.duration_min }} min{% else %}—{% endif %}</span></div>
                 <div><span class="lbl">Total Colors</span><span class="val">{{ snap.total_colors }}</span></div>
                 <div><span class="lbl">Rolls Used</span><span class="val">{{ snap.rolls_count }}</span></div>
                 <div><span class="lbl">Total Fabric Used</span><span class="val">{% if snap.total_fabric_used %}{{ snap.total_fabric_used|floatformat:2 }} m{% else %}—{% endif %}</span></div>

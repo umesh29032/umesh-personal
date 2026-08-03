@@ -1,3 +1,13 @@
+---
+id: production-layering-stage
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Stage 1 — Layering
 
 Reference doc for the Layering stage. Covers data model, save paths, completion handler, and where every piece of data lives.
@@ -225,7 +235,6 @@ Inside `@transaction.atomic`:
 | `record_remaining_cloth` | (Internal) extra leftover piece | entry, weight, length | New `RemainingClothOfClothRoll` row |
 | `remove_remaining_cloth` | × button on leftover badge | leftover | Delete (blocked if `is_consumed`) |
 | `complete_layering` | Section 04 "Complete" button | adda, duration, layer_length, per_entry_layers | LayeringRecord + roll denorm + advance |
-| `sync_layering_workers_for_skill` | accounts signal `m2m_changed` | user | Adds user to all active Layering `workers` M2M |
 
 All services are `@transaction.atomic`. All raise `ValidationError` / `PermissionDenied` — never silent returns.
 

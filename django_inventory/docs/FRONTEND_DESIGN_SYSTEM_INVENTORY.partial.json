@@ -1,0 +1,1606 @@
+[
+ {
+  "file": "config/accounts/templates/accounts/forgot_password.html",
+  "extends_base": false,
+  "page_class": ".card",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 47,
+  "form_system": "field",
+  "validation_display": "messages loop (.alert .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "1 input type=email (work email); plus hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "none"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-cta (dark ink submit) + 2 text links (.back-link/.form-link); not base .btn"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "local .field form system (own copy, not accounts/_user_form_styles.html partial)",
+   "local .alert/.alert-error/.alert-success/.alert-info duplicating base .msg messaging component",
+   "local .btn-cta duplicating base .btn/.btn-copper",
+   "local .card duplicating base .card",
+   "standalone HTML doc \u2014 does NOT extend base.html (no shared tokens/fancify)"
+  ],
+  "canonical_candidate_notes": "Clean copper/cream auth-card aesthetic shared across all 8 auth pages; the auth visual system (card-accent gradient, monogram, .field, .btn-cta) is the de-facto auth design language but is copy-pasted per file \u2014 strong candidate for a single accounts/_auth_base.html the standalone auth pages could extend."
+ },
+ {
+  "file": "config/accounts/templates/accounts/home.html",
+  "extends_base": true,
+  "page_class": "none",
+  "style_only_partial": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "form_system": "none",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "no form inputs"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables; Recent Activity is a div not a table"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 4,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "none"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "4 Quick-Action buttons styled fully via inline style= attrs (white card buttons w/ inline onmouseover hover) \u2014 not base .btn; tabs are bare <a> links"
+  },
+  "empty_state": true,
+  "duplicate_implementations": [
+   "4 Quick-Action <button> with inline style= + inline JS hover handlers, duplicating base .btn/.card (hardcoded #e5e7eb / #3b82f6 \u2014 OFF the copper/cream token palette)",
+   "Recent Activity panel built with inline-style div (background/padding/border-radius/box-shadow hardcoded) instead of base .card/.panel",
+   "empty-state hand-built with inline-style div text, not base .empty-state",
+   "placeholder/demo content: hardcoded KPI numbers (128/92/6/\u20b92.4L), dead-link tabs (#), non-functional action buttons \u2014 appears to be an unwired mockup/dashboard stub"
+  ],
+  "canonical_candidate_notes": "Uses base.html .kpi component correctly (4 .kpi cards) \u2014 that part is on-system; remainder is inline-styled mockup that should be rebuilt on .card/.btn/.empty-state tokens."
+ },
+ {
+  "file": "config/accounts/templates/accounts/login.html",
+  "extends_base": false,
+  "page_class": ".page (split .left/.right + .form-shell)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 300,
+  "form_system": "field",
+  "validation_display": "messages loop (.alert-item .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "1 input type=email (work email); plus hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "none"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-cta (ink submit) + local .btn-google (white SSO w/ inline svg + onclick redirect); not base .btn"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "local .field system (own copy, WCAG-hardened: input border #b8a48e, label #2e2620) \u2014 diverges from both base and the sibling auth pages' lighter --cream-2 borders",
+   "local .alert-item/.alert-* duplicating base .msg",
+   "local .btn-cta + .btn-google duplicating base .btn/.btn-copper/.btn-ghost",
+   "split-screen .page/.left/.right/.form-shell brand layout duplicated near-verbatim in login_password.html and (partially) signup.html",
+   "standalone HTML doc \u2014 does NOT extend base.html",
+   "onclick=window.location.href inline handler on Google button"
+  ],
+  "canonical_candidate_notes": "Most-polished/most-accessible variant of the split-screen auth layout (explicit WCAG contrast comments, autofill suppression, :not(:placeholder-shown) filled state). This is the canonical auth source-of-truth to promote into a shared accounts/_auth_base.html that login_password/signup extend."
+ },
+ {
+  "file": "config/accounts/templates/accounts/login_password.html",
+  "extends_base": false,
+  "page_class": ".page (split .left/.right + .form-shell)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 152,
+  "form_system": "field",
+  "validation_display": "messages loop (.alert .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "2 inputs: type=email (username) + type=password; prefill_email value; plus hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "none"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-cta (ink submit) + .field-row Forgot-password text link; no Google button here"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "split-screen .page/.left/.right/.form-shell layout duplicated from login.html (lighter --cream-2 input borders here vs login.html's hardened #b8a48e \u2014 visual drift between the two)",
+   "local .field system duplicating base + sibling auth pages",
+   "local .alert/.alert-* duplicating base .msg",
+   "local .btn-cta duplicating base .btn",
+   "standalone HTML doc \u2014 does NOT extend base.html",
+   "Syne font used as input font-family here vs Inter on login.html \u2014 inconsistent input typography across auth set"
+  ],
+  "canonical_candidate_notes": "Near-identical twin of login.html minus Google SSO; the divergence (input borders, input font) is exactly the kind of drift a shared _auth_base.html would eliminate."
+ },
+ {
+  "file": "config/accounts/templates/accounts/otp.html",
+  "extends_base": false,
+  "page_class": ".card (centered)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 293,
+  "form_system": "none (custom OTP digit inputs, not .field)",
+  "validation_display": "messages loop (.alert .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 6,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "6 single-char .otp-digit type=text inputmode=numeric maxlength=1 (JS-synced) + 1 hidden otp + hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": true,
+   "notes": "step-progress chips (.steps .step.done/.active/.idle) \u2014 local 3-step indicator, not a base badge/chip"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-verify (disabled-until-6-digits, .ready=copper) + .back-link + .resend-link text links"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "bespoke 6-box .otp-digit input component + ~60-line vanilla JS controller (input/keydown/paste/autofocus/countdown) duplicated near-verbatim in reset_otp.html and signup_otp.html \u2014 3 copies of the same OTP widget",
+   "local .alert/.alert-* duplicating base .msg",
+   "local .btn-verify duplicating base .btn (+ copper-ready state)",
+   "local .card + .step progress indicator",
+   "standalone HTML doc \u2014 does NOT extend base.html"
+  ],
+  "canonical_candidate_notes": "The 6-digit OTP input widget (markup + JS: paste-fill, backspace nav, auto-advance, auto-submit at 6, 60s resend countdown, \u2264360px collapses separator) is genuinely reusable and well-built \u2014 top candidate to extract into a shared partial (e.g. accounts/_otp_widget.html) consumed by otp/reset_otp/signup_otp."
+ },
+ {
+  "file": "config/accounts/templates/accounts/reset_otp.html",
+  "extends_base": false,
+  "page_class": ".card (centered)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 57,
+  "form_system": "field (+ custom OTP digits)",
+  "validation_display": "messages loop (.alert .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 6,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "6 .otp-digit type=text + 1 type=password (new password) + hidden otp + hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": true,
+   "notes": "step-progress chips (.steps .step.done/.active/.idle) 3-step (done/done/active); local, not base"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-cta (ink submit, no disabled-gating here) + .form-link text link"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "6-box .otp-digit widget + JS controller duplicated from otp.html (here without auto-submit/countdown \u2014 drift)",
+   "local .field system (password input) duplicating base + sibling auth pages",
+   "local .alert/.alert-* duplicating base .msg",
+   "local .btn-cta duplicating base .btn",
+   "local .card + .step progress indicator",
+   "standalone HTML doc \u2014 does NOT extend base.html"
+  ],
+  "canonical_candidate_notes": "Combines the OTP widget with a .field password input in one card \u2014 shows the shared OTP partial must be composable with normal fields; reinforces extracting both _auth_base.html and _otp_widget.html."
+ },
+ {
+  "file": "config/accounts/templates/accounts/signup.html",
+  "extends_base": false,
+  "page_class": ".page (split .left/.right + .form-shell)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 150,
+  "form_system": "field (Django-rendered widgets {{form.x}} wrapped in .field)",
+  "validation_display": "form.errors loop (per-field {{field.label}}: {{error}} + form.non_field_errors) rendered as .alert.alert-error",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects (form has no choice fields)"
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "3 form-rendered inputs ({{form.email}}/{{form.password}}/{{form.confirm_password}}) \u2014 types set by the Django form widget, markup not literal in template; plus hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "none"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-cta (ink submit) + .form-links text link; .divider hairline rule"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "split-screen .page/.left/.right/.form-shell brand layout duplicated from login.html/login_password.html (42% left flex here vs 55% \u2014 drift)",
+   "local .field system duplicating base + sibling auth pages; relies on {{form.x}} widget attrs matching .field input CSS (no explicit class on the inputs)",
+   "local .alert/.alert-* duplicating base .msg",
+   "local .btn-cta duplicating base .btn",
+   "standalone HTML doc \u2014 does NOT extend base.html",
+   "template is for self-signup which is disabled (PA-02-OPEN-SIGNUP) \u2014 likely dormant/unrouted"
+  ],
+  "canonical_candidate_notes": "Only auth page using Django {{form.x}} widget rendering + the proper form.errors per-field loop \u2014 that validation-display pattern is the cleanest in the set and worth standardizing across auth forms (the others only surface messages, not field errors)."
+ },
+ {
+  "file": "config/accounts/templates/accounts/signup_otp.html",
+  "extends_base": false,
+  "page_class": ".card (centered)",
+  "style_only_partial": false,
+  "local_style_block": true,
+  "local_css_lines": 57,
+  "form_system": "none (custom OTP digit inputs)",
+  "validation_display": "messages loop (.alert .alert-{{tags}}); no per-field errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "no selects"
+  },
+  "inputs": {
+   "text": 6,
+   "number": 0,
+   "date": 0,
+   "datetime": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "file": 0,
+   "textarea": 0,
+   "notes": "6 .otp-digit type=text inputmode=numeric maxlength=1 (JS-synced) + hidden otp + hidden csrf"
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "no tables"
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "none"
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": true,
+   "notes": "step-progress chips (.steps .step.done/.active) 2-step; local, not base"
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "local .btn-verify (disabled-until-6, .ready=copper) + .back-link + .resend-link text links"
+  },
+  "empty_state": false,
+  "duplicate_implementations": [
+   "6-box .otp-digit widget + full JS controller (auto-submit + 60s countdown) duplicated near-verbatim from otp.html \u2014 3rd copy of the OTP widget",
+   "local .alert/.alert-* duplicating base .msg",
+   "local .btn-verify duplicating base .btn",
+   "local .card + .step progress indicator",
+   "standalone HTML doc \u2014 does NOT extend base.html",
+   "dormant: resend/back links point to accounts:login because native signup is disabled (PA-02-OPEN-SIGNUP); template unrouted per its own comment"
+  ],
+  "canonical_candidate_notes": "Functionally identical OTP-verify twin of otp.html (2-step indicator vs 3-step, copy differs) \u2014 the clearest evidence that otp/signup_otp should share one _otp_widget.html partial; currently dormant so safe to refactor."
+ },
+ {
+  "file": "config/production/templates/production/_worker_report_body.html",
+  "extends_base": false,
+  "style_only_partial": false,
+  "page_class": ".worker-report.form-shell",
+  "form_system": "form-shell",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 1,
+   "notes": "No native <select> at all. Choice fields are a hand-rolled chip picker: hidden <input type=hidden data-key> backing a .chip-row of <button class=chip data-value> toggled by inline JS (single-select, sets hidden value). custom_local select-equivalent \u2014 not auto fancy-select, not <select multiple>. Rendered identically in the prefilled draft loop and the <template id=line-template>."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 2,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "type=number qty-input appears twice (prefilled form_lines loop + <template> clone source). Plus hidden inputs: line-count, per-choice hidden data-key (x2), csrf. inputmode=decimal, min=0, step=any. No text/textarea/date/file."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No <table>. Submitted view uses .ro-line flex rows; editable view uses .line-card stacked cards. Tabular data rendered as flex/card, mobile-first by design."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filter UI."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 2,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 4
+  },
+  "modals": {
+   "count": 0,
+   "type": "confirm()"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": true,
+   "skill_tag": false,
+   "local": true,
+   "notes": "Local .hero-chip / .submitted-chip (ADDA code + SUBMITTED status). .chip = interactive picker button, .ro-pill = read-only chip in submitted view. All locally styled, none are base .badge tokens."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": false,
+   "local": true,
+   "notes": "Uses .btn + .btn-ghost (Save draft) + .btn-primary (Submit), but all locally redefined under .worker-report, NOT base.html. Uses .btn-primary token vs base .btn-copper. Other local buttons: .line-remove, .add-line (dashed), .chip."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "duplicate_implementations": [
+   "Hand-rolled chip-picker single-select (hidden input + .chip-row buttons + inline JS) instead of a native <select> base.html fancify() would auto-upgrade \u2014 custom_local select re-implementation",
+   "Local .btn / .btn-primary / .btn-ghost (in included _worker_report_styles.html) duplicating base button system; .btn-primary token name vs base .btn-copper",
+   "Local .panel numbered-card system duplicating base .panel/.card",
+   "Local .hero-chip / .ro-pill / .submitted-chip duplicating base .badge / status chips",
+   "Local .flash messages block duplicating base .msg (only in embedded mode)"
+  ],
+  "canonical_candidate_notes": "Schema-driven line-entry pattern (single <template id=line-template> cloned by schema-agnostic JS; chips set hidden input; inputs renamed line-<i>-<key> at submit; live totals) is a clean reusable multi-line repeater/chip-picker worth promoting for any quantity+dimension worker capture. Mobile-first card-not-table (.line-card / .ro-line) is also a clean responsive pattern."
+ },
+ {
+  "file": "config/production/templates/production/worker_report_embedded.html",
+  "extends_base": false,
+  "style_only_partial": false,
+  "page_class": "body (chromeless iframe; no scoping wrapper, included body applies .worker-report)",
+  "form_system": "form-shell",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "No selects in wrapper; chip-picker lives in included _worker_report_body.html. Chromeless full HTML doc (own DOCTYPE/head/body), deliberately NOT extending base.html (mirrors stage_panel_embedded.html)."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "Wrapper has no inputs of its own; all from included body (counted there)."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "Wrapper only."
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": false,
+   "notes": "Wrapper only; buttons in included body."
+  },
+  "empty_state": false,
+  "local_style_block": true,
+  "local_css_lines": 8,
+  "duplicate_implementations": [
+   "Inline :root token block (--ink/--stone/--cream/--copper/--border-card/--danger etc.) re-declared in <head> instead of inheriting base.html tokens \u2014 necessary for chromeless iframe but duplicates canonical palette",
+   "Chromeless full-document scaffold (own DOCTYPE/head/body + Cormorant Garamond <link> + reset) bypassing base.html, mirroring stage_panel_embedded.html"
+  ],
+  "canonical_candidate_notes": "Iframe auto-resize postMessage contract (type:'stage-panel-resize' + MutationObserver) is a shared pattern aligned with stage_panel_embedded.html \u2014 good candidate for a documented shared embed scaffold so the inline :root token duplication isn't copy-pasted per embed page."
+ },
+ {
+  "file": "config/production/templates/production/worker_report.html",
+  "extends_base": true,
+  "style_only_partial": false,
+  "page_class": ".worker-report.form-shell (applied by included body)",
+  "form_system": "form-shell",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "Thin standalone wrapper: extends accounts/base.html, sets title, pulls Cormorant Garamond + _worker_report_styles in extra_head, includes body in content. No markup of its own beyond block plumbing."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No inputs of its own; all from included body (counted there)."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "Wrapper only."
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": false,
+   "notes": "Wrapper only."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "duplicate_implementations": [
+   "Loads Cormorant Garamond font <link> in extra_head \u2014 likely already provided by base.html; potential duplicate font include (shared with embedded twin and styles partial)"
+  ],
+  "canonical_candidate_notes": "Clean canonical split: standalone page = extends base + extra_head(styles) + content(body); embedded twin = chromeless + same body. Good two-route DRY pattern (one body, two wrappers) worth citing as reference for future embed/standalone page pairs."
+ },
+ {
+  "file": "config/production/templates/production/_worker_report_styles.html",
+  "extends_base": false,
+  "style_only_partial": true,
+  "page_class": ".worker-report (all rules scoped under it; rule-10 compliant)",
+  "form_system": "form-shell",
+  "validation_display": ".flash / .flash-error / .flash-success (message banners; no per-field error styling)",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "Pure CSS partial \u2014 no markup. Styles the chip-picker (.chip/.chip-row/.selected/.swatch) standing in for a select, plus .qty-input numeric field."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No input markup; defines .qty-input (numeric) and .chip styling. CSS-only."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No table markup; no table CSS \u2014 layout is flex/card (.ro-line, .line-card, .summary-grid). No .table-responsive/data-label rules because there are no tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filter CSS."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": true,
+   "notes": "Defines local chip/status CSS: .hero-chip, .submitted-chip, .chip, .ro-pill. No base .badge tokens."
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "Defines local .btn/.btn-primary/.btn-ghost/.line-remove/.add-line/.chip CSS under .worker-report \u2014 full local re-skin of button system (.btn-primary not base .btn-copper)."
+  },
+  "empty_state": false,
+  "local_style_block": true,
+  "local_css_lines": 110,
+  "duplicate_implementations": [
+   "Full local button system (.btn/.btn-primary/.btn-ghost) duplicating base.html buttons, with divergent token name (.btn-primary vs canonical .btn-copper)",
+   "Local .panel numbered-card system duplicating base .panel/.card",
+   "Local .flash message styles duplicating base .msg",
+   "Local .hero / .hero-chip / status-banner chip styles duplicating base hero+badge tokens",
+   "Token fallbacks (var(--copper,#b87333) etc.) re-hardcode canonical palette as literals"
+  ],
+  "canonical_candidate_notes": "Despite duplications, fully page-scoped (.worker-report) mobile-first sheet with explicit @media(max-width:600px) (hero shrink, panel padding, sticky-actions stack column-reverse + full-width btns) \u2014 good reference for mobile-first standing rule. Chip-picker styling (.chip/.selected/.swatch) is a promotable token-clean select-replacement component."
+ },
+ {
+  "file": "config/production/templates/production/_workers_widget.html",
+  "extends_base": false,
+  "style_only_partial": false,
+  "page_class": ".workers-grid (relies on enclosing .form-shell from _form_styles.html for styling)",
+  "form_system": "form-shell",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 1,
+   "searchable": 0,
+   "custom_local": 1,
+   "notes": "Django ModelMultipleChoiceField widget template (renders widget.optgroups). Produces NO <select> \u2014 hand-rolled checkbox grid (.workers-grid of <label class=worker-chip> wrapping <input type={{option.type}}>). Functionally multi-select (multiselect=1) as a custom_local checkbox-chip grid; relies on _form_styles.html for .worker-chip styling."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "Inputs dynamic: <input type={{ option.type }}> \u2014 type from Django widget (checkbox for ModelMultipleChoiceField). Count is data-driven (one per worker option), not statically enumerable; effectively a checkbox per option."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables; CSS-grid of chips."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": true,
+   "notes": ".worker-chip is a selectable chip (checkbox label) but styling lives in _form_styles.html, not here. Acts as a multi-select chip."
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": false,
+   "notes": "No buttons."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "duplicate_implementations": [
+   "Hand-rolled checkbox-chip multi-select grid (.workers-grid / .worker-chip) instead of native <select multiple> \u2014 base.html fancify() SKIPS multiple selects anyway, so a custom multi widget is reasonable; flagged as custom_local multi-select re-implementation for completeness",
+   "Hinglish comment present (matches project convention)"
+  ],
+  "canonical_candidate_notes": "Minimal, clean Django widget override (optgroups loop \u2192 checkbox-chip grid) deferring all styling to shared _form_styles.html .worker-chip \u2014 good DRY model-widget pattern for multi-select pickers where native select is undesirable on mobile/touch."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/category_confirm_delete.html",
+  "extends_base": true,
+  "page_class": "",
+  "form_system": "none",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "No selects."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No form inputs; only a POST confirm form with csrf + submit button."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "Warning box uses inline status-danger tokens, not a .badge."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": true,
+   "local": false,
+   "notes": ".btn .btn-ghost (Cancel) + .btn .btn-danger (delete) but danger button is overridden with inline background:#dc2626;color:white \u2014 redundant inline restyle on top of canonical .btn-danger."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   ".btn-danger button carries inline background:#dc2626;color:white duplicating/overriding the canonical .btn-danger token color",
+   "Warning callout hand-built with inline status-danger tokens instead of a shared .msg/.alert component"
+  ],
+  "canonical_candidate_notes": "Uses base.html .confirm-card / .confirm-card-head / .confirm-icon / .confirm-card-body / .confirm-card-foot canonical confirm-card pattern cleanly \u2014 good reference for delete-confirm pages. Field/form validation display: none."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/category_form.html",
+  "extends_base": true,
+  "page_class": "cat-form-hero (hero scoping); no overall page wrapper class",
+  "form_system": "sf",
+  "validation_display": ".sf-error (per-field via form.<field>.errors|join) + .form-errors block for form.non_field_errors",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "No <select>; image field renders CroppableImageWidget via {{ form.image }}."
+  },
+  "inputs": {
+   "text": 3,
+   "number": 1,
+   "textarea": 0,
+   "checkbox": 1,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "name, subtitle, item_count_label = text(3); display_order = number(1); is_active = checkbox(1). File input is inside CroppableImageWidget partial (not counted here). is_active checkbox is a hand-built toggle card with inline accent-color styling."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 2
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "No badges."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": false,
+   "local": false,
+   "notes": ".btn .btn-ghost (Cancel) + .btn .btn-primary (submit) with inline padding/font overrides. Back link in hero is a fully inline-styled anchor (no .btn class)."
+  },
+  "empty_state": false,
+  "local_style_block": true,
+  "local_css_lines": 38,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   "Numbered panel/section built with fully inline-styled <section>/<header>/<span>01 instead of a shared .panel / form-shell numbered-panel component",
+   "Dark gradient hero strip is bespoke inline CSS, duplicated near-verbatim in product_form.html (cat-form-hero vs product-form-hero) \u2014 candidate for a shared .sf-hero component",
+   "is_active toggle = hand-rolled inline checkbox card duplicating a toggle pattern across both forms",
+   "Global section{} and section header{} !important element selectors inside the local <style> leak to any <section> on the page (not page-scoped)"
+  ],
+  "canonical_candidate_notes": "Clean .sf-field / .sf-label / .sf-input / .sf-hint / .sf-error usage + .sf-footer sticky bar. extra_head <style> is component-like (not mere scoping): global section/section header restyle via !important element selectors, .cat-form-hero responsive stack, .cat-inline-grid 2-col grid. The two storefront hero strips are nearly identical and should be promoted to one reusable component."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/category_list.html",
+  "extends_base": true,
+  "page_class": "",
+  "form_system": "none",
+  "validation_display": "none",
+  "selects": {
+   "native": 1,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "1 native <select name=active class='filter-select'> with onchange=this.form.submit() \u2014 auto-upgraded by base.html fancify(). Uses local .filter-select class rather than a documented filter canonical."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No text inputs; DataTables injects its own search input via JS."
+  },
+  "tables": {
+   "total": 1,
+   "table_responsive": 1,
+   "data_label": true,
+   "datatables": true,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "1 table #categories-dt wrapped in .table-responsive; every td has data-label; initFancyDataTable used. Responsive standard fully met. Thead/th and tr/td carry heavy inline styling instead of class-based cells."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": true,
+   "skill_filter_chip": false,
+   "local": true,
+   "notes": "Filter row uses canonical .ke-toolbar; inner select uses local .filter-select; Clear is a .btn .btn-ghost with inline font-size. No .filter-card."
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 3,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": true,
+   "status_chip": true,
+   "skill_tag": false,
+   "local": true,
+   "notes": "Canonical .badge .badge-active / .badge-inactive + .badge-dot for status. Items-Label rendered as a hand-rolled inline pill (inline-block padding/border-radius:20px) \u2014 local chip duplicate, not a .badge token."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": false,
+   "local": true,
+   "notes": ".btn .btn-primary (Add), .btn .btn-ghost (Clear). Row actions use local .action-link / .action-link-danger (base.html classes) rather than .btn variants."
+  },
+  "empty_state": true,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   "Items-Label cell = hand-rolled inline rounded pill duplicating a chip/badge token",
+   "Local .filter-select class for the status select instead of a shared filter-control canonical",
+   "Table th/td fully inline-styled (padding/font/color repeated per cell) rather than class-driven table cell styling"
+  ],
+  "canonical_candidate_notes": "Strong canonical-compliant list page: .page-header, .kpis/.kpi, .card.card-clip, .ke-toolbar, .table-responsive + data-label, initFancyDataTable, .empty-state with .empty-icon, .badge status tokens, .action-link. Good reference template for storefront list pages."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/product_confirm_delete.html",
+  "extends_base": true,
+  "page_class": "",
+  "form_system": "none",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "No selects."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No form inputs; only POST confirm form with csrf + submit."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "Warning callout uses inline status-danger tokens, not a .badge."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": true,
+   "local": false,
+   "notes": ".btn .btn-ghost (Cancel) + .btn .btn-danger (delete) with redundant inline background:#dc2626;color:white override on the danger button."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   ".btn-danger button overridden with inline background:#dc2626;color:white duplicating the canonical .btn-danger color",
+   "Warning callout hand-built with inline status-danger tokens instead of a shared .msg/.alert component",
+   "Near-identical twin of category_confirm_delete.html (same confirm-card markup) \u2014 duplicated page rather than a shared partial"
+  ],
+  "canonical_candidate_notes": "Reuses base.html confirm-card canonical (head/icon/body/foot) cleanly; together with category_confirm_delete.html shows the confirm-card pattern is well-established and could be a single parameterised partial. Validation display: none."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/product_form.html",
+  "extends_base": true,
+  "page_class": "product-form-hero (hero scoping); product-form-grid layout wrapper; no overall page class",
+  "form_system": "sf",
+  "validation_display": ".sf-error (per-field on name/price via form.<field>.errors|join) + .form-errors block for form.non_field_errors",
+  "selects": {
+   "native": 2,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "2 native <select> (category, badge) class='sf-input' \u2014 both auto-upgraded by base.html fancify(). Options hand-looped in template."
+  },
+  "inputs": {
+   "text": 3,
+   "number": 3,
+   "textarea": 1,
+   "checkbox": 1,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "text: name, category_label, sizes (3). number: price, original_price, display_order (3). textarea: description (1). checkbox: is_active (1). File input lives inside CroppableImageWidget partial (not counted)."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 3
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "Badge here is a select field, not a status badge."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": false,
+   "local": false,
+   "notes": ".btn .btn-ghost (Cancel) + .btn .btn-primary (submit) with inline padding/font overrides. Hero back link is a fully inline-styled anchor (no .btn class)."
+  },
+  "empty_state": false,
+  "local_style_block": true,
+  "local_css_lines": 48,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   "Three numbered panel <section>/<header>/<span>0N blocks built with fully inline styles instead of a shared .panel / form-shell numbered-panel component",
+   "Dark gradient hero strip is bespoke inline CSS nearly identical to category_form.html's cat-form-hero \u2014 duplicated hero, candidate for one shared component",
+   "is_active toggle = hand-rolled inline checkbox card duplicating the same toggle used in category_form.html",
+   "Global section{} / section header{} !important element selectors in <style> leak to all <section> tags (unscoped), duplicated verbatim from category_form.html",
+   ".product-form-grid / .pricing-grid 2-col responsive grids re-declared locally (same pattern as cat-inline-grid)"
+  ],
+  "canonical_candidate_notes": "Clean .sf-field/.sf-label/.sf-input/.sf-hint/.sf-error + .sf-footer usage and native selects correctly left for fancify auto-upgrade. extra_head <style> is component-like: global section/section header restyle (!important, unscoped), .product-form-grid, .pricing-grid, .product-form-hero responsive stacking. The numbered-panel + hero + toggle patterns are duplicated across both storefront forms and are strong candidates for shared components."
+ },
+ {
+  "file": "config/storefront/templates/storefront/listing/product_list.html",
+  "extends_base": true,
+  "page_class": "",
+  "form_system": "none",
+  "validation_display": "none",
+  "selects": {
+   "native": 2,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "2 native <select> (badge, active) class='filter-select' onchange=this.form.submit() \u2014 auto-upgraded by fancify(). Local .filter-select class used."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 0,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 0,
+   "notes": "No text inputs; DataTables injects its own search input via JS."
+  },
+  "tables": {
+   "total": 1,
+   "table_responsive": 1,
+   "data_label": true,
+   "datatables": true,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "1 table #products-dt wrapped in .table-responsive; every td has data-label; initFancyDataTable used. Responsive standard fully met. th/td heavily inline-styled."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": true,
+   "skill_filter_chip": false,
+   "local": true,
+   "notes": "Canonical .ke-toolbar with two local .filter-select selects + .btn .btn-ghost Clear. No .filter-card."
+  },
+  "cards": {
+   "card": 1,
+   "panel": 0,
+   "kpi": 3,
+   "stat_card": 0,
+   "local": 0
+  },
+  "modals": {
+   "count": 0,
+   "type": "none"
+  },
+  "badges_chips": {
+   "badge": true,
+   "status_chip": true,
+   "skill_tag": false,
+   "local": true,
+   "notes": "Status uses canonical .badge .badge-active/.badge-inactive + .badge-dot. Product badge (new/hot/etc) is a hand-rolled inline pill with conditional status-token backgrounds \u2014 local chip duplicate, not a .badge token."
+  },
+  "buttons": {
+   "btn": true,
+   "btn_copper": false,
+   "btn_ghost": true,
+   "btn_danger": false,
+   "local": true,
+   "notes": ".btn .btn-primary (Add), .btn .btn-ghost (Clear). Row actions use local .action-link / .action-link-danger rather than .btn variants."
+  },
+  "empty_state": true,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   "Product-badge cell = hand-rolled inline rounded pill with branching status-token backgrounds, duplicating a chip/badge token",
+   "Local .filter-select class for both filter selects instead of a shared filter-control canonical",
+   "Table th/td fully inline-styled per cell rather than class-driven",
+   "Near-identical structure to category_list.html (page-header + kpis + card + ke-toolbar + dt + empty-state) \u2014 strong shared-layout candidate"
+  ],
+  "canonical_candidate_notes": "Canonical-compliant list page mirroring category_list.html: .page-header, .kpis/.kpi, .card.card-clip, .ke-toolbar, .table-responsive + data-label, initFancyDataTable, .empty-state, .badge tokens, .action-link. The two storefront list pages share nearly all structure and could share a list-page scaffold."
+ },
+ {
+  "file": "config/storefront/templates/storefront/widgets/croppable_image.html",
+  "extends_base": false,
+  "page_class": "croppable-widget (widget root, id cw-<field>)",
+  "form_system": "form-control",
+  "validation_display": "none",
+  "selects": {
+   "native": 0,
+   "data_no_fancy": 0,
+   "multiselect": 0,
+   "searchable": 0,
+   "custom_local": 0,
+   "notes": "No selects."
+  },
+  "inputs": {
+   "text": 0,
+   "number": 0,
+   "textarea": 0,
+   "checkbox": 1,
+   "radio": 0,
+   "date": 0,
+   "datetime": 0,
+   "file": 1,
+   "notes": "1 file input (.cw-file-input, accept=image/*), 1 hidden input (.cw-crop-data, crop coords, not counted as visible type), and a conditional clearable-file checkbox (1) shown when editing an existing image."
+  },
+  "tables": {
+   "total": 0,
+   "table_responsive": 0,
+   "data_label": false,
+   "datatables": false,
+   "inline_edit": false,
+   "bare": 0,
+   "notes": "No tables."
+  },
+  "filters": {
+   "filter_card": false,
+   "dt_filter_row": false,
+   "ke_toolbar": false,
+   "skill_filter_chip": false,
+   "local": false,
+   "notes": "No filters."
+  },
+  "cards": {
+   "card": 0,
+   "panel": 0,
+   "kpi": 0,
+   "stat_card": 0,
+   "local": 1
+  },
+  "modals": {
+   "count": 1,
+   "type": "custom-overlay"
+  },
+  "badges_chips": {
+   "badge": false,
+   "status_chip": false,
+   "skill_tag": false,
+   "local": false,
+   "notes": "No badges."
+  },
+  "buttons": {
+   "btn": false,
+   "btn_copper": false,
+   "btn_ghost": false,
+   "btn_danger": false,
+   "local": true,
+   "notes": "All buttons hand-rolled with full inline styles: .cw-crop-cancel (2 instances: header X + footer Cancel), .cw-crop-apply (copper #b87333), .cw-open-crop (dark ink trigger). NONE use canonical .btn/.btn-copper/.btn-ghost \u2014 copper apply duplicates .btn-copper, dark cancel duplicates .btn-ghost."
+  },
+  "empty_state": false,
+  "local_style_block": false,
+  "local_css_lines": 0,
+  "style_only_partial": false,
+  "duplicate_implementations": [
+   "Custom-overlay crop modal (.cw-crop-modal fixed inset-0 z-index:10000 backdrop blur + .cw-crop-dialog) hand-built with inline styles + JS show/hide + Escape/backdrop close \u2014 re-implements a modal/dialog pattern with no shared modal component",
+   "Apply button (#b87333 copper) duplicates canonical .btn-copper; Cancel buttons duplicate .btn-ghost; trigger button duplicates a .btn variant \u2014 all raw inline CSS",
+   "Hardcoded hex colors (#b87333, #0e0b09, #7a6a58, #e2d5c3, #f5ede0, #fdfaf6) instead of design tokens (var(--copper), var(--text-secondary), var(--border-default)) \u2014 token-bypass throughout",
+   "Preview box, modal header/footer, and labels styled entirely inline rather than via component classes"
+  ],
+  "canonical_candidate_notes": "Self-contained Cropper.js widget (markup + JS) is a clean reusable unit, reused by both category_form and product_form via {{ form.image }}. Modal is type=custom-overlay (position:fixed inset:0, opened/closed via JS display:flex/none, closes on .cw-crop-cancel, backdrop click, and Escape; not native <details>/dialog, not confirm()). Promotion target: re-skin its buttons to .btn-copper/.btn-ghost and overlay to a shared modal while keeping the JS."
+ }
+]

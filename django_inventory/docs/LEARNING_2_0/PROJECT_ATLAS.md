@@ -1,3 +1,13 @@
+---
+id: l2-project-atlas
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system — PKALS index
+anchors: —
+verified: 2026-07-13
+---
+
 # PROJECT ATLAS — the INDEX of the PKALS learning system
 
 > **This is the section-index for PKALS (docs/LEARNING_2_0/), not a project
@@ -75,7 +85,7 @@ SQL beginner→advanced, online resources). Django-as-used-here:
 [DJANGO_GUIDE/](DJANGO_GUIDE/README.md). Models deep: [DATABASE_GUIDE/](DATABASE_GUIDE/README.md).
 
 ## 9b) For AI agents (zero-context entry)
-[AI_AGENT_GUIDE/](AI_AGENT_GUIDE/README.md) — read-4-files path, canonical-doc
+[AI_AGENT_GUIDE/](AI_AGENT_GUIDE/README.md) — canonical_manifest routing, canonical-doc
 lookup table, never-modify list, safe bug/feature flow. Built so a future Claude
 understands the project WITHOUT scanning the repo (token reduction).
 
@@ -92,7 +102,7 @@ archived under [../archive/reviews/](../archive/reviews/) — history, not curre
 ## 10) Navigation index (where is X?)
 - Every active doc: [../DOCUMENTATION_INDEX.md](../DOCUMENTATION_INDEX.md)
 - What's still to build: [../PENDING_BACKLOG.md](../PENDING_BACKLOG.md)
-- The roadmap (11 phases): [../ROADMAP_REVIEW_POST_C1_2026_06_11.md](../ROADMAP_REVIEW_POST_C1_2026_06_11.md)
+- The roadmap: [../IMPLEMENTATION_ROADMAP_PDD_V1.md](../IMPLEMENTATION_ROADMAP_PDD_V1.md) (canonical; POST_C1 review = historical)
 - Working rules (mobile-first, docs-sync): [../../CLAUDE.md](../../CLAUDE.md)
 - How PKALS was built (history): [../archive/reviews/WORK_LOG.md](../archive/reviews/WORK_LOG.md)
 - History (superseded, never truth): [../archive/](../archive/)

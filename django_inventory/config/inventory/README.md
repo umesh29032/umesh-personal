@@ -1,3 +1,13 @@
+---
+id: app-inventory-readme
+type: app-readme
+status: active
+owner: handwritten
+scope: inventory
+anchors: config/inventory/
+verified: 2026-07-13
+---
+
 # `inventory` app — Dashboards, Access Hub & Glue (no tables of its own)
 
 > Dual-register guide. RBAC truth: [docs/production/RBAC.md](../../docs/production/RBAC.md) ·
@@ -48,6 +58,15 @@ sections · `middleware.py` — the URL-enforcement half of the sidebar.
 1. No raw `is_superuser` checks — `permission_service` only (rule 6).
 2. New menu item without `SidebarItemRule` = unprotected URL.
 3. Don't resurrect signals here; the tombstone stays.
+4. **RoleForm's `permissions` queryset MUST stay pinned to the curated
+   allowlist (`permissions_qs_by_app()` / `ROLE_EDITOR_SECTIONS`)** — the
+   ModelMultipleChoiceField queryset is the VALIDATION gate, not just the
+   display list. Owner-cert OWN-D-1 (2026-07-13): the old app-level filter let
+   a hand-crafted POST persist grants on service-only models (e.g.
+   `production.change_machinetype`) that live gates then honored via
+   `user_has_perm` codename matching. Fixed + pinned
+   (`inventory.tests.RolePermissionCurationTests`). Evidence:
+   [docs/OWNER_VISIBILITY_CERTIFICATION.md](../../docs/OWNER_VISIBILITY_CERTIFICATION.md) §OWN-D.
 
 ## Django Learning Notes
 

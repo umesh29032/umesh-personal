@@ -1,6 +1,16 @@
+---
+id: production-overview
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
+
 # Production Tracking — Overview
 
-**Status:** 4 stages live (Layering · Cutting Pattern · Cutting · Barcode Generation [optional]) + **stage costing** + **worker payroll** (`expense` app). `manage.py check` clean. (Current test count: run `bash scripts/check.sh`.)
+**Status:** 4 stages live (Layering · Pattern Design · Cutting · Barcode Generation [optional]) + **stage costing** + **worker payroll** (`expense` app). `manage.py check` clean. (Current test count: run `bash scripts/check.sh`.)
 
 > **V2 note:** this subsystem doc covers **cloth → stages → cutting → barcode** and is current for that scope (last subsystem verification 2026-06-02). The **worker-truth model** — `WorkerStageTask` / `WorkerStageContribution` — and the **settlement** architecture shipped later (V2, 2026-06-09→11) and live in **[../ARCHITECTURE_V2.md](../ARCHITECTURE_V2.md)** (how workers report + how earnings are settled). This page intentionally does not re-document those.
 

@@ -1,3 +1,13 @@
+---
+id: docs-adr-0004-tracking-is-append-only-history-primitive
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0004 — `tracking` is an append-only history + barcode primitive
 
 **Status:** Accepted (DECISION_LOG #8; refined by docs/archive/reviews/P4_2_BARCODE_DESIGN_REVIEW.md)

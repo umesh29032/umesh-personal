@@ -1,0 +1,124 @@
+{% comment %}
+THE DESIGN ROW — the reusable UI atom of the entire product (owner
+guideline, W2). Renders ONE Design Row business object (the facade
+contract) — every surface renders THIS partial, hiding/showing fields
+via `mode`, never re-implementing presentation:
+  mode='workspace'  (default) all facts + Edit action
+  mode='palette'    (future Cutting Table Available list — no Edit,
+                     adds selection affordance THERE, not here)
+  mode='review'     (future Layout/Approval Review, History — compact)
+Context: row (Design Row dict) · mode · product
+{% endcomment %}
+{% with mode=mode|default:'workspace' %}
+<div class="design-row st-{{ row.status }} {% if mode != 'workspace' %}m-{{ mode }}{% endif %}"
+     id="design-{{ row.piece_id }}-{{ row.size_id }}" data-design-key="{{ row.design_key }}">
+  <div class="dr-previews">
+    {% if row.preview_svg %}
+      <button type="button" class="dr-shape dr-zoom" data-kind="shape"
+              aria-label="zoom {{ row.piece_name }} {{ row.size_label }} shape">
+        {{ row.preview_svg|safe }}</button>
+    {% else %}
+      <div class="dr-shape dr-ghost" aria-hidden="true">✚</div>
+    {% endif %}
+    {% if row.reference_asset_id %}
+      <button type="button" class="dr-ref dr-zoom" data-kind="ref"
+              data-large="{% url 'patterns_ai:capture-thumb' row.reference_asset_id %}?size=1024"
+              aria-label="zoom reference image">
+        <img src="{% url 'patterns_ai:capture-thumb' row.reference_asset_id %}"
+             alt="reference for {{ row.piece_name }}" loading="lazy">
+        <span class="dr-reftag">ref</span></button>
+    {% else %}
+      <div class="dr-ref dr-ghost" aria-hidden="true">🖼</div>
+    {% endif %}
+  </div>
+  <div class="dr-facts">
+    <div class="dr-line1">
+      <strong>{{ row.piece_name }}</strong>
+      <span class="dr-size">· {{ row.size_label }}</span>
+      {% if row.badges.optional %}<span class="dr-badge">optional</span>{% endif %}
+      {% if row.badges.pair %}<span class="dr-badge">pair</span>{% endif %}
+      {% if row.badges.fold %}<span class="dr-badge dr-fold">on-fold</span>{% endif %}
+    </div>
+    <div class="dr-line2">
+      {% if row.status == 'confirmed' %}
+        <span class="dr-chip ok">v{{ row.version_no }} · Confirmed ✓</span>
+        {% if row.draft_in_progress %}
+          <span class="dr-chip draft">v{{ row.draft_version_no }} draft in progress</span>
+        {% endif %}
+      {% elif row.status == 'draft' %}
+        <span class="dr-chip draft">◐ drawn — not confirmed</span>
+      {% else %}
+        <span class="dr-chip missing">✗ NO DESIGN YET</span>
+      {% endif %}
+    </div>
+    <div class="dr-line3">
+      {% if row.dims %}
+        {{ row.dims.w_mm }} × {{ row.dims.h_mm }} mm
+        {% if row.area_cm2 %}· {{ row.area_cm2 }} cm²{% endif %}
+        <small class="{% if row.dims.measured %}dr-measured{% else %}dr-unverified{% endif %}">
+          ({{ row.dims.label }})</small>
+      {% elif row.status == 'missing' %}
+        <small class="muted">{% if row.badges.optional %}optional — skipped honestly when absent{% else %}required for {{ row.size_label }} markers{% endif %}</small>
+      {% endif %}
+    </div>
+    {% if mode == 'palette' %}
+    {# Phase 4: placement constraints the DCT consumes (read-only) #}
+    <div class="dr-meta">grain: {{ row.grain_rule }} · {{ row.fabric_group }}</div>
+    {% endif %}
+    {% if mode == 'library' %}
+    <div class="cutcheck">
+      <span class="{% if row.checks.geometry %}cc-ok{% else %}cc-no{% endif %}"><b>Geometry</b> {% if row.checks.geometry %}✓{% else %}✖{% endif %}</span>
+      <span class="{% if row.checks.reference %}cc-ok{% else %}cc-no{% endif %}"><b>Reference</b> {% if row.checks.reference %}✓{% else %}✖{% endif %}</span>
+      <span class="{% if row.checks.confirmed %}cc-ok{% else %}cc-no{% endif %}"><b>Confirmed</b> {% if row.checks.confirmed %}✓{% else %}✖{% endif %}</span>
+      <span class="{% if row.checks.dxf %}cc-ok{% else %}cc-no{% endif %}"><b>DXF</b> {% if row.checks.dxf %}✓{% else %}✖{% endif %}</span>
+    </div>
+    {% endif %}
+    {% if mode == 'library' and row.status == 'confirmed' %}
+    <div class="dr-meta">updated {{ row.updated_at|date:"Y-m-d H:i" }}
+      {% if row.dxf_url %} · <a href="{{ row.dxf_url }}">DXF</a>{% endif %}</div>
+    {% endif %}
+    {% if mode == 'library' %}
+    <div class="manage-acts">
+      {# Phase 2 frozen resp: optional/required RULE moved to Blueprint; Library only PREPARES; reference stays (documentation) #}
+      <form method="post" enctype="multipart/form-data" style="display:inline-flex; gap:4px; align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="piece" value="{{ row.piece_id }}">
+        <input type="hidden" name="action" value="upload_reference">
+        <input type="file" name="reference" accept="image/*" style="max-width:120px; font-size:10.5px;">
+        <button type="submit" class="btn-mini" title="applies to all sizes of {{ row.piece_name }}">
+          {% if row.reference_asset_id %}replace ref{% else %}add ref{% endif %}</button>
+      </form>
+      {% if row.reference_asset_id %}
+      <form method="post" style="display:inline;">
+        {% csrf_token %}
+        <input type="hidden" name="product" value="{{ product.pk }}">
+        <input type="hidden" name="piece" value="{{ row.piece_id }}">
+        <input type="hidden" name="action" value="clear_reference">
+        <button type="submit" class="btn-mini" title="applies to all sizes of {{ row.piece_name }}">remove ref</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% if mode == 'workspace' or mode == 'library' %}
+  <div class="dr-action">
+    {% if row.status == 'missing' %}
+      <a class="btn btn-primary dr-btn" href="{{ row.edit_url }}">+ Add geometry</a>
+    {% elif row.status == 'draft' %}
+      <a class="btn btn-primary dr-btn" href="{{ row.edit_url }}">Confirm →</a>
+    {% else %}
+      <a class="btn dr-btn" href="{{ row.edit_url }}">Edit →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if mode == 'palette' %}
+  {# Phase 5: the palette's documented selection affordance — session-only import, zero writes #}
+  <div class="dr-action">
+    <button type="button" class="btn-mini dr-import"
+            data-import-key="{{ row.design_key }}"
+            aria-label="import {{ row.piece_name }} {{ row.size_label }}">+ Import</button>
+  </div>
+  {% endif %}
+</div>
+{% endwith %}

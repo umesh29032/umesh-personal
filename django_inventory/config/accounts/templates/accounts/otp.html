@@ -1,366 +1,53 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verify Code — Kapil Enterprises</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+{% extends 'shared/_auth_shell.html' %}
+{% comment %}Phase C-2: card mode + OTP verify. Chrome + OTP/step/resend primitives from
+shared/_auth_shell.html (.auth-*). Form (otp), CSRF, the 6-digit nav JS, auto-submit and the
+60s countdown/resend are preserved verbatim (selector retargeted to .auth-otp-digit; logic + IDs unchanged).{% endcomment %}
+{% block auth_title %}Verify Code — Kapil Enterprises{% endblock %}
+{% block auth_vars %} style="--auth-card-max:440px; --auth-title-size-sm:30px; --auth-sub-size:13px; --auth-sub-color:var(--auth-text-dim); --auth-sub-ls:0.03em; --auth-btn-transition:background 0.2s, transform 0.15s, opacity 0.2s;"{% endblock %}
 
-        :root {
-            --ink:      #0e0b09;
-            --ink-2:    #1c1814;
-            --copper:   #b87333;
-            --copper-l: #d4924a;
-            --cream:    #f5ede0;
-            --cream-2:  #ede3d4;
-            --stone:    #7a6a58;
-            --smoke:    #c4b39e;
-            --white:    #faf7f2;
-        }
-
-        html, body {
-            min-height: 100%;
-            font-family: 'Syne', sans-serif;
-            background: linear-gradient(160deg, #130428 0%, #240a52 50%, #100324 100%);
-            -webkit-font-smoothing: antialiased;
-            overflow-x: hidden;
-        }
-
-        body {
-            min-height: 100dvh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px 16px;
-            position: relative;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background-image:
-                repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px),
-                repeating-linear-gradient(90deg, transparent, transparent 28px, rgba(255,255,255,0.022) 28px, rgba(255,255,255,0.022) 29px);
-            pointer-events: none;
-        }
-
-        body::after {
-            content: '';
-            position: fixed;
-            top: -100px;
-            right: -80px;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(184,115,51,0.18) 0%, rgba(120,60,20,0.06) 45%, transparent 70%);
-            pointer-events: none;
-        }
-
-        /* ── Card ── */
-        .card {
-            width: 100%;
-            max-width: 440px;
-            background: var(--cream);
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-            z-index: 1;
-            opacity: 0;
-            animation: riseIn 0.7s cubic-bezier(0.22,1,0.36,1) 0.1s forwards;
-        }
-
-        .card-accent {
-            height: 3px;
-            background: linear-gradient(to right, var(--ink-2), var(--copper), var(--copper-l), var(--copper));
-        }
-
-        .card-body {
-            padding: 44px 44px 40px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* ── Back link ── */
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--stone);
-            text-decoration: none;
-            margin-bottom: 28px;
-            transition: color 0.2s;
-        }
-        .back-link:hover { color: var(--copper); }
-        .back-link svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-        /* ── Progress bar ── */
-        .steps {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 32px;
-        }
-        .step { height: 3px; border-radius: 2px; transition: all 0.3s; }
-        .step.done   { flex: 1; background: var(--copper); }
-        .step.active { flex: 1.5; background: var(--ink); }
-        .step.idle   { flex: 1; background: var(--cream-2); }
-
-        /* ── Monogram ── */
-        .monogram {
-            width: 48px;
-            height: 48px;
-            border: 1.5px solid var(--copper);
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-            position: relative;
-        }
-        .monogram::before {
-            content: '';
-            position: absolute;
-            inset: 3px;
-            border: 1px solid rgba(184,115,51,0.25);
-            border-radius: 2px;
-        }
-        .monogram span {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--copper);
-        }
-
-        /* ── Headings ── */
-        .heading {
-            font-family: 'Cormorant Garamond', serif;
-            font-size: 36px;
-            font-weight: 300;
-            font-style: italic;
-            color: var(--ink);
-            line-height: 1.1;
-            margin-bottom: 6px;
-            letter-spacing: -0.01em;
-        }
-        .heading em { font-style: normal; font-weight: 600; }
-
-        /* Sub — was --stone (#7a6a58), now #4a3f36 for WCAG AA readability */
-        .sub {
-            font-size: 13px;
-            font-weight: 500;
-            color: #4a3f36;
-            letter-spacing: 0.03em;
-            margin-bottom: 32px;
-            line-height: 1.6;
-        }
-        .sub strong { color: var(--ink); font-weight: 700; }
-
-        /* ── Alerts ── */
-        .alerts { margin-bottom: 20px; }
-        .alert {
-            padding: 11px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            line-height: 1.5;
-        }
-        .alert-error   { background: #fef1ee; color: #7c2d12; border-left: 3px solid #dc4533; }
-        .alert-success { background: #f0fdf4; color: #14532d; border-left: 3px solid #22c55e; }
-        .alert-warning { background: #fffbeb; color: #78350f; border-left: 3px solid var(--copper); }
-        .alert-info    { background: #eff6ff; color: #1e3a5f; border-left: 3px solid #3b82f6; }
-
-        /* ── OTP boxes ── */
-        .otp-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 28px;
-        }
-
-        /* OTP digit — border was --cream-2 (#ede3d4, nearly invisible on cream card)
-           Now #b8a48e — clear, visible boundary without being harsh              */
-        .otp-digit {
-            flex: 1 1 0;
-            min-width: 0;
-            width: 0;
-            height: 64px;
-            background: #ffffff;
-            border: 1.5px solid #b8a48e;
-            border-radius: 6px;
-            text-align: center;
-            font-family: 'Inter', sans-serif;
-            font-size: 28px;
-            font-weight: 600;
-            color: var(--ink);
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-            caret-color: var(--copper);
-            -webkit-appearance: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06) inset;
-        }
-        .otp-digit:focus {
-            border-color: var(--copper);
-            background: #fffdf9;
-            box-shadow: 0 0 0 3px rgba(184,115,51,0.18), 0 1px 3px rgba(0,0,0,0.04) inset;
-        }
-        .otp-digit.filled {
-            border-color: var(--copper);
-            background: #fffdf9;
-        }
-
-        /* Separator dash — was --smoke (#c4b39e), now #7a6252 for visibility */
-        .otp-sep {
-            width: 12px;
-            height: 2px;
-            background: #7a6252;
-            border-radius: 1px;
-            flex-shrink: 0;
-        }
-
-        /* ── Submit ── */
-        .btn-verify {
-            width: 100%;
-            padding: 15px 24px;
-            background: var(--ink);
-            color: var(--cream);
-            border: none;
-            border-radius: 6px;
-            font-family: 'Syne', sans-serif;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            transition: background 0.2s, transform 0.15s, opacity 0.2s;
-        }
-        .btn-verify::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, transparent 40%, rgba(184,115,51,0.15) 100%);
-        }
-        .btn-verify:hover:not(:disabled) { background: var(--ink-2); transform: translateY(-1px); }
-        .btn-verify:active:not(:disabled) { transform: translateY(0); }
-        .btn-verify:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-verify.ready { background: var(--copper); }
-
-        /* ── Resend ── */
-        .resend-area { margin-top: 20px; text-align: center; }
-
-        /* Timer — was --stone (#7a6a58), now #4a3f36 for readability */
-        .timer-text {
-            font-size: 13px;
-            font-weight: 500;
-            color: #4a3f36;
-        }
-        .timer-text strong {
-            color: var(--copper);
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-        }
-
-        .resend-link {
-            display: none;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--copper);
-            letter-spacing: 0.06em;
-            text-decoration: none;
-            transition: opacity 0.2s;
-        }
-        .resend-link:hover { opacity: 0.7; }
-
-        /* ── Keyframes ── */
-        @keyframes riseIn {
-            from { opacity: 0; transform: translateY(24px) scale(0.98); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        /* ── Mobile ── */
-        @media (max-width: 480px) {
-            .card-body { padding: 32px 24px 28px; }
-            .otp-digit { height: 52px; font-size: 24px; }
-            .heading { font-size: 30px; }
-        }
-    </style>
-</head>
-<body>
-
-<div class="card">
-    <div class="card-accent"></div>
-    <div class="card-body">
-
-        <a href="{% url 'accounts:login' %}" class="back-link">
+{% block auth_card_top %}
+        <a href="{% url 'accounts:login' %}" class="auth-back">
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5l-5 5 5 5"/></svg>
             Back
         </a>
-
-        <div class="steps">
-            <div class="step done"></div>
-            <div class="step active"></div>
-            <div class="step idle"></div>
+        <div class="auth-steps">
+            <div class="auth-step done"></div>
+            <div class="auth-step active"></div>
+            <div class="auth-step idle"></div>
         </div>
+        <div class="auth-monogram"><span>KE</span></div>
+        <h1 class="auth-heading"><em>Verify</em> your<br>identity.</h1>
+        <p class="auth-sub">6-digit code sent to<br><strong>{{ email }}</strong></p>
+{% endblock %}
 
-        <div class="monogram"><span>KE</span></div>
-
-        <h1 class="heading"><em>Verify</em> your<br>identity.</h1>
-        <p class="sub">
-            6-digit code sent to<br>
-            <strong>{{ email }}</strong>
-        </p>
-
-        {% if messages %}
-        <div class="alerts">
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
+{% block auth_body %}
         <form method="post" id="otpForm">
             {% csrf_token %}
             <input type="hidden" name="otp" id="otpHidden">
 
-            <div class="otp-row" id="otpRow">
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="0">
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="1">
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="2">
-                <div class="otp-sep"></div>
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="3">
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="4">
-                <input class="otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="5">
+            <div class="auth-otp-row" id="otpRow">
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="0">
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="1">
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="2">
+                <div class="auth-otp-sep"></div>
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="3">
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="4">
+                <input class="auth-otp-digit" type="text" inputmode="numeric" maxlength="1" autocomplete="off" data-idx="5">
             </div>
 
-            <button type="submit" class="btn-verify" id="submitBtn" disabled>
-                Verify Code →
-            </button>
+            <button type="submit" class="auth-btn" id="submitBtn" disabled>Verify Code →</button>
         </form>
 
-        <div class="resend-area">
-            <p class="timer-text" id="timerText">
-                Resend code in <strong id="countdown">60</strong>s
-            </p>
-            <a href="{% url 'accounts:resend_otp' %}" class="resend-link" id="resendLink">↺ Resend Code</a>
+        <div class="auth-resend-area">
+            <p class="auth-timer-text" id="timerText">Resend code in <strong id="countdown">60</strong>s</p>
+            <a href="{% url 'accounts:resend_otp' %}" class="auth-resend-link" id="resendLink">↺ Resend Code</a>
         </div>
+{% endblock %}
 
-    </div>
-</div>
-
+{% block auth_scripts %}
 <script>
 (function () {
-    const digits = Array.from(document.querySelectorAll('.otp-digit'));
+    const digits = Array.from(document.querySelectorAll('.auth-otp-digit'));
     const hidden = document.getElementById('otpHidden');
     const form   = document.getElementById('otpForm');
     const btn    = document.getElementById('submitBtn');
@@ -420,6 +107,4 @@
     }, 1000);
 })();
 </script>
-
-</body>
-</html>
+{% endblock %}

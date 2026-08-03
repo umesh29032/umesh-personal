@@ -10,7 +10,7 @@
 
     /* Hero — Adda code + status + product line */
     .adda-detail .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px; padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
         position: relative; overflow: hidden;
@@ -33,6 +33,41 @@
         letter-spacing: 0.1em; background: rgba(34,197,94,0.18); color: #4ade80;
         border: 1px solid rgba(34,197,94,0.3);
     }
+    /* R1 (PDD §23): hero navigation pill — 44px touch target (rule 11). */
+    .adda-detail .hero-action-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 44px; padding: 8px 16px; border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.35); color: #fff;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+        background: rgba(255,255,255,0.08); cursor: pointer; font-family: inherit;
+    }
+    .adda-detail .hero-action-btn:hover { background: rgba(255,255,255,0.16); }
+    /* S1.1 + AE-4: hero text links (Stage Rates, Production Snapshot) — scoped class so no inline raw font-size (DS-LINT rule #10). */
+    .adda-detail .hero-link { font-size: 13px; color: rgba(255,255,255,0.85); text-decoration: underline; }
+    /* R1 (PDD §27-D7): My Work cards — mobile-first, presentation-only. */
+    .adda-detail .my-work {
+        background: var(--surface-card, #fff); border: var(--border-card, 1px solid #e5e0d8);
+        border-radius: 14px; box-shadow: var(--shadow-card, 0 1px 3px rgba(0,0,0,0.06));
+        padding: 16px 18px; margin-bottom: 18px;
+    }
+    .adda-detail .my-work-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+    .adda-detail .my-work-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+    .adda-detail .my-work-card { border: 1px solid #eee7db; border-radius: 12px; padding: 12px 14px; background: #fffdf9; }
+    .adda-detail .mw-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .adda-detail .mw-stage { font-weight: 600; font-size: 14px; }
+    .adda-detail .mw-status { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #f1ede4; color: #6b6357; text-transform: uppercase; letter-spacing: 0.4px; }
+    .adda-detail .mw-status.mw-completed, .adda-detail .mw-status.mw-verified { background: #e7f6ec; color: #1a7f45; }
+    .adda-detail .mw-status.mw-in_progress { background: #eaf1fd; color: #2563eb; }
+    .adda-detail .mw-lines { list-style: none; margin: 0 0 8px; padding: 0; font-size: 13px; color: #4b4437; }
+    .adda-detail .mw-lines li { padding: 2px 0; }
+    .adda-detail .mw-total { font-size: 13px; font-weight: 700; border-top: 1px dashed #e2dbcd; padding-top: 8px; }
+    .adda-detail .mw-empty { font-size: 13px; color: #8a8071; font-style: italic; }
+    .adda-detail .mw-checked { font-size: 12px; color: #20603c; white-space: nowrap; }
+    .adda-detail .mw-checked-diff { color: #a5702a; font-weight: 700; }
+    .adda-detail .my-work-footer { margin-top: 12px; font-size: 14px; }
+    @media (max-width: 600px) {
+        .adda-detail .my-work-grid { grid-template-columns: 1fr; }  /* stack cards on phones */
+    }
     .adda-detail .hero-badge.inprogress { background: rgba(37,99,235,0.18); color:#60a5fa; border-color: rgba(37,99,235,0.3); }
     .adda-detail .hero-badge.onhold     { background: rgba(217,119,6,0.18); color:#fbbf24; border-color: rgba(217,119,6,0.3); }
     .adda-detail .hero-badge.cancelled  { background: rgba(220,38,38,0.18); color:#fca5a5; border-color: rgba(220,38,38,0.3); }
@@ -53,6 +88,14 @@
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 10px;
     }
+    .adda-detail .so-cat { border: 1px solid var(--border-subtle); border-radius: 12px;
+        margin-bottom: 10px; background: var(--cream); }
+    .adda-detail .so-cat > summary { list-style: none; cursor: pointer; display: flex;
+        justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px;
+        font-weight: 700; letter-spacing: 0.06em; font-size: 12px; color: var(--ink); }
+    .adda-detail .so-cat > summary::-webkit-details-marker { display: none; }
+    .adda-detail .so-cat-count { color: var(--stone); font-weight: 600; }
+    .adda-detail .so-cat .stages-overview-grid { padding: 0 12px 12px; }
     .adda-detail .so-tile {
         background: var(--cream); border: 1px solid var(--border-subtle);
         border-radius: 12px; padding: 12px 14px;
@@ -453,6 +496,13 @@
         .adda-detail .activity-row { flex-direction: column; gap: 4px; }
         .adda-detail .activity-time { width: auto; }
     }
+    /* Super-admin Danger Zone (owner 2026-07-22) — tokens/classes only (ds-lint). */
+    .adda-detail .danger-zone { margin: 18px 0; border: 1px solid var(--danger); border-radius: var(--radius-card, 12px); padding: 16px 18px; background: var(--danger-bg); }
+    .adda-detail .danger-zone-title { font-weight: 700; color: var(--danger); font-size: var(--fs-sm, 14px); margin-bottom: 4px; }
+    .adda-detail .danger-zone-note { color: var(--stone); font-size: var(--fs-xs, 13px); margin: 0 0 12px; }
+    .adda-detail .danger-zone-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .adda-detail .danger-zone-actions form { margin: 0; }
+    .adda-detail .btn-ghost.is-danger { color: var(--danger); }
 </style>
 {% endblock %}
 
@@ -465,11 +515,84 @@
                 <h1>{{ adda.code }}</h1>
                 <p>{{ adda.product.name }} · started {{ adda.started_at|date:"d M Y H:i" }}</p>
             </div>
-            <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
-                ● {{ adda.get_status_display }}
-            </span>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+                <span class="hero-badge {% if adda.status == 'in_progress' %}inprogress{% elif adda.status == 'on_hold' %}onhold{% elif adda.status == 'cancelled' %}cancelled{% endif %}">
+                    ● {{ adda.get_status_display }}
+                </span>
+                {% if is_management %}
+                {# R1 (PDD §23): state-aware Settlement navigation — mgmt only. #}
+                {% if adda_settlement %}
+                <a href="{% url 'expense:adda-settlement-detail' reference=adda_settlement.reference %}"
+                   class="hero-action-btn">Settlement · {{ adda_settlement.reference }}</a>
+                {% else %}
+                {# Start view is POST-only (405 on GET) — csrf form, not a link. #}
+                <form method="post" action="{% url 'expense:adda-settlement-start' adda_pk=adda.pk %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="hero-action-btn">Start Settlement</button>
+                </form>
+                {% endif %}
+                {% endif %}
+                {% if is_management %}
+                {# AE-4: production snapshot — worker×bundle allocation state at a glance. #}
+                <a href="{% url 'production:adda-snapshot' code=adda.code %}"
+                   class="hero-link">Production Snapshot</a>
+                {% endif %}
+                {% if is_super_admin %}
+                {# S1.1: super-admin rate-correction entry — before-settlement only. #}
+                <a href="{% url 'production:stage-rates' code=adda.code %}"
+                   class="hero-link">Stage Rates</a>
+                {% endif %}
+            </div>
         </div>
     </div>
+
+    {# A360 (plan v2): per-Adda management overview — ctx is management-gated; renders nothing for workers #}
+    {% include 'production/_a360.html' %}
+
+    {% comment %}
+    R1 (PDD §27-D7): MY WORK — the viewing user's own tasks on THIS Adda.
+    PRESENTATION-ONLY: display quantities + own expected earning; no submit,
+    no edit, no action buttons (future phases own worker actions). Self-scoped
+    in the view (worker=request.user) — renders only when the user has tasks,
+    so management (no tasks) never sees it.
+    {% endcomment %}
+    {% if my_tasks %}
+    <div class="my-work">
+        <div class="my-work-title">My Work on this Adda{% if viewer_is_monthly %} <span class="badge badge-monthly"><span class="badge-dot"></span>Monthly Salary</span>{% endif %}</div>
+        <div class="my-work-grid">
+            {% for t in my_tasks %}
+            <div class="my-work-card">
+                <div class="mw-head">
+                    <span class="mw-stage">{{ t.stage_record.workflow_stage.stage.name }}</span>
+                    <span class="mw-status mw-{{ t.status }}">{{ t.get_status_display }}</span>
+                </div>
+                {% if t.contributions.all %}
+                <ul class="mw-lines">
+                    {% for c in t.contributions.all %}
+                    <li>
+                        {% if c.color %}{{ c.color.name }} · {% endif %}{% if c.size %}{{ c.size.label }} · {% endif %}{{ c.good_quantity|floatformat:"-2" }} {{ t.unit_label }}
+                        {# M10 transparency: verified_quantity = management check result (reported stays immutable) — worker must see WHY settlement pays a different count #}
+                        {% if c.verified_quantity != None %}{% if c.verified_quantity != c.good_quantity %}<span class="mw-checked mw-checked-diff">checked: {{ c.verified_quantity|floatformat:"-2" }} passed</span>{% else %}<span class="mw-checked">checked ✓</span>{% endif %}{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {# R4/P-4: monthly viewer → qty only, ₹ suppressed entirely (no ₹0.00) #}
+                <div class="mw-total">
+                    Qty {{ t.my_qty|floatformat:"-2" }}{% if not viewer_is_monthly and t.my_expected > 0 %} · Expected ₹{{ t.my_expected }}{% endif %}
+                </div>
+                {% else %}
+                <div class="mw-empty">No lines reported yet</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% if viewer_is_monthly %}
+        <div class="my-work-footer">Work is tracked for records — salary is paid monthly, separately.</div>
+        {% elif my_expected_total > 0 %}
+        <div class="my-work-footer">Total expected on this Adda: <strong>₹{{ my_expected_total }}</strong></div>
+        {% endif %}
+    </div>
+    {% endif %}
 
     {% comment %}
     STAGES OVERVIEW PANEL — saare stages ka headline summary ek jagah.
@@ -484,45 +607,112 @@
       • in_progress → copper pulse + "Currently active"
       • pending → muted "Pending"
     {% endcomment %}
-    {% if is_management or has_layering_access %}
+    {# OP-1 L2 (blind rule, owner 2026-07-05): overview totals = factory numbers - #}
+    {# management ONLY. Workers navigate via the stage tabs (their assigned panels). #}
+    {% if is_management and show_lanes or is_management and can_add_lane %}
+    {# Streams redesign: PRE-PRODUCTION LANES — one card per fabric lane. #}
+    {# Single-lane products render NO cards (zero chrome law) — only the #}
+    {# management "＋ Add lane" entry (GAP-4: recuts on single-lane products #}
+    {# are the primary declared-lane use). #}
+    <div class="stages-overview lane-cards">
+        {% if show_lanes %}
+        <div class="stages-overview-title">Pre-production — cutting lanes</div>
+        {% endif %}
+        {% if show_lanes %}{% for c in lane_cards %}
+        {% if c.cancelled %}
+        {# GAP-4 / lifecycle §7: cancelled lanes render GREYED with their reason — never hidden. #}
+        <div class="lane-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px dashed var(--border-card);border-radius:10px;margin:6px 0;opacity:0.55;">
+            <strong style="min-width:130px;text-decoration:line-through;">{{ c.lane.label|title }}</strong>
+            <span style="font-size:11px;font-weight:700;color:var(--stone);text-transform:uppercase;">Cancelled</span>
+            <span style="font-size:11px;color:var(--stone);">({{ c.lane.cancel_reason }})</span>
+        </div>
+        {% else %}
+        <div class="lane-card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border-card);border-radius:10px;margin:6px 0;">
+            <strong style="min-width:130px;">{% if c.blocking %}●{% else %}○{% endif %} {{ c.lane.label|title }}</strong>
+            {% for s in c.steps %}
+            <span style="font-size:12px;{% if s.state == 'done' %}color:#20603c;{% elif s.state == 'open' %}color:#a5702a;{% else %}color:var(--stone);{% endif %}">
+                {{ s.name }} {% if s.state == 'done' %}✓{% elif s.state == 'open' %}⏳{% else %}—{% endif %}
+            </span>{% if not forloop.last %}<span style="color:var(--stone);">·</span>{% endif %}
+            {% endfor %}
+            {% if c.lane.reason %}<span style="font-size:11px;color:var(--stone);">({{ c.lane.reason }})</span>{% endif %}
+            {% if c.can_cancel %}
+            <form method="post" action="{% url 'production:adda-cancel-lane' code=adda.code %}" style="margin:0;margin-left:auto;"
+                  onsubmit="var r=prompt('Reason for cancelling this empty lane?'); if(!r){return false;} this.reason.value=r; return true;">
+                {% csrf_token %}
+                <input type="hidden" name="stream" value="{{ c.lane.pk }}">
+                <input type="hidden" name="reason" value="">
+                <button type="submit" class="btn btn-ghost" style="padding:2px 10px;font-size:11px;color:var(--danger);">Cancel lane</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}{% endif %}
+        {% if can_add_lane %}
+        <div style="margin-top:6px;">
+            <a href="{% url 'production:adda-add-lane' code=adda.code %}" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;">＋ Add lane</a>
+        </div>
+        {% endif %}
+        {% if not preproduction_joined %}
+        <div style="font-size:12px;color:var(--stone);margin-top:4px;">🔒 Bundling &amp; barcodes unlock when every blocking lane is cut.</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# GAP-5 GARMENT READINESS — DERIVE-ONLY (pool_service.garment_readiness): #}
+    {# cut truth × Blueprint per size; bottleneck component flagged; one-tap slip #}
+    {# bundles the complete unbundled sets. Management + post-join + multi-component. #}
+    {% if garment_readiness %}
+    <div class="stages-overview garment-readiness">
+        <div class="stages-overview-title">Garment readiness — {{ garment_readiness.total_sets }} complete set{{ garment_readiness.total_sets|pluralize }} of {{ garment_readiness.total_pieces }} cut pieces</div>
+        {% for row in garment_readiness.sizes %}
+        <div class="gr-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--border-card);border-radius:10px;margin:6px 0;">
+            <strong style="min-width:64px;">Size {{ row.size.label }}</strong>
+            {% for c in row.components %}
+            <span style="font-size:12px;{% if c.is_min %}color:#a5702a;font-weight:700;{% else %}color:#20603c;{% endif %}">
+                {{ c.name }} {{ c.cut }}{% if c.need > 1 %}÷{{ c.need }}{% endif %}{% if c.is_min %} ▲{% endif %}
+            </span>{% if not forloop.last %}<span style="color:var(--stone);">·</span>{% endif %}
+            {% endfor %}
+            <span style="margin-left:auto;font-weight:700;{% if row.blocked %}color:#a33;{% endif %}">→ {{ row.sets }} set{{ row.sets|pluralize }}</span>
+            {% if row.unbundled_sets > 0 %}
+            <form method="post" action="{% url 'production:adda-bundle-sets' code=adda.code %}" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="size_id" value="{{ row.size.pk }}">
+                <button type="submit" class="btn btn-sm">Bundle {{ row.unbundled_sets }} set{{ row.unbundled_sets|pluralize }}</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if garment_readiness.leftovers %}
+        <div style="font-size:12px;color:var(--stone);margin-top:4px;">
+            Leftover pieces (waiting on the ▲ component):
+            {% for l in garment_readiness.leftovers %}{{ l.component }} {{ l.size }} +{{ l.count }}{% if not forloop.last %} · {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if is_management %}
     <div class="stages-overview">
         <div class="stages-overview-title">Stages Overview</div>
+        {% if overview_grouped %}
+        {# R10-B UI philosophy: category rollup — summary-first, collapsible; the active category opens. #}
+        {% for g in overview_groups %}
+        <details class="so-cat"{% if g.open %} open{% endif %}>
+            <summary class="so-cat-summary"><span>{{ g.label|upper }}</span>
+                <span class="so-cat-count">{{ g.done }} / {{ g.total }} complete</span></summary>
+            <div class="stages-overview-grid">
+            {% for so in g.items %}
+                {% include 'production/_so_tile.html' %}
+            {% endfor %}
+            </div>
+        </details>
+        {% endfor %}
+        {% else %}
         <div class="stages-overview-grid">
             {% for so in stages_overview %}
-            <div class="so-tile so-{{ so.state }}">
-                <div class="so-tile-head">
-                    <span class="so-tile-state">
-                        {% if so.state == 'completed' %}✓{% elif so.state == 'in_progress' %}▸{% else %}•{% endif %}
-                    </span>
-                    <span class="so-tile-label">{{ so.label }}</span>
-                </div>
-                {% if so.state == 'completed' %}
-                    {% if so.stage_type == 'layering' and so.snap.record %}
-                        <div class="so-tile-meta">
-                            <span>Lay count <strong>{{ so.snap.lay_count }}</strong></span>
-                            <span>Length <strong>{{ so.snap.layer_length }} m</strong></span>
-                            <span>Duration <strong>{{ so.snap.duration_min }} min</strong></span>
-                            <span>Rolls <strong>{{ so.snap.rolls_count }}</strong></span>
-                        </div>
-                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
-                    {% elif so.stage_type == 'cutting_pattern' and so.snap.record %}
-                        <div class="so-tile-meta">
-                            <span>Photos <strong>{{ so.snap.photo_count }}</strong></span>
-                            <span>Video <strong>{% if so.snap.record.video %}✓{% else %}—{% endif %}</strong></span>
-                        </div>
-                        <div class="so-tile-foot">By {{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
-                    {% else %}
-                        <div class="so-tile-meta"><span>Completed</span></div>
-                    {% endif %}
-                {% elif so.state == 'in_progress' %}
-                    <div class="so-tile-meta"><span>Currently active</span></div>
-                {% else %}
-                    <div class="so-tile-meta"><span style="color:var(--stone);">Pending</span></div>
-                {% endif %}
-                <button type="button" class="so-tile-jump" data-tab="{{ so.stage_type }}">Open tab →</button>
-            </div>
+            {% include 'production/_so_tile.html' %}
             {% endfor %}
         </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -600,7 +790,8 @@
         <section class="tabpane" id="tab-{{ s.stage_type }}"
                  role="tabpanel" aria-labelledby="btn-{{ s.stage_type }}"
                  {% if default_tab != s.stage_type %}hidden{% endif %}>
-            {% if s.has_access %}
+            {# C-2: iframe only when the panel gate would ADMIT (access ∩ assignment) — never render a workspace the viewer can't open #}
+            {% if s.can_open %}
                 <div class="tab-toolbar">
                     <a href="{% url 'production:stage-panel' adda.code s.stage_type %}" target="_blank" rel="noopener" class="open-new">
                         Open in new window ↗
@@ -619,8 +810,8 @@
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                         </svg>
                     </div>
-                    <h3>{{ s.get_stage_type_display }} — Restricted</h3>
-                    <p>You don't have the skill or role required to view this stage. Track progress via the pipeline above.</p>
+                    <h3>{{ s.get_stage_type_display }} — {% if s.has_access %}Not assigned{% else %}Restricted{% endif %}</h3>
+                    <p>{% if s.has_access %}You're not assigned to this stage on this Adda — ask your manager if you should be.{% else %}You don't have the skill or role required to view this stage.{% endif %} Track progress via the pipeline above.</p>
                 </div>
             {% endif %}
         </section>
@@ -666,9 +857,40 @@
     </div>
     {% endif %}
 
+    {% comment %}Owner rule 2026-07-22: super-admin Danger Zone — soft Cancel + hard
+    Delete. Hidden once the batch is completed/cancelled (terminal). Service owns all
+    guards; the confirm page shows WHY if a delete is blocked.{% endcomment %}
+    {% if is_super_admin and adda.status != 'completed' and adda.status != 'cancelled' %}
+    <div class="danger-zone">
+        <div class="danger-zone-title">Danger zone</div>
+        <p class="danger-zone-note">
+            Cancel keeps the batch on record (status → Cancelled). Delete removes a
+            pristine/mistaken batch permanently — blocked once any work, earning or
+            barcode exists.
+        </p>
+        <div class="danger-zone-actions">
+            <form method="post" action="{% url 'production:adda-cancel' code=adda.code %}"
+                  onsubmit="var r=prompt('Reason for cancelling this batch?');if(!r){return false;}this.reason.value=r;">
+                {% csrf_token %}
+                <input type="hidden" name="reason">
+                <button type="submit" class="btn btn-ghost is-danger">Cancel batch</button>
+            </form>
+            <a href="{% url 'production:adda-delete' code=adda.code %}" class="btn btn-danger">Delete batch</a>
+        </div>
+    </div>
+    {% endif %}
+
     <div style="margin: 18px 0;">
         <a href="{% url 'production:adda-list' %}" class="btn btn-ghost">← Back to Addas</a>
         <a href="{% url 'tracking:adda-history' adda.code %}" class="btn btn-ghost">View Full History</a>
+        {% if is_management %}
+        {# P5 Pattern-Intelligence entry — LINKS ONLY (ADR-H: project-level url composition exactly like the expense:/tracking: links above; production python never imports patterns_ai). #}
+        <a href="{% url 'patterns_ai:advisor' %}?product={{ adda.product_id }}" class="btn btn-ghost">🧠 Cut Advisor</a>
+        <a href="{% url 'patterns_ai:yield-board' %}?product={{ adda.product_id }}" class="btn btn-ghost">Yield Board</a>
+        <a href="{% url 'patterns_ai:piece-list' %}?product={{ adda.product_id }}" class="btn btn-ghost">Pattern Library</a>
+        {# Phase 8B: the manufacturing contract chooser (rule 9 — library-only) #}
+        <a href="{% url 'patterns_ai:choose-layout' adda.pk %}" class="btn btn-ghost">★ Manufacturing Layouts</a>
+        {% endif %}
     </div>
 </div>
 

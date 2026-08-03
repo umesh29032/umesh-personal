@@ -3,10 +3,11 @@
 {% block page_title %}{{ action }} Stage{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 <style>
     .stage-form { max-width: 900px; margin: 0 auto; }
     .stage-form .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%);
+        background: var(--hero-grad-deep);
         color: #fff; border-radius: 16px;
         padding: 26px 30px; margin-bottom: 22px;
         box-shadow: 0 8px 32px rgba(14,11,9,0.20);
@@ -42,7 +43,6 @@
     }
     .stage-form .panel-body { padding: 20px 22px 22px; }
 
-    .stage-form .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
     .stage-form label {
         font-size: 12px; font-weight: 600; color: var(--ink);
         letter-spacing: 0.02em;
@@ -52,20 +52,21 @@
     }
     .stage-form input[type="text"],
     .stage-form input[type="email"],
+    /* FE-3 (PA-14-3): the R10 pickers render as FancySelect BUTTON triggers —
+       style them like the sibling cream inputs (tag rules can't reach them). */
+    .stage-form .fancy-select-trigger,
+    .stage-form input[type="number"],
     .stage-form textarea {
         background: var(--cream); border: 1.5px solid var(--border-subtle);
         border-radius: 10px; padding: 10px 12px;
         font-size: 14px; color: var(--ink);
-        font-family: inherit;
+        font-family: inherit; width: 100%; text-align: left;
         box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
     }
     .stage-form input[type="text"]:focus,
     .stage-form textarea:focus {
         outline: none; border-color: var(--copper);
         box-shadow: 0 0 0 3px rgba(184,115,51,0.15);
-    }
-    .stage-form .field-grid-2 {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
     }
     .stage-form .switch-row {
         display: flex; align-items: center; gap: 12px;
@@ -94,7 +95,6 @@
         background: var(--success); border-color: var(--success);
     }
     .stage-form .chip-pick input { display: none; }
-    .stage-form .errors { color: #b91c1c; font-size: 12px; margin-top: 4px; }
 
     .stage-form .builtin-notice {
         margin: 4px 0 14px;
@@ -143,7 +143,7 @@
     </div>
 
     {% if form.non_field_errors %}
-        <div class="form-alert form-alert-error" style="margin-bottom:14px;">{{ form.non_field_errors }}</div>
+        <div class="form-error" style="margin-bottom:14px;">{{ form.non_field_errors }}</div>
     {% endif %}
 
     <form method="post">
@@ -161,14 +161,14 @@
                         <input type="text" name="code" id="id_code"
                                value="{{ form.code.value|default:'' }}" required maxlength="32">
                         <div class="help-text">Stable slug used in URLs + services (e.g. <code>layering</code>).</div>
-                        {% if form.code.errors %}<div class="errors">{{ form.code.errors|join:" " }}</div>{% endif %}
+                        {% if form.code.errors %}<div class="field-error">{{ form.code.errors|join:" " }}</div>{% endif %}
                     </div>
                     <div class="field">
                         <label for="id_name">Display Name *</label>
                         <input type="text" name="name" id="id_name"
                                value="{{ form.name.value|default:'' }}" required maxlength="64">
                         <div class="help-text">Shown in pipeline + tab labels.</div>
-                        {% if form.name.errors %}<div class="errors">{{ form.name.errors|join:" " }}</div>{% endif %}
+                        {% if form.name.errors %}<div class="field-error">{{ form.name.errors|join:" " }}</div>{% endif %}
                     </div>
                 </div>
                 <div class="field">
@@ -181,6 +181,42 @@
                     <label for="id_is_active" style="margin: 0;">Active</label>
                     <span class="help-text" style="margin: 0;">Inactive stages are hidden from new Product flows + access checks.</span>
                 </div>
+                {# R10 frozen model — operation classification: category (display grouping), #}
+                {# work type (canonical HOW), machine type (only when Machine). #}
+                <div class="field">
+                    <label for="id_category">Stage Category</label>
+                    {{ form.category }}
+                    <span class="help-text">Grouping for dashboards & reports only — never workflow logic.</span>
+                    {% if form.category.errors %}<div class="field-error">{{ form.category.errors|join:" " }}</div>{% endif %}
+                </div>
+                <div class="field">
+                    <label for="id_work_type">Work Type</label>
+                    {{ form.work_type }}
+                    <span class="help-text">How the operation is performed. Machine ⇒ pick its Machine Type.</span>
+                    {% if form.work_type.errors %}<div class="field-error">{{ form.work_type.errors|join:" " }}</div>{% endif %}
+                </div>
+                <div class="field" id="machine-type-field">
+                    <label for="id_machine_type">Machine Type</label>
+                    {{ form.machine_type }}
+                    <span class="help-text">Reusable across operations (e.g. Overlock Machine serves several stages).</span>
+                    {% if form.machine_type.errors %}<div class="field-error">{{ form.machine_type.errors|join:" " }}</div>{% endif %}
+                </div>
+                <script>
+                  // Show Machine Type only when Work Type = machine (display-only;
+                  // the form clean() + DB constraint remain the enforcement).
+                  (function () {
+                    function sync() {
+                      var wt = document.querySelector('[name=work_type]');
+                      var field = document.getElementById('machine-type-field');
+                      if (!wt || !field) return;
+                      field.style.display = (wt.value === 'machine') ? '' : 'none';
+                    }
+                    document.addEventListener('change', function (e) {
+                      if (e.target && e.target.name === 'work_type') sync();
+                    });
+                    sync();
+                  })();
+                </script>
             </div>
         </section>
 
@@ -223,8 +259,8 @@
         </section>
 
         <div class="sticky-actions">
-            <a href="{% url 'production:stage-list' %}" class="btn-ghost">Cancel</a>
-            <button type="submit" class="btn-copper">{{ action }} Stage</button>
+            <a href="{% url 'production:stage-list' %}" class="btn btn-ghost btn-lg">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">{{ action }} Stage</button>
         </div>
     </form>
 </div>

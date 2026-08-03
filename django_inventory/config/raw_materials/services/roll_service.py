@@ -22,7 +22,90 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from accounts.services import user_can_edit_financials
+from django.db.models import Count, Q
 from raw_materials.models import ClothRoll, ClothType, StorageLocation
+
+
+# ── BOD-C step-2 read functions (owner gates G-1/G-2, 2026-07-18) ────────────
+# EXTRACTED VERBATIM from ClothDashboardView (the one calculation, now with two
+# consumers: that certified view + the BOD tile — INERT to every other caller;
+# same filter semantics incl. the half-open to_dt the view already applies).
+
+def stock_status_counts(*, from_dt=None, to_dt=None, color_id=None) -> dict:
+    """G-1: roll stock by status (total/available/damaged/used). COUNT of
+    rolls, exactly as the cloth dashboard has always shown it — Django COUNT
+    aggregates, no weights (no kg truth exists, census R-4)."""
+    rolls = ClothRoll.objects.all()
+    if from_dt:
+        rolls = rolls.filter(created_at__gte=from_dt)
+    if to_dt:
+        rolls = rolls.filter(created_at__lt=to_dt)
+    if color_id:
+        rolls = rolls.filter(cloth_color_id=color_id)
+    return {
+        'total': rolls.count(),
+        'available': rolls.filter(status=ClothRoll.Status.NOT_USED).count(),
+        # V1.1 item-1: damaged stock is visible, never hidden in 'used'.
+        'damaged': rolls.filter(status=ClothRoll.Status.DAMAGED).count(),
+        'used': rolls.filter(status=ClothRoll.Status.USED).count(),
+    }
+
+
+def stock_by_location(*, from_dt=None, to_dt=None, color_id=None):
+    """G-2: per-StorageLocation roll counts (the 'which warehouse needs
+    attention' truth) — the cloth dashboard's own Q-composition, verbatim."""
+    return (
+        StorageLocation.active
+        .annotate(
+            roll_count=Count('rolls', filter=(
+                (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
+                & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
+                & (Q(rolls__cloth_color_id=color_id) if color_id else Q())
+            )),
+            available=Count('rolls', filter=(
+                Q(rolls__status=ClothRoll.Status.NOT_USED)
+                & (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
+                & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
+                & (Q(rolls__cloth_color_id=color_id) if color_id else Q())
+            )),
+        )
+        .order_by('name')
+    )
+
+
+def material_purchases_in_period(year: int, month: int) -> dict:
+    """RMX-C (Phase 17, charter = PDD register entry 8): PURCHASES-in-period —
+    cloth bought this month, valued at PURCHASE price (weight_kg × cost_per_kg,
+    both intake facts — ADR-0009 Decision 5; never re-priced). Honest-NULL:
+    unpriced rolls are COUNTED, never valued (never ₹0). Damaged rolls are
+    INCLUDED in the total and separately counted (owner ruling 2026-07-18:
+    honest in purchases — they were bought). READ-ONLY: one aggregate query;
+    `purchased_date` is a DateField ⇒ exact month boundaries, no tz semantics."""
+    from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
+
+    if not (1 <= month <= 12 and 2000 <= year <= 2100):
+        raise ValidationError("Invalid period (expected a real year/month).")
+    zero = Decimal('0.00')
+    value = ExpressionWrapper(
+        F('weight_kg') * F('cost_per_kg'),
+        output_field=DecimalField(max_digits=14, decimal_places=4))
+    agg = ClothRoll.objects.filter(
+        purchased_date__year=year, purchased_date__month=month,
+    ).aggregate(
+        total=Sum(value, filter=Q(cost_per_kg__isnull=False)),
+        priced_rolls=Count('id', filter=Q(cost_per_kg__isnull=False)),
+        unpriced_rolls=Count('id', filter=Q(cost_per_kg__isnull=True)),
+        total_weight_kg=Sum('weight_kg'),
+        damaged_rolls=Count('id', filter=Q(status=ClothRoll.Status.DAMAGED)),
+    )
+    return {
+        'period_key': f"{year:04d}-{month:02d}",
+        'total': agg['total'] or zero,
+        'priced_rolls': agg['priced_rolls'],
+        'unpriced_rolls': agg['unpriced_rolls'],
+        'total_weight_kg': agg['total_weight_kg'] or zero,
+        'damaged_rolls': agg['damaged_rolls'],
+    }
 # tracking.services ka import yahan TOP-level pe NAHI hai — circular import bachne ke liye
 # functions ke andar lazy-import karte hain.
 
@@ -273,8 +356,14 @@ def assign_roll_to_adda(user, *, roll: ClothRoll, adda, weight_kg: Decimal, widt
         raise ValidationError(f"Roll {roll.roll_id} is already used")
     if adda.status != AddaModel.Status.IN_PROGRESS:
         raise ValidationError(f"Adda {adda.code} is not in-progress")
-    # Rolls sirf Layering stage pe assign hote hain — Cutting/baaki stages pe nahi
-    if adda.current_stage is None or adda.current_stage.stage_type != STAGE_LAYERING:
+    # Rolls sirf Layering pe assign hote hain. Streams redesign: the truth
+    # is the LANES' state, not the coarse pointer — any live lane with an
+    # OPEN (started, incomplete) layering record may still receive rolls.
+    from production.models import AddaStageRecord
+    open_layering = AddaStageRecord.objects.filter(
+        adda=adda, workflow_stage__stage__code=STAGE_LAYERING,
+        completed_at__isnull=True).exists()
+    if not open_layering:
         raise ValidationError("Rolls can only be assigned during the Layering stage")
 
     # Saare fields ek hi save() mein update — update_fields se sirf ye columns hit hote hain
@@ -347,9 +436,75 @@ def consume_leftover(user, *, leftover, adda, notes=''):
         leftover.notes = (leftover.notes + ' | ' + notes).strip(' |')[:255]
     leftover.save(update_fields=['is_consumed', 'consumed_in_adda',
                                  'consumed_at', 'notes', 'updated_at'])
+    # V1.1 item-2: the consuming Adda's timeline carries the provenance —
+    # existing ROLL_ASSIGNED vocabulary, the note says it was a leftover.
+    from tracking.models import AddaHistory
+    from tracking.services import log_adda
+    log_adda(adda, AddaHistory.ChangeType.ROLL_ASSIGNED, user,
+             roll=leftover.roll,
+             note=(f"leftover #{leftover.pk} · "
+                   f"{leftover.remaining_weight_kg or '?'} kg from "
+                   f"{leftover.source_adda.code}")[:200])
     logger.info(
         "roll.consume_leftover leftover=%s roll=%s from=%s into=%s by=%s",
         leftover.pk, leftover.roll_id, leftover.source_adda_id, adda.code,
         user.pk,
     )
     return leftover
+
+
+@transaction.atomic
+def mark_roll_damaged(user, *, roll: ClothRoll, reason: str) -> ClothRoll:
+    """V1.1 item-1: retire a WHOLE unusable roll from available stock —
+    management-only, mandatory reason, audited (ClothRollHistory
+    STATUS_CHANGED with the reason). Refused on a USED roll (its cloth is
+    already production history — damage found later lives on the pieces/
+    reports, not the roll). Soft state, never delete."""
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    if not user_has_role(user, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can mark a roll damaged.")
+    if not (reason or '').strip():
+        raise ValidationError("A reason is required to mark a roll damaged.")
+    r = ClothRoll.objects.select_for_update().get(pk=roll.pk)
+    if r.status == ClothRoll.Status.USED:
+        raise ValidationError(
+            "This roll is already consumed by production — record damage on "
+            "the affected pieces/reports, not the roll.")
+    if r.status == ClothRoll.Status.DAMAGED:
+        raise ValidationError("This roll is already marked damaged.")
+    old = r.status
+    r.status = ClothRoll.Status.DAMAGED
+    r.save(update_fields=['status', 'updated_at'])
+    from tracking.models import ClothRollHistory
+    from tracking.services import log_roll
+    log_roll(r, ClothRollHistory.ChangeType.STATUS_CHANGED, user,
+             field_name='status', old_value=old, new_value='damaged',
+             note=f"damaged: {reason.strip()}"[:200])
+    logger.info("roll.mark_damaged roll=%s by=%s reason=%s",
+                r.roll_id, getattr(user, 'pk', None), reason.strip())
+    return r
+
+
+@transaction.atomic
+def restore_damaged_roll(user, *, roll: ClothRoll, reason: str) -> ClothRoll:
+    """V1.1 item-1: the mistake escape — a wrongly-damaged roll returns to
+    available stock. Management-only, mandatory reason, audited. Only a
+    DAMAGED roll can be restored."""
+    from accounts.services import MANAGEMENT_ROLES, user_has_role
+    if not user_has_role(user, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can restore a damaged roll.")
+    if not (reason or '').strip():
+        raise ValidationError("A reason is required to restore a roll.")
+    r = ClothRoll.objects.select_for_update().get(pk=roll.pk)
+    if r.status != ClothRoll.Status.DAMAGED:
+        raise ValidationError("Only a damaged roll can be restored.")
+    r.status = ClothRoll.Status.NOT_USED
+    r.save(update_fields=['status', 'updated_at'])
+    from tracking.models import ClothRollHistory
+    from tracking.services import log_roll
+    log_roll(r, ClothRollHistory.ChangeType.STATUS_CHANGED, user,
+             field_name='status', old_value='damaged', new_value='not_used',
+             note=f"restored: {reason.strip()}"[:200])
+    logger.info("roll.restore_damaged roll=%s by=%s",
+                r.roll_id, getattr(user, 'pk', None))
+    return r

@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kapil-erp/knowledge_graph.schema.json",
+  "title": "Kapil Enterprises Knowledge Graph — schema v1 (1.0.1)",
+  "description": "Contract for docs/knowledge_graph.json (Phase 8, KG-B; Design Record KG-D1..D9 ratified 2026-07-13). The graph is the single source FOR GENERATED DOCUMENTATION only — NEVER project truth (code + T1 truth-locks stay the territory; fix-at-source; hand-edits forbidden, generated class). Serialization law (KG-D4): canonical JSON — object keys sorted, nodes sorted by id, edges sorted by (from, kind, to, source), indent 2, UTF-8, single trailing newline, ZERO wall-clock timestamps anywhere in the body. Consumers (Phase-9 generators, Phase-14 knowledge_sync, Phase-18 lifecycle) pin schema MAJOR; additive evolution = minor bump only (KG-D6); the additive-minor register lives in KNOWLEDGE_GRAPH_BUILD_LOG.md §KG-0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "nodes", "edges"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "content_hash", "built_from"],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "pattern": "^1\\.[0-9]+\\.[0-9]+$",
+          "description": "Semver; this schema document is 1.0.1 (patch 2026-07-13: id-regex widening only — url namespace-less hyphenated names + view closure qualnames; validator-proven, PHASE_08 dated amendment). Major is pinned by consumers; breaking change = major bump + owner approval + same-change consumer update (KG-D6)."
+        },
+        "content_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "sha256 of the canonical body with this field's value replaced by the empty string. The validator REFUSES a graph whose hash does not match (hand-edit guard, KG-D7)."
+        },
+        "built_from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["git_head", "census"],
+          "properties": {
+            "git_head": { "type": "string", "pattern": "^[0-9a-f]{7,40}$", "description": "HEAD at build time — changes only when inputs change; NOT a timestamp." },
+            "census": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["app", "url", "view_project", "view_vendor", "service", "model", "doc", "adr", "feature"],
+              "properties": {
+                "app": { "type": "integer", "minimum": 0 },
+                "url": { "type": "integer", "minimum": 0 },
+                "view_project": { "type": "integer", "minimum": 0 },
+                "view_vendor": { "type": "integer", "minimum": 0 },
+                "service": { "type": "integer", "minimum": 0 },
+                "model": { "type": "integer", "minimum": 0 },
+                "doc": { "type": "integer", "minimum": 0 },
+                "adr": { "type": "integer", "minimum": 0 },
+                "feature": { "type": "integer", "minimum": 0 }
+              },
+              "description": "KG-A instrument totals at build time — the completeness-floor denominators (invariant 8): per-kind node counts must be >= these."
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/node" },
+      "description": "Sorted by id (KG-D4). ID uniqueness = invariant 1 (validator-enforced; JSON Schema cannot express it)."
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/edge" },
+      "description": "Sorted by (from, kind, to, source). Referential integrity (every endpoint exists) = invariant 2, validator-enforced."
+    }
+  },
+  "definitions": {
+    "node": {
+      "type": "object",
+      "required": ["id", "kind", "label", "anchors"],
+      "properties": {
+        "id": { "type": "string", "minLength": 3 },
+        "kind": { "enum": ["app", "url", "view", "service", "model", "doc", "feature", "adr"] },
+        "label": { "type": "string", "minLength": 1, "description": "Human-readable display name. Ownership semantics (KG-D7): every attribute value is DERIVED from its declared source; the graph owns nothing." },
+        "anchors": {
+          "type": "array", "items": { "type": "string" }, "minItems": 1,
+          "description": "Repo-relative paths proving the node's existence (invariant 6 for docs; existence-checkable for code kinds). Derivation source per kind is fixed: app/url/view/model = Django introspection (apps registry + root-URLConf walk); service = file census; doc = DD-1 active-boundary census + frontmatter; adr = docs/adr census; feature = FEATURE_INDEX R3 seed."
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "app" } } },
+          "then": { "properties": { "id": { "pattern": "^app:[a-z_]+$" } },
+                    "required": ["id", "kind", "label", "anchors", "app_label"],
+                    "$comment": "MODEL-LESS APP RULE (KG-A flag c): apps with zero models (core, inventory) are VALID; app connectivity is guaranteed via documented_by edges to their README/GUIDE doc nodes (island invariant 7 — apps are never islands THROUGH documentation, not through models)." } },
+        { "if": { "properties": { "kind": { "const": "url" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^url:([a-z0-9_-]+(:[a-z0-9_-]+)?|_unnamed:[a-z0-9-]{1,80})$" },
+                      "namespace": { "type": "string" },
+                      "url_name": { "type": ["string", "null"], "$comment": "null for the 46 unnamed routes." },
+                      "pattern": { "type": "string" },
+                      "mount": { "type": "string" },
+                      "named": { "type": "boolean" },
+                      "gate": { "type": "string", "$comment": "Informational gate summary from the census. RBAC TRUTH STAYS IN CODE — this is navigation metadata, never authorization." } },
+                    "required": ["id", "kind", "label", "anchors", "pattern", "mount", "named"],
+                    "$comment": "UNNAMED-ROUTE ID FALLBACK (KG-A flag a): named routes id = url:<namespace>:<url_name> (or url:<url_name> when namespace-less); unnamed routes id = url:_unnamed:<slug-of-full-mount-pattern> — deterministic from the URLConf source; a slug collision is a build FAILURE routed to a source finding (never auto-suffixed)." } },
+        { "if": { "properties": { "kind": { "const": "view" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^view:[A-Za-z_][A-Za-z0-9_.<>]*$" },
+                      "module": { "type": "string" },
+                      "name": { "type": "string" },
+                      "vendor": { "type": "boolean" } },
+                    "required": ["id", "kind", "label", "anchors", "module", "name", "vendor"],
+                    "$comment": "VENDOR-VIEW REPRESENTATION (KG-A flag b): vendor callables (django.contrib/allauth/debug_toolbar) ARE nodes with vendor:true, so every routes_to edge keeps referential integrity (528 routes all resolve); completeness floor applies to vendor:false nodes only (>= census.view_project); vendor floor informational (>= census.view_vendor). Vendor anchors = the route mounts they serve (site-packages paths are NOT repo anchors)." } },
+        { "if": { "properties": { "kind": { "const": "service" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^service:[a-z_]+\\.[a-z0-9_]+$" },
+                      "app_label": { "type": "string" },
+                      "module": { "type": "string" },
+                      "single_writer_of": { "type": "array", "items": { "type": "string" }, "$comment": "model ids from the never_modify registry — declared, register-sourced (ADR-0002)." } },
+                    "required": ["id", "kind", "label", "anchors", "app_label", "module"] } },
+        { "if": { "properties": { "kind": { "const": "model" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^model:[a-z_]+\\.[A-Za-z0-9]+$" },
+                      "app_label": { "type": "string" },
+                      "model_name": { "type": "string" },
+                      "table": { "type": "string" },
+                      "single_writer": { "type": ["string", "null"], "$comment": "service id where the never_modify registry names one; null otherwise (honest absence, never guessed)." } },
+                    "required": ["id", "kind", "label", "anchors", "app_label", "model_name", "table"] } },
+        { "if": { "properties": { "kind": { "const": "doc" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^doc:[A-Za-z0-9_./-]+\\.(md|json)$" },
+                      "path": { "type": "string" },
+                      "tier": { "enum": ["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"] },
+                      "doc_type": { "enum": ["entry-index", "truth-lock", "adr", "topic-canonical", "app-readme", "app-guide", "feature-doc", "url-card", "page-contract", "data-flow", "request-journey", "chokepoint", "database-guide", "lesson", "receipt", "evidence-cert", "campaign-contract", "status-anchor", "machine-index", "archive-record"] },
+                      "owner_class": { "enum": ["handwritten", "generated", "hybrid", "frozen", "append-only"] },
+                      "lifecycle": { "type": "string", "$comment": "DOC_STANDARDS §12 states incl. versioned frozen labels (frozen-v1...) and pre-retrofit 'unknown' for the 14 owner-review + non-carrier docs — honest absence, never guessed." } },
+                    "required": ["id", "kind", "label", "anchors", "path", "tier", "doc_type", "owner_class", "lifecycle"],
+                    "$comment": "tier/doc_type/owner_class/lifecycle derive from frontmatter (223 carriers) else the Phase-6 census rows; the derivation source is recorded per-node via anchors + the builder's extraction tables." } },
+        { "if": { "properties": { "kind": { "const": "feature" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^feature:[a-z0-9-]{2,60}$" },
+                      "slug": { "type": "string" },
+                      "seed_source": { "const": "docs/LEARNING_2_0/PROJECT_BRAIN/FEATURE_INDEX.md", "$comment": "R3-ratified seed; single allowed source in v1." } },
+                    "required": ["id", "kind", "label", "anchors", "slug", "seed_source"] } },
+        { "if": { "properties": { "kind": { "const": "adr" } } },
+          "then": { "properties": {
+                      "id": { "pattern": "^adr:[0-9]{4}$" },
+                      "number": { "type": "integer", "minimum": 1 },
+                      "status": { "type": "string" } },
+                    "required": ["id", "kind", "label", "anchors", "number", "status"] } }
+      ]
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "kind", "source"],
+      "properties": {
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "kind": { "enum": ["routes_to", "gated_by", "calls", "writes", "documented_by", "belongs_to_feature", "supersedes", "cites"] },
+        "source": {
+          "enum": ["urlconf", "register:never_modify", "register:chokepoints", "register:guide", "frontmatter", "banner", "feature_index", "manifest", "documentation_index"],
+          "description": "Declared extraction source (KG-D3) — every edge is register/introspection-sourced, NEVER inferred, guessed, or runtime-traced. Per-kind expectations: routes_to←urlconf · gated_by←urlconf+register:guide · calls←register:guide/chokepoints · writes←register:never_modify/chokepoints · documented_by←frontmatter/manifest/documentation_index/register:guide · belongs_to_feature←feature_index · supersedes←banner/frontmatter · cites←frontmatter/manifest."
+        },
+        "note": { "type": "string" }
+      },
+      "$comment": "Validator-enforced semantics (not expressible in JSON Schema): endpoint kinds per edge kind — routes_to url→view · gated_by url→(service|doc) · calls view→service · writes service→model · documented_by (url|model|service|view|app)→doc · belongs_to_feature (url|doc|service|model)→feature · supersedes doc→doc (acyclic, superseded doc has EXACTLY one successor) · cites doc→(doc|adr)."
+    }
+  },
+  "$comment": "INVARIANTS (KG-D5, all fatal, validator-enforced — JSON Schema expresses shape, the stdlib validator enforces semantics): 1 id-unique · 2 referential integrity · 3 kinds closed · 4 cardinality (url routes_to exactly 1 view; url documented_by <=1 url-card doc; superseded doc exactly 1 successor) · 5 supersedes acyclic · 6 every doc path exists on disk · 7 islands (apps never — via documented_by; doc islands = orphan finding) · 8 completeness floors vs meta.built_from.census. TOOL-DEATH: this file + the graph are plain readable JSON; consumers fail soft to md/code truth. VALIDATION TOOLING NOTE: the frozen venv has no third-party jsonschema library — the Phase-8 validator implements BOTH the shape checks and the semantic invariants in stdlib Python (scripts/, KG-D9); this .schema.json remains the authoritative machine-readable contract for any external JSON-Schema-aware consumer."
+}

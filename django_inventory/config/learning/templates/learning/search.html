@@ -1,0 +1,53 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}Search — Learn{% endblock %}
+{% block page_title %}Search{% endblock %}
+
+{% block content %}
+<div class="learn-page learn-page--search">
+  <div class="learn-hero">
+    <span class="lp-eyebrow"><a href="{% url 'learning:index' %}" class="lp-back">← All courses</a></span>
+    <h1>🔍 Search the courses</h1>
+    <p>Every chapter of every course. Matches exactly what you type — no guessing,
+       so a result is never a mystery.</p>
+  </div>
+
+  <form method="get" action="{% url 'learning:search' %}" class="lp-actions" role="search">
+    <label for="q" class="sr-only" style="position:absolute;left:-9999px">Search courses</label>
+    <input type="search" id="q" name="q" value="{{ query }}" autofocus
+           placeholder="e.g. index, deadlock, gunicorn, NULL"
+           class="lp-input" border:1px solid var(--lp-line);border-radius:11px;
+                  background:var(--lp-bg);box-shadow:inset 0 1px 2px rgba(0,0,0,.05);
+                  font-family:inherit;color:var(--lp-ink)">
+    <button type="submit" class="lp-btn lp-btn--accent">Search</button>
+  </form>
+
+  {% if too_short %}
+    <div class="lp-prose"><p>Type at least two characters.</p></div>
+  {% elif query %}
+    <p class="lp-pct" style="margin:0 0 12px">
+      {{ total }} chapter{{ total|pluralize }} match “{{ query }}”{% if total > results|length %} · showing the top {{ results|length }}{% endif %}
+    </p>
+    {% for r in results %}
+    <a class="lp-row" href="{% url 'learning:chapter' r.course.slug r.chapter.slug %}"
+       style="align-items:flex-start;flex-direction:column;gap:5px;margin-bottom:9px;padding:12px 14px">
+      <span style="display:flex;gap:8px;align-items:center;width:100%">
+        <span class="lp-num" style="min-width:34px;height:30px">{{ r.chapter.number }}</span>
+        <span class="lp-t">{{ r.chapter.title }}</span>
+        <span class="lp-chip" style="margin-left:auto">{{ r.hits }}×</span>
+      </span>
+      <span style="font-size:12.5px;color:var(--lp-soft);line-height:1.55">{{ r.snippet }}</span>
+      <span class="lp-meta--inline">{{ r.course.icon }} {{ r.course.title }}</span>
+    </a>
+    {% empty %}
+    <div class="lp-prose"><p>No chapter contains “{{ query }}”. Try a shorter or
+      more common term — the search is literal on purpose.</p></div>
+    {% endfor %}
+  {% else %}
+    <div class="lp-prose">
+      <p>Try: <a href="?q=index">index</a> · <a href="?q=deadlock">deadlock</a> ·
+         <a href="?q=NULL">NULL</a> · <a href="?q=transaction">transaction</a> ·
+         <a href="?q=backup">backup</a> · <a href="?q=gunicorn">gunicorn</a></p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

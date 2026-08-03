@@ -1,0 +1,32 @@
+{% comment %}
+R8 — THE generic stage admin-snapshot partial (owner spec 2026-07-05).
+Renders `prev_admin_snapshot` (the previous stage's handler.admin_snapshot):
+    {'title', 'sections': [{'label', 'rows': [(name, value), …]}]}
+Management-only: the VIEW gates the ctx (workers never receive the data);
+this template renders nothing when the variable is absent. Read-only
+reference view — live data, never frozen. Reused by every future stage
+panel and by Adda-360 (do NOT fork this partial).
+{% endcomment %}
+{% if prev_admin_snapshot %}
+<details class="admin-snap" open>
+    <summary>{{ prev_admin_snapshot.title }} <span class="admin-snap-tag">management reference</span></summary>
+    {% for sec in prev_admin_snapshot.sections %}
+    <div class="admin-snap-sec">
+        <div class="admin-snap-label">{{ sec.label }}</div>
+        {% for name, value in sec.rows %}
+        <div class="admin-snap-row"><span>{{ name }}</span><strong>{{ value }}</strong></div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</details>
+<style>
+    /* Scoped to the partial (rule 10) — single-column mobile-first. */
+    .admin-snap { background: var(--cream-2, #f1ece2); border: 1px solid var(--border-subtle, #e6dcc9); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; }
+    .admin-snap summary { cursor: pointer; font-weight: 700; font-size: 13px; min-height: 32px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .admin-snap-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--stone, #6e6259); font-weight: 600; }
+    .admin-snap-sec { margin-top: 8px; }
+    .admin-snap-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--stone, #6e6259); margin-bottom: 4px; }
+    .admin-snap-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed var(--border-subtle, #e6dcc9); font-size: 13px; flex-wrap: wrap; }
+    .admin-snap-row:last-child { border-bottom: 0; }
+</style>
+{% endif %}

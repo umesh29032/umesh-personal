@@ -1,0 +1,26 @@
+{# §2d Rule L — readiness matrix partial (Hub + Generate page). Context: hub (from views._hub_readiness) #}
+<div class="table-responsive rm-scroll">
+  <table class="rm-table">
+    <thead>
+      <tr><th>Piece</th>
+        {% for s in hub.sizes %}<th class="rm-size">{{ s.label }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in hub.rows %}
+      <tr>
+        <td class="rm-piece">{{ row.name }}
+          {% if row.piece.is_optional %}<span class="rm-opt">optional</span>{% endif %}
+          {% if row.piece.on_fold %}<span class="rm-fold">on-fold</span>{% endif %}
+        </td>
+        {% for size, state in row.cells %}
+          <td class="rm-cell rm-{{ state }}"
+              title="{{ row.name }} / {{ size.label }}: {% if state == 'ok' %}confirmed{% elif state == 'draft' %}drawn, not confirmed{% else %}missing{% endif %}">
+            {% if state == 'ok' %}✓{% elif state == 'draft' %}◐{% else %}✗{% endif %}
+          </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

@@ -1,3 +1,13 @@
+---
+id: l2-apps-expense-file-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: expense
+anchors: config/expense/
+verified: 2026-07-13
+---
+
 # expense — every important file (FILE_MAP)
 
 ## TL;DR (1 min)

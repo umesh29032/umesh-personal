@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: documentation system
+anchors: —
+verified: 2026-07-13
+---
+
 # DATABASE GUIDE — models for someone weak in SQL
 
 > START with the complete data-model + persistence doc:

@@ -1,0 +1,32 @@
+{% extends "accounts/base.html" %}
+{# P2 — register a physical mat (form-shell canon, mobile-first) #}
+{% block page_title %}Register Calibration Mat{% endblock %}
+{% block content %}
+<div class="pai-mat-new">
+  <div class="page-header">
+    <h1>Register Calibration Mat</h1>
+    <p class="subtitle">Registration only records the physical asset —
+    the mat cannot back a capture until it is commissioned.</p>
+  </div>
+  <form method="post" class="card" style="padding:20px; max-width:520px;">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="form-errors">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="field">
+      <label for="id_mat_code">Mat code (the physical label)</label>
+      {{ form.mat_code }}
+      {{ form.mat_code.errors }}
+    </div>
+    <div class="field">
+      <label for="id_name">Display name (optional)</label>
+      {{ form.name }}
+      {{ form.name.errors }}
+    </div>
+    <div style="display:flex; gap:10px; margin-top:14px;">
+      <a class="btn" href="{% url 'patterns_ai:mat-list' %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Register</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 """Cutting-pattern stage service — yeh file kyu hai?
 
 PRODUCTION FLOW MEIN POSITION:
-  Layering → Cutting Pattern (yahan) → Cutting
+  Layering → Pattern Design (yahan) → Cutting
 
 CUTTING-PATTERN STAGE MATLAB:
   Cutting master Adda ke layered cloth pe pattern draw karta hai. Yeh
@@ -133,7 +133,8 @@ def _pattern_workflow_stage(adda: Adda) -> WorkflowStage | None:
     return adda.product.workflow_stages.filter(stage__code=STAGE_CUTTING_PATTERN).first()
 
 
-def get_or_create_pattern_stage_record(adda: Adda, user) -> AddaStageRecord:
+def get_or_create_pattern_stage_record(adda: Adda, user,
+                                       stream=None) -> AddaStageRecord:
     """Iss Adda ka cutting_pattern AddaStageRecord row return (lazy create).
 
     PRE-CONDITION: Adda abhi cutting_pattern stage pe ho. Iska matlab
@@ -148,18 +149,32 @@ def get_or_create_pattern_stage_record(adda: Adda, user) -> AddaStageRecord:
     wf = _pattern_workflow_stage(adda)
     if wf is None:
         raise ValidationError("This product does not include the cutting_pattern stage.")
-    if adda.current_stage_id != wf.id:
-        raise ValidationError("Adda is not currently at the cutting_pattern stage.")
-    # get_or_create = atomic SELECT-or-INSERT. Race-safe under
-    # @transaction.atomic wrappers in caller.
-    sr, created = AddaStageRecord.objects.get_or_create(
-        adda=adda, workflow_stage=wf,
-        defaults={'started_at': timezone.now()},
-    )
+    # Streams: the gate is the LANE's readiness, not pointer equality —
+    # this lane's LAY must be complete before its pattern work opens.
+    from production.services.adda_service import resolve_stream
+    lane = resolve_stream(adda, stream)
+    from django.db.models import Q as _Q
+    lay_done = AddaStageRecord.objects.filter(
+        adda=adda, workflow_stage__stage__code='layering',
+        completed_at__isnull=False).filter(
+        _Q(stream=lane) | _Q(stream__isnull=True)).exists()
+    if not lay_done:
+        raise ValidationError(
+            f"Complete the {lane.label} layering before its pattern work.")
+    # lane-scoped SELECT-or-INSERT (adopts legacy NULL-stream rows).
+    from production.services.adda_service import lane_stage_record
+    sr = lane_stage_record(adda, wf, lane, create=True,
+                           defaults={'started_at': timezone.now()})
+    created = getattr(sr, '_lane_created', False)
     # Defensive: agar pehle se row tha but started_at NULL (legacy?), set kar do.
     if created and not sr.started_at:
         sr.started_at = timezone.now()
         sr.save(update_fields=['started_at'])
+    if created:
+        # PA-10-3 (Contract 2): snapshot the payable-rate at creation, like every other
+        # SR site. Idempotent; caller is @transaction.atomic.
+        from production.services.stage_rate_service import ensure_stage_role_rates
+        ensure_stage_role_rates(sr)
     return sr
 
 
@@ -198,7 +213,8 @@ def _compress_image(uploaded) -> ContentFile:
 
 
 @transaction.atomic
-def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaStageRecord:
+def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user,
+                        stream=None) -> AddaStageRecord:
     """Manager workers assign karta hai → stage formally start.
 
     Workers M2M is reset (`workers.set(...)`) — call again with different
@@ -211,7 +227,7 @@ def start_pattern_stage(*, adda: Adda, worker_ids: Iterable[int], user) -> AddaS
     """
     if not user_has_role(user, MANAGEMENT_ROLES):
         raise PermissionDenied("only management can start the cutting_pattern stage")
-    sr = get_or_create_pattern_stage_record(adda, user)
+    sr = get_or_create_pattern_stage_record(adda, user, stream=stream)
     # .set() = M2M replace (delete extras + add missing). Idempotent.
     from production.services.worker_task_service import set_stage_workers
     set_stage_workers(sr, worker_ids)   # dual-write: M2M (authoritative) + WorkerStageTask
@@ -281,7 +297,8 @@ def attach_photo(*, stage_record: AddaStageRecord, uploaded_image,
 
 
 @transaction.atomic
-def save_pattern_record(*, adda: Adda, video_file, notes: str, user) -> CuttingPatternRecord:
+def save_pattern_record(*, adda: Adda, video_file, notes: str, user,
+                        stream=None) -> CuttingPatternRecord:
     """Video + notes save/replace karna — independent (kisi ek se kaam chal jaata).
 
     Idempotent:
@@ -293,7 +310,7 @@ def save_pattern_record(*, adda: Adda, video_file, notes: str, user) -> CuttingP
     replay ke beech preserved rehti hai (record FK same).
     """
     _ensure_pattern_skill(user)
-    sr = get_or_create_pattern_stage_record(adda, user)
+    sr = get_or_create_pattern_stage_record(adda, user, stream=stream)
     if sr.completed_at is not None:
         raise ValidationError("Stage already completed.")
 
@@ -421,7 +438,8 @@ def set_size_allocation(
 
 
 @transaction.atomic
-def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
+def complete_pattern_stage(*, adda: Adda, user, stream=None,
+                           override_pending_reason: str | None = None) -> CuttingPatternRecord:
     """Finalize karke agle stage pe advance.
 
     Validation chain:
@@ -454,13 +472,16 @@ def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
     wf = _pattern_workflow_stage(adda)
     if wf is None:
         raise ValidationError("Product does not include the cutting_pattern stage.")
-    if adda.current_stage_id != wf.id:
-        raise ValidationError("Adda is not at the cutting_pattern stage.")
+    from production.services.adda_service import resolve_stream
+    lane = resolve_stream(adda, stream)
 
     try:
         # WF-4: lock the stage row so a concurrent completer blocks here and then
         # sees completed_at set below — prevents double-advance / double-freeze.
-        sr = AddaStageRecord.objects.select_for_update().get(adda=adda, workflow_stage=wf)
+        from production.services.adda_service import lane_stage_record
+        sr = lane_stage_record(adda, wf, lane, for_update=True)
+        if sr is None:
+            raise AddaStageRecord.DoesNotExist
     except AddaStageRecord.DoesNotExist:
         raise ValidationError("Stage record missing — upload video + photos first.")
     if sr.completed_at is not None:
@@ -510,10 +531,27 @@ def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
     sr.completed_by = user
     sr.save(update_fields=['completed_at', 'completed_by', 'updated_at'])
 
+    # R8 WP-5 (spec §3, ANALYTICS ONLY — no payment reads this): lead time =
+    # Pattern Design complete − Layering complete, minutes, on the typed record.
+    from django.db.models import Q
+    layering_sr = (AddaStageRecord.objects
+                   .filter(adda=adda, workflow_stage__stage__code='layering',
+                           completed_at__isnull=False)
+                   .filter(Q(stream=lane) | Q(stream__isnull=True))
+                   .order_by('-completed_at').first())
+    if layering_sr is not None:
+        delta = sr.completed_at - layering_sr.completed_at
+        record.lead_minutes_from_layering = max(0, int(delta.total_seconds() // 60))
+        record.save(update_fields=['lead_minutes_from_layering', 'updated_at'])
+
     # advance_to_next_stage = adda_service mein defined helper. Yeh
     # adda.current_stage ko agle WorkflowStage pe set karta hai aur
     # tracking.AddaHistory entry log karta hai.
-    advance_to_next_stage(adda, user)
+    # R3: C3 guard + override live at the funnel (passthrough only).
+    # Streams: the LANE finished its pattern check — lane funnel.
+    from production.services.adda_service import advance_lane
+    advance_lane(adda, stream=lane, leaving_sr=sr, user=user,
+                 override_pending_reason=override_pending_reason)
     logger.info(
         "cutting_pattern.complete adda=%s stage_record=%s from_stage=%s "
         "verified=%s/%s allocations=%s user=%s",
@@ -526,7 +564,7 @@ def complete_pattern_stage(*, adda: Adda, user) -> CuttingPatternRecord:
 
 @transaction.atomic
 def reopen_pattern_stage(*, adda: Adda, user) -> AddaStageRecord:
-    """Admin-only: completed Cutting Pattern stage ko unlock for correction.
+    """Admin-only: completed Pattern Design stage ko unlock for correction.
 
     Mirror of `layering_service.reopen_layering` — same rules apply:
       • Management role required (super_admin / manager)
@@ -550,7 +588,7 @@ def reopen_pattern_stage(*, adda: Adda, user) -> AddaStageRecord:
     # reopen — the master can replace them on re-complete — so there is NO
     # teardown. Its only delta from the shared skeleton is the downstream guard.
     return reopen_stage_record(
-        adda=adda, stage_code=STAGE_CUTTING_PATTERN, stage_label='Cutting Pattern',
+        adda=adda, stage_code=STAGE_CUTTING_PATTERN, stage_label='Pattern Design',
         user=user, guard=downstream_started_guard,
     )
 

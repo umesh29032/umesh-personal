@@ -16,6 +16,14 @@ from decimal import Decimal
 from production.constants import STAGE_LAYERING
 from production.stages.base import CompletionResult, ReopenResult, StageHandler, register
 
+# M6 — layering-side layout provider (the SAME registry species as
+# cutting_pattern.LAYOUT_PROVIDER; MANUFACTURING_INTEGRATION_REVIEW §4).
+# Contract: LAYOUT_PROVIDER(adda) -> {'groups': [{'group', 'uid',
+# 'length_mm', 'layering_type'}]} | None — plain data, ADVISORY display
+# only (the operator's layer length stays the manufacturing fact).
+# Registered by patterns_ai in apps.ready(); production calls it wrapped.
+LAYOUT_PROVIDER = None
+
 
 @register
 class LayeringHandler(StageHandler):
@@ -26,6 +34,36 @@ class LayeringHandler(StageHandler):
     def snapshot(self, adda):
         from production.services import get_layering_snapshot
         return get_layering_snapshot(adda)
+
+    def admin_snapshot(self, adda):
+        # R8 generic snapshot: layering's output as a management reference for
+        # the NEXT stage (Pattern Design). LIVE reads only — get_layering_snapshot
+        # + the per-roll entries; nothing frozen, nothing duplicated.
+        from production.services import get_layering_snapshot
+        snap = get_layering_snapshot(adda)
+        if snap['state'] in ('absent', 'not_started'):
+            return None
+        sr = snap['stage_record']
+        roll_rows = []
+        if sr is not None:
+            for e in (sr.layering_roll_entries
+                      .select_related('roll__cloth_type', 'roll__cloth_color')
+                      .order_by('attached_at')):
+                roll_rows.append((
+                    f"Roll #{e.roll_id} · {e.roll.cloth_type.name} · {e.roll.cloth_color.name}",
+                    f"{e.layers_on_roll or '—'} layers · width {e.width_verified_inch or '—'}\" · {e.weight_verified_kg or '—'} kg",
+                ))
+        totals = [
+            ('Total layers', snap['lay_count'] if snap['lay_count'] is not None else '—'),
+            ('Layer length', f"{snap['layer_length']} m" if snap['layer_length'] is not None else '—'),
+            ('Colours', snap['total_colors'] if snap['total_colors'] is not None else '—'),
+            ('Rolls used', snap['rolls_count']),
+            ('Leftover cloth', f"{snap['leftover_length_sum']} m · {snap['leftover_weight_sum']} kg"),
+        ]
+        sections = [{'label': 'Totals', 'rows': totals}]
+        if roll_rows:
+            sections.append({'label': 'Colour-wise rolls', 'rows': roll_rows})
+        return {'title': 'Layering — reference', 'sections': sections}
 
     def panel_context(self, request, adda, record):
         from production.views.stage_views import _build_layering_context
@@ -64,3 +102,15 @@ class LayeringHandler(StageHandler):
         # cost_service._quantity_for's per_layer branch).
         lr = getattr(record, 'layering', None)
         return Decimal(lr.lay_count) if lr is not None and lr.lay_count is not None else None
+
+    def contribution_schema(self, adda, worker=None):
+        # R2 (PDD §14): layering workers report LAYERS, not pieces — override
+        # only the label/unit of the base single-quantity schema. Dimensionless
+        # (no colour/size at this stage); the report view/parser stay generic.
+        return {
+            'line_label': 'layers',
+            'fields': [
+                {'key': 'reported_quantity', 'kind': 'quantity',
+                 'label': 'Layers laid', 'required': True, 'unit': 'layers'},
+            ],
+        }

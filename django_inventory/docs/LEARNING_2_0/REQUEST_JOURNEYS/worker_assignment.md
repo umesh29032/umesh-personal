@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-worker-assignment
+type: request-journey
+status: active
+owner: handwritten
+scope: worker_assignment (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Worker Assignment (roster)
 
 ## TL;DR (1 min)

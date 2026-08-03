@@ -1,3 +1,13 @@
+---
+id: l2-django-guide-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: learning — Django patterns
+anchors: —
+verified: 2026-07-13
+---
+
 # DJANGO GUIDE — Django as THIS project uses it
 
 ## TL;DR (2 min)

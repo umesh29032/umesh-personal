@@ -1,3 +1,13 @@
+---
+id: l2-architecture-explained-03-why-addasettlement
+type: topic-canonical
+status: active
+owner: handwritten
+scope: learning — architecture rationale
+anchors: —
+verified: 2026-07-13
+---
+
 # Why AddaSettlement exists
 
 **Problem:** Paisa kab "ban" jaata hai? Pehle allocation ke waqt guess hota tha

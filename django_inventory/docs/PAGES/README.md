@@ -1,3 +1,13 @@
+---
+id: pages-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: page contracts
+anchors: —
+verified: 2026-07-13
+---
+
 # docs/PAGES/ — per-page documentation
 
 One markdown file per significant page. Each must cover the master-spec sections:
@@ -13,7 +23,7 @@ One markdown file per significant page. Each must cover the master-spec sections
 - **Mobile behavior** — responsive layout, overflow handling.
 - **Risks** — what could go wrong; trust boundaries.
 
-`ACCESS_CONTROL.md` is the filled-in exemplar.
+[`ACCESS_CONTROL.md`](ACCESS_CONTROL.md) is the filled-in exemplar.
 
 ## Backlog (pages still to document)
 Costing (`/production/costing/`), Payroll Overview (`/expense/payroll/`),

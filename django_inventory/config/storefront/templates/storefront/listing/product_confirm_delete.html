@@ -44,7 +44,7 @@
             <a href="{% url 'storefront:product_list' %}" class="btn btn-ghost">Cancel</a>
             <form method="post" style="display: contents;">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-danger" style="background: #dc2626; color: white;">
+                <button type="submit" class="btn btn-danger">
                     Yes, Delete Product
                 </button>
             </form>

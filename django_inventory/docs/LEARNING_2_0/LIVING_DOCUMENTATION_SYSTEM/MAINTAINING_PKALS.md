@@ -1,3 +1,13 @@
+---
+id: l2-living-documentation-system-maintaining-pkals
+type: topic-canonical
+status: active
+owner: handwritten
+scope: documentation system (PKALS-LIVE)
+anchors: —
+verified: 2026-07-13
+---
+
 # MAINTAINING PKALS — surviving years of development
 
 ## TL;DR

@@ -105,9 +105,29 @@ class ListViewQueryBaselineTest(TestCase):
 
 # Locked full-render baselines (3-Adda fixture; includes sidebar/menu overhead).
 # A silent move = a template/queryset N+1 regression — update CONSCIOUSLY.
-ADDA_LIST_QUERIES = 11
+# 11 → 8 (engineering sweep 2026-07-06, conscious): AddaListView queryset gained
+# select_related('current_stage__stage') — get_stage_type_display no longer
+# fires one Stage read per rendered row (3-Adda fixture ⇒ −3).
+ADDA_LIST_QUERIES = 6
+# 2026-08-02 (conscious, IMPROVEMENT): `user_role_codes()` is now request-cached
+# like its two neighbours in permission_service. Every `user_has_role()` call used
+# to fire a fresh `extra_roles` M2M query, so a page doing many role checks paid
+# many queries for an answer that cannot change mid-request. Lowered here to LOCK
+# the gain in — a future rise is a real regression.
 # 9→10 (C-1, conscious): +1 aggregate for the unpriced-rolls honest-NULL map.
-COSTING_QUERIES = 10
+# 10 → 11 (M13, conscious): +1 payable-std aggregate — the like-for-like
+# variance needs the payable-only Σ alongside the total frozen Σ.
+# 11 → 16 (Phase-17 RMX-D 2026-07-18, conscious — Model-B completion): +5,
+# ALL from the ONE certified Decision-2 assembly (full_costs_for_addas:
+# material arm 3 grouped aggregates + SWA settled Σ + non-payable ASR Σ) —
+# constant count regardless of Adda volume; the Material/Full-Cost columns'
+# entire price.
+COSTING_QUERIES = 14
+# 2026-08-02 (conscious, IMPROVEMENT): `user_role_codes()` is now request-cached
+# like its two neighbours in permission_service. Every `user_has_role()` call used
+# to fire a fresh `extra_roles` M2M query, so a page doing many role checks paid
+# many queries for an answer that cannot change mid-request. Lowered here to LOCK
+# the gain in — a future rise is a real regression.
 
 
 class BulkSnapshotN1Test(TestCase):
@@ -148,7 +168,18 @@ BULK_SNAPSHOT_QUERIES = 5
 # CONSCIOUSLY if a real change moves them — a silent move = an N+1 regression.
 # NOTE 2026-06-10: these are HIGH (per-Adda snapshot/pipeline work) — M5/P5.1 should
 # bring them down; when it does, lower these numbers in the same commit.
-WORKER_DASHBOARD_QUERIES = 16   # was 14 — pt.2c: +1 badge task query, +1 my_active_stages
-                                # now materialized in the builder (list() for badge attach;
-                                # previously lazy = uncounted here). Bounded, not per-row.
-MANAGEMENT_DASHBOARD_QUERIES = 21   # was 20 (25 pre-P5.1) — pt.2c: +1 badge task query
+WORKER_DASHBOARD_QUERIES = 21   # 22 → 21: role-codes request-cache (2026-08-02).
+                                # was 16 — C-2 freeze closeout 2026-07-05: the
+                                # dashboard now consults the LIVE Stage-Access
+                                # predicate (ONE stage_access_map call: Stage +
+                                # skill/role principal reads) + one batched
+                                # my-task-ids query for the accordion gate +
+                                # assignment-scoped helper board. Bounded,
+                                # not per-row — the price of hub-live visibility.
+MANAGEMENT_DASHBOARD_QUERIES = 25   # 26 → 25: role-codes request-cache (2026-08-02).
+                                    # was 21 (R1 reuse; R5 +1 expense aggregate).
+                                    # C-2 2026-07-05: +5 — same single
+                                    # stage_access_map (management short-circuits
+                                    # inside it but principal/Stage reads still
+                                    # run) + my_active_stages materialized before
+                                    # the map. Bounded, not per-row.

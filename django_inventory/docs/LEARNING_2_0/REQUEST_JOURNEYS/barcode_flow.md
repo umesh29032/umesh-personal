@@ -1,3 +1,13 @@
+---
+id: l2-request-journeys-barcode-flow
+type: request-journey
+status: active
+owner: handwritten
+scope: barcode_flow (request-journey)
+anchors: —
+verified: 2026-07-13
+---
+
 # Journey: Barcode Generation
 
 ## TL;DR (1 min)

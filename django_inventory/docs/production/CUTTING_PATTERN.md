@@ -1,6 +1,16 @@
-# Cutting Pattern Stage (NEW 2026-05-28)
+---
+id: production-cutting-pattern
+type: topic-canonical
+status: active
+owner: handwritten
+scope: production subsystem
+anchors: —
+verified: 2026-07-13
+---
 
-Cutting master draws the pattern on the layered cloth and records evidence (video + photos) for traceability. Sits between Layering and Cutting in product flows that require it. Optional per-product — admin inserts via the flow editor.
+# Pattern Design Stage (code: cutting_pattern; renamed from "Cutting Pattern" 2026-07-05, R8)
+
+Pattern master verifies every Product Pattern Design on the layered cloth — phone CHECKLIST (R8) or the management console, both writing the same verification rows — and records evidence (video + photos). FIXED-per-Adda pay (stage-trio spec 2026-07-05). Sits between Layering and Cutting in product flows that require it. Optional per-product — admin inserts via the flow editor.
 
 ## Data model
 
@@ -39,7 +49,7 @@ Seeded by `production/migrations/0013_seed_cutting_pattern_stage.py`:
 ```python
 Stage(
     code='cutting_pattern',
-    name='Cutting Pattern',
+    name='Pattern Design (code cutting_pattern)',
     description='Cutting master draws pattern on layered cloth + records via video/photos. Sits between layering and cutting.',
     is_active=True,
     access_by_skill=[cutting_master, cutting_master_helper],

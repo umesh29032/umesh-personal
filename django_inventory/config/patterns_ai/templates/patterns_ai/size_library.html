@@ -1,0 +1,139 @@
+{% extends "accounts/base.html" %}
+{# PDM W2R — the PATTERN DESIGN LIBRARY for ONE size (locked workflow).
+   The complete source of truth for this Product Size: every design row
+   carries preview · reference · dims · area · version · status · DXF ·
+   last-updated · contextual action. Issues float to the top. #}
+{% block page_title %}{{ product.code }} · Preparing Size {{ section.size.label }}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-lib { max-width: 860px; margin: 0 auto; }
+  .pai-lib .head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:4px 0 6px; }
+  .pai-lib .head h1 { font-family:'Cormorant Garamond', serif; font-size:24px; margin:0; color:var(--ink); }
+  .pai-lib .verdict { font-size:14px; font-weight:800; }
+  .pai-lib .verdict.ok { color:#20603c; } .pai-lib .verdict.warn { color:#a26a00; }
+  .pai-lib .sub { font-size:12.5px; color:var(--stone); margin-bottom:14px; }
+  .pai-lib .bucket-head { font-size:12px; font-weight:800; text-transform:uppercase;
+    letter-spacing:0.07em; margin:16px 0 8px; display:flex; gap:8px; align-items:center; }
+  .pai-lib .bucket-head.b-missing { color:#b91c1c; }
+  .pai-lib .bucket-head.b-work { color:#a26a00; }
+  .pai-lib .bucket-head.b-done { color:#20603c; }
+  .pai-lib .b-count { font-size:11px; background:#eee; color:#555;
+    border-radius:999px; padding:1px 8px; }
+  .pai-lib .cutcheck { display:flex; gap:10px; margin-top:3px; font-size:11px; color:var(--stone); }
+  .pai-lib .cutcheck b { font-weight:700; }
+  .pai-lib .cc-ok { color:#20603c; } .pai-lib .cc-no { color:#b91c1c; }
+  /* the Design Row atom (library skin) */
+  .pai-lib .design-row { display:flex; gap:12px; align-items:center;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card);
+    padding:12px 14px; margin-bottom:10px; }
+  .pai-lib .design-row.st-missing { border-style:dashed; background:#fdfaf3; box-shadow:none; }
+  .pai-lib .dr-previews { display:flex; gap:8px; }
+  .pai-lib .dr-shape, .pai-lib .dr-ref { width:72px; height:72px; border-radius:10px;
+    border:1px solid var(--border-card); background:#fff; padding:2px; position:relative;
+    display:flex; align-items:center; justify-content:center; cursor:zoom-in; }
+  .pai-lib .dr-shape svg { width:100%; height:100%; }
+  .pai-lib .dr-ref img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
+  .pai-lib .dr-reftag { position:absolute; bottom:2px; right:4px; font-size:9px;
+    background:rgba(42,31,14,0.75); color:#fff; border-radius:6px; padding:0 5px;
+    text-transform:uppercase; letter-spacing:0.05em; }
+  .pai-lib .dr-ghost { border-style:dashed; color:var(--stone); cursor:default; font-size:20px; }
+  .pai-lib .dr-facts { flex:1; min-width:0; }
+  .pai-lib .dr-line1 { font-size:14.5px; display:flex; gap:6px; flex-wrap:wrap; align-items:baseline; }
+  .pai-lib .dr-size { color:var(--stone); font-weight:700; }
+  .pai-lib .dr-badge { font-size:10px; padding:1px 7px; border-radius:999px; background:#eee;
+    color:#555; text-transform:uppercase; letter-spacing:0.05em; }
+  .pai-lib .dr-fold { background:#fdeeee; color:#b91c1c; }
+  .pai-lib .dr-chip { font-size:11px; padding:2px 8px; border-radius:999px; }
+  .pai-lib .dr-chip.ok { background:#d9efe1; color:#20603c; }
+  .pai-lib .dr-chip.draft { background:#fdf3d8; color:#7a5c10; }
+  .pai-lib .dr-chip.missing { background:#fdeeee; color:#b91c1c; }
+  .pai-lib .dr-line3 { font-size:12px; color:var(--ink); margin-top:2px; }
+  .pai-lib .dr-measured { color:#20603c; } .pai-lib .dr-unverified { color:#a26a00; }
+  .pai-lib .dr-meta { font-size:11px; color:var(--stone); margin-top:2px; }
+  .pai-lib .dr-action { display:flex; flex-direction:column; gap:6px; align-items:stretch; }
+  .pai-lib .dr-btn { white-space:nowrap; min-height:40px; }
+  .pai-lib .manage-acts { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .pai-lib .btn-mini { padding:6px 10px; font-size:11.5px; border-radius:8px;
+    cursor:pointer; border:1px solid var(--border-subtle); background:#fff; }
+  /* lightbox */
+  .pai-lib-light { position:fixed; inset:0; background:rgba(10,16,28,0.82);
+    display:none; align-items:center; justify-content:center; z-index:1001; padding:24px; }
+  .pai-lib-light.open { display:flex; }
+  .pai-lib-light .box { background:#fff; border-radius:12px; padding:12px;
+    max-width:92vw; max-height:88vh; overflow:auto; }
+  .pai-lib-light img, .pai-lib-light svg { max-width:86vw; max-height:78vh; }
+  @media (max-width:640px) {
+    .pai-lib .design-row { flex-wrap:wrap; }
+    .pai-lib .dr-action { width:100%; }
+    .pai-lib .dr-btn { width:100%; text-align:center; min-height:44px; }
+    .pai-lib .dr-shape, .pai-lib .dr-ref { width:80px; height:80px; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-lib">
+  <div class="head">
+    <a class="btn" href="?product={{ product.pk }}">← Sizes</a>
+    <h1>Preparing Size {{ section.size.label }}</h1>
+    {% if section.ready %}
+      <span class="verdict ok">Ready for Cutting ✓</span>
+    {% else %}
+      <span class="verdict warn">Needs Attention ⚠</span>
+    {% endif %}
+    <span style="flex:1;"></span>
+    <span class="sub" style="margin:0;">{{ section.confirmed }}/{{ section.total }} confirmed</span>
+  </div>
+  <p class="sub">{{ product.name }} ({{ product.code }}) — prepare every
+    Pattern Design this size needs, top to bottom.
+    {% if section.required_missing %}Missing:
+      <strong>{{ section.required_missing|join:", " }}</strong>{% endif %}</p>
+
+  {% if messages %}{% for m in messages %}
+    <div class="form-alert form-alert-{{ m.tags|default:'info' }}" style="margin-bottom:12px;">{{ m }}</div>
+  {% endfor %}{% endif %}
+
+  {% for bucket in buckets %}
+    {% if bucket.rows %}
+    <div class="bucket-head b-{{ bucket.key }}">{{ bucket.icon }} {{ bucket.label }}
+      <span class="b-count">{{ bucket.rows|length }}</span></div>
+    {% for row in bucket.rows %}
+      {% include 'patterns_ai/_design_row.html' with row=row mode='library' product=product %}
+    {% endfor %}
+    {% endif %}
+  {% endfor %}
+  {% if not section.rows %}
+    <div class="design-row st-missing"><div class="dr-facts">
+      <div class="dr-line1"><strong>No pattern designs yet</strong></div>
+      <div class="dr-meta">Start by registering the pattern pieces this
+        product needs — every size then gets its own designs.</div>
+    </div></div>
+  {% endif %}
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+    {# Phase 2 frozen resp: piece registration + rules live in the Blueprint (STEP 1); the Library only prepares #}
+    <a class="btn" href="{% url 'patterns_ai:blueprint' %}?product={{ product.pk }}">structure &amp; rules → Pattern Blueprint
+      <small style="color:var(--stone);">(add/remove pieces · counts · optional · grain)</small></a>
+  </div>
+
+  <div class="pai-lib-light" id="liblight"><div class="box" id="liblightbox"></div></div>
+  <script>
+  (function(){
+    var light = document.getElementById('liblight'),
+        box = document.getElementById('liblightbox');
+    document.addEventListener('click', function(e){
+      var z = e.target.closest('.dr-zoom');
+      if (z) {
+        if (z.dataset.kind === 'ref') {
+          box.innerHTML = '<img src="' + z.dataset.large + '" alt="reference zoom">';
+        } else { box.innerHTML = z.innerHTML; }
+        light.classList.add('open'); return;
+      }
+      if (light.classList.contains('open') && !e.target.closest('.box')) {
+        light.classList.remove('open'); box.innerHTML = '';
+      }
+    });
+  })();
+  </script>
+</div>
+{% endblock %}

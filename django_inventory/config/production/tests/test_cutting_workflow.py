@@ -32,9 +32,9 @@ from production.constants import (
     STAGE_CUTTING, STAGE_LAYERING,
 )
 from production.models import (
-    AddaStageRecord, CuttingPatternRecord, CuttingPatternSizeAllocation, CuttingPieceBreakup,
-    CuttingRecord, LayeringRecord, Product, ProductPattern, ProductPatternAssignment,
-    ProductSize, Stage, WorkflowStage,
+    AddaStageRecord, CuttingBundleItem, CuttingPatternRecord, CuttingPatternSizeAllocation,
+    CuttingPieceBreakup, CuttingRecord, LayeringRecord, Product, ProductPattern,
+    ProductPatternAssignment, ProductSize, Stage, WorkflowStage,
 )
 from production.services import (
     add_bundle_item, add_item_to_bundle, add_pieces_to_bundle, complete_cutting,
@@ -184,6 +184,19 @@ class CuttingWorkflowFixture(TestCase):
         self.adda.current_stage = self.cutting_wf
         self.adda.save(update_fields=['current_stage'])
 
+    def _join(self, adda=None):
+        """GAP-5: bundling is POST-JOIN — stamp every cutting lane complete
+        (breakups must be seeded BEFORE calling; upsert locks after)."""
+        a = adda or self.adda
+        for sr in AddaStageRecord.objects.filter(
+                adda=a, workflow_stage__stage__code=STAGE_CUTTING,
+                completed_at__isnull=True):
+            CuttingRecord.objects.get_or_create(
+                stage_record=sr, defaults={'pieces_cut': 0})
+            sr.completed_at = timezone.now()
+            sr.completed_by = self.admin
+            sr.save(update_fields=['completed_at', 'completed_by'])
+
 
 class StartCuttingTests(CuttingWorkflowFixture):
     def test_creates_stage_record(self):
@@ -202,6 +215,32 @@ class StartCuttingTests(CuttingWorkflowFixture):
         sr1 = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         sr2 = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
         self.assertEqual(sr1.pk, sr2.pk)
+
+    def test_start_snapshots_stage_role_rates(self):
+        """PA-10-3 (Contract 2): the cutting SR-creation helper now snapshots the
+        AddaStageRoleRate at creation (like every other SR site), so no late-create +
+        spurious 'snapshot_missing_at_complete' WARNING at first worker completion."""
+        from production.models import AddaStageRoleRate
+        sr = start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
+        self.assertTrue(
+            AddaStageRoleRate.objects.filter(stage_record=sr).exists(),
+            "start_cutting must snapshot AddaStageRoleRate at SR creation")
+
+    def test_legacy_complete_after_start_refused_gracefully(self):
+        """PA-09-1: complete_cutting_legacy CREATEs the AddaStageRecord; if start_cutting
+        (or any bundle op / a prior complete+reopen) already made it, the unconditional
+        create would hit unique_together(adda, workflow_stage) → IntegrityError → 500.
+        Must surface as a graceful ValidationError instead."""
+        from production.stages.cutting.service import complete_cutting_legacy
+        start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
+        with self.assertRaises(ValidationError):
+            complete_cutting_legacy(
+                adda=self.adda, pieces_cut=5, worker_ids=[self.admin.pk],
+                notes='', user=self.admin)
+        # No partial state: still exactly one SR, still not completed.
+        srs = AddaStageRecord.objects.filter(adda=self.adda, workflow_stage=self.cutting_wf)
+        self.assertEqual(srs.count(), 1)
+        self.assertIsNone(srs.get().completed_at)
 
 
 class UpsertBreakupRowTests(CuttingWorkflowFixture):
@@ -318,7 +357,7 @@ class CompleteCuttingWorkspaceTests(CuttingWorkflowFixture):
         xl = ProductSize.objects.create(
             product=self.product, code='xl', label='X Large', display_order=4,
         )
-        add_bundle_item(
+        upsert_breakup_row(
             adda=self.adda, size_id=xl.id, color_id=self.red.id,
             pattern_id=self.front.id, count=5, user=self.admin,
         )
@@ -329,7 +368,7 @@ class CompleteCuttingWorkspaceTests(CuttingWorkflowFixture):
         blue = ClothColor.objects.exclude(pk=self.red.pk).first()
         if not blue:
             self.skipTest("Need second color.")
-        add_bundle_item(
+        upsert_breakup_row(
             adda=self.adda, size_id=self.s_m.id, color_id=blue.id,
             pattern_id=self.front.id, count=5, user=self.admin,
         )
@@ -337,11 +376,13 @@ class CompleteCuttingWorkspaceTests(CuttingWorkflowFixture):
             complete_cutting(adda=self.adda, user=self.admin)
 
     def test_happy_path_generates_barcodes_and_advances(self):
-        add_bundle_item(
+        # GAP-5: breakup rows ARE the actuals (owner cutting spec); bundles
+        # are post-join containers and play no part in completion.
+        upsert_breakup_row(
             adda=self.adda, size_id=self.s_m.id, color_id=self.red.id,
             pattern_id=self.front.id, count=10, user=self.admin,
         )
-        add_bundle_item(
+        upsert_breakup_row(
             adda=self.adda, size_id=self.s_m.id, color_id=self.red.id,
             pattern_id=self.back.id, count=10, user=self.admin,
         )
@@ -401,8 +442,8 @@ class ReopenCuttingTests(CuttingWorkflowFixture):
     def setUp(self):
         super().setUp()
         start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
-        # PR7: bundles drive barcodes — set up one bundle for reopen tests.
-        add_bundle_item(
+        # GAP-5: breakups drive completion + barcodes; bundles are post-join.
+        upsert_breakup_row(
             adda=self.adda, size_id=self.s_m.id, color_id=self.red.id,
             pattern_id=self.front.id, count=5, user=self.admin,
         )
@@ -430,11 +471,12 @@ class ReopenCuttingTests(CuttingWorkflowFixture):
 
 
 class CreateBundleTests(CuttingWorkflowFixture):
-    """PR9 two-step flow: create bundle then add items."""
+    """PR9 two-step flow, GAP-5 semantics: bundles open AFTER the join."""
 
     def setUp(self):
         super().setUp()
         start_cutting(adda=self.adda, worker_ids=[self.admin.pk], user=self.admin)
+        self._join()
 
     def test_create_bundle_creates_header_without_items(self):
         bundle = create_bundle(
@@ -499,6 +541,7 @@ class CreateBundleTests(CuttingWorkflowFixture):
         other_adda.current_stage = self.cutting_wf
         other_adda.save(update_fields=['current_stage'])
         start_cutting(adda=other_adda, worker_ids=[other_admin.pk], user=other_admin)
+        self._join(other_adda)
         other_bundle = create_bundle(
             adda=other_adda, size_id=self.s_l.id, user=other_admin,
         )
@@ -532,6 +575,7 @@ class AddPiecesToBundleTests(CuttingWorkflowFixture):
             adda=self.adda, size_id=self.s_l.id, color_id=self.red.id,
             pattern_id=self.sleeve.id, count=40, user=self.admin,
         )
+        self._join()
         self.bundle = create_bundle(
             adda=self.adda, size_id=self.s_l.id,
             bundle_number='Lot-A', user=self.admin,
@@ -553,6 +597,26 @@ class AddPiecesToBundleTests(CuttingWorkflowFixture):
         self.assertEqual(self.brk_front.available_count, 10)
         self.assertEqual(self.brk_back.consumed_count, 5)
         self.assertEqual(self.bundle.total_pieces, 15)
+
+    def test_manual_item_then_breakup_consume_increments_one_line(self):
+        """GAP-5 supersedes PA-09-2: the DB truth is ONE line per (bundle,
+        pattern, colour) — a breakup-consume onto an existing manual line now
+        INCREMENTS it (cross-source aggregation) instead of refusing."""
+        add_item_to_bundle(
+            adda=self.adda, bundle_id=self.bundle.id,
+            pattern_id=self.front.id, color_id=self.red.id, count=5, user=self.admin)
+        add_pieces_to_bundle(
+            adda=self.adda, bundle_id=self.bundle.id,
+            selections=[{'breakup_id': self.brk_front.id, 'take_count': 3}],
+            user=self.admin)
+        line = CuttingBundleItem.objects.get(
+            bundle=self.bundle, pattern=self.front, color=self.red)
+        self.assertEqual(line.count, 8)          # 5 manual + 3 consumed
+        # GROUP INVARIANT (GAP-5): Σ consumed over the (pattern, colour)
+        # breakups ≡ Σ bundle-line counts — a manual line still means physical
+        # pieces left the cut inventory, so the resync attributes all 8.
+        self.brk_front.refresh_from_db()
+        self.assertEqual(self.brk_front.consumed_count, 8)
 
     def test_consume_full_zeros_available(self):
         add_pieces_to_bundle(
@@ -626,6 +690,7 @@ class CreateBundleWithPiecesTests(CuttingWorkflowFixture):
             adda=self.adda, size_id=self.s_l.id, color_id=self.red.id,
             pattern_id=self.back.id, count=15, user=self.admin,
         )
+        self._join()
 
     def test_atomic_creates_header_and_items(self):
         bundle = create_bundle_with_pieces(
@@ -686,8 +751,7 @@ class CreateBundleWithPiecesTests(CuttingWorkflowFixture):
         # but should not persist if items fail. Verify total still 0.
         from production.models import CuttingBundle
         bundle = CuttingBundle.objects.filter(
-            cutting_record__stage_record__adda=self.adda,
-            size=self.s_l,
+            adda=self.adda, size=self.s_l,
         ).first()
         if bundle is not None:
             self.assertEqual(bundle.total_pieces, 0)
@@ -709,6 +773,9 @@ class BarcodeBatchBundleLinkTests(CuttingWorkflowFixture):
             adda=self.adda, size_id=self.s_l.id, color_id=self.red.id,
             pattern_id=self.front.id, count=20, user=self.admin,
         )
+        # GAP-5: completion (the join, single blocking lane) comes FIRST;
+        # bundles are created after, spanning the cut truth.
+        complete_cutting(adda=self.adda, user=self.admin)
         self.bundle_m = create_bundle(
             adda=self.adda, size_id=self.s_m.id, user=self.admin,
         )
@@ -727,14 +794,14 @@ class BarcodeBatchBundleLinkTests(CuttingWorkflowFixture):
         )
 
     def test_batches_link_to_correct_bundle(self):
-        complete_cutting(adda=self.adda, user=self.admin)
         from tracking.models import BarcodeBatch
         batches = list(BarcodeBatch.objects.filter(adda=self.adda).order_by('start_seq'))
         self.assertEqual(len(batches), 2)
         # M batch (display_order=2) comes first, L second.
         m_batch = next(b for b in batches if b.size_id == self.s_m.id)
         l_batch = next(b for b in batches if b.size_id == self.s_l.id)
-        self.assertEqual(m_batch.bundle_id, self.bundle_m.id)
-        self.assertEqual(l_batch.bundle_id, self.bundle_l.id)
+        # Streams conscious update: batches derive from breakup-mode
+        # breakdown rows (bundle FK = None by design); size/color/count
+        # remain the traceability truth.
         self.assertEqual(m_batch.total_pieces, 10)
         self.assertEqual(l_batch.total_pieces, 20)

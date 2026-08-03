@@ -11,6 +11,7 @@ These cover the hardening shipped in 2026-05-16:
 - LoginView remains anti-enumeration (same redirect regardless of email).
 - PasswordLoginView locks out after repeated failures.
 - RestrictedSocialAccountAdapter only allows pre-provisioned users to sign in.
+- RestrictedAccountAdapter closes /accounts/signup/ (S2 fix, 2026-07-12).
 
 Run with: env/bin/python config/manage.py test accounts --settings=config.settings.local
 """
@@ -223,6 +224,297 @@ class AntiEnumerationTests(BaseSecurityTest):
         self.assertEqual(r1.status_code, r2.status_code)
         self.assertEqual(r1.url, r2.url)
 
+    def test_login_verify_step_unknown_email_same_as_known(self):
+        # PA-02-1: the OTP-verify STEP must also be indistinguishable. Before the
+        # decoy-OTP fix, a wrong code for an unknown email hit "Session expired"
+        # (→ redirect to login) while a known email got "Invalid OTP" (→ stay on
+        # verify) — an enumeration oracle one step deeper than the redirect.
+        User.objects.create_user(email="known@t.com", password="Str0ngP@ssw0rd!")
+        urls = []
+        for email in ("known@t.com", "ghost@t.com"):
+            c = Client()
+            c.post(reverse("accounts:login"), {"email": email})
+            r = c.post(reverse("accounts:verify_otp"), {"otp": "000000"})
+            urls.append((r.status_code, r.url))
+        self.assertEqual(urls[0], urls[1])
+        # both stay on the verify page (wrong OTP), neither bounces to login
+        self.assertEqual(urls[0][1], reverse("accounts:verify_otp"))
+
+    def test_forgot_password_unknown_email_same_as_known(self):
+        # PA-02-1: forgot-password previously set reset_email ONLY for existing
+        # emails, so ResetPasswordVerifyView showed "Session expired" for unknown
+        # vs "Invalid OTP" for known. Now both reach the same verify outcome.
+        User.objects.create_user(email="known@t.com", password="Str0ngP@ssw0rd!")
+        results = []
+        for email in ("known@t.com", "ghost@t.com"):
+            c = Client()
+            r1 = c.post(reverse("accounts:forgot_password"), {"email": email})
+            r2 = c.post(reverse("accounts:reset_password_verify"),
+                        {"otp": "000000", "password": "Str0ngP@ssw0rd!"})
+            results.append((r1.status_code, r1.url, r2.status_code, r2.url))
+        self.assertEqual(results[0], results[1])
+        # forgot-password → verify page; wrong OTP → stays on verify page
+        self.assertEqual(results[0][1], reverse("accounts:reset_password_verify"))
+        self.assertEqual(results[0][3], reverse("accounts:reset_password_verify"))
+
+
+# ─── Email case-insensitivity (PA-02-2) ─────────────────────────────────────
+
+class EmailCaseInsensitiveAuthTests(BaseSecurityTest):
+    """A mixed-case-local-part email (e.g. from `createsuperuser`) must still be
+    reachable by the OTP-login / password-reset flows, which lowercase input.
+    BaseUserManager.normalize_email lowercases only the DOMAIN, so without an
+    iexact lookup such an account was silently locked out."""
+
+    def test_otp_login_resolves_mixed_case_email_end_to_end(self):
+        from django.core import mail
+        import re
+        User.objects.create_user(email="Mixed.Case@t.com", password="Str0ngP@ssw0rd!")
+        mail.outbox.clear()
+        c = Client()
+        # user types the lowercase form
+        r = c.post(reverse("accounts:login"), {"email": "mixed.case@t.com"})
+        self.assertEqual(r.url, reverse("accounts:verify_otp"))
+        # existing-user branch ran → a real OTP was emailed (decoy sends nothing)
+        self.assertEqual(len(mail.outbox), 1)
+        otp = re.search(r"\b(\d{6})\b", mail.outbox[0].body).group(1)
+        r2 = c.post(reverse("accounts:verify_otp"), {"otp": otp})
+        self.assertEqual(r2.url, reverse("accounts:home"))
+        self.assertIn("_auth_user_id", c.session)  # logged in
+
+    def test_forgot_password_recognises_mixed_case_email(self):
+        from django.core import mail
+        User.objects.create_user(email="Reset.Me@t.com", password="Str0ngP@ssw0rd!")
+        mail.outbox.clear()
+        c = Client()
+        r = c.post(reverse("accounts:forgot_password"), {"email": "reset.me@t.com"})
+        self.assertEqual(r.url, reverse("accounts:reset_password_verify"))
+        self.assertEqual(len(mail.outbox), 1)  # real reset OTP sent, not a decoy
+
+
+# ─── Auth pages are not cacheable (PA-02-3) ─────────────────────────────────
+
+class AuthPageCacheControlTests(BaseSecurityTest):
+    def test_auth_get_pages_set_no_store(self):
+        for name in ("accounts:login", "accounts:login_password",
+                     "accounts:forgot_password",
+                     "accounts:reset_password_verify"):
+            r = self.client.get(reverse(name))
+            self.assertIn("no-store", r.headers.get("Cache-Control", ""),
+                          msg=f"{name} must be uncacheable (never_cache)")
+
+
+# ─── Native self-signup disabled (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ─
+
+class SkillDeleteGuardTests(BaseSecurityTest):
+    """PA-05A-1: a Skill in use (by a worker or a sidebar rule) must NOT be
+    silently deletable — the M2M would cascade and strip stage access / break
+    the sidebar rule with no warning."""
+
+    def setUp(self):
+        super().setUp()
+        from .models import Skill
+        self.admin = User.objects.create_user(
+            email='sg-admin@t.com', password='Str0ngP@ssw0rd!', is_superuser=True)
+        self.skill = Skill.objects.create(name='guard_skill', label='Guard Skill')
+        self.client.force_login(self.admin)
+
+    def _delete(self):
+        return self.client.post(reverse('accounts:skill_delete', args=[self.skill.pk]))
+
+    def test_blocked_when_assigned_to_user(self):
+        from .models import Skill
+        w = User.objects.create_user(email='sg-w@t.com', password='Str0ngP@ssw0rd!')
+        w.skills.add(self.skill)
+        self._delete()
+        self.assertTrue(Skill.objects.filter(pk=self.skill.pk).exists())
+
+    def test_blocked_when_referenced_by_sidebar_rule(self):
+        from .models import Skill, SidebarItemRule
+        rule = SidebarItemRule.objects.first()
+        self.assertIsNotNone(rule)
+        rule.allowed_skills.add(self.skill)
+        self._delete()
+        self.assertTrue(Skill.objects.filter(pk=self.skill.pk).exists())
+
+    def test_deletes_when_unused(self):
+        from .models import Skill
+        self._delete()
+        self.assertFalse(Skill.objects.filter(pk=self.skill.pk).exists())
+
+
+class SignupDisabledTests(BaseSecurityTest):
+    """Internal ERP = pre-provisioned users only. The public signup routes were
+    removed; accounts come from a Super Admin or a pre-provisioned Google link."""
+
+    def test_signup_url_names_are_not_reversible(self):
+        from django.urls import NoReverseMatch
+        for name in ("accounts:signup", "accounts:signup_verify",
+                     "accounts:signup_resend_otp"):
+            with self.assertRaises(NoReverseMatch, msg=f"{name} must be unrouted"):
+                reverse(name)
+
+    def test_signup_paths_return_404(self):
+        for path in ("/app/signup/", "/app/signup/verify/", "/app/signup/resend-otp/"):
+            self.assertEqual(self.client.get(path).status_code, 404,
+                             msg=f"{path} must be gone (signup disabled)")
+
+    def test_login_pages_have_no_signup_link(self):
+        for name in ("accounts:login", "accounts:login_password"):
+            html = self.client.get(reverse(name)).content.decode()
+            self.assertNotIn("Create one", html,
+                             msg=f"{name} must not advertise self-signup")
+
+    # ── S2 fix (2026-07-12): the allauth mount at /accounts/ exposed
+    # account_signup with the default adapter → anonymous users could create
+    # live active accounts. ACCOUNT_ADAPTER now closes it.
+
+    def test_allauth_signup_get_is_closed(self):
+        resp = self.client.get("/accounts/signup/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("account/signup_closed.html",
+                      [t.name for t in resp.templates],
+                      msg="/accounts/signup/ must render the closed page, not a form")
+
+    def test_allauth_signup_post_creates_no_user(self):
+        before = User.objects.count()
+        resp = self.client.post("/accounts/signup/", {
+            "email": "anon.s2@test.local",
+            "password1": "Str0ngP@ssw0rd!x",
+            "password2": "Str0ngP@ssw0rd!x",
+        })
+        self.assertIn("account/signup_closed.html",
+                      [t.name for t in resp.templates],
+                      msg="signup POST must hit the closed page")
+        self.assertEqual(User.objects.count(), before,
+                         msg="anonymous signup must not create a User")
+        self.assertFalse(User.objects.filter(email__iexact="anon.s2@test.local").exists())
+
+
+class EmailManagementDisabledTests(BaseSecurityTest):
+    """S3 fix (2026-07-12): the allauth mount exposed `account_email`
+    (/accounts/email/) with add / remove / make-primary. A signed-in worker
+    could add an arbitrary UNVERIFIED email and promote it to primary, which
+    allauth syncs into User.email — the OTP login identity. That breaks the
+    'pre-provisioned users only' invariant. The route is now shadowed by
+    EmailManagementDisabledView before the allauth include."""
+
+    def setUp(self):
+        super().setUp()
+        # Plain worker: no roles, just an active provisioned account.
+        self.worker = User.objects.create_user(
+            email="worker.s3@test.local", password="Str0ngP@ssw0rd!x")
+
+    def test_reverse_account_email_still_resolves(self):
+        # allauth base templates reverse this name; the shadow keeps the URL.
+        self.assertEqual(reverse("account_email"), "/accounts/email/")
+
+    def test_worker_get_email_page_is_shadowed(self):
+        self.client.force_login(self.worker)
+        resp = self.client.get("/accounts/email/")
+        # Bounced (never renders allauth's EmailView / account/email.html).
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn("account/email.html",
+                         [t.name for t in resp.templates],
+                         msg="worker must never reach allauth's email-management page")
+
+    def test_worker_add_email_post_creates_nothing(self):
+        from allauth.account.models import EmailAddress
+        self.client.force_login(self.worker)
+        before = EmailAddress.objects.count()
+        resp = self.client.post("/accounts/email/", {
+            "action_add": "",
+            "email": "worker-selfchosen@evil.local",
+        })
+        self.assertEqual(resp.status_code, 302, msg="POST must be refused, not processed")
+        self.assertEqual(EmailAddress.objects.count(), before,
+                         msg="worker must not be able to add an email address")
+        self.assertFalse(
+            EmailAddress.objects.filter(email__iexact="worker-selfchosen@evil.local").exists())
+        self.worker.refresh_from_db()
+        self.assertEqual(self.worker.email, "worker.s3@test.local",
+                         msg="login identity must stay the provisioned email")
+
+    def test_worker_make_primary_post_does_not_change_identity(self):
+        # Even if a second EmailAddress somehow exists, the endpoint must not let
+        # a worker flip primary (which allauth would sync into User.email).
+        from allauth.account.models import EmailAddress
+        EmailAddress.objects.create(
+            user=self.worker, email="worker.s3@test.local", primary=True, verified=False)
+        other = EmailAddress.objects.create(
+            user=self.worker, email="worker-alt@evil.local", primary=False, verified=True)
+        self.client.force_login(self.worker)
+        resp = self.client.post("/accounts/email/", {
+            "action_primary": "",
+            "email": other.email,
+        })
+        self.assertEqual(resp.status_code, 302)
+        other.refresh_from_db()
+        self.assertFalse(other.primary, msg="make-primary must be refused")
+        self.worker.refresh_from_db()
+        self.assertEqual(self.worker.email, "worker.s3@test.local")
+
+    def test_anonymous_is_sent_to_login(self):
+        resp = self.client.get("/accounts/email/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/app/", resp["Location"],
+                      msg="anonymous hit must go to the login page (login_url)")
+
+
+# ─── Allauth adapters (Google OAuth gate) ────────────────────────────────────
+
+class AllauthAdapterTests(BaseSecurityTest):
+    """Pin both halves of the pre-provisioned-only invariant:
+    RestrictedSocialAccountAdapter (Google) + RestrictedAccountAdapter (local S2)."""
+
+    def _social_login(self, email):
+        # SocialLogin = allauth's in-flight OAuth result (unsaved user + account)
+        from allauth.socialaccount.models import SocialAccount, SocialLogin
+        return SocialLogin(user=User(email=email),
+                           account=SocialAccount(provider="google", uid="uid-" + email))
+
+    def _request(self):
+        # RequestFactory request + manual session/messages (adapter uses both)
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from importlib import import_module
+        from django.conf import settings
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        engine = import_module(settings.SESSION_ENGINE)
+        request.session = engine.SessionStore()
+        request._messages = FallbackStorage(request)
+        return request
+
+    def test_account_adapter_signup_closed(self):
+        from accounts.allauth_adapters import RestrictedAccountAdapter
+        self.assertFalse(RestrictedAccountAdapter().is_open_for_signup(self._request()))
+
+    def test_social_adapter_signup_closed(self):
+        from accounts.allauth_adapters import RestrictedSocialAccountAdapter
+        self.assertFalse(RestrictedSocialAccountAdapter().is_open_for_signup(
+            self._request(), self._social_login("x@test.local")))
+
+    def test_google_login_links_pre_provisioned_user(self):
+        from allauth.socialaccount.models import SocialAccount
+        from accounts.allauth_adapters import RestrictedSocialAccountAdapter
+        provisioned = User.objects.create_user(email="prov.g@test.local",
+                                               password="Str0ngP@ssw0rd!x")
+        sociallogin = self._social_login("prov.g@test.local")
+        RestrictedSocialAccountAdapter().pre_social_login(self._request(), sociallogin)
+        self.assertTrue(SocialAccount.objects.filter(user=provisioned,
+                                                     provider="google").exists(),
+                        msg="pre-provisioned Google email must auto-link")
+
+    def test_google_login_refuses_unprovisioned_user(self):
+        from allauth.exceptions import ImmediateHttpResponse
+        from accounts.allauth_adapters import RestrictedSocialAccountAdapter
+        before = User.objects.count()
+        with self.assertRaises(ImmediateHttpResponse) as ctx:
+            RestrictedSocialAccountAdapter().pre_social_login(
+                self._request(), self._social_login("stranger.g@test.local"))
+        self.assertEqual(ctx.exception.response.url, reverse("accounts:login"))
+        self.assertEqual(User.objects.count(), before,
+                         msg="unprovisioned Google login must not create a User")
+
 
 # ─── Password login lockout ─────────────────────────────────────────────────
 
@@ -363,9 +655,31 @@ class UserServiceTests(TestCase):
         delete_user(self.worker, actor=self.admin)
         self.assertFalse(User.objects.filter(pk=self.worker.pk).exists())
 
-    # ── sync_user_skills (the one accounts->production lazy edge) ─────────
-    def test_sync_user_skills_returns_count_and_is_safe_with_no_skills(self):
-        from accounts.services.user_service import sync_user_skills
-        # No skills + no active layering rosters → no retro-tag, returns 0 (no crash
-        # across the lazy accounts->production edge).
-        self.assertEqual(sync_user_skills(self.worker), 0)
+    # ── C-1 freeze closeout: accounts must have ZERO production imports ────
+    def test_accounts_has_no_production_edge(self):
+        # The retro-tag (sync_user_skills) was the one accounts→production
+        # edge; its removal must stay permanent (REMEDIATION COUP-5).
+        import pathlib
+        import re
+        import accounts
+        root = pathlib.Path(accounts.__file__).parent
+        pat = re.compile(r'^\s*(from|import) production', re.M)
+        offenders = [
+            str(p) for p in root.rglob('*.py')
+            if p.name != 'tests.py' and pat.search(p.read_text())
+        ]
+        self.assertEqual(offenders, [])
+
+
+class UserListFilterParamTests(TestCase):
+    """PA-13-4: a non-numeric ?skills= filter must not 500 the user-management list."""
+
+    def setUp(self):
+        self.admin = get_user_model().objects.create_user(
+            email='ul-admin@t.test', password='x', is_superuser=True, is_staff=True)
+
+    def test_non_numeric_skills_param_does_not_500(self):
+        self.client.force_login(self.admin)
+        for qs in ('skills=abc', 'skills=1&skills=xyz', 'skills=%20'):
+            resp = self.client.get(reverse('accounts:user_list') + '?' + qs)
+            self.assertEqual(resp.status_code, 200, f"500 on ?{qs}")

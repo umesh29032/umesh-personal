@@ -1,0 +1,90 @@
+{% extends "accounts/base.html" %}
+{# Phase 8B — the Adda chooses its manufacturing contract(s) from the
+   LIBRARY only (rule 9). Stale = shown disabled w/ LAW-11 reason.
+   Void = F1 flow (reason mandatory, history forever). #}
+{% block page_title %}{{ adda.code }} · Manufacturing Layouts{% endblock %}
+{% block extra_head %}
+<style>
+  .clay { max-width: 760px; margin: 0 auto; }
+  .clay h1 { font-family:'Cormorant Garamond', serif; font-size:24px; color:var(--ink); margin:4px 0 4px; }
+  .clay .sub { font-size:12.5px; color:var(--stone); margin-bottom:14px; }
+  .clay .panel { background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:14px; box-shadow:var(--shadow-card); padding:14px 16px; margin-bottom:14px; }
+  .clay h2 { font-size:12px; text-transform:uppercase; letter-spacing:0.07em;
+    color:var(--stone); font-weight:800; margin:0 0 10px; }
+  .clay .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    border:1px solid var(--border-subtle); border-radius:10px;
+    padding:8px 10px; margin-bottom:6px; font-size:12.5px; }
+  .clay .row.off { opacity:0.55; }
+  .clay .uid { font-family:monospace; font-weight:700; }
+  .clay .chip { font-size:10px; padding:1px 7px; border-radius:999px; background:#eee; color:#555;
+    text-transform:uppercase; letter-spacing:0.05em; }
+  .clay .stale { color:#b91c1c; font-weight:800; font-size:11px; }
+  .clay .btn-mini { padding:6px 12px; font-size:12px; border-radius:8px;
+    cursor:pointer; border:1px solid var(--border-subtle); background:#fff; min-height:38px; }
+  .clay input[type=text] { padding:7px 10px; border:1.5px solid var(--border-card);
+    border-radius:8px; background:var(--cream); font-size:12.5px; }
+  @media (max-width:640px) { .clay .btn-mini { min-height:44px; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="clay">
+  <h1>{{ adda.code }} · Manufacturing Layouts</h1>
+  <p class="sub">{{ adda.product.name }} ({{ adda.product.code }}) — the
+    Adda manufactures ONLY from the Approved Layout Library. One active
+    contract per fabric group; wrong pick = void (history kept) + choose
+    again.</p>
+
+  <div class="panel">
+    <h2>Current contracts</h2>
+    {% for u in usages %}
+      <div class="row">
+        <span class="chip">{{ u.fabric_group|upper }}</span>
+        <span class="uid">{{ u.layout.layout_uid }}</span>
+        <span>V{{ u.layout.version_no }} · {{ u.layout.name }}</span>
+        <span class="sub" style="margin:0;">by {{ u.recorded_by }}</span>
+        <span style="flex:1;"></span>
+        <a class="btn-mini" href="{% url 'patterns_ai:candidate-svg' u.layout.candidate_id %}">SVG</a>
+        <form method="post" style="display:inline-flex; gap:6px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="void">
+          <input type="hidden" name="usage" value="{{ u.pk }}">
+          <input type="text" name="reason" placeholder="void reason (required)" required>
+          <button type="submit" class="btn-mini">Void</button>
+        </form>
+      </div>
+    {% empty %}
+      <p class="sub">No contract yet — choose below.</p>
+    {% endfor %}
+  </div>
+
+  <div class="panel">
+    <h2>Approved Layout Library ({{ adda.product.code }})</h2>
+    {% for o in options %}
+      <div class="row {% if o.stale or o.group_taken %}off{% endif %}">
+        <span class="chip">{{ o.lay.fabric_group|upper }}</span>
+        <span class="uid">{{ o.lay.layout_uid }}</span>
+        <span>V{{ o.lay.version_no }} · {{ o.lay.name }}</span>
+        <span class="chip">{{ o.lay.candidate.run.usable_width_mm }} mm</span>
+        <span class="chip">{{ o.metrics.length_mm }} mm · {{ o.metrics.utilization_pct }}%</span>
+        {% if o.stale %}<span class="stale" title="LAW 11: a frozen geometry version is no longer the confirmed truth — supersede with a fresh layout">⚠ STALE — cannot manufacture</span>{% endif %}
+        <span style="flex:1;"></span>
+        <a class="btn-mini" href="{% url 'patterns_ai:candidate-svg' o.lay.candidate_id %}">SVG</a>
+        {% if not o.stale and not o.group_taken %}
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="record">
+          <input type="hidden" name="layout" value="{{ o.lay.pk }}">
+          <button type="submit" class="btn-mini">★ Use for {{ o.lay.fabric_group|upper }}</button>
+        </form>
+        {% elif o.group_taken and not o.stale %}
+          <span class="sub" style="margin:0;">group has a contract — void it first</span>
+        {% endif %}
+      </div>
+    {% empty %}
+      <p class="sub">No ACTIVE approved layouts for this product yet —
+        create one on the Digital Cutting Table, then approve it.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

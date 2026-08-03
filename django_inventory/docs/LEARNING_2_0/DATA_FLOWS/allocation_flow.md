@@ -1,3 +1,13 @@
+---
+id: l2-data-flows-allocation-flow
+type: data-flow
+status: active
+owner: handwritten
+scope: allocation_flow (data-flow)
+anchors: —
+verified: 2026-07-13
+---
+
 # Data flow: Allocation (era-A legacy, lever-gated)
 
 ## TL;DR

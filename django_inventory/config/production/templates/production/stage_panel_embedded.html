@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ adda.code }} · {{ stage_type|capfirst }}</title>
+<title>{{ adda.code }} · {{ stage_label|default:stage_type|capfirst }}</title>
 {% comment %}
 Chromeless template — meant for iframe embed. No sidebar, no global nav.
 Only the design tokens + form-shell CSS + page-scoped panel CSS.
@@ -22,6 +22,9 @@ to fit iframe height. Implemented in script at bottom.
         --card-bg: #ffffff;
         --border-card: #cfc0aa;
         --border-subtle: #e6dcc9;
+        /* tokens the shared _fancy_controls.html needs (iframe doc has a minimal :root) */
+        --cream-3: #e2d5c3; --ink-2: #1c1814; --copper-l: #d4924a; --copper-d: #8a5520;
+        --text-primary: var(--ink); --text-tertiary: var(--stone);
         --shadow-card: 0 2px 12px rgba(14,11,9,0.08);
         --danger: #b91c1c;
         --danger-bg: rgba(220,38,38,0.10);
@@ -81,13 +84,7 @@ to fit iframe height. Implemented in script at bottom.
 
     /* Forms */
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    .field.full { grid-column: 1/-1; }
-    .field label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.06em; color: var(--stone);
-    }
-    .field-error { color: var(--danger); font-size: 11px; }
+    /* .field / .field label → shared/_form_styles.html (F-4a) */
     input, select, textarea, .sf-input {
         width: 100%; padding: 9px 12px;
         background: var(--cream); border: 1.5px solid var(--border-card); border-radius: 8px;
@@ -124,7 +121,6 @@ to fit iframe height. Implemented in script at bottom.
     .roll-row details { margin-top: 6px; }
     .roll-row summary { cursor: pointer; font-size: 11px; color: var(--copper); font-weight: 600; }
     .inline-form { margin-top: 8px; display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; }
-    .inline-form .field { flex: 1 1 100px; min-width: 100px; }
     .row-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top: 8px; }
 
     .roll-id-chip {
@@ -190,6 +186,8 @@ to fit iframe height. Implemented in script at bottom.
 </style>
 </head>
 <body>
+    {# R8: generic prev-stage admin snapshot — ctx is management-gated; renders nothing for workers #}
+    {% include 'production/_stage_admin_snapshot.html' %}
     {% if stage_type == 'layering' %}
         {% include 'production/_stage_panel_layering.html' %}
     {% elif stage_type == 'cutting_pattern' %}
@@ -198,6 +196,9 @@ to fit iframe height. Implemented in script at bottom.
         {% include 'production/_stage_panel_cutting.html' %}
     {% elif stage_type == 'barcode_generation' %}
         {% include 'production/_stage_panel_barcode_gen.html' %}
+    {% elif generic_stage_code %}
+        {# R10-B: EVERY config-only operation renders through ONE generic partial #}
+        {% include 'production/_stage_panel_generic.html' %}
     {% else %}
         <p>Unknown stage: {{ stage_type }}</p>
     {% endif %}
@@ -255,5 +256,7 @@ to fit iframe height. Implemented in script at bottom.
             if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     </script>
+    {# Canonical FancySelect/FancyDate (CSS+JS+observer): native <select>/date popups misposition inside this iframe — custom dropdown positions correctly + auto-upgrades dynamic rows. #}
+    {% include 'accounts/_fancy_controls.html' %}
 </body>
 </html>

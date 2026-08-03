@@ -1,0 +1,67 @@
+{% extends 'accounts/base.html' %}
+{# GAP-4: the Add-lane form — CUTTING_STREAM_LIFECYCLE §1–§9 verbatim. #}
+{# Management-only (view mixin). One question + confirm-with-context (§9.1): #}
+{# the group's existing lanes and their live state render BEFORE the button. #}
+{% block title %}Add cutting lane — {{ adda.code }}{% endblock %}
+{% block extra_head %}
+<style>
+    .add-lane .lane-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+        padding:8px 10px; border:1px solid var(--border-card); border-radius:10px; margin:6px 0;
+        font-size:13px; }
+    .add-lane .lane-row.cancelled { opacity:0.55; border-style:dashed; }
+    .add-lane .field label { display:block; font-size:11px; font-weight:700;
+        text-transform:uppercase; letter-spacing:0.05em; color:var(--stone); margin-bottom:4px; }
+    .add-lane .field { margin-bottom:14px; }
+    .add-lane .hint { font-size:12px; color:var(--stone); margin-top:4px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="add-lane" style="max-width:640px;margin:0 auto;">
+    <div class="page-hero" style="margin-bottom:14px;">
+        <h1 style="margin:0;">Add a cutting lane</h1>
+        <p style="margin:4px 0 0;color:var(--stone);">{{ adda.code }} · {{ adda.product.name }} — a new lane walks its own lay → pattern → cut. Nothing that already happened moves.</p>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">This Adda's lanes today</div></div>
+        <div class="panel-body">
+            {% for l in lanes %}
+            <div class="lane-row{% if l.cancelled_at %} cancelled{% endif %}">
+                <strong>{{ l.label|title }}</strong>
+                <span style="color:var(--stone);">{{ l.live_state }}</span>
+                {% if l.reason %}<span style="color:var(--stone);">({{ l.reason|truncatechars:60 }})</span>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="post" class="panel" style="margin-top:14px;">
+        {% csrf_token %}
+        <div class="panel-head"><div class="panel-num">02</div><div class="panel-title">The new lane</div></div>
+        <div class="panel-body">
+            <div class="field">
+                <label for="fabric_group">Fabric</label>
+                <select name="fabric_group" id="fabric_group" required>
+                    {% for g in fabric_groups %}<option value="{{ g }}">{{ g|title }}</option>{% endfor %}
+                </select>
+                <div class="hint">Only this Adda's existing fabrics — a NEW fabric is a Blueprint change and applies to future Addas.</div>
+            </div>
+            <div class="field">
+                <label for="reason_pick">Why is this lane needed?</label>
+                <select name="reason_pick" id="reason_pick">
+                    <option value="">— pick a reason —</option>
+                    {% for r in reason_picks %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="reason">Details (required if no pick)</label>
+                <input type="text" name="reason" id="reason" maxlength="180"
+                       placeholder="e.g. buyer added 100 garments / 12 pieces failed checking">
+            </div>
+            <div class="hint" style="margin-bottom:12px;">This appends a lane and writes a permanent history event — it never edits, renumbers, or reopens anything. An empty lane created by mistake can be cancelled from the Adda page.</div>
+            <button type="submit" class="btn btn-primary" style="min-height:44px;">Add lane</button>
+            <a href="{% url 'production:adda-detail' code=adda.code %}" class="btn btn-ghost" style="min-height:44px;">Back</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,8 +1,10 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Settle · {{ viewed_worker.get_full_name|default:viewed_worker.email }}{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-4a: canonical .field (page label/input rules below still win) #}
 <style>
     .settle { max-width: 720px; margin: 0 auto; }
     .settle .panel h2 { font-size: 14px; margin: 0 0 12px; }
@@ -11,7 +13,6 @@
     .settle table.adv th { font-size: 11px; color: var(--stone); text-transform: uppercase; letter-spacing: .03em; }
     .settle table.adv td.num, .settle table.adv th.num { text-align: right; }
     .settle table.adv input { width: 110px; padding: 8px 10px; font-size: 14px; background: var(--cream); border: 1.5px solid var(--border-subtle); border-radius: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,.04); text-align: right; }
-    .settle .field { margin-bottom: 16px; }
     .settle label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
     .settle input, .settle select, .settle textarea { width: 100%; padding: 11px 13px; font-size: 14px; background: var(--cream); border: 1.5px solid var(--border-subtle); border-radius: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,.04); }
     .settle input:focus, .settle select:focus, .settle textarea:focus { outline: none; border-color: var(--copper); }
@@ -35,8 +36,8 @@
     </div>
 
     <div class="stat-grid">
-        <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value" id="payableVal" data-payable="{{ payable|floatformat:2 }}">₹{{ payable|floatformat:2 }}</div></div>
-        <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">₹{{ advance_outstanding|floatformat:2 }}</div></div>
+        <div class="stat-card payable"><div class="label">Pending Payable</div><div class="value" id="payableVal" data-payable="{{ payable|floatformat:2 }}">{% money payable %}</div></div>
+        <div class="stat-card"><div class="label">Advance Outstanding</div><div class="value">{% money advance_outstanding %}</div></div>
         <div class="stat-card"><div class="label">Date</div><div class="value" style="font-size:15px;">{{ today }}</div></div>
     </div>
 
@@ -57,7 +58,7 @@
                 {% for o in outstanding_advances %}
                     <tr>
                         <td>{{ o.advance.advance_date }}{% if o.advance.notes %} · <span style="color:var(--stone)">{{ o.advance.notes }}</span>{% endif %}</td>
-                        <td class="num">₹{{ o.remaining|floatformat:2 }}</td>
+                        <td class="num">{% money o.remaining %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -89,13 +90,13 @@
 
         <div class="preview">
             <div class="row total"><span>Cash paid</span><span>₹<span id="pvPaid">0.00</span></span></div>
-            <div class="row"><span>Payable after</span><span id="pvAfter">₹{{ payable|floatformat:2 }}</span></div>
+            <div class="row"><span>Payable after</span><span id="pvAfter">{% money payable %}</span></div>
             <div class="row" id="pvWarnRow" style="display:none;"><span class="warn">⚠ Paid exceeds pending payable</span><span></span></div>
         </div>
 
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:worker-detail' viewed_worker.pk %}">Cancel</a>
-            <button type="submit" class="btn-copper" id="settleBtn">Confirm Payment</button>
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:worker-detail' viewed_worker.pk %}">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg" id="settleBtn">Confirm Payment</button>
         </div>
     </form>
 </div>

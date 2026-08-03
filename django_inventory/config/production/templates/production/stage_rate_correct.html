@@ -1,0 +1,69 @@
+{% extends "accounts/base.html" %}
+
+{% block page_title %}Correct Rate{% endblock %}
+
+{% block extra_head %}{% include 'shared/_form_styles.html' %}
+{# Page-scoped (rule 10): readonly current-rate strip lives only on this page. #}
+<style>
+  .rate-correct .current-strip{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;
+    background:var(--cream-2);border:1px solid var(--border-card);border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+  .rate-correct .current-strip b{font-size:1.15rem;}
+  .rate-correct .muted{color:var(--ink-soft,#6b6b6b);font-size:.85rem;}
+  .rate-correct .confirm-row{display:flex;gap:10px;align-items:flex-start;margin-top:6px;}
+  .rate-correct .confirm-row input{margin-top:4px;min-width:20px;min-height:20px;}
+  .rate-correct .settled-note{background:#fbeaea;border:1px solid #e0b4b4;border-radius:10px;padding:12px 14px;color:#8a2b2b;margin-bottom:14px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-shell rate-correct">
+    <div class="hero">
+        <h1>Correct Stage Rate</h1>
+        <p>Super-admin correction — applies before settlement only. All completed-but-unsettled earnings on this stage &amp; role are recalculated automatically. Audited with a mandatory reason.</p>
+        <span class="hero-chip">RATE CORRECTION</span>
+    </div>
+
+    <div class="current-strip">
+        <span>Adda <b>{{ adda.code }}</b></span>
+        <span>Stage <b>{{ stage_record.workflow_stage.get_stage_type_display }}</b></span>
+        <span>Role <b>{{ role.name }}</b></span>
+        <span>Current rate <b>₹{{ current_rate }}</b></span>
+    </div>
+
+    {% if settled %}
+    <div class="settled-note">
+        This stage/role is already settled. Repricing is refused — reverse or supersede that settlement first, then correct the rate.
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <div class="panel">
+            <div class="panel-head"><div class="panel-num">01</div><div class="panel-title">New rate &amp; reason</div></div>
+            <div class="panel-body">
+                <div class="form-grid cols-1">
+                    <div class="field">
+                        <label>{{ form.new_rate.label }} *</label>{{ form.new_rate }}
+                        {% if form.new_rate.errors %}<div class="field-error">{{ form.new_rate.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <label>{{ form.reason.label }} *</label>{{ form.reason }}
+                        {% if form.reason.errors %}<div class="field-error">{{ form.reason.errors|join:" " }}</div>{% endif %}
+                    </div>
+                    <div class="field">
+                        <div class="confirm-row">{{ form.confirm }}<label for="{{ form.confirm.id_for_label }}">{{ form.confirm.label }}</label></div>
+                        {% if form.confirm.errors %}<div class="field-error">{{ form.confirm.errors|join:" " }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sticky-actions">
+            <a href="{% url 'production:stage-rates' code=adda.code %}" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary" {% if settled %}disabled{% endif %}>Apply Correction</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

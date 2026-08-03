@@ -207,9 +207,10 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     <form method="post" action="{% url 'production:barcode-gen-complete' adda.code %}"
-          onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completing will CANCEL their reports (no pay eligibility).\n\n{% endif %}{% endwith %}Complete Barcode Generation and advance the Adda?');">
+          onsubmit="return confirm('{% with pending=stage_record.pending_report_workers %}{% if pending %}⚠ NOT SUBMITTED: {{ pending|join:', '|escapejs }} — completion will be BLOCKED unless a Super Admin overrides with a reason (R3).\n\n{% endif %}{% endwith %}Complete Barcode Generation and advance the Adda?');">
         {% csrf_token %}
         {% if embedded %}<input type="hidden" name="embedded" value="1">{% endif %}
+        {% include "production/_completion_override.html" %}
         <button type="submit" class="btn btn-primary">
             Complete &amp; Advance to {{ next_stage.stage.name|default:"Completion" }}
         </button>
@@ -217,8 +218,8 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
 </section>
 {% endif %}
 
-{% comment %} SECTION 06 — EXPORT PANEL (post-complete only) {% endcomment %}
-{% if stage_record.completed_at %}
+{% comment %} SECTION 06 — EXPORT PANEL (post-complete + management-only; V1.1 Item 3: workers never export) {% endcomment %}
+{% if stage_record.completed_at and is_management %}
 <section class="panel">
     <header class="panel-head">
         <span class="panel-num">06</span>
@@ -228,9 +229,8 @@ REQUIRED CONTEXT (from _build_barcode_gen_context):
         </div>
     </header>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <form method="post" action="{% url 'tracking:export-csv' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-primary">Export CSV</button></form>
-        <form method="post" action="{% url 'tracking:export-xlsx' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">Export XLSX</button></form>
-        <form method="post" action="{% url 'tracking:export-pdf' adda.code %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-ghost">PDF Summary</button></form>
+        {# Export trio owner: shared/_export_buttons.html (Phase G S1). CSV primary; PDF label kept verbatim. #}
+        {% include 'shared/_export_buttons.html' with adda_code=adda.code csv_label='Export CSV' csv_variant='primary' xlsx_label='Export XLSX' pdf_label='PDF Summary' %}
         <a href="{% url 'tracking:export-list' %}" class="btn btn-ghost">View Export History →</a>
     </div>
 </section>

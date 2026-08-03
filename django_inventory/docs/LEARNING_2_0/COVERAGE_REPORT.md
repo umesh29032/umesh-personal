@@ -1,3 +1,13 @@
+---
+id: l2-coverage-report
+type: machine-index
+status: active
+owner: handwritten
+scope: coverage metrics
+anchors: —
+verified: 2026-07-13
+---
+
 # PKALS COVERAGE REPORT — DATED SNAPSHOT (2026-06-12)
 
 > **Point-in-time snapshot, not a live contract.** Counts were grep/ORM-counted on
@@ -8,11 +18,11 @@
 ## Codebase totals (denominators)
 | Thing | Count | How measured |
 |---|---|---|
-| Named URL routes | ~146 | `grep -c path( ` per urls.py (accounts 23, production 64, expense 9, raw_materials 22, storefront 8, inventory 8, tracking 12) |
+| Named URL routes | ~146 | `grep -c path( ` per urls.py (accounts 23, production 80 [recounted RCP-2A 2026-07-18 after −5 orphan legacy routes; the old '64' was an era figure], expense 9, raw_materials 22, storefront 8, inventory 8, tracking 12 — era counts, other figures approximate) |
 | Concrete models | 55 | Django `apps.get_models` (production 25, expense 8, storefront 7, tracking 6, accounts 5, raw_materials 4; inventory/core 0) |
 | Service files | 26 | `find */services/*.py` |
 | Apps | 8 | accounts, production, expense, raw_materials, tracking, inventory, storefront, core |
-| ADRs | 10 | docs/adr/0001–0010 |
+| ADRs | 11 | docs/adr/0001–0011 |
 
 ## LEARNING_2_0 coverage (numerators)
 | Area | Documented | Of | % | Notes |

@@ -1,3 +1,13 @@
+---
+id: pages-access-control
+type: page-contract
+status: active
+owner: handwritten
+scope: access control
+anchors: —
+verified: 2026-07-13
+---
+
 # Page — Access Control hub
 
 The unified RBAC overview page mandated by the master spec. This file is the

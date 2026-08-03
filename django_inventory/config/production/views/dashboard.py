@@ -10,11 +10,11 @@ Date filter: ?from=&to= ke saath created_at range filter.
 from datetime import datetime, time
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from production.models import Adda, Stage
+from production.models import Adda
 
 from .mixins import ProductionRoleMixin
 
@@ -46,32 +46,20 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         if to_dt:
             addas = addas.filter(created_at__lt=to_dt)
 
-        ctx['in_progress'] = addas.filter(status=Adda.Status.IN_PROGRESS).count()
-        ctx['on_hold'] = addas.filter(status=Adda.Status.ON_HOLD).count()
-        ctx['completed_today'] = Adda.objects.filter(
-            status=Adda.Status.COMPLETED,
-            completed_at__date=timezone.now().date(),
-        ).count()
-        ctx['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
-
-        # Single grouped aggregate instead of one COUNT per stage (was N+1):
-        # count in-progress Addas grouped by current stage, then map onto the
-        # active Stage list.
-        stage_counts = {
-            r['current_stage__stage']: r['n']
-            for r in addas.filter(
-                status=Adda.Status.IN_PROGRESS,
-                current_stage__stage__isnull=False,
-            ).values('current_stage__stage').annotate(n=Count('id'))
-        }
-        stage_breakdown = [
-            {'label': stage.name, 'count': stage_counts.get(stage.id, 0)}
-            for stage in Stage.active.order_by('name')
-        ]
-        ctx['stage_breakdown'] = stage_breakdown
+        # G-4 (BOD-C, 2026-07-18): KPI counts + stage chips now live in
+        # operations_digest — one calculation, two consumers (this page + the
+        # BOD tiles). INERT: same keys, same numbers, same filter semantics.
+        from production.services.operations_digest import (
+            adda_status_counts, stage_breakdown)
+        counts = adda_status_counts(from_dt=from_dt, to_dt=to_dt)
+        ctx['in_progress'] = counts['in_progress']
+        ctx['on_hold'] = counts['on_hold']
+        ctx['completed_today'] = counts['completed_today']
+        ctx['total_completed'] = counts['total_completed']
+        ctx['stage_breakdown'] = stage_breakdown(from_dt=from_dt, to_dt=to_dt)
 
         recent = list(
-            addas.select_related('product', 'current_stage')
+            addas.select_related('product', 'current_stage__stage')
             .prefetch_related('product__workflow_stages')
             .order_by('-started_at')[:12]
         )
@@ -92,4 +80,93 @@ class AddaDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             )
             .order_by('-created_at')[:30]
         )
+
+        # Operations digest (P1-1) — management-only morning pulse. This view is
+        # the management LANDING (HomeView routes super_admin/manager here); the
+        # digest is gated to management so workers who navigate here don't see
+        # factory-wide money/pending counts.
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        if user_has_role(self.request.user, MANAGEMENT_ROLES):
+            from production.services.operations_digest import operations_digest
+            ctx['digest'] = operations_digest()
+        else:
+            ctx['digest'] = None
+        return ctx
+
+
+class StalledAddaListView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+    """H-2B drill-down for the digest's Stalled Addas tile. Uses the SAME
+    `stalled_stage_records()` as the digest (no second stalled-calc path → the
+    tile count and this list always reconcile). Worker isolation: non-management
+    see only stalled Addas they hold a live task on (same rule as the dashboard /
+    history). Read-only — no settlement / costing / production-truth touch."""
+    template_name = 'production/stalled_addas.html'
+
+    def get_context_data(self, **kwargs):
+        from django.conf import settings
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from production.models import WorkerStageTask
+        from production.services.operations_digest import stalled_stage_records
+
+        ctx = super().get_context_data(**kwargs)
+        srs = stalled_stage_records()
+        if not user_has_role(self.request.user, MANAGEMENT_ROLES):
+            assigned = WorkerStageTask.objects.filter(
+                stage_record__adda_id=OuterRef('adda_id'), worker=self.request.user,
+            ).exclude(status=WorkerStageTask.Status.CANCELLED)
+            srs = srs.filter(Exists(assigned))
+
+        now = timezone.now()
+        threshold = getattr(settings, 'STALLED_ADDA_DAYS', 3)
+        seen, rows = set(), []
+        for sr in srs:                       # started_at ASC → longest-stalled first
+            if sr.adda_id in seen:
+                continue                     # one row per Adda (oldest open stage)
+            seen.add(sr.adda_id)
+            days = (now - sr.started_at).days
+            rows.append({
+                'adda': sr.adda,
+                'stage': sr.workflow_stage.stage.name,
+                'status': sr.adda.get_status_display(),
+                'days': days,
+                'since': sr.started_at,
+                'severity': 'critical' if days >= threshold * 2 else 'warning',
+            })
+        ctx['rows'] = rows
+        ctx['threshold'] = threshold
+        return ctx
+
+
+class PendingReportListView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
+    """F-3 drill-down for the digest's Pending Reports tile. Uses the SAME
+    `pending_report_tasks()` as the digest (no second calc path → counts always
+    reconcile). Management/super_admin see all; a worker sees ONLY their own queue
+    (existing isolation preserved — they never see other workers' pending tasks).
+    Read-only — no settlement / costing / payroll / production-truth touch."""
+    template_name = 'production/pending_reports.html'
+
+    def get_context_data(self, **kwargs):
+        from accounts.services import MANAGEMENT_ROLES, user_has_role
+        from production.services.operations_digest import pending_report_tasks
+
+        ctx = super().get_context_data(**kwargs)
+        tasks = pending_report_tasks()
+        is_mgmt = user_has_role(self.request.user, MANAGEMENT_ROLES)
+        if not is_mgmt:
+            tasks = tasks.filter(worker=self.request.user)   # own queue only
+
+        now = timezone.now()
+        rows = []
+        for t in tasks:                          # created_at ASC → oldest waiting first
+            hours = (now - t.created_at).total_seconds() / 3600
+            rows.append({
+                'adda': t.stage_record.adda,
+                'stage': t.stage_record.workflow_stage.stage.name,
+                'worker': t.worker,
+                'status': t.get_status_display(),
+                'assigned': t.created_at,
+                'age_display': f'{int(hours)}h' if hours < 48 else f'{int(hours // 24)}d',
+            })
+        ctx['rows'] = rows
+        ctx['is_management'] = is_mgmt
         return ctx

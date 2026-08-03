@@ -1,0 +1,150 @@
+{% extends "accounts/base.html" %}
+{# M2 — PATTERN INTELLIGENCE STUDIO · BROWSE MODE (UI freeze §2.3).
+   The Pattern Library shelf: size tabs (Product → Size → Piece law),
+   the creation checklist (the SAME readiness truth the DCT gate uses),
+   shelf rows, the conveyor. One room — [Open in Studio] flips a row
+   into WORK mode. Mobile = browse/view-only (§2.3). #}
+{% block page_title %}{% if product %}{{ product.code }} · Pattern Intelligence Studio{% else %}Pattern Intelligence Studio{% endif %}{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-studio { max-width: 980px; margin: 0 auto; }
+  .pai-studio .head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .pai-studio .head h1 { font-family:'Cormorant Garamond', serif; font-size:26px; color:var(--ink); margin:0; }
+  .pai-studio .sub { font-size:12.5px; color:var(--stone); margin:2px 0 14px; }
+  .pai-studio .rail-nav { display:flex; justify-content:space-between; font-size:12px; margin-bottom:10px; }
+  .pai-studio .rail-nav a { color:var(--copper); text-decoration:none; font-weight:700; }
+  /* size tabs — hierarchy law: size-first inside the locked product */
+  .pai-studio .size-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .pai-studio .size-tabs a { padding:8px 16px; border-radius:20px; font-size:13px;
+    font-weight:700; text-decoration:none; color:var(--ink);
+    background:var(--card-bg); border:1px solid var(--border-card); min-height:36px; }
+  .pai-studio .size-tabs a.on { background:var(--copper); color:#fff; border-color:var(--copper); }
+  .pai-studio .size-tabs a .mini { font-weight:400; font-size:11px; opacity:0.85; }
+  /* creation checklist chips (gap-5 surface of the readiness law) */
+  .pai-studio .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .pai-studio .chip { font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:12px; }
+  .pai-studio .chip.ok { background:#e3f2e8; color:#20603c; }
+  .pai-studio .chip.miss { background:#fdebea; color:#a33028; }
+  .pai-studio .chip.opt { background:var(--card-bg); color:var(--stone); border:1px dashed var(--border-card); }
+  .pai-studio .ready-banner { font-size:13px; font-weight:800; padding:10px 14px;
+    border-radius:10px; margin-bottom:14px; }
+  .pai-studio .ready-banner.ok { background:#e3f2e8; color:#20603c; }
+  .pai-studio .ready-banner.warn { background:#fff6e5; color:#a26a00; }
+  .pai-studio .conveyor { margin-left:auto; }
+  /* shelf rows */
+  .pai-studio .shelf-row { display:flex; gap:14px; align-items:center;
+    background:var(--card-bg); border:1px solid var(--border-card);
+    border-radius:12px; box-shadow:var(--shadow-card); padding:12px 14px; margin-bottom:10px; }
+  .pai-studio .shelf-row .pv { width:84px; height:64px; flex:none; display:flex;
+    align-items:center; justify-content:center; background:#faf7f0; border-radius:8px; }
+  .pai-studio .shelf-row .pv svg { max-width:80px; max-height:60px; }
+  .pai-studio .shelf-row .body { flex:1; min-width:0; }
+  .pai-studio .shelf-row .nm { font-size:14.5px; font-weight:800; color:var(--ink); }
+  .pai-studio .shelf-row .meta { font-size:11.5px; color:var(--stone); margin-top:2px; }
+  .pai-studio .shelf-row .st { font-size:11px; font-weight:800; padding:3px 8px; border-radius:10px; }
+  .pai-studio .st.confirmed { background:#e3f2e8; color:#20603c; }
+  .pai-studio .st.draft { background:#fff6e5; color:#a26a00; }
+  .pai-studio .st.missing { background:#fdebea; color:#a33028; }
+  .pai-studio .shelf-row .acts { display:flex; gap:6px; flex-wrap:wrap; }
+  .pai-studio .acts a { font-size:12px; font-weight:700; padding:8px 12px;
+    border-radius:8px; text-decoration:none; min-height:36px; display:inline-flex; align-items:center; }
+  .pai-studio .acts .open { background:var(--copper); color:#fff; }
+  .pai-studio .acts .ghost { border:1px solid var(--border-card); color:var(--ink); background:var(--card-bg); }
+  .pai-studio .bucket-h { font-size:12px; font-weight:800; color:var(--stone);
+    text-transform:uppercase; letter-spacing:0.06em; margin:16px 0 8px; }
+  .pai-studio .chooser { display:flex; flex-direction:column; gap:8px; }
+  .pai-studio .chooser a { display:block; padding:14px 16px; background:var(--card-bg);
+    border:1px solid var(--border-card); border-radius:12px; box-shadow:var(--shadow-card);
+    color:var(--ink); text-decoration:none; font-size:14px; }
+  @media (max-width:700px) {
+    .pai-studio .shelf-row { flex-wrap:wrap; }
+    .pai-studio .acts .open { display:none; }   /* §2.3: work mode is desktop */
+    .pai-studio .conveyor { display:none; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-studio">
+{% if not product %}
+  <div class="head"><h1>Pattern Intelligence Studio</h1></div>
+  <p class="sub">Pick a product — its pattern knowledge lives here.</p>
+  <div class="chooser">
+    {% for p in all_products %}
+      <a href="?product={{ p.pk }}"><strong>{{ p.code }}</strong> · {{ p.name }}</a>
+    {% empty %}<p class="sub">No active products yet.</p>{% endfor %}
+  </div>
+{% else %}
+  <div class="rail-nav">
+    <a href="{% url 'patterns_ai:blueprint' %}?product={{ product.pk }}">← 1 · Blueprint</a>
+    <a href="{% url 'patterns_ai:dashboard' %}?product={{ product.pk }}">Dashboard</a>
+    {% if summary.any_size_ready %}<a href="{% url 'patterns_ai:cutting-table' product.pk %}">3 · Cutting Table →</a>
+    {% else %}<span style="color:var(--stone);">3 · Cutting Table (no Ready size yet)</span>{% endif %}
+  </div>
+  <div class="head">
+    <h1>{{ product.name }}</h1>
+    <span class="sub" style="margin:0;">({{ product.code }}) · Pattern Intelligence Studio</span>
+  </div>
+  <p class="sub">The company's pattern knowledge — digitized once, verified by a human, owned forever.</p>
+
+  {# size tabs — Product → Size → Piece #}
+  <div class="size-tabs">
+    {% for s in sections %}
+      <a class="{% if s.size.pk == active.size.pk %}on{% endif %}"
+         href="?product={{ product.pk }}&amp;size={{ s.size.code }}">{{ s.size.label }}
+        <span class="mini">{{ s.confirmed }}/{{ s.total }}</span></a>
+    {% endfor %}
+  </div>
+
+  {% if active %}
+    {# the CREATION CHECKLIST — readiness truth, surfaced (freeze §2.3) #}
+    <div class="chips">
+      {% for c in chips %}
+        {% if c.optional %}<span class="chip opt">{% if c.done %}✓{% else %}○{% endif %} {{ c.name }}</span>
+        {% elif c.done %}<span class="chip ok">✓ {{ c.name }}</span>
+        {% else %}<span class="chip miss">✖ {{ c.name }}</span>{% endif %}
+      {% endfor %}
+    </div>
+    {% if active.ready %}
+      <div class="ready-banner ok">✓ {{ active.size.label }} is READY FOR CUTTING — every mandatory design confirmed.</div>
+    {% else %}
+      <div class="ready-banner warn" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span>{{ active.size.label }}: {{ active.required_missing|length }} mandatory design{{ active.required_missing|length|pluralize }} missing.</span>
+        {% if conveyor %}
+          <a class="btn btn-primary conveyor" href="{{ conveyor_url }}">▶ Digitize next missing piece — {{ conveyor.piece_name }} · {{ conveyor.size_code }}</a>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {# shelf rows — todo-first buckets #}
+    {% for bucket in buckets %}{% if bucket.rows %}
+      <div class="bucket-h">{{ bucket.icon }} {{ bucket.label }}</div>
+      {% for row in bucket.rows %}
+      <div class="shelf-row">
+        <div class="pv">{% if row.preview_svg %}{{ row.preview_svg|safe }}{% else %}<span style="font-size:20px;color:var(--stone);">▱</span>{% endif %}</div>
+        <div class="body">
+          <div class="nm">{{ row.piece_name }}
+            <span class="st {{ row.status }}">{% if row.status == 'confirmed' %}v{{ row.version_no }} ✓{% elif row.status == 'draft' %}draft v{{ row.draft_version_no }}{% else %}missing{% endif %}</span>
+          </div>
+          <div class="meta">
+            {{ row.fabric_group }} · grain {{ row.grain_rule }}{% if row.badges.pair %} · pair{% endif %}{% if row.badges.fold %} · fold{% endif %}{% if row.badges.optional %} · optional{% endif %}
+            {% if row.dims %} · {{ row.dims.w_mm }}×{{ row.dims.h_mm }} mm ({{ row.dims.label }}){% endif %}
+            {% if row.area_cm2 %} · {{ row.area_cm2 }} cm²{% endif %}
+          </div>
+        </div>
+        <div class="acts">
+          <a class="open" href="{{ row.work_url }}">Open in Studio</a>
+          <a class="ghost" href="{{ row.history_url }}">History</a>
+          {% if row.dxf_url %}<a class="ghost" href="{{ row.dxf_url }}">DXF</a>{% endif %}
+          {% if row.svg_url %}<a class="ghost" href="{{ row.svg_url }}">SVG</a>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}{% empty %}
+      <p class="sub">No pieces in the Blueprint yet — define the garment structure first.</p>
+    {% endfor %}
+  {% else %}
+    <div class="ready-banner warn">No sizes yet — start on the Dashboard (Universal) or add sizes in production.</div>
+  {% endif %}
+{% endif %}
+</div>
+{% endblock %}

@@ -19,6 +19,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+# Leaf constants module (no model import) — safe at handler load time.
+from production.constants import ALLOC_DIM_NONE
+
 
 @dataclass(frozen=True)
 class WorkerAllocation:
@@ -62,6 +65,10 @@ class StageHandler(ABC):
       template_partial path to the stage's panel partial
       required_skill  skill code gating the stage, or None (data-driven via
                       production.Stage.access_by_skill is preferred — see M3.1)
+      pool_grain      piece-pool grain this stage participates at (S4 / D1), one of
+                      ALLOC_DIM_{NONE,QUANTITY,COLOR_SIZE}. Default NONE = not a
+                      piece-pool stage. Seeds WorkflowStage.allocation_dimensions.
+                      POOL-ONLY — orthogonal to settlement + costing.
 
     Payability (does completing this stage credit workers?) is NOT a handler
     attribute — it lives on WorkflowStage.credits_workers (data). See cost/credit.
@@ -71,11 +78,32 @@ class StageHandler(ABC):
     name: str = ''
     template_partial: str = ''
     required_skill: str | None = None
+    # Piece-pool grain (S4/D1). NONE = pre-piece / not a pool stage. Cutting overrides
+    # to COLOR_SIZE (the pool source). Pool behaviour ONLY — not settlement/costing.
+    pool_grain: str = ALLOC_DIM_NONE
 
     @abstractmethod
     def snapshot(self, adda) -> dict:
         """Lightweight, request-free stage state (drives the Adda overview tiles +
         embedded mini-panels). Mirrors the service get_*_snapshot."""
+
+    def admin_snapshot(self, adda):
+        """R8 (owner spec 2026-07-05) — the GENERIC stage-snapshot architecture.
+
+        A management-only, READ-ONLY reference view of this stage's output,
+        automatically shown on the NEXT stage's panel (StagePanelView injects
+        the nearest previous stage's admin_snapshot) and reusable by Adda-360.
+        LIVE reads of existing business data ONLY — never a frozen copy, never
+        a new table (owner constraint).
+
+        Default None = stage exposes nothing. Future stages (bundling, sewing,
+        checking, packing, …) just override — zero view/template work; the ONE
+        shared partial `production/_stage_admin_snapshot.html` renders the shape:
+
+            {'title': str,
+             'sections': [{'label': str, 'rows': [(name, value), …]}, …]}
+        """
+        return None
 
     @abstractmethod
     def panel_context(self, request, adda, record) -> dict:
@@ -112,9 +140,14 @@ class StageHandler(ABC):
         no quantity is available (unpriced) — NOT 0, so processing_cost stays NULL
         (NULL = unpriced; 0.00 = priced-zero / grouped). See cost_service."""
 
-    def contribution_schema(self, adda) -> dict:
+    def contribution_schema(self, adda, worker=None) -> dict:
         """Declare the fields a WORKER reports for this stage's contribution lines —
         the open-closed seam that keeps the worker report form stage-agnostic.
+
+        `worker` (OP-1, optional): the reporting worker, so a pool-participant
+        stage can scope its choice options to THAT worker's allocated dimensions
+        (blind reporting — labels only, never pool quantities). None = unscoped
+        (rollup/summary callers). Handlers that ignore it stay valid.
 
         Default = a single quantity. A stage OVERRIDES to add dimensions/measures
         (Cutting adds colour + size). The report view + template render + parse
@@ -140,6 +173,66 @@ class StageHandler(ABC):
                  'label': 'Quantity', 'required': True, 'unit': 'pieces'},
             ],
         }
+
+    def checklist_submit(self, *, task, checked_ids, photos, actor, action):
+        """R8 (spec §3): the CHECKLIST report path — only meaningful for stages
+        whose contribution_schema sets `mode='checklist'` (Pattern Design).
+        The worker report view dispatches here instead of the line parser; the
+        handler syncs its stage's verification truth and reports through the
+        SAME C-TM chokepoint. Default: refuse (stage has no checklist)."""
+        from django.core.exceptions import ValidationError
+        raise ValidationError("This stage does not use a checklist report.")
+
+    # ── Piece-pool source (S4 / D2-D3, Option B) — handler-dispatched, no stage-name
+    # conditionals in the allocation services. Cutting OVERRIDES both (its pool source
+    # is AddaProductSizeColorPieceBreakdown, never duplicated into StagePoolSnapshot).
+    def pool_good(self, stage_record) -> dict:
+        """The frozen good this stage makes available to allocate downstream, as
+        ``{(color_id, size_id): Decimal}`` at the stage's grain. Base source =
+        StagePoolSnapshot (materialized at complete). Pool-only — no money/settlement."""
+        from django.db.models import Sum
+
+        from production.models import StagePoolSnapshot
+        rows = (StagePoolSnapshot.objects.filter(stage_record=stage_record)
+                .values('color_id', 'size_id').annotate(g=Sum('good')))
+        return {(r['color_id'], r['size_id']): r['g'] for r in rows}
+
+    def materialize_pool(self, stage_record) -> int:
+        """Write-once freeze of this stage's pool good into StagePoolSnapshot = Σ
+        verified-else-good per WorkerStageContribution at the stage's grain (owner
+        decision 2026-07-06: verification is the final business truth — downstream
+        operations consume the manager-corrected number, same resolver rule as
+        settlement). Only for non-NONE grain; idempotent (skips if already
+        materialised). Cutting overrides to a no-op (APSCPB is its snapshot).
+        Returns rows written. Caller is atomic."""
+        # Coalesce = SQL-level verified-else-good, mirroring settlement_resolver
+        # without importing money code into the pool (concerns stay independent).
+        from django.db.models import Sum
+        from django.db.models.functions import Coalesce
+
+        from production.constants import ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE
+        from production.models import (
+            StagePoolSnapshot, WorkerStageContribution, WorkerStageTask,
+        )
+        dim = stage_record.workflow_stage.allocation_dimensions
+        if dim == ALLOC_DIM_NONE:
+            return 0   # not a piece-pool stage
+        if StagePoolSnapshot.objects.filter(stage_record=stage_record).exists():
+            return 0   # write-once (already materialised)
+        done = (WorkerStageTask.Status.COMPLETED, WorkerStageTask.Status.VERIFIED)
+        qs = WorkerStageContribution.objects.filter(
+            task__stage_record=stage_record, task__status__in=done)
+        effective = Coalesce('verified_quantity', 'good_quantity')
+        if dim == ALLOC_DIM_COLOR_SIZE:
+            grouped = qs.values('color_id', 'size_id').annotate(g=Sum(effective))
+            rows = [StagePoolSnapshot(stage_record=stage_record, color_id=r['color_id'],
+                                      size_id=r['size_id'], good=r['g']) for r in grouped]
+        else:   # QUANTITY (scalar; dims NULL)
+            from decimal import Decimal
+            total = qs.aggregate(g=Sum(effective))['g'] or Decimal('0')
+            rows = [StagePoolSnapshot(stage_record=stage_record, color=None, size=None, good=total)]
+        StagePoolSnapshot.objects.bulk_create(rows)
+        return len(rows)
 
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<StageHandler {self.code!r}>"

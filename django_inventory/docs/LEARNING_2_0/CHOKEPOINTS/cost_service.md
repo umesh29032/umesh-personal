@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-cost-service
+type: chokepoint
+status: active
+owner: handwritten
+scope: cost_service (chokepoint)
+anchors: config/production/services/cost_service.py
+verified: 2026-07-13
+---
+
 ## TL;DR (2 min)
 Freezes a stage's STANDARD manufacturing cost (`processing_cost = ws.cost_rate ×
 handler quantity`, role-independent) at stage advance; honest-NULL if unpriced.
@@ -56,5 +66,34 @@ role_rate_for(ws, role) — grouped-member guard (C-1): cost_billed_at set → r
 - **Recovery path:** wrong frozen cost → reopen the stage (`clear_stage_cost`) →
  re-complete re-freezes at the corrected rate/quantity.
 
+---
+## P17 addition (2026-07-18, RMX): the material/full-cost READ engine
+
+The file now ALSO owns all material-money reads (READ-ONLY — no writes, no
+FactoryExpense/ledger/settlement contact):
+
+```
+_material_value_expr — THE single Decision-5 valuation SQL (purchase price; NullIf
+ replicates the verified-weight-0 or-fallback; honest-NULL never 0)
+material_costs_for_addas(adda_ids) — bulk per-Adda material arm (3 grouped aggregates:
+ entries − remnants + leftover-ins at SOURCE roll price)
+material_cost_for_adda — DELEGATES to the bulk (one valuation, one home)
+full_costs_for_addas / full_cost_for_adda — THE ADR-0009 Decision-2 assembly
+ (material G1 + Σ non-voided SWA via earn_map source + non-payable priced
+ processing; overhead reserved-future). A360 AND the costing page read THIS —
+ never re-derive.
+material_consumption_in_period(year, month) — the derive law time-sliced
+ (tz-local month windows)
+```
+
+**Invariants added:** one-rupee-once (Σperiods ≡ ΣAddas ≡ intake-once — pinned) ·
+consumption vs purchases = separate LABELLED bases, never blended · Decision-1
+sum-guard (assembly components listed, standard labor never added to settled) ·
+RMX-D2 permanent rule (aggregates management-visible; per-roll stays walled).
+**What breaks if bypassed:** a second valuation expression drifts from Decision 5;
+a page re-deriving full cost breaks A360↔costing parity.
+Tests: `production/tests/test_rmx_read_paths.py` (11) + `test_rmx_certification.py`
+(6). Evidence: [RM_EXPENSE_INTEGRATION_LOG](../../RM_EXPENSE_INTEGRATION_LOG.md).
+
 ### Confidence
-**Verified from code (verified against commit f067daf0, 2026-06-12; re-verify the cited file if it changed)** (cost_service compute, freeze, role_rate_for;). Tests: production/tests/test_c1_hardening.py (grouped-member guard).
+**Verified from code (verified against commit f067daf0, 2026-06-12; re-verify the cited file if it changed)** (cost_service compute, freeze, role_rate_for;). Tests: production/tests/test_c1_hardening.py (grouped-member guard). **P17 engine section verified from code 2026-07-18 (uncommitted tree, campaign U2).**

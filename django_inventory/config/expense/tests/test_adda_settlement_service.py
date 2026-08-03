@@ -167,14 +167,14 @@ class InvariantTests(_Base):
             earning_rate_snapshot=Decimal('3'),
             earning_amount_snapshot=Decimal('135'),
             entered_by=self.mgmt)
-        lines, skip_a, skip_b = preview_lines(self._draft())
+        lines, skip_a, skip_b, _skip_m = preview_lines(self._draft())
         self.assertEqual({c.task.worker_id for c in lines}, {self.w2.pk})
         self.assertEqual({c.task.worker_id for c in skip_a}, {self.w1.pk})
         # NET counting: void the era-A SWA → w1 becomes settleable
         era_a.voided_at = timezone.now()
         era_a.save(update_fields=['voided_at'])
         s = AddaSettlement.objects.filter(status='draft').first()
-        lines2, skip_a2, _ = preview_lines(s)
+        lines2, skip_a2, _, _ = preview_lines(s)
         self.assertEqual({c.task.worker_id for c in lines2},
                          {self.w1.pk, self.w2.pk})
         self.assertEqual(skip_a2, [])
@@ -309,7 +309,7 @@ class ReversalLifecycleTests(_Base):
         c = WorkerStageContribution.objects.get(task__worker=self.w1)
         self.assertIsNotNone(c.settlement_line.voided_at)
         s2 = self._draft()
-        lines, skip_a, skip_b = preview_lines(s2)
+        lines, skip_a, skip_b, _skip_m = preview_lines(s2)
         self.assertEqual(len(lines), 1)
         self.assertEqual(skip_b, [])
 
@@ -397,3 +397,93 @@ class ReversalLifecycleTests(_Base):
             create_settlement(user=self.mgmt, worker=self.w1,
                               amount_paid=Decimal('50'),
                               recoveries=[{'advance': adv.id, 'amount': 10}])
+
+
+class Phase11SettlementAuditTests(_Base):
+    """PA-11: settlement-audit fixes."""
+
+    def test_outstanding_advances_excludes_reversed_recovery(self):
+        """PA-11-1: a reversed recovery must NOT count as recovered in
+        outstanding_advances (it already doesn't in advance_remaining/outstanding).
+        After reversing a settlement that fully recovered an advance, the advance
+        must reappear as outstanding so the owner can re-recover it."""
+        from expense.services.payroll_service import outstanding_advances
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        self._contribute(self.w1, self.sr_pay, 50)            # ₹150 earning
+        adv = WorkerAdvance.objects.create(
+            worker=self.w1, amount=Decimal('100'),
+            advance_date=timezone.now().date(), entered_by=self.mgmt)
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt,
+                                 recoveries={adv.pk: Decimal('100')})
+        # fully recovered → drops out of the outstanding list
+        self.assertEqual(outstanding_advances(self.w1), [])
+        # reverse → advance restored everywhere, incl. the recovery UI source
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+        out = outstanding_advances(self.w1)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['advance'].pk, adv.pk)
+        self.assertEqual(out[0]['remaining'], Decimal('100'))
+
+    def test_grouped_after_complete_preview_matches_finalize_zero(self):
+        """PA-11-2: a stage grouped AFTER its workers completed has a stale non-zero
+        frozen expected_rate. The settlement preview/queue must apply the grouped→0
+        effective_pay_rate guard (mirror finalize), not the raw frozen rate."""
+        from expense.services.adda_settlement_service import settlement_queue
+        self._contribute(self.w1, self.sr_pay, 50)            # expected_rate frozen = 3
+        self._close_stages()
+        # Group the payable stage after completion (billed at the other stage).
+        self.ws_pay.cost_billed_at = self.ws_free
+        self.ws_pay.save(update_fields=['cost_billed_at'])
+        # Queue preview must show 0 (grouped member pays at the payer), matching finalize.
+        q = settlement_queue()
+        row = next(r for r in q['ready'] if r['adda'].pk == self.adda.pk)
+        self.assertEqual(row['expected'], Decimal('0.00'))
+        # And finalize books 0 — preview now agrees with the money write.
+        s = create_draft(adda=self.adda, user=self.mgmt)
+        finalize_adda_settlement(settlement=s, user=self.mgmt)
+        s.refresh_from_db()
+        self.assertEqual(s.expected_total, Decimal('0.00'))
+
+
+class Phase12PayrollAuditTests(_Base):
+    """PA-12: payroll reads must stay consistent with the ledger after a reversal."""
+
+    def _advance(self, worker, amount):
+        return WorkerAdvance.objects.create(
+            worker=worker, amount=Decimal(amount),
+            advance_date=timezone.now().date(), entered_by=self.mgmt)
+
+    def test_advance_exposure_and_earnings_correct_after_reverse(self):
+        from django.urls import reverse as urlreverse
+        from expense.services.payroll_service import (
+            advance_outstanding, payroll_totals, worker_summary)
+        from expense.services.adda_settlement_service import reverse_adda_settlement
+        self._contribute(self.w1, self.sr_pay, 50)            # ₹150 earning
+        adv = self._advance(self.w1, '100')
+        s = self._draft()
+        finalize_adda_settlement(settlement=s, user=self.mgmt,
+                                 recoveries={adv.pk: Decimal('100')})
+        # Fully recovered → exposure 0 everywhere.
+        self.assertEqual(advance_outstanding(self.w1), Decimal('0'))
+        self.assertEqual(payroll_totals()['advance_exposure'], Decimal('0'))
+
+        reverse_adda_settlement(settlement=s, user=self.mgmt)
+
+        # PA-12-A: factory advance_exposure must EXCLUDE the reversed recovery → ₹100.
+        self.assertEqual(advance_outstanding(self.w1), Decimal('100'))
+        self.assertEqual(payroll_totals()['advance_exposure'], Decimal('100'))
+        # Earnings netted to 0 after the reversal (the per-worker truth).
+        summ = worker_summary(self.w1)
+        self.assertEqual(summ['total_earnings'], Decimal('0.00'))
+        self.assertEqual(summ['advance_outstanding'], Decimal('100'))
+
+        # PA-12-B/C: the management overview row must AGREE with worker_summary
+        # (earnings netted of reversals, advance excludes the reversed recovery) —
+        # not credits−all-reversals / recovered-incl-reversed.
+        self.client.force_login(self.mgmt)
+        resp = self.client.get(urlreverse('expense:payroll-overview'))
+        self.assertEqual(resp.status_code, 200)
+        row = next(w for w in resp.context['workers'] if w['worker'].pk == self.w1.pk)
+        self.assertEqual(row['total_earnings'], Decimal('0.00'))     # PA-12-C
+        self.assertEqual(row['advance_outstanding'], Decimal('100'))  # PA-12-B

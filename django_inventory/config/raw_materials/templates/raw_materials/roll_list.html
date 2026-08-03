@@ -3,25 +3,13 @@
 {% block page_title %}Cloth Rolls{% endblock %}
 
 {% block extra_head %}
-<style>
-    .roll-list .filter-card {
-        display: flex; gap: 12px; align-items: end; flex-wrap: nowrap;
-        padding: 14px 18px; background: var(--card-bg);
-        border: 1px solid var(--border-card); border-radius: 14px;
-        box-shadow: var(--shadow-card); margin-bottom: 18px;
-        overflow-x: auto; -webkit-overflow-scrolling: touch;
-    }
-    .roll-list .filter-card > * { flex-shrink: 0; }
-    .roll-list .filter-card .field { display: flex; flex-direction: column; gap: 4px; }
-    .roll-list .filter-card label {
-        font-size: 10px; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: var(--stone);
-    }
-    .roll-list .filter-card select {
-        padding: 9px 12px; min-width: 150px;
-        border: 1.5px solid #cfc0aa; border-radius: 10px;
-        background: var(--cream); box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
-        font-size: 13px;
+<style>    /* F-Select A: chrome from canonical .select-field--form. Filters fancify → width on
+       the .fancy-select wrap (visible control), tokens on the trigger; the native
+       <select> is hidden and no longer drives layout. */
+    .roll-list .filter-card select,
+    .roll-list .filter-card .fancy-select { min-width: 150px; }
+    .roll-list .filter-card .fancy-select-trigger {
+        --select-field-padding: 9px 12px; --select-field-font: 13px;
     }
 
     /* Active-filter summary strip — shows under filter card when any filter is on. */
@@ -67,6 +55,8 @@
     @media (max-width: 600px) {
         .roll-list .filter-info { padding: 10px 12px; }
         .roll-list .filter-info .clear-all { margin-left: 0; width: 100%; text-align: center; margin-top: 4px; }
+        .roll-list .filter-card select,
+        .roll-list .filter-card .fancy-select { width: 100%; min-width: 0; }
     }
 
     /* Time-log styling shared partial mein move ho gayi (inventory/_time_log_styles.html) */
@@ -92,38 +82,39 @@
     {% endif %}
 
     {# GET form — status/cloth_type/location querystring mein bhejta hai, view filter karta hai #}
+    {# Filter selects use FancySelect (no data-no-fancy): native <select> popup mispositions on mobile/DevTools emulation; custom dropdown positions correctly. #}
     <form method="get" class="filter-card">
-        <div class="field">
+        <div class="filter-field">
             <label>Status</label>
-            <select name="status" data-no-fancy>
+            <select name="status" class="select-field--form">
                 <option value="">All</option>
                 <option value="not_used" {% if filters.status == 'not_used' %}selected{% endif %}>Not Used</option>
                 <option value="used" {% if filters.status == 'used' %}selected{% endif %}>Used</option>
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Cloth Type</label>
-            <select name="cloth_type" data-no-fancy>
+            <select name="cloth_type" class="select-field--form">
                 <option value="">All</option>
                 {% for t in cloth_types %}<option value="{{ t.pk }}" {% if filters.cloth_type == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Location</label>
-            <select name="location" data-no-fancy>
+            <select name="location" class="select-field--form">
                 <option value="">All</option>
                 {% for l in locations %}<option value="{{ l.pk }}" {% if filters.location == l.pk|stringformat:'s' %}selected{% endif %}>{{ l.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field">
+        <div class="filter-field">
             <label>Color</label>
-            <select name="color" data-no-fancy>
+            <select name="color" class="select-field--form">
                 <option value="">All</option>
                 {% for c in colors %}<option value="{{ c.pk }}" {% if filters.color == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
             </select>
         </div>
-        <div class="field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
-        <div class="field"><label>&nbsp;</label><a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Reset</a></div>
+        <div class="filter-field"><label>&nbsp;</label><button type="submit" class="btn btn-primary">Apply</button></div>
+        <div class="filter-field"><label>&nbsp;</label><a href="{% url 'raw_materials:roll-list' %}" class="btn btn-ghost">Reset</a></div>
     </form>
 
     {# `active_filter_chips` context var — har chip mein `remove_url` already built hai (view side) #}

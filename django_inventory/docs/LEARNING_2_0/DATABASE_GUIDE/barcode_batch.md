@@ -1,3 +1,13 @@
+---
+id: l2-database-guide-barcode-batch
+type: database-guide
+status: active
+owner: handwritten
+scope: barcode_batch (model)
+anchors: —
+verified: 2026-07-13
+---
+
 # DB: BarcodeBatch — piece identity ranges
 
 ## TL;DR

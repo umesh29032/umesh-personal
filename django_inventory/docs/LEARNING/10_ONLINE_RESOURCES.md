@@ -1,3 +1,13 @@
+---
+id: learning-10-online-resources
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Online resources — har topic ka OFFICIAL link + "is project me kahan"
 
 > Fresher ke liye: pehle column ka concept padho (link official docs ka hai —

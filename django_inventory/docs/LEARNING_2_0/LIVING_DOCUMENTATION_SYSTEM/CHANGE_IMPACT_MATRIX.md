@@ -1,3 +1,13 @@
+---
+id: l2-living-documentation-system-change-impact-matrix
+type: topic-canonical
+status: active
+owner: handwritten
+scope: documentation system (PKALS-LIVE)
+anchors: —
+verified: 2026-07-13
+---
+
 # CHANGE IMPACT MATRIX — changed file → docs to review
 
 ## TL;DR
@@ -25,6 +35,9 @@ rediscover.
 | any template (.html) | UI_COMPONENTS (if pattern/vocab) · CLAUDE rule 11 (3-viewport verify) · app GUIDE if page list changed |
 | a new ADR | adr/README · KNOWLEDGE_MAP §9 · AI_AGENT_GUIDE (decisions) · ARCHITECTURE_VALIDATION · PENDING_BACKLOG if it changes the plan |
 | a new app/model/migration | SYSTEM_DESIGN §5 · LEARNING/02 · APPS/<app>/* · DATABASE_GUIDE · COVERAGE_REPORT counts |
+| `config/devseed/*` (dev-only DEV TOOLING: seeder P12 + knowledge_sync P14) | docs/apps/devseed/GUIDE.md · config/devseed/README.md · SEEDER_ENGINE_LOG + KNOWLEDGE_SYNC_LOG (append-only evidence) · DEV_DATASET_ARCHITECTURE.md is 🔒frozen-v1 — spec gaps = dated §12 amendments, never silent divergence · scenario/registry changes must keep test_guard registry pins green · `knowledge/` = PURE DETECTOR (never repairs; single write site = var/ reports; no --fix ever — pins in test_knowledge_purity) |
+| `config/bod/*` (owner command center, Phase 15 — WINDOW never engine) | docs/apps/bod/GUIDE.md · config/bod/README.md · BOD_BUILD_LOG (append-only evidence) · PDD register entry 6 = the product charter (owner change-control) · every KPI needs a closed Metric Resolution Ladder row (BOD-D3; step-3 = owner STOP) · read-only law: any write path/POST route = red battery + campaign stop · sidebar MenuItem changes bump per-render SidebarItemRule lookups (see the a360 76-query pin) |
+| `config/verification/*` (read-only verify engine, Phase 13 — CERTIFIED 1.0.0) | docs/apps/verification/GUIDE.md · config/verification/README.md · VERIFICATION_ENGINE_LOG (append-only evidence) · READ-ONLY law: any write path = red purity battery + campaign stop · checks need citations (VER-D4); new invariants = owner/ADR · `assertions.py` = the SEED-D6 single implementation (devseed imports it — never fork) · **report schema is CERTIFIED (test_certification.py tripwire): changing envelope/body keys = new engine version + dated Design-Record amendment** · deployment consumers (P19/20/21) cite the schema — coordinate before touching report.py |
 | roadmap/phase change | ROADMAP_REVIEW · PENDING_BACKLOG · KNOWLEDGE_MAP §10 |
 | **TM-1 / Tracking Mode lands** | WorkflowStage row (above) · REQUIREMENT_REVIEW_STAGE_TRACKING · DATABASE_GUIDE/workflow_stage · flow-editor journey · CHOKEPOINTS/worker_task_service (C-TM convergence) · future-phase detail (this file, below) |
 | **MissingPiece module lands** | new APPS/production additions · REQUEST_JOURNEY + DATA_FLOW + DATABASE_GUIDE/MissingPieceCase · ARCHITECTURE_EXPLAINED "why" · PROJECT_BRAIN FEATURE/SEARCH/DEBUGGING_INDEX · settlement pre-fill note · drop "future placeholder" in FEATURE_INDEX · future-phase detail (this file, below) |

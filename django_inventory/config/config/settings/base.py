@@ -76,6 +76,11 @@ INSTALLED_APPS = [
     'production',     # products, Adda batches, workflow stages, stage records
     'tracking',       # piece-level barcodes (QR) + per-domain audit history
     'expense',        # worker payroll: allocation, ledger, advances, payments (downstream of production)
+    'machines',
+    'patterns_ai',   # AI Pattern Intelligence (P1 Block 1 — foundation)       # R10-A: physical machines + operator possession windows (assets only; downstream of production)
+    'verification',  # Phase-13 read-only verification engine — production-PRESENT by design (VER-D1); no models/migrations/URLs
+    'bod',            # Phase-15 Business Operating Dashboard — owner command center; WINDOW never engine (read-only, zero models)
+    'learning',       # course reader — a WINDOW over docs/*_course/*.md; zero models, GET-only
 ]
 
 # AUTHENTICATION_BACKENDS: Django kaise verify karta hai ki user valid hai
@@ -181,6 +186,39 @@ else:
 # deletion of the legacy path stays soak-gated (separate future PR).
 LEDGER_CREDIT_AT_ALLOCATION = config('LEDGER_CREDIT_AT_ALLOCATION', default=False, cast=bool)
 
+# AE-1 (owner ruling 2026-07-20): the allocation bound is now HARD + ALWAYS enforced
+# (no feature flag — see pool_service.check_allocation_bound). The former
+# ENFORCE_ALLOCATION_BOUND kill-switch was removed: the FAT proved the soft/off default
+# let workers over-report beyond their allocation. `preview_allocation_bound` remains as
+# a read-only audit of any pre-existing rows that would now be refused at complete.
+
+# Foundation S5 — M-6 settlement reconciliation BLOCK. Default False = WARN-only (today's
+# behavior: an over-allocated settlement is recorded + warned, never blocked). True = finalize
+# REFUSES when a stage settled MORE than it produced (Σ settled good > cost_quantity_snapshot)
+# beyond the tolerance, unless a super-admin supplies an audited override reason. Quantity-only
+# (good vs produced) — reads no rate/earning/cost. Kill-switch: flip False to disable instantly.
+ENFORCE_SETTLEMENT_RECONCILIATION = config('ENFORCE_SETTLEMENT_RECONCILIATION', default=False, cast=bool)
+# Allowed over-allocation margin (ABSOLUTE pieces, global) before the BLOCK fires. Default 0 =
+# strict when enforcement is on. Absorbs legit rounding / minor discrepancies.
+SETTLEMENT_RECONCILIATION_TOLERANCE = config('SETTLEMENT_RECONCILIATION_TOLERANCE', default='0')
+
+# M6 (Pattern Intelligence manufacturing gates) — BOTH default OFF (ship →
+# soak → owner flips; MANUFACTURING_INTEGRATION_REVIEW §4). OFF = today's
+# advisory-only behavior byte-identical.
+# True = cutting completion REFUSES without an active approved-layout
+# contract for the Adda (names the choose page).
+REQUIRE_APPROVED_LAYOUT = config('REQUIRE_APPROVED_LAYOUT', default=False, cast=bool)
+# True = cutting completion REFUSES when any size's cut count differs from
+# the approved layout's expected (marker content × plies) beyond the
+# tolerance (ABSOLUTE pieces). The advisory WARN stays regardless.
+ENFORCE_LAYOUT_RECONCILIATION = config('ENFORCE_LAYOUT_RECONCILIATION', default=False, cast=bool)
+LAYOUT_RECONCILIATION_TOLERANCE = config('LAYOUT_RECONCILIATION_TOLERANCE', default=0, cast=int)
+
+# Operations digest (P1-1): an in-progress Adda whose current open stage has not
+# moved in this many days is flagged "stalled" on the management Operations
+# landing. Constant (not hardcoded in query logic) so the threshold is tunable.
+STALLED_ADDA_DAYS = config('STALLED_ADDA_DAYS', default=3, cast=int)
+
 # ─── Password Validation ──────────────────────────────────────────────────────
 # Yeh validators password set karte waqt check karte hain — weak passwords reject hote hain
 AUTH_PASSWORD_VALIDATORS = [
@@ -259,6 +297,9 @@ ACCOUNT_EMAIL_REQUIRED = True             # email required hai
 # themselves; a Super Admin must pre-provision the User row first. See
 # accounts/allauth_adapters.py for the enforcement logic.
 # Matlab: koi bhi Google account se signup nahi kar sakta — pehle admin ko user banana hoga
+# S2 fix 2026-07-12: local email/password signup bhi band — ACCOUNT_ADAPTER
+# closes /accounts/signup/ (pre-provisioned users only, PA-02 invariant).
+ACCOUNT_ADAPTER = "accounts.allauth_adapters.RestrictedAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = False
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True              # Google email se existing account dhundhe
 SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True  # match mila toh auto-link karo

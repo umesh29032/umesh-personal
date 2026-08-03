@@ -14,7 +14,6 @@ forms in one file = unmaintainable. Each file ~100 lines tops.
 Forms in this file (Layering):
   • StartLayeringForm        — manager assigns workers
   • AttachRollForm           — worker attaches a roll (width + weight)
-  • EditRollEntryForm        — corrects existing entry (width/weight/notes)
   • RemainingClothForm       — records leftover cloth piece
   • CompleteLayeringForm     — overall layer length + duration + notes
 """
@@ -70,24 +69,6 @@ class AttachRollForm(forms.Form):
         super().__init__(*args, **kwargs)
         if available_rolls_qs is not None:
             self.fields['roll'].queryset = available_rolls_qs
-
-
-class EditRollEntryForm(forms.Form):
-    """Corrects width/weight/notes on an existing LayeringRollEntry."""
-    width_verified_inch = forms.TypedChoiceField(
-        required=False,
-        choices=[('', '— no change —')] + [(str(v), label) for v, label in WIDTH_CHOICES],
-        coerce=int, empty_value=None,
-        widget=forms.Select(attrs={**_BASE}),
-    )
-    weight_verified_kg = forms.DecimalField(
-        required=False, min_value=0.01, max_digits=8, decimal_places=2,
-        widget=forms.NumberInput(attrs={**_BASE, 'step': '0.01'}),
-    )
-    notes = forms.CharField(
-        required=False,
-        widget=forms.TextInput(attrs={**_BASE}),
-    )
 
 
 class RemainingClothForm(forms.Form):

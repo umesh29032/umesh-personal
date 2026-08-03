@@ -112,26 +112,18 @@
 .panel-head p { font-size: 13px; color: var(--gray-500); margin: 0; }
 .panel-body { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
 
-/* ─── FIELDS ──────────────────────────────────────── */
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: flex; gap: 16px; }
-.field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 560px) { .field-grid-2 { grid-template-columns: 1fr; } }
-
-.field label {
-    font-size: 12px; font-weight: 700;
-    color: var(--ink-2); text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
+/* ─── FIELDS ── F-4c (2026-06-16): .field / .field-row / .field-grid-2 / .field label converged
+   to the Forms owner (shared/_form_styles.html). Accounts keeps only its .field INPUT styling
+   (below) + label.avatar-btn (explicit exception). No .field layout/label def here. ─── */
 .field input, .field select, .field textarea,
 .field .fancy-select-trigger {
     width: 100%;
-    padding: 11px 14px;
-    border: 1.5px solid #cfc0aa;
-    border-radius: 10px;
+    padding: var(--input-padding);
+    border: 1.5px solid var(--input-border);
+    border-radius: var(--input-radius);
     font-size: 14px; line-height: 1.5;
     font-family: inherit;
-    background: var(--cream);
+    background: var(--input-bg);
     color: var(--ink);
     box-shadow: inset 0 1.5px 4px rgba(14,11,9,0.07);
     transition: all .15s;
@@ -140,21 +132,21 @@
 .field select {
     -webkit-appearance: none;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a6a58' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-image: var(--select-arrow);
+    background-size: var(--select-arrow-size);
     background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 38px;
+    background-position: right var(--select-arrow-offset-right) center;
+    padding-right: var(--select-padding-right);
     cursor: pointer;
 }
 .field input:focus, .field select:focus, .field textarea:focus,
 .field .fancy-select.open .fancy-select-trigger {
     outline: none;
-    background: var(--white);
-    border-color: var(--copper);
-    box-shadow: 0 0 0 3px rgba(184,115,51,0.15);
+    background: var(--input-bg-focus);
+    border-color: var(--input-border-focus);
+    box-shadow: 0 0 0 3px var(--input-focus-ring);
 }
 .field small { font-size: 12px; color: var(--gray-500); }
-.field-error { color: var(--danger) !important; font-weight: 600; }
 .label-unit { color: var(--copper); font-weight: 600; }
 
 /* ─── AVATAR UPLOAD ───────────────────────────────── */
@@ -360,7 +352,6 @@ html[data-theme="dark"] .field input:focus,
 html[data-theme="dark"] .field select:focus,
 html[data-theme="dark"] .field textarea:focus,
 html[data-theme="dark"] .field .fancy-select.open .fancy-select-trigger { background: var(--cream-2); box-shadow: 0 0 0 3px rgba(184,115,51,0.18); }
-html[data-theme="dark"] .field label { color: var(--ink-2); }
 html[data-theme="dark"] .field small { color: var(--stone); }
 html[data-theme="dark"] .avatar-upload { background: var(--cream); border-color: var(--cream-3); }
 html[data-theme="dark"] .avatar-preview { background: var(--card-bg); border-color: var(--cream-3); }

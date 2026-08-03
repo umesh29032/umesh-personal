@@ -1,3 +1,13 @@
+---
+id: l2-apps-accounts-app-flow
+type: topic-canonical
+status: active
+owner: handwritten
+scope: accounts
+anchors: config/accounts/
+verified: 2026-07-13
+---
+
 # accounts — business flows (APP_FLOW)
 
 ## TL;DR (1 min)

@@ -1,0 +1,35 @@
+{# ONE stage-overview tile — shared by the flat + category-grouped renderings (R10-B) #}
+            <div class="so-tile so-{{ so.state }}">
+                <div class="so-tile-head">
+                    <span class="so-tile-state">
+                        {% if so.state == 'completed' %}✓{% elif so.state == 'in_progress' %}▸{% else %}•{% endif %}
+                    </span>
+                    <span class="so-tile-label">{{ so.label }}</span>
+                </div>
+                {% if so.state == 'completed' %}
+                    {% if so.stage_type == 'layering' and so.snap.record %}
+                        <div class="so-tile-meta">
+                            <span>Lay count <strong>{{ so.snap.lay_count }}</strong></span>
+                            <span>Length <strong>{{ so.snap.layer_length }} m</strong></span>
+                            <span>Duration <strong>{{ so.snap.duration_min }} min</strong></span>
+                            <span>Rolls <strong>{{ so.snap.rolls_count }}</strong></span>
+                        </div>
+                        {# completed_by nullable (legacy/imported records) — filter-arg lookup on None hard-crashes the page, so guard #}
+                        <div class="so-tile-foot">By {% if so.snap.completed_by %}{{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }}{% else %}—{% endif %} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
+                    {% elif so.stage_type == 'cutting_pattern' and so.snap.record %}
+                        <div class="so-tile-meta">
+                            <span>Photos <strong>{{ so.snap.photo_count }}</strong></span>
+                            <span>Video <strong>{% if so.snap.record.video %}✓{% else %}—{% endif %}</strong></span>
+                        </div>
+                        {# completed_by nullable (legacy/imported records) — filter-arg lookup on None hard-crashes the page, so guard #}
+                        <div class="so-tile-foot">By {% if so.snap.completed_by %}{{ so.snap.completed_by.get_full_name|default:so.snap.completed_by.email }}{% else %}—{% endif %} · {{ so.snap.completed_at|date:"d M H:i" }}</div>
+                    {% else %}
+                        <div class="so-tile-meta"><span>Completed</span></div>
+                    {% endif %}
+                {% elif so.state == 'in_progress' %}
+                    <div class="so-tile-meta"><span>Currently active</span></div>
+                {% else %}
+                    <div class="so-tile-meta"><span style="color:var(--stone);">Pending</span></div>
+                {% endif %}
+                <button type="button" class="so-tile-jump" data-tab="{{ so.stage_type }}">Open tab →</button>
+            </div>

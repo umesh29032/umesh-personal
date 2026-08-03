@@ -60,6 +60,11 @@ class WorkerStageTask(TimeStampedModel):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
+    # Pre-Phase-3 C (owner-approved 2026-07-06): when the WORKER first reported —
+    # started_at is prefilled from the stage record (parity with backfill), so it
+    # is stage time, not worker time. first_report_at → completed_at is the
+    # honest per-task work window. PASSIVE metadata: nothing reads it yet.
+    first_report_at = models.DateTimeField(null=True, blank=True)
     # null=True (DB) but NOT blank — required at form level, matches created_by posture.
     verified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
@@ -91,6 +96,8 @@ class WorkerStageTask(TimeStampedModel):
         indexes = [
             models.Index(fields=['stage_record']),
             models.Index(fields=['worker', 'status']),
+            # pending-reports digest/list: status-scoped scan ordered by age
+            models.Index(fields=['status', 'created_at']),
         ]
         ordering = ['stage_record', 'worker']
 
@@ -140,7 +147,29 @@ class WorkerStageContribution(TimeStampedModel):
         null=True, blank=True, related_name='+',
     )
     # Worker-entered; LOCKED after submit. Corrections go to verified_quantity.
+    # Foundation S3: LEGACY claim column — kept + dual-written (= good_quantity) through
+    # S3→S5 for legacy reads; renamed-not-dropped at S6 (one-way, soak-gated).
     reported_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    # Foundation S3 (good/alter/missing): production-truth split at the stage's grain.
+    # good_quantity = the PAYABLE-good count (what settlement pays — settlement_resolver).
+    # alter/missing = immutable COUNT OBSERVATIONS (same-stage/grain/Adda netting only,
+    # addendum M-7). Thin slice: good = the one quantity the worker submits, alter=missing=0;
+    # they diverge only once the future Missing/Alter modules observe defects. NOT NULL —
+    # dual-write always populates it + the resolver depends on it (NULL has no meaning).
+    good_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+    alter_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    missing_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Pre-Phase-3 A (owner-approved 2026-07-06): scrap — damaged beyond repair,
+    # found AT this operation. 4th immutable observation: pays nothing, feeds no
+    # pool, terminal. Distinct from Alter (reworkable) and Missing (lost) so the
+    # theft/loss signal stays clean.
+    damaged_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Pre-Phase-3 B (owner-approved 2026-07-06): machine identity SNAPSHOT at
+    # report time. Machine.code is F1-immutable-once-assigned, so the string is
+    # a stable identifier; a string (not FK) keeps the acyclic layering —
+    # machines FKs INTO production, never the reverse. '' = manual stage / no
+    # open assignment resolved. Passive metadata: no engine/money reads.
+    machine_code = models.CharField(max_length=32, blank=True, default='')
     # Manager/supervisor/super_admin only; null until reviewed.
     verified_quantity = models.DecimalField(
         max_digits=12, decimal_places=2, null=True, blank=True,
@@ -169,15 +198,35 @@ class WorkerStageContribution(TimeStampedModel):
         'production.CuttingBundleItem', on_delete=models.PROTECT,
         null=True, blank=True, related_name='+',
     )
+    # Foundation S2 (addendum M-5): the worker's role FROZEN at complete, so the
+    # payable rate resolves against the role that did the work — never the live
+    # mutable User.role (which a later role change would otherwise re-price).
+    # NULL only on pre-S2 rows (their pay already froze via the legacy live path).
+    role_snapshot = models.ForeignKey(
+        'accounts.Role', on_delete=models.PROTECT,
+        null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         indexes = [models.Index(fields=['task'])]
         ordering = ['task', 'pk']
         constraints = [
-            # reported quantity is a real claim → strictly positive.
+            # Foundation S3 (RC-3), extended pre-Phase-3 A: good/alter/missing/damaged
+            # each ≥ 0 AND the contribution observes SOMETHING (sum > 0). Replaced
+            # wsc_gam_nonneg_sum_positive when damaged_quantity joined the observation
+            # set (migration 0048).
             models.CheckConstraint(
-                check=models.Q(reported_quantity__gt=0),
-                name='wsc_reported_quantity_positive',
+                check=(
+                    (models.Q(good_quantity__gte=0)
+                     & models.Q(alter_quantity__gte=0)
+                     & models.Q(missing_quantity__gte=0)
+                     & models.Q(damaged_quantity__gte=0))
+                    & (models.Q(good_quantity__gt=0)
+                       | models.Q(alter_quantity__gt=0)
+                       | models.Q(missing_quantity__gt=0)
+                       | models.Q(damaged_quantity__gt=0))
+                ),
+                name='wsc_gamd_nonneg_sum_positive',
             ),
             # nullable money/qty snapshots are non-negative WHEN set.
             models.CheckConstraint(
@@ -195,4 +244,4 @@ class WorkerStageContribution(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f'contrib task={self.task_id} qty={self.reported_quantity}'
+        return f'contrib task={self.task_id} good={self.good_quantity}'

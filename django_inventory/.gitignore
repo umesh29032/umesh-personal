@@ -28,6 +28,7 @@ config/media
 media/
 
 /staticfiles
+config/staticfiles/
 /static_root
 
 # Environment Variables
@@ -103,3 +104,14 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# POC vendored deps — pinned clones with nested .git (see poc/patterns_ai/README.md manifest);
+# committing them creates broken gitlinks (P19 SVGnest incident). Reproducible via clone @ pinned commit.
+poc/patterns_ai/vendor/
+
+# ── Local database backups (scripts/db.sh save) ─────────────────────────────
+# NEVER commit these: a dump contains real worker data and password hashes.
+db_backups/
+*.sql
+*.dump
+.env.bak

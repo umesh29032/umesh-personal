@@ -1,3 +1,13 @@
+---
+id: learning-readme
+type: entry-index
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # docs/LEARNING — topic lessons (developer + owner)
 
 Teaching material: not WHAT the code does (code + docstrings say that) but

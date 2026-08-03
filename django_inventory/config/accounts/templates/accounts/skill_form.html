@@ -25,7 +25,7 @@
             <div class="user-hero-actions"><a href="{% url 'accounts:skill_list' %}" class="hero-btn hero-btn-ghost">← Back</a></div>
         </div>
     </div>
-    {% if form.non_field_errors %}<div class="form-alert form-alert-error">{{ form.non_field_errors }}</div>{% endif %}
+    {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
     <form method="post" id="skillForm">
         {% csrf_token %}
         <section class="panel">
@@ -68,4 +68,5 @@ var chip=document.getElementById('skillPreviewChip');
 if(lbl&&chip){lbl.addEventListener('input',function(){chip.textContent=this.value||'Skill Name';});}
 </script>
 <style>{% include 'accounts/_user_form_styles.html' %}</style>
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 {% endblock %}

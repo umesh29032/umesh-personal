@@ -3,10 +3,10 @@
 {% block page_title %}Record Advance{% endblock %}
 
 {% block extra_head %}
+{% include 'shared/_form_styles.html' %}{# F-4a: canonical .field (page label/input rules below still win) #}
 <style>
     .expense-form { max-width: 640px; margin: 0 auto; }
     .expense-form .panel { padding: 20px 22px; margin-bottom: 80px; }   /* sticky-bar glue */
-    .expense-form .field { margin-bottom: 16px; }
     .expense-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
     .expense-form input, .expense-form select, .expense-form textarea {
         width: 100%; padding: 11px 13px; font-size: 14px;
@@ -42,8 +42,8 @@
             {% endfor %}
         </div>
         <div class="sticky-bar">
-            <a class="btn-ghost" href="{% url 'expense:payroll-overview' %}">Cancel</a>
-            <button type="submit" class="btn-copper">Record Advance</button>
+            <a class="btn btn-ghost btn-lg" href="{% url 'expense:payroll-overview' %}">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">Record Advance</button>
         </div>
     </form>
 </div>

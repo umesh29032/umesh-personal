@@ -1,10 +1,105 @@
+---
+id: ui-components
+type: topic-canonical
+status: active
+owner: handwritten
+scope: UI — THE certified component library (Phase 10): vocabulary, canon owners, tokens, permanent UI-architecture rules
+anchors: config/accounts/templates/accounts/base.html
+verified: 2026-07-16
+---
+
 # UI Components — Kapil Enterprises Inventory
+
+> **🏆 CERTIFIED COMPONENT LIBRARY (Campaign Phase 10, UIL-F 2026-07-16).** This file is the
+> permanent canon: every taxonomy family below has EXACTLY ONE certified owner pattern with
+> its reference page named (evidence + proofs: [docs/UI_COMPONENT_LIBRARY_LOG.md](docs/UI_COMPONENT_LIBRARY_LOG.md)).
+> Certified census basis: 169 templates · 127-token closed registry · duplication register
+> D-UI-01..14 (resolved/retained/deferred split in the log §UIL-F). Owner Design Record
+> UI-D1..UI-D9 ALL ACCEPT + taxonomy amendment A1 (domain-widgets gains `patterns`).
+
+## Certified canon — one owner per family (reference pages named)
+
+| Family | Certified owner | Reference page |
+|---|---|---|
+| layout | base.html shell/`.hero-strip`/`.panel`/sticky + form-shell hero (`--hero-grad-deep`) | `production/stage_form.html` |
+| navigation | base.html sidebar + `_nav_icon`/`_section_icon`; `.tabs` | base.html (any page) |
+| forms 🔒 | DUAL by law: A `.field` = `shared/_form_styles` + `accounts/_user_form_styles` · B `.sf-*` = base.html | A: `production/stage_form.html` · B: `storefront/listing/product_form.html` |
+| inputs/select/date 🔒 | `accounts/_fancy_controls.html` (single owner) | styleguide + any form |
+| tables | `.table-responsive`+`data-label`+`.dt-th`+`initFancyDataTable`+`shared/_datatables_vendor_*` | `accounts/user_list.html` |
+| cards | base.html `.card`/`.kpi`/`.stat-card` | `raw_materials/cloth_dashboard.html` |
+| badges/chips | base.html `.badge*` + `--status-*` tokens; `.chip-pick` | `accounts/user_list.html` |
+| dialogs/confirmations | base.html `.confirm-card` + `confirm()` law; `<details>` disclosure subtype | `inventory/role_confirm_delete.html` |
+| notifications | base.html `.msg`/`.msg-stack` | base.html |
+| filters | `.dt-filter-row` (preferred) · `.filter-card` (base.html-owned core + mobile stack) | `accounts/user_list.html` · `raw_materials/roll_list.html` |
+| pagination / search | DataTables `.dt-bottom` / `.dt-search-row` | any DataTables list |
+| dashboards | base.html `.kpis`/`.stat-grid` | `raw_materials/cloth_dashboard.html` |
+| domain: production | `_stage_panel_*` dispatch + embed-shell protocol + `_workers_widget` + behavior partials | `production/adda_detail.html` |
+| domain: financial 🔒 | money-family (`.hero-strip.copper`, `.stat-card.payable`) | `expense/adda_settlement_detail.html` |
+| domain: stage | worker-report body + `_worker_report_styles` | `production/worker_report_embedded.html` |
+| domain: inventory | `_time_log_styles` + events-accordion pair | `raw_materials/roll_detail.html` |
+| domain: patterns (A1) | `_design_row` atom + SVG workspace vocabulary | `patterns_ai/cutting_table.html` |
+| export/print | `shared/_export_buttons.html` + print-document subtype | tracking dashboard · `tracking/barcode_print_sheet.html` |
+| auth 🔒 | `shared/_auth_shell.html` (`--auth-*` knobs) | `accounts/login.html` |
+
+🔒 = FROZEN family (2026-06-18 lock): owner implementations read-only; changes need the
+design-frozen audit + owner gate.
+
+## Deprecation register (certified UIL-F)
+
+| Pattern | Status | Successor | Occurrences |
+|---|---|---|---|
+| `.ke-toolbar` | **DEPRECATION-NOMINATED** (owner-flagged UIL-B) — do not use in new pages | `.dt-filter-row` (inside-card) | 3 live (migrate via a future owner-selected queue, then mark deprecated) |
+| `.filter-select` | legacy (documented) — FancySelect replaces globally | FancySelect (automatic) | residual styling class only |
+| `signup.html` / `signup_otp.html` pre-shell auth pages | dormant (S2-closed), AUTH-frozen register — not for composition | `shared/_auth_shell.html` | 2 files, register-only |
+
+Deprecation rule (§6.3): a superseded pattern is never deleted while referenced —
+occurrences migrate (INERT), then the pattern is marked deprecated here with its successor
+named; dead CSS removal only after a zero-occurrence re-census.
 
 Component vocabulary for templates. All CSS lives in `config/accounts/templates/accounts/base.html` (single source of truth). Page-specific overrides go in each page's `{% block extra_head %}` scoped under a page-specific class.
 
 **Rule:** Before writing CSS on a page, search this file. If component exists → use it. If 80% match → extend with a modifier. If novel → add to base.html, then add it here.
 
+## Canonical hierarchy (owner ruling Q-0b(1), 2026-07-13)
+
+**THIS file is the LIVE UI vocabulary — the one canonical home for "what component do I
+use".** `docs/DESIGN_SYSTEM_SPEC.md` + `docs/UI_COMPONENTS_CATALOG.md` are the FROZEN-system
+reference pair (historical spec of the 2026-06 design-system close, owner rule 2026-06-18) —
+consult them for why the system froze, never for what to use today. All other
+`DESIGN_SYSTEM_*` / `FRONTEND_DESIGN_SYSTEM_*` / `*_FOUNDATION_SPEC` / `*_MIGRATION_MATRIX`
+working docs are superseded era documents (archived per DOCUMENT_ARCHIVE_REVIEW).
+
+## The 7 permanent UI-architecture rules (owner, 2026-07-05 — materialized here 2026-07-13, Phase-7 Q-A4; source: FE-audit approval, [docs/FRONTEND_AUDIT_2026_07_05.md](docs/FRONTEND_AUDIT_2026_07_05.md))
+
+1. **NEVER redesign independently** — every new page first names its UI REFERENCE page
+   (forms → Stage Form/form-shell · CRUD masters → Skills CRUD · cards/tables/buttons/
+   badges/sticky → the existing families). Never a second implementation.
+2. **Rule of 3 for extraction:** 3+ pages share a pattern ⇒ shared component, never copied
+   HTML/CSS.
+3. **ZERO hardcoded colors/spacing/typography/sizing** — design tokens only.
+4. **Every page answers ONE business question in seconds**; summarize-first, expand-later;
+   never overload mobile.
+5. **Before "FE done": consistency RE-AUDIT** of every touched page (no duplicate
+   buttons/cards/forms/tables, no hardcoded colors, no inline styles, no invented CSS where
+   a component exists — the class-existence check: template classes vs base.html + included
+   partials).
+6. **No new base components unless genuinely reusable** (rule of 3).
+7. **When replacing custom UI, STATE which canonical page/component it now reuses.**
+
 ---
+
+## Owner engineering ruling 2026-07-17 — MOBILE-FIRST UI STANDARD (permanent, all future phases)
+
+Every NEW UI page, dashboard, workflow, screen, modal, component, or feature MUST be
+mobile-first and satisfy ALL of: desktop-friendly · tablet-friendly · mobile-friendly ·
+responsive on all supported breakpoints — in Phase 15 and every later phase, unless an
+explicit owner ruling overrides. Implementation: this certified library + the existing
+design system are the only sources (no duplicate components when an approved one exists);
+responsive by default; no horizontal scrolling; mobile-first layouts; touch-friendly
+spacing; accessibility; visual consistency. **Certification minimum: mobile + tablet +
+desktop layout verification before a feature is complete — a non-responsive page is NOT
+production-ready.** (Strengthens the 2026-06-11 standing rule + CLAUDE.md rule 11; changes
+no product charter and no business logic.)
 
 ## Layout
 
@@ -36,7 +131,7 @@ Component vocabulary for templates. All CSS lives in `config/accounts/templates/
 
 ## Template checklist (new pages + updating old pages) — owner rule 2026-06-12
 
-**NEW page:** extends base · page-class wrapper · page CSS only in extra_head
+**NEW page:** FIRST name its canonical REFERENCE page (forms→Stage Form · CRUD masters→Skills CRUD · panels→layering panel · money→settlement family) · run the CLASS-EXISTENCE check (every class used must exist in base.html or an included partial — the R10 drift bug: invented .page-hero + missing shared/_form_styles ⇒ white inputs/unstyled hero) · extends base · page-class wrapper · page CSS only in extra_head
 under that class · COMPOSE FROM CANONICALS first (`hero-strip copper` for
 money screens — never swap a page's hero variant, that's a re-theme · `.panel`
 · `.stat-grid/.stat-card` · `.sticky-bar` · bare `.btn-copper/-ghost/-danger`,
@@ -64,7 +159,7 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `.hero-strip.copper` | Money-screen page hero (copper gradient, h1 20px) | Plain `.hero-strip` = the navy default. Page may add a flex modifier for hero actions/totals |
 | `.panel` | Content card: card-bg, radius 14, shadow, padding 16, mb 18 | Page modifiers only for real needs (e.g. `padding:16px 0 4px` table-bleed) |
 | `.stat-grid` / `.stat-card` | KPI cards (label uppercase 11px / value 22px; `.payable` → copper value) | auto-fit minmax(140px); 2-col on ≤560px |
-| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included |
+| `.sticky-bar` | Frosted bottom action bar (sticky, blur, right-aligned) | Dark-theme variant included. `flex-wrap: wrap` (UI-audit 2026-07-20): 3+ buttons wrap on mobile — `flex-end` + `nowrap` used to clip the first button off the LEFT edge (settlement detail regression) |
 | `.btn-copper` / `.btn-ghost` / `.btn-danger` (standalone, WITHOUT `.btn`) | Money-screen buttons: radius 10, font 13/700, 40px min-height | `:not(.btn)` shapes — combining with `.btn` keeps the classic 6px-radius system instead |
 | stacked table (`.table-responsive` + `td[data-label]`) | THE responsive-table standard for all future lists | thead hidden ≤ breakpoint; label:value rows; F1 fix guarantees width |
 
@@ -92,7 +187,25 @@ money or list+detail UI composes THESE classes from base.html — do not redefin
 | `.tbl` | Base table styles (alternate to inline-styled tables) |
 | `.tbl-wrap` | Wrapper with rounded corners + horizontal scroll |
 | `td[data-label="X"]` | Required on EVERY `<td>` — turns into stacked card row at ≤600px |
-| `.td-actions` | Add to actions `<td>` — full-width button row on mobile |
+| `.td-actions` | Add to actions `<td>` — full-width button row on mobile. Wraps (`flex-wrap: wrap`, UI-audit 2026-07-20): 5-button rows (Edit/Flow/Patterns/Sizes/Archive) used to clip leftmost buttons — `justify-content: flex-end` overflows leftwards, invisible + unreachable |
+| `.dt-th` | List-page `<th>` header cell (uppercase 11px tracked) — promoted from 14 identical inline styles (UIL-D 2026-07-16); add page extras (e.g. `text-align:right`) inline alongside |
+
+**⚠ Never ship a bare `<table>` (PA-14-1).** Page content sits inside `main.content { overflow-x: hidden }`, so a table wider than the viewport is **clipped with no scroll** — the rightmost columns (often money: "Final payable ₹", "Recovered ₹") become invisible and unreachable on a phone. Wrap EVERY `<table>` in `.table-responsive` AND put `data-label` on every `<td>`. The wrapper gives desktop horizontal-scroll and, at ≤600px, switches to stacked label:value cards. This includes detail/snapshot tables (e.g. settlement detail), not just DataTables lists.
+
+**⚠ `data-label` is INERT without a `.table-responsive` ancestor (PA-15).** The stacking media query (`base.html` ≤600px) keys EVERY rule on `.table-responsive` (`thead { display:none }`, `td[data-label]::before`). A `<td data-label="…">` inside a table that is NOT wrapped in `.table-responsive` (or an equivalent page-scoped `<scope> table` stacking block) does **nothing** — the column header stays, no label prefix renders, and a wide table still clips. Phase 15 found several templates with `data-label` attrs that were dead because the wrapper was missing. If you add `data-label`, you MUST also provide the stacking host (wrap in `.table-responsive`, or a page-scoped `@media (max-width:…) { .scope thead{display:none} .scope td::before{content:attr(data-label)} }`).
+
+**Inline-edit tables clip worse than text tables (PA-15-1/2).** A cell holding a `<form>` with fixed-width inputs (`input[name=label]{width:140px}`, number inputs, a Save button) **cannot shrink** — it forces the table past the viewport and clips the Actions column with no scroll. A text-only table (e.g. an advance list: Date · Amount · Recovered · Remaining) wraps its cells and fits, so it is **safe to leave bare** (document why). For inline-edit tables: `.table-responsive` + `data-label` + mark the form cell `class="cell-edit"` and the action cell `class="td-actions"`, then add a mobile rule so the edit form goes full-width and mini buttons reach 44px:
+
+```css
+@media (max-width: 600px) {
+    .<scope> .table-responsive td.cell-edit { flex-direction: column; align-items: stretch; text-align: left; gap: 6px; }
+    .<scope> .table-responsive td.cell-edit form { width: 100%; }
+    .<scope> .table-responsive td.cell-edit input { width: 100%; min-width: 0; }
+    .<scope> .btn-mini { min-height: 44px; }   /* mini row-actions were 28px → sub-44 touch */
+}
+```
+
+**Shared table partials must own their responsive CSS (PA-15-3).** A partial included by more than one host (e.g. `_stage_panel_cutting_pattern.html` → both `stage_panel_embedded.html` AND the standalone `pattern_workspace.html`) must not rely on stacking CSS that only one host loads. `_form_styles.html` scopes `.form-shell .breakup-table` stacking; the standalone workspace had no `.form-shell` wrapper, so its `.breakup-table` `data-label`s were dead. Scope shared-table stacking to the **bare element** (`.breakup-table`, as `stage_panel_embedded.html` does) so every host gets it, or ensure every host applies the same wrapper class.
 
 ## DataTables — list pages
 
@@ -144,6 +257,21 @@ $(document).ready(function () {
 | `.filter-select` | Native-style select with custom arrow (legacy, fancy-select replaces these globally) |
 | `.ke-toolbar` | Standalone filter strip ABOVE card (avoid — prefer `.dt-filter-row` INSIDE card) |
 
+### `.filter-card` — horizontal filter bar (stacks ≤600px — PA-14-2)
+
+**Promoted to base.html (UIL-D 2026-07-16):** the core (`display:flex; flex-wrap:nowrap; overflow-x:auto` container + `.filter-field` + label styling) AND the ≤600px vertical-stack rule are now owned by base.html — pages get them for free by using `class="filter-card"`. Pages keep ONLY their tails page-scoped (input/fancy-select sizing, extra mobile widths). Do NOT re-declare the core or the stack rule. Legacy guidance for page-scoped variants (kept for standalone documents only):
+
+```css
+@media (max-width: 600px) {
+    .<page-scope> .filter-card { flex-direction: column; align-items: stretch; overflow-x: visible; }
+    .<page-scope> .filter-card .field { width: 100%; }
+    .<page-scope> .filter-card input,
+    .<page-scope> .filter-card select { width: 100%; min-width: 0; }
+}
+```
+
+Applied to roll-list, adda-list, adda-dashboard, cloth-dashboard, barcode/tracking-dashboard. Mirror it on any new filter bar.
+
 ## Forms
 
 Two parallel form styles. Pick one per page. Don't mix.
@@ -186,19 +314,62 @@ Include `{% include 'accounts/_user_form_styles.html' %}` at end of `{% block ex
 | `.form-error` | Error text |
 | `.form-actions` | Sticky action bar (generic — see also `.sticky-actions`, `.sf-footer`) |
 
+## Multi-box input groups (OTP `.otp-row` / `.otp-digit`) — mobile rule
+
+Proven by the Phase-02 audit fix (PA-02-4). When a row holds many fixed-size
+boxes (the 6-digit OTP inputs: `.otp-row` of `.otp-digit`, optionally split by a
+decorative `.otp-sep`), the boxes must stay touch-usable on the smallest phones:
+
+- `.otp-digit` uses `flex: 1 1 0` so the boxes share the row width evenly.
+- At `@media (max-width: 480px)` shrink height/font (`height: 52px; font-size: 24px;`) — **keep this consistent across all OTP pages** (login `otp.html`, signup, reset). reset_otp.html was missing it; that was the bug.
+- At `@media (max-width: 360px)` **drop the decorative separator** (`.otp-sep { display: none; }`), tighten the gap (`.otp-row { gap: 4px; }`) and reduce card padding so each box reaches ~39–46px wide instead of ~30px. Decorative dividers are the first thing to sacrifice for touch width on narrow screens.
+- Target ≥44px touch width where the box count allows; document the residual if the count makes 44px impossible at 320px (6 boxes cannot, ~39px is the achievable floor — acceptable for single-char numeric input).
+
 ## Selects — fancy-select (automatic)
 
-Just write `<select>`. base.html JS auto-upgrades to custom dropdown that escapes iframe/transform/overflow clipping bugs.
+Just write `<select>`. base.html JS auto-upgrades to a custom dropdown that escapes iframe/transform/overflow clipping bugs **and positions the panel correctly on mobile** (native `<select>`/`<input type=date>` OS popups misposition — detach off-screen — under DevTools device-emulation / transformed-overflow parents; the custom panel is portaled to `<body>` at `position:fixed`, anchored to the trigger).
+
+**🔒 RULE — never ship a native dropdown/calendar for a visible control.** Every `<select>` **and** every `<input type=date>` auto-upgrades to FancySelect/FancyDate — **opt-out, not opt-in** (as of 2026-06-17 dates no longer need `data-fancy-date`; this also covers Django `DateInput(attrs={'type':'date'})` widgets, which never carried the attr and were the `expense/advances/add/` calendar bug). Add `data-no-fancy` only to opt a specific control back to native. A `MutationObserver` (base.html, after the init IIFEs) auto-upgrades **dynamically-added** selects/dates too — cloned rows, `innerHTML`/`insertAdjacentHTML`, AJAX panels, modals — so this holds with **zero per-page wiring**. (Verified 2026-06-17: filters + forms + dynamic rows all open below the field, left-aligned, on 375px.)
+
+**🔒 The CSS+JS owner is [`accounts/_fancy_controls.html`](config/accounts/templates/accounts/_fancy_controls.html)** — one partial holding the fancy-select/fancy-date CSS, the upgrade JS, and the MutationObserver. `base.html` `{% include %}`s it. **Any standalone document that does NOT `{% extends "accounts/base.html" %}` (iframe panels, print sheets) MUST `{% include 'accounts/_fancy_controls.html' %}` itself** + define the design tokens it uses — otherwise its native selects/dates render OS-level and **misposition inside the iframe** (detach off-screen). This was the real bug: the Adda-detail stage panels load via `<iframe src=…?embedded=1>`, and the chromeless embedded docs (`stage_panel_embedded.html`, `worker_report_embedded.html`) shipped no FancySelect JS → native iframe dropdowns. Fixed 2026-06-17 by extracting the owner partial + including it in all standalone docs (+ `barcode_print_sheet.html`).
+
+**Multi-select — FancySelect does NOT cover it.** FancySelect skips `<select multiple>` ([`_fancy_controls.html`](config/accounts/templates/accounts/_fancy_controls.html) `if (select.multiple || select.size > 1) return`). For a many-option multi-pick the pattern is a **scoped collapsible multi-select dropdown** (trigger + count badge + search + checkbox checklist), NOT a wall of checkboxes and NOT a native multi-select. First use (owner 2026-07-22): the **worker roster picker** on the generic stage panel [`_stage_panel_generic.html`](config/production/templates/production/_stage_panel_generic.html) `.gsp .worker-ms*` — 38 eligible workers made the old checkbox grid unusable on mobile+desktop. Rules that keep it safe: real `<input type="checkbox" name="workers">` stay inside (POST unchanged — `set_stage_workers`), it expands **inline** (never absolute → no iframe clipping; the embedded doc's `ResizeObserver` auto-grows the frame), and it is **progressive** (no `[data-ready]` → panel stays open = plain usable list). Currently **page-scoped**, not a shared base.html component — promote to shared only via a design-system audit (design system is FROZEN). Reuse this pattern for future multi-picks; don't reintroduce checkbox walls.
 
 | Attr / Class | Purpose |
 |---|---|
-| `<select data-no-fancy>` | Opt out of upgrade (keeps native dropdown) |
+| `<select data-no-fancy>` | Opt out of upgrade (keeps native dropdown). **⚠ Avoid on any visible select:** the native OS dropdown mispositions on mobile / DevTools device-emulation / transformed-overflow parents (detaches to screen-left instead of opening below the field). As of 2026-06-17 **no app select uses it** — all selects are FancySelect. Reserve only for genuine exceptions (and even then prefer wiring `window.fancifySelects(node)` for dynamically-cloned rows — see `roll_bulk_form.html`). |
 | `.fancy-select` | Wrap div (auto-generated) |
-| `.fancy-select-trigger` | Button replacing visual `<select>` (inherits select's classes) |
+| `.fancy-select-trigger` | Button replacing visual `<select>` (copies the select's **classes**) |
+| `.fancy-select-trigger--bare` | Auto-added fallback box when the select had **no class** (cream box + 44px touch target) |
 | `.fancy-select-panel` | Dropdown options panel (auto-rendered in `<body>` when open) |
 | `.fancy-select-option` | Each option in panel |
 
-Existing CSS that targets `select.form-control` / `.field select` / `.sf-input` etc. is automatically applied to `.fancy-select-trigger` because the trigger inherits the select's classes. No special handling needed.
+CSS that targets the select **by a class** (`select.form-control` / `.sf-input` / `.filter-select`) is applied to `.fancy-select-trigger` because the JS copies the select's `className` onto the trigger.
+
+**⚠ Mobile gotcha (PA-14-3):** the trigger is a `<button>`, NOT a `<select>` — so page CSS that styles selects **by tag name** (`.my-form select { … }`) does NOT reach it. A class-less `<select>` would otherwise render as a bare ~20px UA-styled line (sub-44px touch target, visually inconsistent with sibling inputs). base.html now auto-adds `.fancy-select-trigger--bare` to class-less triggers so they always get a default input box. **Best practice when styling form selects: put a styling class on the `<select>` (`class="sf-input"`), or target `.fancy-select-trigger` alongside `select` in your page CSS — never rely on a tag-only `select{}` rule.**
+
+## Date picker — fancy-date (opt-in)
+
+Write `<input type="date" data-fancy-date>`. base.html JS (`fancifyDate`) upgrades it to a custom calendar — same reason as fancy-select: native date popups **misposition** under transformed / `backdrop-filter` / `@view-transition` ancestors, and on desktop Chromium **only the tiny calendar icon is clickable** (not the text). The custom panel is a `.fancy-select-panel` appended to `<body>` (`position:fixed`), so it anchors to the field on mobile + desktop, flips above when space below is short, and every day cell is a full tap target.
+
+**Opt-in by design** — without `data-fancy-date` the input stays native. (Date-range filters on dashboards intentionally keep the native input; only convert single-value fields like Birth Date.)
+
+| Attr / Class | Purpose |
+|---|---|
+| `<input type=date data-fancy-date>` | Trigger the upgrade |
+| `data-min-year` / `data-max-year` | Optional year bounds (default `currentYear-100` … `currentYear`) |
+| `placeholder="…"` | Shown on the trigger when empty |
+| `.fancy-date` | Wrap div (also carries `.fancy-select` for the shared outside-click/Escape close) |
+| `.fancy-date-trigger` | Button replacing the input (gets `.fancy-select-trigger--bare` when class-less) |
+| `.fancy-date-panel` | Calendar panel (a `.fancy-select-panel`, auto-rendered in `<body>` when open) |
+| `.fancy-date-head` / `-nav` / `-title` | Month/year header: prev-next arrows + title (click title → year/month pane) |
+| `.fancy-date-grid` / `-dow` / `-cell` | Day grid; `.selected` (copper) + `.today` (copper ring) |
+| `.fancy-date-months` / `-mo`, `.fancy-date-years` / `-yr` | Year/month pane (DOB-friendly fast year jump) |
+| `.fancy-date-clear` | Footer action — clears the value (the field stays optional) |
+
+The real `<input type=date>` stays in the DOM (`display:none`, `name` intact) so the form submits the `YYYY-MM-DD` value normally; each pick dispatches native `change`/`input` so existing handlers still fire. JS-off → native date input still works (progressive enhancement).
+
+**Known limitations (accepted — same class as `fancy-select`).** Keyboard users can Tab to day cells (`<button>`s) and Enter to pick, but there is no arrow-key grid navigation, focus-trap, or focus-return, and typing a date is no longer possible (the native input is `aria-hidden`). Day cells are 38px (<44px) at 320px — the 7-column grid floor (cf. the OTP 6-box residual). A native form-reset restores the hidden input value without firing `change`, so the trigger label won't re-sync on reset (no form here has a reset). None block use; keyboard-nav parity is a future **shared** enhancement for `fancy-select` + `fancy-date`.
 
 ## Buttons
 
@@ -223,10 +394,22 @@ Existing CSS that targets `select.form-control` / `.field select` / `.sf-input` 
 | `.badge-active` / `.badge-inactive` | Status pills |
 | `.badge-planned` / `.badge-wip` / `.badge-completed` / `.badge-cancelled` | Batch lifecycle |
 | `.badge-available` / `.badge-reserved` / `.badge-exhausted` | Stock states |
+| `.badge-monthly` | Monthly-salary worker marker (R4/D4) — shown wherever a piece-rate ₹ expectation is suppressed |
 | `.badge-dot` | Small dot inside badge |
 | `.skill-tag` | Inline skill chip inside table rows (different from `.skill-filter-chip`) |
 
 Use `var(--status-*-bg/text)` tokens for custom badges — they auto-flip in dark mode.
+
+## Confirm cards (delete-confirm canon)
+
+THE delete-confirm composition (reference page: `inventory/role_confirm_delete.html`; CSS owner: base.html). All confirm pages compose this — accounts + storefront re-pointed UIL-D 2026-07-16.
+
+| Class | Purpose |
+|---|---|
+| `.confirm-card` | Centered card (480px, white, cream border) — wrap in a `max-width:500px; margin:80px auto` div |
+| `.confirm-card-head` | Header strip (`h2` title; optional `.confirm-icon.confirm-icon-danger` + trash SVG) |
+| `.confirm-card-body` | Body copy — object name in `<strong>` |
+| `.confirm-card-foot` | Right-aligned actions: `.btn.btn-ghost` Cancel + POST form with `.btn.btn-danger` submit |
 
 ## Empty state
 
@@ -259,6 +442,27 @@ Each app has its own hero variant (`.user-hero`, `.product-form-hero`, etc.). Th
 
 ## Design tokens (CSS vars)
 
+> **CLOSED SET (UI-D7, certified UIL-F 2026-07-16): 127 custom properties defined in
+> base.html** (48 dual-defined light+dark). A new token = owner-gated (frozen system).
+> Full registry by category — values live in base.html `:root` (+ dark override block):
+>
+> - **Brand/colors:** `--ink/-2/-3/-4` · `--copper/-l/-d` · `--cream/-2/-3` · `--stone` · `--smoke` · `--page-bg` · `--white` · `--gray-50..900` (10) · `--primary-blue/-dark/-light`
+> - **Status (auto-flip dark):** `--status-{success,warning,danger,info,neutral}-{bg,text}` (10) + `--success/-bg` · `--warning/-bg` · `--danger/-bg` · `--info/-bg`
+> - **Semantic:** `--text-{primary,secondary,tertiary}` · `--surface/-2/-3/-input/-input-focus` · `--border-{default,subtle,card}` · `--card-bg`
+> - **Typography:** `--font-display/--font-sans` · `--fs-{2xs,xs,sm,base,md,lg,xl,2xl,3xl}` · `--fw-{normal,medium,semibold,bold}` · `--lh-{tight,base}`
+> - **Spacing:** `--space-{1,2,3,4,5,6,8,16}` · **Radius:** `--radius{,-xs,-sm,-md,-lg,-xl,-2xl,-3xl,-pill}`
+> - **Shadows:** `--shadow-card/-hover` · `--shadow-focus` · `--shadow-input-inset`
+> - **Inputs:** `--input-{bg,bg-focus,border,border-focus,focus-ring,padding,radius}` · `--control-h` · `--touch-min`
+> - **Select arrow:** `--select-arrow/{-size,-offset-right}` · `--select-padding-right`
+> - **Chrome:** `--sidebar-{w,bg,border,shadow,text,active}` · `--nav-text/{-hover,-muted}` · `--topbar-{bg,h}`
+> - **Z-scale:** `--z-{base,raised,dropdown,sticky,overlay,modal}` · **Hero:** `--hero-grad-deep` · misc `--filter`/`--form`
+>
+> **CSS breakpoints** (≠ the 3 verification widths): 360 · 480 · 560 · 600 · 768 · 1024 px
+> + `prefers-reduced-motion`. **Verification widths** (rule 11): 360 / 768 / 1280.
+> Motion: 1 keyframe (`slideDown`) · 34 transition rules.
+> Standalone-document token sets (by design, NOT part of this registry): `_auth_shell`
+> (`--auth-*` knobs) · `public_home.html` · chromeless iframe shells.
+
 ### Colors
 
 | Token | Value | Use |
@@ -274,6 +478,7 @@ Each app has its own hero variant (`.user-hero`, `.product-form-hero`, etc.). Th
 | `--border-card` | `#cfc0aa` | **All card/panel borders** |
 | `--shadow-card` | `0 2px 12px rgba(14,11,9,0.10)` | Default card shadow |
 | `--shadow-card-hover` | Bigger shadow | Hover |
+| `--hero-grad-deep` | `linear-gradient(135deg, #0a1628 0%, #1a2840 50%, #2a1f0e 85%, #b87333 130%)` | **THE deep page-hero gradient** (form-shell + page heroes; owner-granted token, UIL-D 2026-07-16 — never re-declare the literal; deliberately does NOT flip in dark mode) |
 
 ### Status tokens (auto-flip in dark mode)
 - `--status-success-bg/text`

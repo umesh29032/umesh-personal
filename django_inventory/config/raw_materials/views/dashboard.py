@@ -17,7 +17,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from accounts.services import ROLE_SUPER_ADMIN, user_has_role
+from accounts.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 
 from .mixins import ProductionRoleMixin
@@ -71,11 +71,17 @@ class RawMaterialDashboardView(LoginRequiredMixin, ProductionRoleMixin, Template
         ctx['can_add_rolls'] = user_has_role(self.request.user, [ROLE_SUPER_ADMIN])
         # Time logs — saari cloth-roll movements ka top-level overview (accordion)
         from tracking.models import ClothRollHistory
-        ctx['roll_events'] = (
+        roll_events = (
             ClothRollHistory.objects
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
-            .order_by('-created_at')[:30]
+            .order_by('-created_at')
         )
+        # PA-13-3 (PA-03-1 class, on the dashboard time-log): the accordion renders
+        # field_name/old/new, so a non-financial viewer would see cost_per_kg/supplier
+        # CHANGE VALUES that the roll table/detail hide. Filter server-side.
+        if not user_can_view_financials(self.request.user):
+            roll_events = roll_events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['roll_events'] = roll_events[:30]
         return ctx
 
 
@@ -101,9 +107,17 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         if color_id.isdigit():
             rolls = rolls.filter(cloth_color_id=int(color_id))
 
-        ctx['total_rolls'] = rolls.count()
-        ctx['available_rolls'] = rolls.filter(status=ClothRoll.Status.NOT_USED).count()
-        ctx['used_rolls'] = rolls.filter(status=ClothRoll.Status.USED).count()
+        # G-1 (BOD-C, 2026-07-18): the status counts now live in roll_service —
+        # one calculation, two consumers (this page + the BOD tile). INERT:
+        # same keys, same numbers, same filter semantics.
+        from raw_materials.services import roll_service
+        _c = int(color_id) if color_id.isdigit() else None
+        counts = roll_service.stock_status_counts(from_dt=from_dt, to_dt=to_dt,
+                                                  color_id=_c)
+        ctx['total_rolls'] = counts['total']
+        ctx['available_rolls'] = counts['available']
+        ctx['damaged_rolls'] = counts['damaged']
+        ctx['used_rolls'] = counts['used']
 
         # ── Type × Color breakup ───────────────────────────────────────────
         # Rows = ClothType (active). Inside each row, list every color present
@@ -139,24 +153,9 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
             type_rows[t_id]['available'] += row['available']
         ctx['type_breakup'] = sorted(type_rows.values(), key=lambda r: r['name'])
 
-        # ── By location ───────────────────────────────────────────────────
-        ctx['by_location'] = (
-            StorageLocation.active
-            .annotate(
-                roll_count=Count('rolls', filter=(
-                    (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
-                    & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
-                    & (Q(rolls__cloth_color_id=int(color_id)) if color_id.isdigit() else Q())
-                )),
-                available=Count('rolls', filter=(
-                    Q(rolls__status=ClothRoll.Status.NOT_USED)
-                    & (Q(rolls__created_at__gte=from_dt) if from_dt else Q())
-                    & (Q(rolls__created_at__lt=to_dt) if to_dt else Q())
-                    & (Q(rolls__cloth_color_id=int(color_id)) if color_id.isdigit() else Q())
-                )),
-            )
-            .order_by('name')
-        )
+        # ── By location ── G-2 (BOD-C): extracted to roll_service, verbatim.
+        ctx['by_location'] = roll_service.stock_by_location(
+            from_dt=from_dt, to_dt=to_dt, color_id=_c)
 
         ctx['recent_rolls'] = (
             rolls.select_related('cloth_type', 'cloth_color', 'storage_location')
@@ -164,11 +163,15 @@ class ClothDashboardView(LoginRequiredMixin, ProductionRoleMixin, TemplateView):
         )
         # Time logs — ClothRollHistory latest 30 events (accordion mein render hota hai)
         from tracking.models import ClothRollHistory
-        ctx['roll_events'] = (
+        roll_events = (
             ClothRollHistory.objects
             .select_related('roll', 'roll__cloth_type', 'roll__cloth_color', 'actor')
-            .order_by('-created_at')[:30]
+            .order_by('-created_at')
         )
+        # PA-13-3: hide cost_per_kg/supplier change values from non-financial viewers.
+        if not user_can_view_financials(self.request.user):
+            roll_events = roll_events.exclude(field_name__in=('supplier', 'cost_per_kg'))
+        ctx['roll_events'] = roll_events[:30]
         ctx['active_colors'] = ClothColor.active.order_by('name')
         ctx['filter_from'] = self.request.GET.get('from', '')
         ctx['filter_to'] = self.request.GET.get('to', '')

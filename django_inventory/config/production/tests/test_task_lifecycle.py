@@ -5,6 +5,7 @@ rows are reported back, never silently dropped.
 from datetime import date
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -68,11 +69,11 @@ class LayeringCompletionLifecycleTests(TestCase):
                                remaining_length_meters=Decimal('0'), user=self.admin)
         self.entry = entry
 
-    def _complete(self):
+    def _complete(self, **kw):
         return complete_layering(
             adda=self.adda, duration_minutes=15,
             layer_length_meters=Decimal('1.5'),
-            per_entry_layers={self.entry.pk: 3}, notes='', user=self.admin)
+            per_entry_layers={self.entry.pk: 3}, notes='', user=self.admin, **kw)
 
     def _task(self, user):
         return (WorkerStageTask.objects
@@ -95,7 +96,14 @@ class LayeringCompletionLifecycleTests(TestCase):
         # Active roster (tasks) = only the worker who actually reported.
         self.assertEqual({u.pk for u in self.sr.active_workers}, {self.reporter.pk})
 
-    def test_draft_lines_retained_on_autocancelled_task(self):
+    def test_draft_holder_blocks_then_override_retains_draft_lines(self):
+        """R3 C3 (PDD §27-C3): a worker WITH draft lines has ENTERED the
+        workflow (IN_PROGRESS) → completion now BLOCKS instead of silently
+        cancelling them. Behind the super-admin override, the original F3
+        mechanics run and the draft evidence is retained on the cancelled
+        task exactly as before."""
+        from django.core.exceptions import ValidationError
+
         rep_task = self._task(self.reporter)
         report_contributions(rep_task, [{'reported_quantity': '3'}], actor=self.reporter)
         complete_worker_task(rep_task, actor=self.reporter)
@@ -103,10 +111,14 @@ class LayeringCompletionLifecycleTests(TestCase):
         save_draft_contributions(idle_task, [{'reported_quantity': '7'}],
                                  actor=self.idle)   # draft, never submitted
 
-        self._complete()
+        with self.assertRaises(ValidationError):    # R3: draft-holder blocks
+            self._complete()
+
+        self._complete(override_pending_reason='draft holder unavailable')
 
         idle_task.refresh_from_db()
         self.assertEqual(idle_task.status, WorkerStageTask.Status.CANCELLED)
+        self.assertIn('draft holder unavailable', idle_task.notes)  # reason stamped
         # Draft evidence retained — and still invisible to business reads
         # (everything money/readiness reads filters COMPLETED tasks).
         lines = list(idle_task.contributions.all())
@@ -225,3 +237,51 @@ class LayeringDraftSkippedFeedbackTests(TestCase):
                          'leftover_length': None},
         })
         self.assertEqual(skipped, [])
+
+
+class CompleteTaskRaceTests(TestCase):
+    """P0-5: complete_worker_task locks + re-reads the task row, so a worker
+    complete cannot race a manager stage-complete (which cancels open tasks)."""
+
+    def setUp(self):
+        self.worker = _user('ctr-w@test', role_code='worker', is_super=False,
+                            skills=['cutting_master'])
+        product = Product.objects.create(code='CTR', name='CTR P')
+        stage, _ = Stage.objects.get_or_create(
+            code='ctr_cut', defaults={'name': 'CTR Cut'})
+        ws = WorkflowStage.objects.create(
+            product=product, stage=stage, order=1,
+            cost_rate=Decimal('3'), credits_workers=True)
+        self.adda = Adda.objects.create(code='CTR-001', product=product)
+        self.sr = AddaStageRecord.objects.create(
+            adda=self.adda, workflow_stage=ws, started_at=timezone.now())
+        set_stage_workers(self.sr, [self.worker.pk])
+        self.task = WorkerStageTask.objects.get(
+            stage_record=self.sr, worker=self.worker)
+        report_contributions(self.task, [{'reported_quantity': '10'}],
+                             actor=self.worker)   # → in_progress + 1 contribution
+
+    def test_stale_complete_refuses_after_concurrent_cancel(self):
+        # Worker holds a task loaded BEFORE the manager closed the stage. Simulate
+        # the manager's cancel landing first (bypass save → DB-only, in-memory stale).
+        stale = WorkerStageTask.objects.get(pk=self.task.pk)   # in_progress in memory
+        WorkerStageTask.objects.filter(pk=self.task.pk).update(
+            status=WorkerStageTask.Status.CANCELLED)
+        with self.assertRaisesMessage(ValidationError, 'cancelled'):
+            complete_worker_task(stale, actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.CANCELLED)  # NOT resurrected
+        # contributions were never frozen (no stranded expected_*)
+        self.assertFalse(
+            self.task.contributions.exclude(expected_rate=None).exists())
+
+    def test_completed_task_survives_stage_resolve_no_strand(self):
+        complete_worker_task(self.task, actor=self.worker)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)
+        # Manager closes the stage: resolve keeps completed/verified tasks.
+        resolve_stage_tasks_on_complete(self.sr)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, WorkerStageTask.Status.COMPLETED)  # not stranded
+        self.assertTrue(   # frozen contribution remains visible to settlement
+            self.task.contributions.exclude(expected_rate=None).exists())

@@ -1,3 +1,13 @@
+---
+id: soak-tracker
+type: status-anchor
+status: active
+owner: handwritten
+scope: all — navigation/state
+anchors: —
+verified: 2026-07-13
+---
+
 # P2→P3 Soak Tracker — Worker Reporting Under Real Usage
 
 **STATUS (owner clarification 2026-06-11): PRE-SOAK READINESS PHASE.** There is no
@@ -30,7 +40,7 @@ Categories: `UX` worker feedback · `SCHEMA` contribution schema limitation · `
 | 2026-06-11 | UX | Bulk roll intake: "Create Rolls" stays disabled until "+ Add color row" is clicked — the filled color/qty inputs alone don't count. Reasonable design but not obvious; a hint near the button would help. SETUP issue. | logged |
 | 2026-06-11 | EDGE | Flow editor allowed appending cutting_pattern/barcode_generation UNPRICED (rate=None) with no warning. Correct per NULL=unpriced semantics (both stages are legitimately unpriced), but docs describe a "mandatory-rate flow editor" — guard appears scoped to priced methods only. Verify intent during validation. ARCHITECTURE observation (benign). | logged |
 | 2026-06-11 | SEC | Layering workspace worker-assignment list correctly shows only SKILLED users (utest, worker2); worker3 (no skill) absent — skill-filter works at the assignment UI level. First positive isolation evidence. | ✅ pass |
-| 2026-06-11 | — | **SCENARIO 1 (Layering) EXECUTED** — owner started stage + assigned utest/worker2; agent continued: manager1 attached CR-000001 (36in/10kg), draft layers=25 + leftover 1.5kg + length 8m; worker2 reported 25 via qty-only schema → draft → submit → locked; super_admin completed → advanced to Cutting Pattern. | done |
+| 2026-06-11 | — | **SCENARIO 1 (Layering) EXECUTED** — owner started stage + assigned utest/worker2; agent continued: manager1 attached CR-000001 (36in/10kg), draft layers=25 + leftover 1.5kg + length 8m; worker2 reported 25 via qty-only schema → draft → submit → locked; super_admin completed → advanced to Pattern Design. | done |
 | 2026-06-11 | EDGE | **Layering draft silently drops a partial row**: `save_layering_draft` skips an entry unless BOTH layers AND leftover-weight are non-empty (layering/service.py:596) but the UI still flashes "Draft saved." — worker/manager believes layers persisted when they didn't. Misleading success on partial fill. | **OWNER TRIAGE: EDGE · fix-before-P3** — silent data loss + success message is misleading; worker must be told when rows are skipped. |
 | 2026-06-11 | SEC | **Manager cannot complete layering**: manager1 refused with "only cutting_master_helper can complete Layering stage". Manager bypasses stage ACCESS but not the skill-gated COMPLETION → with current users only super_admin can complete layering. Asymmetry: manager can start + assign but not complete. Intended (completion = skilled act) or gap? | **OWNER TRIAGE: SEC/WORKFLOW · won't-fix (for now)** — completion stays a skilled-worker action; access ≠ completion authority. Revisit if validation shows managers frequently need it. |
 | 2026-06-11 | EDGE | **Stage completion leaves unreported tasks dangling as `assigned`** (utest) on a completed stage record — completion neither blocks on nor auto-resolves active tasks. Consistent with locked semantics (the all-tasks-completed gate is the PAY-2 worker-ADVANCE guard, not stage advance) and harmless to money (settlement reads completed only) + parity (sets still match), but the task is stuck active forever = data hygiene + reporting noise. Options: block / auto-cancel at complete / leave. | **OWNER TRIAGE: EDGE · fix-before-P3** — completed stage must not leave unresolved active tasks; deliberate lifecycle decision needed before V2-1d freezes behavior. |
@@ -39,7 +49,7 @@ Categories: `UX` worker feedback · `SCHEMA` contribution schema limitation · `
 | 2026-06-11 | UX | ✅ Badge transitions exact: Report needed → ✎ Draft saved → ✓ Submitted. | ✅ pass |
 | 2026-06-11 | UX | ✅ NO manual duration input anywhere; workspace says "Time is recorded automatically"; completion computed duration_minutes=35 from timestamps; drafts cleared on complete. Owner auto-duration rule implemented. | ✅ pass |
 | 2026-06-11 | PARITY | ✅ `check_worker_task_parity` after Scenario 1: PARITY OK — M2M == task sets everywhere. | ✅ pass |
-| 2026-06-11 | — | **SCENARIO 2 (Cutting Pattern) EXECUTED** — super_admin assigned utest, started stage, uploaded photo evidence, verified 1/1 patterns, locked size proportions (Free=100%), completed → advanced to Cutting; then REOPENED + re-completed. | done |
+| 2026-06-11 | — | **SCENARIO 2 (Pattern Design) EXECUTED** — super_admin assigned utest, started stage, uploaded photo evidence, verified 1/1 patterns, locked size proportions (Free=100%), completed → advanced to Cutting; then REOPENED + re-completed. | done |
 | 2026-06-11 | EDGE | ✅ **Completion gates fire in strict order with clear refusals**: (1) evidence gate "Upload at least one photo or a video…", (2) verification gate "0 of 1 patterns verified — verify all before completing" (R0 C3 stage-level handler gate confirmed at runtime), (3) size-proportions gate "Select at least one size for this batch and lock proportions." All three refused premature completion correctly. | ✅ pass |
 | 2026-06-11 | EDGE | **Reopen semantics differ per stage**: pattern reopen = SOFT unlock (record/verification/photo/proportions all preserved; re-complete sails through), layering reopen = teardown (record deleted, header copied to drafts). Both are handler-owned (`reopen()` contract, I2) so divergence is by design — but worth a one-line doc note so future stages pick a semantic deliberately. | **OWNER TRIAGE (F4): EDGE · fix-after-P3** — valid behavior, not an architecture issue; document the destructive-vs-soft reopen choice so future handlers decide deliberately, never inherit accidentally. |
 | 2026-06-11 | EDGE | F3 RECURS on pattern stage: utest's task left `assigned` on the completed stage record (never reported). Same lifecycle gap as layering — strengthens the fix-before-P3 triage. | covered by F3 |

@@ -10,7 +10,9 @@ ke chalti rahein. App label + table names same hain → koi schema migration nah
 (sirf upload_to callable ka path move ek no-SQL AlterField generate karta hai).
 
 Subdomain map:
-  core.py      → CostMethod, Product, Stage, WorkflowStage, WorkflowStageRoleRate
+  core.py      → CostMethod, Product, Stage, WorkflowStage, WorkflowStageRoleRate,
+                 AddaStageRoleRate, RateCorrectionAudit, AllocationDimensions,
+                 StagePoolSnapshot
   adda.py      → Adda, AddaStageRecord  (polymorphic stage-execution parent)
   layering.py  → LayeringRecord, LayeringRollEntry, RemainingClothOfClothRoll
   cutting.py   → CuttingRecord, ProductPattern(+Assignment), CuttingPatternRecord(+Photo),
@@ -19,15 +21,23 @@ Subdomain map:
   barcode.py   → BarcodeGenerationRecord, LabelPrintQueue
 """
 from .core import (
+    MachineType,
+    StageCategory,
+    AllocationDimensions,
     CostMethod,
     Product,
     Stage,
     WorkflowStage,
     WorkflowStageRoleRate,
+    AddaStageRoleRate,
+    RateCorrectionAudit,
+    StagePoolSnapshot,
+    WorkerStageAllocation,
 )
 from .adda import (
     Adda,
     AddaStageRecord,
+    CuttingStream,
 )
 from .layering import (
     LayeringRecord,
@@ -65,10 +75,18 @@ __all__ = [
     'CostMethod',
     'Product',
     'Stage',
+    'StageCategory',
+    'MachineType',
     'WorkflowStage',
+    'AllocationDimensions',
     'WorkflowStageRoleRate',
+    'AddaStageRoleRate',
+    'RateCorrectionAudit',
+    'StagePoolSnapshot',
+    'WorkerStageAllocation',
     'Adda',
     'AddaStageRecord',
+    'CuttingStream',
     'LayeringRecord',
     'LayeringRollEntry',
     'RemainingClothOfClothRoll',

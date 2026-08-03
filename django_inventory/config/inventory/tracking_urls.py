@@ -16,6 +16,7 @@ urlpatterns = [
     path('barcodes/<str:adda_code>/print/', tracking_barcodes.BarcodePrintSheetView.as_view(),   name='barcode-print'),
     path('barcodes/<str:adda_code>/export/', tracking_dashboard.barcode_export_csv,               name='barcode-export'),
     path('scan/<str:value>/',               tracking_barcodes.scan_piece,                        name='scan'),
+    path('scan/<str:value>/status/',        tracking_barcodes.update_piece_status,               name='scan-status'),
     path('history/roll/<int:roll_pk>/',     tracking_history.RollHistoryView.as_view(),         name='roll-history'),
     path('history/adda/<str:adda_code>/',   tracking_history.AddaHistoryView.as_view(),         name='adda-history'),
 

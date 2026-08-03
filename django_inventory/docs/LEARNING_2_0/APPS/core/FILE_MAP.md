@@ -1,3 +1,13 @@
+---
+id: l2-apps-core-file-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: core
+anchors: config/core/
+verified: 2026-07-13
+---
+
 # core — FILE_MAP
 
 ## TL;DR (1 min)

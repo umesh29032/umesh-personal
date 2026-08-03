@@ -7,7 +7,7 @@ from .master_views import (
     StorageLocationListView, StorageLocationCreateView, StorageLocationUpdateView,
     StorageLocationArchiveView, StorageLocationDeleteView,
 )
-from .roll_views import RollListView, RollBulkCreateView, RollDetailView, RollUpdateView
+from .roll_views import RollListView, RollBulkCreateView, RollDamageView, RollDetailView, RollUpdateView
 from .assign_views import RollAssignView
 
 __all__ = [

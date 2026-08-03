@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Adda Settlements{% endblock %}
 
@@ -14,11 +15,7 @@
     .adst-list .empty { padding: 16px; color: var(--stone); font-style: italic; }
     .adst-list a.ref { color: var(--copper); font-weight: 600; text-decoration: none; }
     .adst-list .btn-copper { padding: 7px 14px; border-radius: 9px; font-size: 12px; min-height: 0; }   /* compact in-table action */
-    .adst-list .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-    .adst-list .pill.draft      { background: #fdf3e3; color: #9a6a1b; }
-    .adst-list .pill.finalized  { background: #e7f4ea; color: #1f7a3d; }
-    .adst-list .pill.reversed   { background: #fdeaea; color: #b03434; }
-    .adst-list .pill.superseded { background: #ececf4; color: #55557e; }
+    /* E-2: settlement-status chips now use canonical .status-pill / .status-pill--<state> (base.html) */
     .adst-list .skipnote { color: var(--stone); font-size: 11px; }
     @media (max-width: 640px) {
         .adst-list thead { display: none; }
@@ -52,14 +49,14 @@
                     <td data-label="Product">{{ r.adda.product.name }}</td>
                     <td class="num" data-label="Workers">{{ r.workers }}</td>
                     <td class="num" data-label="Lines">{{ r.lines }}</td>
-                    <td class="num" data-label="Expected">₹{{ r.expected|floatformat:2 }}</td>
+                    <td class="num" data-label="Expected">{% money r.expected %}</td>
                     <td data-label="Action">
                         {% if r.draft %}
                             <a class="ref" href="{% url 'expense:adda-settlement-detail' r.draft.reference %}">Open draft {{ r.draft.reference }}</a>
                         {% else %}
                             <form method="post" action="{% url 'expense:adda-settlement-start' r.adda.pk %}" style="display:inline;">
                                 {% csrf_token %}
-                                <button type="submit" class="btn-copper">Start settlement</button>
+                                <button type="submit" class="btn btn-copper btn-lg">Start settlement</button>
                             </form>
                         {% endif %}
                     </td>
@@ -100,8 +97,8 @@
                 <tr>
                     <td data-label="Reference"><a class="ref" href="{% url 'expense:adda-settlement-detail' s.reference %}">{{ s.reference }}</a></td>
                     <td data-label="Adda">{{ s.adda.code }}</td>
-                    <td data-label="Status"><span class="pill {{ s.status }}">{{ s.get_status_display }}</span></td>
-                    <td class="num" data-label="Expected">{% if s.status == 'draft' %}—{% else %}₹{{ s.expected_total|floatformat:2 }}{% endif %}</td>
+                    <td data-label="Status"><span class="status-pill status-pill--{{ s.status }}">{{ s.get_status_display }}</span></td>
+                    <td class="num" data-label="Expected">{% if s.status == 'draft' %}—{% else %}{% money s.expected_total %}{% endif %}</td>
                     <td data-label="Settled">{{ s.settled_at|date:"d M Y H:i"|default:"—" }}</td>
                     <td data-label="Chain">{% if s.supersedes %}replaces {{ s.supersedes.reference }}{% else %}—{% endif %}</td>
                 </tr>

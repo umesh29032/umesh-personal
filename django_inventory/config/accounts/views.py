@@ -53,7 +53,9 @@ from .models import Skill, User, UserType
 from .services import auth_service, user_service
 from .throttle import check_throttle, reset_throttle, format_retry
 # Centralised RBAC helper — replaces raw `is_superuser` checks (CLAUDE.md rule #6).
-from accounts.services.permission_service import user_has_role, ROLE_SUPER_ADMIN
+from accounts.services.permission_service import (
+    user_has_role, ROLE_SUPER_ADMIN, MANAGEMENT_ROLES,
+)
 
 security_logger = logging.getLogger("accounts.security")
 from .utils import (
@@ -61,6 +63,8 @@ from .utils import (
     can_resend_otp,
     check_otp_from_session,
     clear_otp_session,
+    generate_otp,
+    store_otp_in_session,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,10 +72,13 @@ logger = logging.getLogger(__name__)
 
 # ─── Authentication ────────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class LoginView(View):
     """
     Step 1: User enters email → OTP is generated and emailed.
     Only sends OTP to existing users to prevent account enumeration.
+    never_cache: keep auth pages out of the bfcache so the back button after
+    logout can't redisplay a stale OTP/login screen (PA-02-3).
     """
 
     def get(self, request):
@@ -95,10 +102,14 @@ class LoginView(View):
         if not can_resend_otp(request, prefix="otp"):
             return redirect("accounts:verify_otp")
 
-        # Only send OTP to existing users — don't auto-create accounts.
-        # Always show the same redirect to prevent account enumeration.
-        if User.objects.filter(email=email).exists():
-            request.session["otp_email"] = email
+        # Anti-enumeration: the OTP page must look identical whether or not the
+        # email exists. Real accounts get a REAL OTP emailed; unknown emails get
+        # a DECOY OTP stashed in-session (never emailed) so the verify step ALSO
+        # behaves identically — a wrong code returns "Invalid OTP" either way,
+        # instead of leaking existence via a different message/redirect.
+        # email__iexact (not exact) so a mixed-case-local account isn't missed.
+        request.session["otp_email"] = email
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="otp",
                 subject=f"Your Login OTP — {settings.SITE_NAME}",
@@ -106,9 +117,9 @@ class LoginView(View):
                 messages.error(request, "Failed to send OTP. Please try again.")
                 return render(request, "accounts/login.html")
         else:
-            # Store email in session so the OTP page renders, but no OTP is sent.
-            # This prevents account enumeration (attacker can't tell if email exists).
-            request.session["otp_email"] = email
+            # Decoy: random un-emailed OTP hash so a non-existent account is
+            # indistinguishable from a real one on the verify page.
+            store_otp_in_session(request, generate_otp(), prefix="otp")
             request.session.modified = True
 
         return redirect("accounts:verify_otp")
@@ -134,7 +145,7 @@ class ResendOTPView(View):
 
         # Only send OTP if the user actually exists — mirrors LoginView logic.
         # For non-existent emails we still redirect to the OTP page (anti-enumeration).
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="otp",
                 subject=f"Your New Login OTP — {settings.SITE_NAME}",
@@ -144,6 +155,7 @@ class ResendOTPView(View):
         return redirect("accounts:verify_otp")
 
 
+@method_decorator(never_cache, name="dispatch")
 class VerifyOTPView(View):
     """Step 2: User enters the 6-digit OTP to complete login."""
 
@@ -178,10 +190,14 @@ class VerifyOTPView(View):
             return redirect("accounts:verify_otp")
 
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
-            messages.error(request, "Account not found. Please sign up.")
-            return redirect("accounts:signup")
+            # Native signup is disabled (PA-02-OPEN-SIGNUP); accounts are
+            # admin-provisioned. With the decoy-OTP anti-enumeration this branch
+            # is only reachable by guessing a decoy code — send them back to login
+            # with a neutral message rather than a (removed) signup page.
+            messages.error(request, "Account not found. Contact your administrator.")
+            return redirect("accounts:login")
 
         login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
@@ -214,14 +230,49 @@ class LogoutView(View):
         return redirect("accounts:home")
 
 
+@method_decorator(never_cache, name="dispatch")
+class EmailManagementDisabledView(LoginRequiredMixin, View):
+    """S3 fix (2026-07-12): shadow allauth's `account_email` endpoint.
+
+    allauth's EmailView (add / remove / make-primary) let ANY signed-in worker
+    self-service their own login identity: add an arbitrary UNVERIFIED email and
+    promote it to primary, which allauth syncs into `User.email` — the OTP login
+    address. That breaks the 'pre-provisioned users only' invariant (identity is
+    admin-owned, PA-02). Mounted BEFORE `include("allauth.urls")` in the root
+    URLConf so neither GET nor POST reaches allauth's EmailView. Google OAuth,
+    password reset, and confirm-email routes are untouched.
+    LoginRequiredMixin → anonymous hits go to the login page (login_url).
+    """
+    login_url = "/app/"
+
+    def get(self, request):
+        # Neutral bounce: email is an admin-managed field, no self-service page.
+        messages.info(request, "Your email address is managed by your administrator.")
+        return redirect("accounts:home")
+
+    def post(self, request):
+        # Refuse the mutation outright; log the attempt to the security channel.
+        security_logger.warning("email_selfservice_blocked email=%s", request.user.email)
+        messages.error(request, "Your email address is managed by your administrator.")
+        return redirect("accounts:home")
+
+
 # ─── Home (protected redirect) ────────────────────────────────────────────────
 
 @method_decorator(login_required(login_url="/app/"), name="dispatch")
 class HomeView(View):
-    """Protected entry point — always redirects to the real inventory dashboard."""
+    """Protected entry point — ROLE-BASED landing (P1-1 + D9): the Owner/Super
+    Admin lands on the Business Operating Dashboard (owner charter D9 override,
+    BOD-E 2026-07-18); managers land on the Operations dashboard (P1-1,
+    unchanged); everyone else on their personal My Dashboard. Auth flow itself
+    untouched — LOGIN_REDIRECT_URL still points here."""
 
     def get(self, request):
-        return redirect("inventory:inventory_dashboard")
+        if user_has_role(request.user, {ROLE_SUPER_ADMIN}):
+            return redirect("bod:dashboard")            # D9: Owner/SA → BOD
+        if user_has_role(request.user, MANAGEMENT_ROLES):
+            return redirect("production:dashboard")     # P1-1, unchanged
+        return redirect("inventory:my_dashboard")
 
 
 # ─── User Management ──────────────────────────────────────────────────────────
@@ -258,7 +309,13 @@ class UserListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
                 Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q)
             )
         if skills:
-            qs = qs.filter(skills__id__in=skills).distinct()
+            # PA-13-4: skills come from the querystring; a non-numeric value
+            # (?skills=abc, tampered/stale link) made the integer FK lookup raise
+            # ValueError → 500. Keep only numeric ids (mirrors the int()-guard the
+            # context builder already applies to selected_skills below).
+            skill_ids = [s for s in skills if s.isdigit()]
+            if skill_ids:
+                qs = qs.filter(skills__id__in=skill_ids).distinct()
         return qs
 
     def get_context_data(self, **kwargs):
@@ -285,10 +342,18 @@ class UserCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
     success_url = reverse_lazy("accounts:user_list")
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        # Skills saved by ModelForm.save_m2m → retro-tag onto active layerings
-        # (explicit; replaces the removed m2m_changed signal).
-        user_service.sync_user_skills(self.object)
+        from django.db import IntegrityError
+        try:
+            response = super().form_valid(form)
+        except IntegrityError:
+            # PA-05A-5: clean_email validates with iexact but the DB unique is
+            # case-sensitive; a concurrent double-submit can pass validation then
+            # collide at INSERT. Surface a field error instead of a 500 (mirrors
+            # SignupVerifyView's IntegrityError handling).
+            form.add_error("email", "A user with this email already exists.")
+            return self.form_invalid(form)
+        # (C-1 2026-07-05: no retro-tag — creating a user never assigns work;
+        # managers assign explicitly on the stage panels.)
         messages.success(self.request, f"User {self.object.email} created.")
         return response
 
@@ -326,8 +391,8 @@ class UserUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
                 return self.form_invalid(form)
 
         response = super().form_valid(form)
-        # Skills may have changed → retro-tag (explicit; replaces the signal).
-        user_service.sync_user_skills(self.object)
+        # (C-1 2026-07-05: no retro-tag on edit — saving a profile never
+        # touches production rosters.)
         if editing_self and form.cleaned_data.get("new_password"):
             update_session_auth_hash(self.request, self.object)
         messages.success(self.request, "User updated successfully.")
@@ -353,6 +418,7 @@ class UserDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
 
 # ─── Password Login ───────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class PasswordLoginView(DjangoLoginView):
     template_name = "accounts/login_password.html"
     redirect_authenticated_user = True
@@ -390,8 +456,14 @@ class PasswordLoginView(DjangoLoginView):
         return super().form_valid(form)
 
 
-# ─── Signup ───────────────────────────────────────────────────────────────────
+# ─── Signup — DISABLED (PA-02-OPEN-SIGNUP, owner decision 2026-06-14) ────────────
+# These three views are NO LONGER ROUTED (see accounts/urls.py). Native public
+# self-signup contradicted the "pre-provisioned users only" invariant on this
+# internal ERP, so the routes + login-page links were removed in the Production
+# Audit. The classes are kept (unrouted) for a clean, reversible re-enable if
+# invite/allowlist onboarding is ever scoped. Do not re-add routes without that.
 
+@method_decorator(never_cache, name="dispatch")
 class SignupView(FormView):
     template_name = "accounts/signup.html"
     form_class = SignupForm
@@ -424,6 +496,7 @@ class SignupView(FormView):
         return super().form_valid(form)
 
 
+@method_decorator(never_cache, name="dispatch")
 class SignupVerifyView(View):
     def get(self, request):
         if not request.session.get("signup_email"):
@@ -521,6 +594,7 @@ class ResendSignupOTPView(View):
 
 # ─── Password Reset ───────────────────────────────────────────────────────────
 
+@method_decorator(never_cache, name="dispatch")
 class ForgotPasswordView(View):
     def get(self, request):
         return render(request, "accounts/forgot_password.html")
@@ -534,21 +608,32 @@ class ForgotPasswordView(View):
             messages.error(request, f"Too many requests. Try again in {format_retry(retry)}.")
             return redirect("accounts:forgot_password")
 
-        # Don't reveal whether the email exists (prevents account enumeration)
-        if User.objects.filter(email=email).exists():
-            request.session["reset_email"] = email
+        # Anti-enumeration: behave identically whether or not the email exists.
+        # Real accounts get a REAL reset OTP emailed; unknown emails get a DECOY
+        # OTP stashed in-session (never emailed) AND reset_email set, so neither the
+        # redirect nor the verify step can distinguish the two. Previously the
+        # session key was set only for existing emails, so a non-existent email hit
+        # the "Session expired" branch in ResetPasswordVerifyView while a real one
+        # reached "Invalid OTP" — a clean enumeration oracle (PA-02-1).
+        # email__iexact so a mixed-case-local account isn't missed (PA-02-2).
+        request.session["reset_email"] = email
+        if User.objects.filter(email__iexact=email).exists():
             if not auth_service.issue_otp(
                 request, email=email, prefix="reset",
                 subject=f"Password Reset OTP — {settings.SITE_NAME}",
             ):
                 messages.error(request, "Failed to send reset email. Please try again.")
                 return redirect("accounts:forgot_password")
+        else:
+            store_otp_in_session(request, generate_otp(), prefix="reset")
+        request.session.modified = True
 
         # Always show the same message regardless of whether email exists
         messages.info(request, "If this email is registered, an OTP has been sent.")
         return redirect("accounts:reset_password_verify")
 
 
+@method_decorator(never_cache, name="dispatch")
 class ResetPasswordVerifyView(View):
     def get(self, request):
         return render(request, "accounts/reset_otp.html")
@@ -579,10 +664,10 @@ class ResetPasswordVerifyView(View):
                 return redirect("accounts:forgot_password")
             return redirect("accounts:reset_password_verify")
 
-        # Defense in depth — even though reset_email is only set when the email
-        # exists, treat a missing user as a tampered session and bail.
+        # Defense in depth — a missing user here means either a tampered session
+        # or a decoy-OTP reset for a non-existent email; treat both as bail.
         try:
-            user = User.objects.get(email=email)
+            user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             request.session.pop("reset_email", None)
             request.session.modified = True
@@ -654,6 +739,23 @@ class SkillDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     success_url = reverse_lazy("accounts:skill_list")
 
     def form_valid(self, form):
+        # PA-05A-1: Skill→User and Skill→SidebarItemRule are M2M (no FK PROTECT),
+        # so a bare delete silently strips the skill from every worker that holds
+        # it (losing stage access) and empties any sidebar rule that references it
+        # — no warning, no audit. Mirror UserTypeDeleteView: refuse while in use.
+        skill = self.get_object()
+        blockers = []
+        if skill.users.exists():
+            blockers.append(f"{skill.users.count()} user(s)")
+        if skill.visible_sidebar_items.exists():
+            blockers.append(f"{skill.visible_sidebar_items.count()} sidebar rule(s)")
+        if blockers:
+            messages.error(
+                self.request,
+                f"Cannot delete '{skill.get_name_display()}' — still used by "
+                f"{', '.join(blockers)}. Reassign / update those first.",
+            )
+            return redirect("accounts:skill_list")
         messages.success(self.request, "Skill deleted.")
         return super().form_valid(form)
 

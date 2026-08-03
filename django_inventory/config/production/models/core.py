@@ -8,6 +8,24 @@ from django.db import models
 
 # Shared bases — single source in core app (TimeStampedModel + ActiveManager).
 from core.models import ActiveManager, TimeStampedModel
+from production.constants import (
+    ALLOC_DIM_COLOR_SIZE, ALLOC_DIM_NONE, ALLOC_DIM_QUANTITY,
+)
+
+
+class AllocationDimensions(models.TextChoices):
+    """Piece-pool grain a WorkflowStage participates at (Foundation S4 / D1).
+
+    Governs PIECE-POOL behaviour ONLY — orthogonal to settlement
+    (WorkflowStage.credits_workers) and costing (WorkflowStage.cost_method). A NONE
+    stage still settles + pays; it just has no StagePoolSnapshot / allocation bound.
+    Owner-locked 2026-06-14: the piece-pool starts at CUTTING; pre-piece stages
+    (layering, cutting_pattern, barcode_generation) are NONE.
+    """
+
+    NONE = ALLOC_DIM_NONE, 'Not a piece-pool stage'
+    QUANTITY = ALLOC_DIM_QUANTITY, 'Quantity (scalar)'
+    COLOR_SIZE = ALLOC_DIM_COLOR_SIZE, 'Colour + Size'
 
 
 class CostMethod(models.TextChoices):
@@ -54,6 +72,78 @@ class Product(TimeStampedModel):
     class Meta:
         ordering = ['name']
 
+    def clean(self):
+        """PDD §31.1-F1 (R1): `code` is IMMUTABLE once the product has any Adda.
+
+        Adda codes ('3-PATTI-001') and permanent barcode payloads (ADR-0010)
+        embed this prefix; a rename would let a future product reuse the old
+        code and collide on Adda.code UNIQUE. The edit form already disables
+        the field and update_product never writes code — this model-level guard
+        (Django full_clean, so admin/ModelForm paths hit it too) is the
+        defense-in-depth backstop (PDD P10).
+        """
+        super().clean()
+        if self.pk:
+            old_code = (
+                Product.objects.filter(pk=self.pk)
+                .values_list('code', flat=True).first()
+            )
+            if old_code is not None and old_code != self.code and self.addas.exists():
+                from django.core.exceptions import ValidationError
+                raise ValidationError({
+                    'code': f"Product code is locked once Addas exist ('{old_code}' "
+                            "is embedded in Adda codes and barcode payloads forever).",
+                })
+
+    def __str__(self):
+        return self.name
+
+
+class StageCategory(TimeStampedModel):
+    """R10 (frozen architecture 2026-07-05): grouping METADATA for stages —
+    Pre Production / Stitching / Finishing / Dispatch. Display, reporting and
+    filters ONLY: the workflow engine, money paths and access control NEVER
+    read categories (rule 2 of the frozen architecture; guard-tested)."""
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=64)
+    display_order = models.PositiveSmallIntegerField(default=0)
+    # Owner-editable master (data-driven rule): deactivate hides a category
+    # from NEW-stage pickers; existing stages keep their FK (PROTECT) and
+    # keep grouping under the old name — history never lies.
+    is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name_plural = 'stage categories'
+
+    def __str__(self):
+        return self.name
+
+
+class MachineType(TimeStampedModel):
+    """R10: the KIND of machine a stage runs on (Overlock/Flatlock/Sewing…).
+
+    Lives in PRODUCTION (stage-domain metadata beside Stage) so the layering
+    stays acyclic: the machines app (physical assets) points DOWN at this and
+    at Adda; production keeps no model-level machines imports (3 sanctioned
+    function-level reads, see .importlinter). Reusable across ANY number of
+    operations (plain FK from Stage — frozen rule 5). NEVER carries ₹ (future
+    MachineRate = separate table + ADR, per the frozen architecture §0.2)."""
+
+    code = models.SlugField(max_length=32, unique=True)
+    name = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+
+    objects = models.Manager()
+    active = ActiveManager()
+
+    class Meta:
+        ordering = ['name']
+
     def __str__(self):
         return self.name
 
@@ -83,6 +173,27 @@ class Stage(TimeStampedModel):
     )
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    # ── R10 frozen production model (2026-07-05) ──────────────────────────
+    # A Stage = ONE business OPERATION (Overlock, Collar Attach…), never a
+    # process ("Stitching" = a StageCategory) and never a machine number.
+    class WorkType(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        MACHINE = 'machine', 'Machine'
+
+    work_type = models.CharField(
+        max_length=16, choices=WorkType.choices, default=WorkType.MANUAL,
+        help_text="HOW the operation is performed. Machine ⇒ pick a Machine Type.",
+    )
+    machine_type = models.ForeignKey(
+        'production.MachineType', null=True, blank=True,
+        on_delete=models.PROTECT, related_name='stages',
+        help_text="Mandatory when Work Type = Machine; forbidden when Manual.",
+    )
+    category = models.ForeignKey(
+        'production.StageCategory', null=True, blank=True,
+        on_delete=models.PROTECT, related_name='stages',
+        help_text="Grouping for dashboards/reports ONLY — never workflow logic.",
+    )
     access_by_skill = models.ManyToManyField(
         'accounts.Skill', blank=True, related_name='accessible_stages',
         help_text="Users with ANY of these skills can access this stage.",
@@ -112,6 +223,15 @@ class Stage(TimeStampedModel):
             models.CheckConstraint(
                 check=models.Q(default_cost_rate__gte=0),
                 name='prod_stage_defaultrate_nonneg',
+            ),
+            # R10 frozen rule 4 — THE single enforcement point for Work Type:
+            # Machine ⇒ machine_type mandatory; Manual ⇒ machine_type forbidden.
+            models.CheckConstraint(
+                check=(
+                    models.Q(work_type='machine', machine_type__isnull=False)
+                    | (~models.Q(work_type='machine') & models.Q(machine_type__isnull=True))
+                ),
+                name='prod_stage_worktype_machinetype_pair',
             ),
         ]
 
@@ -172,6 +292,15 @@ class WorkflowStage(TimeStampedModel):
     # Adda-stage snapshot will freeze/copy it (like cost_rate_snapshot), never
     # relocating this field.
     credits_workers = models.BooleanField(default=False)
+    # PIECE-POOL grain (S4 / D1). Governs ONLY whether this stage participates in
+    # StagePoolSnapshot + the allocation bound, and at what grain. ORTHOGONAL to
+    # settlement (credits_workers) and costing (cost_method) — a NONE stage still
+    # settles + pays per its cost_method. Default NONE = pool is opt-in (pool starts
+    # at cutting). Seeded from the stage handler's pool_grain; flow-editable.
+    allocation_dimensions = models.CharField(
+        max_length=16, choices=AllocationDimensions.choices,
+        default=AllocationDimensions.NONE,
+    )
 
     class Meta:
         # Same product mein 2 stages same order ya same stage na ho
@@ -233,3 +362,187 @@ class WorkflowStageRoleRate(TimeStampedModel):
 
     def __str__(self):
         return f"{self.workflow_stage} · {self.role} = {self.cost_rate}"
+
+
+class AddaStageRoleRate(TimeStampedModel):
+    """Frozen RESOLVED payable rate for one (AddaStageRecord, role) — Foundation S2.
+
+    DISTINCT from WorkflowStageRoleRate: that is the per-role TEMPLATE override
+    (an INPUT); THIS is the resolved OUTPUT (cost_service.resolved_payable_rate —
+    grouped-member→0 / role override / stage base / 0), snapshotted when the
+    AddaStageRecord is created (stage-start, addendum D-α), owner-editable until
+    that stage's FIRST task completion, then IMMUTABLE (locked_at set in the
+    completing transaction — addendum contract 1). complete_worker_task and
+    settlement read THIS, never the live workflow, so editing a WorkflowStage rate
+    later never moves an in-flight Adda's pay (addendum M-5).
+
+    Race contract: edit_until_lock() and complete_worker_task() both
+    select_for_update THIS row in the documented lock order (task →
+    AddaStageRoleRate) — whoever wins the row lock decides; a locked row refuses
+    edits. Deterministic.
+    """
+    # CASCADE = a frozen rate is meaningless without its stage record (mirrors
+    # WorkflowStageRoleRate). A completed/locked stage record is PROTECTed by its
+    # contributions, so CASCADE only ever reaches un-locked snapshots.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.CASCADE, related_name='role_rates',
+    )
+    role = models.ForeignKey(
+        'accounts.Role', on_delete=models.PROTECT, related_name='+',
+    )
+    rate = models.DecimalField(max_digits=10, decimal_places=4)
+    # Set in the transaction of this (stage_record, role)'s FIRST task completion.
+    # Non-null ⇒ immutable (edit_until_lock refuses).
+    locked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('stage_record', 'role')]
+        ordering = ['stage_record', 'role__name']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rate__gte=0),
+                name='prod_addastagerolerate_rate_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return f'AddaStageRoleRate sr={self.stage_record_id} role={self.role_id} rate={self.rate}'
+
+
+class RateCorrectionAudit(TimeStampedModel):
+    """Append-only financial audit of a super-admin re-rate (S1.1, owner 2026-06-14).
+
+    A rate correction is a FINANCIAL event — it must survive log rotation and be
+    queryable (e.g. all re-rates in the soak window, Σ delta). So it gets its own
+    typed, immutable row rather than a free-text AddaHistory note. Written ONLY by
+    stage_rate_service.rerate_stage_role, in the same transaction as the recalc, so
+    audit and money move together. `reason` is mandatory (service enforces non-empty).
+    """
+    # PROTECT everywhere — a financial audit must never be cascaded away.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='rate_corrections',
+    )
+    role = models.ForeignKey('accounts.Role', on_delete=models.PROTECT, related_name='+')
+    old_rate = models.DecimalField(max_digits=10, decimal_places=4)
+    new_rate = models.DecimalField(max_digits=10, decimal_places=4)
+    # How many completed-but-unsettled contributions were re-priced by this action.
+    recalc_count = models.PositiveIntegerField(default=0)
+    reason = models.TextField()
+    actor = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(old_rate__gte=0) & models.Q(new_rate__gte=0),
+                name='prod_ratecorrection_rates_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return (f'RateCorrection sr={self.stage_record_id} role={self.role_id} '
+                f'{self.old_rate}->{self.new_rate} by={self.actor_id}')
+
+
+class StagePoolSnapshot(TimeStampedModel):
+    """Frozen per-(colour,size) good a DOWNSTREAM pool-producing stage makes available
+    to allocate (Foundation S4 / D2-D3, Option B).
+
+    Owner-locked 2026-06-14: CUTTING does NOT get a row — its pool good is
+    `AddaProductSizeColorPieceBreakdown` (the single source of truth, C1/B), never
+    duplicated here. This table exists ONLY for downstream pool-producing stages that
+    lack an equivalent frozen artifact (e.g. a future stitching stage that self-reports).
+    The pool SOURCE is handler-dispatched (`handler.pool_good`); this model is the base
+    handler's source.
+
+    Immutable: `good` is materialized write-once at the producing stage's complete
+    (`handler.materialize_pool` → `pool_service`); reopen clears + refreezes. Only `good`
+    is stored — `available` (= good + recovered − Σ non-voided allocations) is DERIVED at
+    draw-down under the D2 advisory lock. `created_at` (TimeStampedModel) = materialized-at.
+    """
+    # CASCADE: a pool snapshot is meaningless without its stage record.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.CASCADE, related_name='pool_snapshots',
+    )
+    # Grain dims (NULL for a QUANTITY-grain stage). PROTECT mirrors WorkerStageContribution.
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    good = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        unique_together = [('stage_record', 'color', 'size')]
+        ordering = ['stage_record', 'color', 'size']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(good__gte=0),
+                name='prod_stagepoolsnapshot_good_nonneg',
+            ),
+        ]
+
+    def __str__(self):
+        return f'pool sr={self.stage_record_id} c={self.color_id} s={self.size_id} good={self.good}'
+
+
+class WorkerStageAllocation(TimeStampedModel):
+    """A worker's allocated slice of a CONSUMING stage's available upstream pool
+    (Foundation S4 / Phase 3, addendum C2 — Option B).
+
+    PRODUCTION-TRUTH ONLY — capacity/quantity control. It carries NO money: no rate, no
+    earning, no ledger, no settlement FK. Money lives solely at settlement
+    (`StageWorkAssignment`, born at finalize, = good × frozen rate); this model never
+    influences earning/rate/settlement/costing math (see allocation_service decoupling
+    note + the `WorkerStageAllocation`-has-no-money test). Distinct from the settlement
+    earning line `StageWorkAssignment`.
+
+    Born when management allocates work (pre-work); draws down the upstream pool
+    (`allocation_service.allocate`, under the D2 advisory lock). Append-only: corrected by
+    `voided_at` (never deleted — owner data-history rule); voiding returns the qty to the
+    pool's derived `available`. `stage_record` = the CONSUMING stage; the pool SOURCE is
+    resolved upstream by the service. `color`/`size` NULL for a QUANTITY-grain stage.
+    """
+    # PROTECT: an allocation is production history — never orphaned/lost.
+    stage_record = models.ForeignKey(
+        'production.AddaStageRecord', on_delete=models.PROTECT, related_name='worker_allocations',
+    )
+    worker = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+    color = models.ForeignKey(
+        'raw_materials.ClothColor', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    size = models.ForeignKey(
+        'production.ProductSize', on_delete=models.PROTECT, null=True, blank=True, related_name='+',
+    )
+    allocated_quantity = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # AE-1 (owner-approved bundle model 2026-07-20): the manager's INTENT at
+    # allocation time. WHOLE = "assign the whole remaining bundle" (one click, no
+    # qty typed); PARTIAL = "assign N pieces" (explicit exception). Stored (not
+    # derived) for audit/analytics/debugging — the numbers stay authoritative from
+    # `allocated_quantity`. Default PARTIAL so pre-AE-1 rows read truthfully (they
+    # were typed quantity slices). TextChoices = DB string + human label.
+    class Mode(models.TextChoices):
+        WHOLE = 'whole', 'Whole bundle'
+        PARTIAL = 'partial', 'Partial'
+    allocation_mode = models.CharField(
+        max_length=8, choices=Mode.choices, default=Mode.PARTIAL)
+
+    created_by = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='+')
+    # Set = voided (correction); never deleted. Voided rows leave the `available` sum.
+    voided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['stage_record', 'worker', 'pk']
+        indexes = [models.Index(fields=['stage_record', 'worker'])]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(allocated_quantity__gt=0),
+                name='prod_workerstageallocation_qty_positive',
+            ),
+        ]
+
+    def __str__(self):
+        v = ' voided' if self.voided_at else ''
+        return f'alloc sr={self.stage_record_id} w={self.worker_id} qty={self.allocated_quantity}{v}'

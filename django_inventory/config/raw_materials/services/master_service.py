@@ -15,13 +15,18 @@ from django.db import transaction
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.db.models import ProtectedError
 
-from accounts.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, user_has_role
 
 
 def _ensure_can_manage(user):
-    """Production roles (super_admin/manager/worker) check — service-side gate."""
-    if not user_has_role(user, PRODUCTION_ROLES):
-        raise PermissionDenied("requires production role")
+    """Management (super_admin/manager) check — service-side gate.
+
+    Phase-E cert (2026-07-12): was PRODUCTION_ROLES — the name-trap let any
+    worker archive/restore/hard-delete master data (same class as M9/BUG-1).
+    Masters shape stock truth; the floor never manages them.
+    """
+    if not user_has_role(user, MANAGEMENT_ROLES):
+        raise PermissionDenied("Only management can modify master data.")
 
 
 @transaction.atomic

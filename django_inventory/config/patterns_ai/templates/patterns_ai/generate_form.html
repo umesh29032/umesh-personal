@@ -1,0 +1,107 @@
+{% extends "accounts/base.html" %}
+{# P3 — marker generation: ratio + width + constraints -> engines run synchronously #}
+{% block page_title %}Generate Layout{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-gen .ratio-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); gap:8px; }
+  .pai-gen .ratio-grid label { font-size:13px; }
+  .pai-gen .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .pai-gen .grid2 { grid-template-columns:1fr; } }
+  .pai-gen .note { background:#fdf7e7; border:1px solid #eadfc0; border-radius:10px;
+    padding:10px 12px; font-size:13px; margin:10px 0; }
+  /* §3b readiness matrix (shared partial) */
+  .pai-gen .rm-table { border-collapse:collapse; font-size:13px; min-width:420px; }
+  .pai-gen .rm-table th, .pai-gen .rm-table td { padding:7px 9px;
+    border-bottom:1px solid var(--border-subtle); text-align:center; }
+  .pai-gen .rm-table th { font-size:10px; text-transform:uppercase;
+    letter-spacing:0.06em; color:var(--stone); }
+  .pai-gen .rm-piece { text-align:left; font-weight:600; white-space:nowrap; }
+  .pai-gen .rm-ok { color:#20603c; background:#eef7f0; }
+  .pai-gen .rm-draft { color:#a26a00; background:#fdf6e3; }
+  .pai-gen .rm-missing { color:#b91c1c; background:#fdeeee; }
+  .pai-gen .rm-opt, .pai-gen .rm-fold { margin-left:6px; font-size:10px;
+    padding:1px 7px; border-radius:999px; background:#eee; color:#555;
+    text-transform:uppercase; letter-spacing:0.05em; }
+  .pai-gen .rm-fold { background:#fdeeee; color:#b91c1c; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-gen">
+  <div class="page-header">
+    <h1>Generate Layout</h1>
+    <p class="subtitle">Layouts are built from your CONFIRMED geometry
+    only, and every option is independently checked before you see it.
+    You choose what to use.</p>
+  </div>
+
+  <form method="get" style="margin-bottom:12px;">
+    <select name="product" onchange="this.form.submit()">
+      <option value="">— pick product —</option>
+      {% for p in all_products %}
+        <option value="{{ p.pk }}" {% if product and p.pk == product.pk %}selected{% endif %}>
+          {{ p.code }} · {{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if product %}
+  {# §3b/§2d Rule L: readiness visible BEFORE Generate (refusal stays the backstop) #}
+  {% if hub and hub.rows %}
+  <div class="card" style="padding:14px 16px; margin-bottom:12px; max-width:640px;">
+    <strong style="font-size:13px;">Readiness — pieces × sizes</strong>
+    {% if not hub.ready %}<span style="font-size:12px; color:#a26a00;"> · incomplete — see the <a href="{% url 'patterns_ai:piece-list' %}?product={{ product.pk }}">Pattern Design Hub</a></span>{% endif %}
+    <div style="margin-top:8px;">{% include 'patterns_ai/_readiness_matrix.html' %}</div>
+  </div>
+  {% endif %}
+  <form method="post" class="card" style="padding:20px; max-width:640px;">
+    {% csrf_token %}
+    <input type="hidden" name="product" value="{{ product.pk }}">
+    <h2>1 · Ratio (garments per marker)</h2>
+    <div class="ratio-grid">
+      {% for s in sizes %}
+        <label>{{ s.label }}
+          <input type="text" inputmode="numeric" name="count_{{ s.pk }}" placeholder="0"></label>
+      {% empty %}<p class="muted">no sizes on this product</p>{% endfor %}
+    </div>
+    <h2 style="margin-top:16px;">2 · Fabric & constraints</h2>
+    <div class="grid2">
+      {# Rule G (§2c): fabric-profile DEFAULTS prefill here (new work only) — always editable #}
+      <div class="field"><label>Usable width (mm)</label>
+        <input type="text" inputmode="numeric" name="usable_width_mm" required placeholder="e.g. 900" value="{{ prefill_width|default:'' }}"></div>
+      <div class="field"><label>Piece spacing (mm)</label>
+        <input type="text" inputmode="decimal" name="spacing_mm" value="{{ prefill_spacing|default:'3' }}"></div>
+    </div>
+    <div class="field"><label>Method</label>
+      <select name="engine">
+        <option value="auto">Auto (recommended)</option>
+        <option value="svgnest">Thorough</option>
+        <option value="blf">Quick</option>
+      </select></div>
+    <div class="note">Grain runs along the lay (pieces rotate 0/180° only) ·
+      mirrored pairs handled automatically · on-fold pieces refuse honestly
+      (annotation era) · generation takes up to ~20&nbsp;s.</div>
+    <button type="submit" class="btn btn-primary">Generate layout options</button>
+  </form>
+
+  <div class="card" style="padding:20px; margin-top:16px;">
+    <h2>Recent runs (append-only)</h2>
+    {% if runs %}
+    <div class="table-responsive"><table>
+      <thead><tr><th>#</th><th>Width</th><th>Options</th><th>When</th><th></th></tr></thead>
+      <tbody>
+      {% for r in runs %}
+        <tr>
+          <td data-label="#">{{ r.pk }}</td>
+          <td data-label="Width">{{ r.usable_width_mm }} mm</td>
+          <td data-label="Options">{{ r.candidates.count }}</td>
+          <td data-label="When">{{ r.created_at|date:"Y-m-d H:i" }}</td>
+          <td data-label=""><a class="btn" href="{% url 'patterns_ai:generation-run' r.pk %}">open →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="muted">No runs yet for this product.</p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

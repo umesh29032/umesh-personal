@@ -41,10 +41,10 @@
         </div>
     </div>
 
-    {# Show ALL validation errors (field + non-field). Without this, a rejected
-       password / email silently re-renders with no feedback (looks "broken"). #}
+    {% comment %}Show ALL validation errors (field + non-field). Without this, a rejected
+       password / email silently re-renders with no feedback (looks "broken").{% endcomment %}
     {% if form.errors %}
-        <div class="form-alert form-alert-error">
+        <div class="form-error">
             <strong>Could not save — please fix:</strong>
             <ul style="margin:6px 0 0; padding-left:18px;">
                 {% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}
@@ -116,12 +116,13 @@
                         <div class="field-grid-2">
                             <div class="field">
                                 <label for="id_birth_date">Birth Date</label>
-                                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date">
+                                {# data-fancy-date → custom body-anchored calendar (native date popup mispositions under transformed ancestors + only its icon is clickable on desktop). placeholder shows on the trigger when empty. #}
+                                <input type="date" name="birth_date" value="{{ object.birth_date|date:'Y-m-d' }}" id="id_birth_date" data-fancy-date placeholder="Select birth date">
                             </div>
                             <div class="field">
                                 <label for="id_new_password">Reset Password</label>
                                 <input type="password" name="new_password" id="id_new_password" placeholder="Leave blank to keep current">
-                                {% if form.new_password.errors %}<small class="form-alert form-alert-error" style="display:block;margin-top:6px;">{{ form.new_password.errors|join:" " }}</small>{% endif %}
+                                {% if form.new_password.errors %}<small class="field-error" style="display:block;margin-top:6px;">{{ form.new_password.errors|join:" " }}</small>{% endif %}
                                 <small>Only fill to issue a new password.</small>
                             </div>
                         </div>
@@ -256,8 +257,8 @@
 
         {# Sticky action bar #}
         <div class="sticky-actions">
-            <a href="{% url 'accounts:user_list' %}" class="btn-ghost">Cancel</a>
-            <button type="submit" class="btn-copper">Save Changes</button>
+            <a href="{% url 'accounts:user_list' %}" class="btn btn-ghost btn-lg">Cancel</a>
+            <button type="submit" class="btn btn-copper btn-lg">Save Changes</button>
         </div>
     </form>
 </div>
@@ -278,5 +279,6 @@ document.querySelectorAll('.chip-pick input').forEach(cb => {
 
 <style>
 {% include 'accounts/_user_form_styles.html' %}
+{% include 'shared/_form_styles.html' %}{# F-3: canonical .field-error / .form-error #}
 </style>
 {% endblock %}

@@ -1,3 +1,13 @@
+---
+id: docs-requirement-review-stage-tracking
+type: truth-lock
+status: active
+owner: frozen
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Requirement Review — Stage Reporting, Tracking Mode, and Settlement Truth
 
 Status: 🔒 LOCKED 2026-06-11 (owner-accepted; decisions in §9). No implementation yet.

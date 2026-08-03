@@ -1,3 +1,13 @@
+---
+id: l2-chokepoints-adda-settlement-service
+type: chokepoint
+status: active
+owner: handwritten
+scope: adda_settlement_service (chokepoint)
+anchors: config/expense/services/adda_settlement_service.py
+verified: 2026-07-13
+---
+
 # Chokepoint: adda_settlement_service (THE money event)
 
 > **CANONICAL** for the settlement lifecycle + lock order (binding spec:
@@ -18,14 +28,24 @@ debits; stamps `WSC.settlement_line` (provenance). CI gates **[4b/4]** (ADST)
 **Who can call:** management settlement UI only (`_ensure_management`).
 
 **Key functions:** `create_draft` (recomputable scratchpad, no money) ·
-`finalize_adda_settlement` (THE write) · `reverse_adda_settlement`
+`finalize_adda_settlement` (THE write; **R7 `only_worker=` — F&F leaver-scoped
+filter on the funnel OUTPUT, guards untouched; partial settlements are legal
+§11.8, and the resulting mixed settled/unsettled-lines-on-one-SR state was
+verified safe 2026-07-05: line-granular consumers, conservative reopen-armor
+and per-(SR,role) rate lock until reverse**) · `reverse_adda_settlement`
 (compensating rows + supersede chain) · `settlement_queue`/`preview_lines`/
 `discard_draft`.
 
 **Invariants protected:** a contribution line is paid AT MOST ONCE (era-A +
-era-B skip guards, both directions) · full provenance loop item↔SWA↔ledger↔WSC
-· **lock ORDER** advisory 5374 → ADST → stage records → profiles → advances
-(deadlock-safe) · recovery ≤ remaining · frozen snapshots never recomputed.
+era-B skip guards, both directions) · **R4 (PDD §27-D4): a MONTHLY worker's
+lines are structurally excluded at `_settleable_lines` (4th skip class
+`skip_monthly`, one funnel = preview/queue/finalize; basis read at settlement
+time; `set_pay_basis` joins advisory 5374 so a basis flip can't race
+finalize)** · full provenance loop item↔SWA↔ledger↔WSC
+· **lock ORDER** advisory 5374 → ADST → stage records → **WSC rows (PA-11-3: `verified_quantity` lives here, not on AddaStageRecord — locked `of=self` so a racing `set_verified_quantity` can't lost-update the settled qty)** → profiles → advances
+(deadlock-safe) · recovery ≤ remaining · frozen snapshots never recomputed ·
+**PA-11-2: the grouped→0 `effective_pay_rate` guard is applied at the preview surfaces
+(`settlement_queue` + `_line_dict`) too, not just at finalize — preview == money-write.**
 
 **What breaks if bypassed:** double-pay, deadlocks, unauditable money, and the
 V2-3 holes (reopen/void touching settled lines — now guarded).
@@ -48,7 +68,7 @@ Traced from `config/expense/services/adda_settlement_service.py:finalize_adda_se
 
 **Transaction boundary + lock order (verified,:**
 ```
-@transaction.atomic pg_advisory_xact_lock(5374) # global settlement lock AddaSettlement.select_for_update # this ADST row AddaStageRecord.select_for_update # freeze quantities (race guard) WorkerProfile.select_for_update # per settled worker WorkerAdvance.select_for_update # advances
+@transaction.atomic pg_advisory_xact_lock(5374) # global settlement lock AddaSettlement.select_for_update # this ADST row AddaStageRecord.select_for_update # freeze stage records WorkerStageContribution.select_for_update(of=self) # PA-11-3: freeze verified_quantity (the settled qty lives HERE) WorkerProfile.select_for_update # per settled worker WorkerAdvance.select_for_update # advances
 ```
 
 **Models touched, in order (verified:**

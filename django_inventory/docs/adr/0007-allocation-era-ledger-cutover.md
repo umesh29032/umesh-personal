@@ -1,3 +1,13 @@
+---
+id: docs-adr-0007-allocation-era-ledger-cutover
+type: adr
+status: active
+owner: frozen
+scope: architecture
+anchors: —
+verified: 2026-07-18
+---
+
 # ADR 0007 — Allocation-Era Ledger Cutover for Adda-Centric Settlement (V2-2)
 
 **Status: ✅ ACCEPTED 2026-06-10 — owner selected Option A (Coexist).**

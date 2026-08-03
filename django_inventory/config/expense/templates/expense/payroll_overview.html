@@ -1,4 +1,5 @@
 {% extends "accounts/base.html" %}
+{% load finance %}
 
 {% block page_title %}Payroll Overview{% endblock %}
 
@@ -10,7 +11,8 @@
     .payroll-overview .hero-strip .total .l { font-size: 11px; opacity: .9; text-transform: uppercase; }
     .payroll-overview .actions { display: flex; gap: 8px; margin-bottom: 16px; }
     .payroll-overview .actions a { background: var(--copper); color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; }
-    .payroll-overview .card { background: var(--card-bg); border: 1px solid var(--border-card); border-radius: 14px; box-shadow: var(--shadow-card); padding: 4px 0; }
+    /* D-1: chrome inherited from canonical .card (base.html); page keeps only the table-bleed padding */
+    .payroll-overview .card { padding: 4px 0; }
     .payroll-overview table { width: 100%; border-collapse: collapse; }
     .payroll-overview th, .payroll-overview td { text-align: left; padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border-subtle); }
     .payroll-overview th { font-size: 11px; text-transform: uppercase; color: var(--stone); letter-spacing: .04em; }
@@ -34,7 +36,7 @@
     <div class="hero-strip copper">
         <h1>Payroll Overview</h1>
         <div class="total">
-            <div class="v">₹{{ total_payable|floatformat:2 }}</div>
+            <div class="v">{% money total_payable %}</div>
             <div class="l">Total Pending Payable</div>
         </div>
     </div>
@@ -64,15 +66,21 @@
                             <a class="worker" href="{% url 'expense:worker-detail' w.worker.pk %}">
                                 {{ w.worker.get_full_name|default:w.worker.email }}
                             </a>
+                            {% if w.is_monthly %}<span class="badge badge-monthly"><span class="badge-dot"></span>Monthly</span>{% endif %}
                         </td>
                         <td data-label="Role">{{ w.role.name|default:"—" }}</td>
                         <td class="num" data-label="Pieces">{{ w.pieces|floatformat:0 }}</td>
-                        <td class="num" data-label="Earned">₹{{ w.total_earnings|floatformat:2 }}</td>
-                        <td class="num" data-label="Advance Out">₹{{ w.advance_outstanding|floatformat:2 }}</td>
-                        <td class="num" data-label="Settled">₹{{ w.total_settled|floatformat:2 }}</td>
-                        <td class="num payable" data-label="Payable">₹{{ w.payable|floatformat:2 }}</td>
+                        <td class="num" data-label="Earned">{% money w.total_earnings %}</td>
+                        <td class="num" data-label="Advance Out">{% money w.advance_outstanding %}</td>
+                        <td class="num" data-label="Settled">{% money w.total_settled %}</td>
+                        <td class="num payable" data-label="Payable">{% money w.payable %}</td>
                         <td class="num" data-label="">
+                            {% if w.is_monthly %}
+                            {# ADR-0011: monthly pay never flows through settlement #}
+                            <a class="worker" href="{% url 'expense:factory-expense-add' %}">Salary →</a>
+                            {% else %}
                             <a class="worker" href="{% url 'expense:settlement-create' w.worker.pk %}">Settle</a>
+                            {% endif %}
                         </td>
                     </tr>
                 {% empty %}

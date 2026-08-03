@@ -7,6 +7,14 @@
     <style>
         /* Standalone print template — does NOT extend accounts/base.html. */
         @page { size: A4; margin: 6mm; }
+        /* tokens for the shared _fancy_controls.html (this doc has no design-token :root) */
+        :root{
+            --ink:#1c1c1e; --ink-2:#1c1814; --stone:#6e6259;
+            --cream:#faf7f2; --cream-2:#f1ece2; --cream-3:#e2d5c3;
+            --copper:#b87333; --copper-l:#d4924a; --copper-d:#8a5520;
+            --surface-2:#f5f1ea; --card-bg:#fff; --border-card:#cfc0aa; --border-subtle:#e6dcc9;
+            --danger:#b91c1c; --white:#fff; --text-primary:var(--ink); --text-tertiary:var(--stone);
+        }
         *, *::before, *::after { box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
@@ -155,5 +163,7 @@
     </div>
 </div>
 
+{# Canonical FancySelect/FancyDate — toolbar selects are screen-only (hidden in @media print); native popups misposition on mobile, custom dropdown positions correctly. #}
+{% include 'accounts/_fancy_controls.html' %}
 </body>
 </html>

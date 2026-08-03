@@ -60,6 +60,14 @@ def _admin(email):
     return u
 
 
+def _user_with_role(email, role_code):
+    """Plain user carrying a seeded Role — for V1.1 Item 3 permission tests."""
+    u = User.objects.create_user(email=email, password='x')
+    u.role = Role.objects.get(code=role_code)
+    u.save()
+    return u
+
+
 class _ExportFixture(TestCase):
     """Adda with barcode_generation stage COMPLETED + 20 barcodes ready."""
 
@@ -148,6 +156,8 @@ class _ExportFixture(TestCase):
             adda=self.adda, size_id=self.s_m.id, color_id=self.red.id,
             pattern_id=self.front.id, count=20, user=self.admin,
         )
+        # GAP-5: completion (the join) first; bundling follows post-join.
+        complete_cutting(adda=self.adda, user=self.admin)
         bundle = create_bundle(
             adda=self.adda, size_id=self.s_m.id, user=self.admin,
         )
@@ -156,7 +166,6 @@ class _ExportFixture(TestCase):
             selections=[{'breakup_id': b.id, 'take_count': 20}],
             user=self.admin,
         )
-        complete_cutting(adda=self.adda, user=self.admin)
         self.adda.refresh_from_db()
 
 
@@ -254,7 +263,7 @@ class ReDownloadTests(_PostCompleteFixture):
 
     def test_redownload_returns_equivalent_bytes(self):
         batch, original = generate_csv(self.adda, self.admin)
-        regenerated = regenerate_for_export(batch)
+        regenerated = regenerate_for_export(batch, self.admin)
         # Both reference live data; barcodes unchanged → equal content
         self.assertEqual(original, regenerated)
 
@@ -313,3 +322,115 @@ class ViewIntegrationTests(_PostCompleteFixture):
             reverse('tracking:export-csv', args=[self.adda.code]),
         )
         self.assertEqual(resp.status_code, 400)
+
+
+class ExportPermissionTests(_PostCompleteFixture):
+    """V1.1 Item 3 (2026-07-12): exports = MANAGEMENT_ROLES only.
+
+    Browser-proven HIGH: worker could GET /tracking/exports/ + POST CSV.
+    Root cause: PRODUCTION_ROLES gate (includes worker) — now
+    ManagerOrAdminMixin on every export view + service backstop.
+    Barcode list/print/scan gates UNTOUCHED (workers legitimately scan).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.worker = _user_with_role(f'w{id(self)}@perm.test', 'worker')
+        self.manager = _user_with_role(f'm{id(self)}@perm.test', 'manager')
+        self.client = Client()
+
+    # ── Worker: every export entry point → 403 ────────────────────────────
+
+    def test_worker_export_list_403(self):
+        self.client.force_login(self.worker)
+        resp = self.client.get(reverse('tracking:export-list'))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_worker_export_triggers_403(self):
+        self.client.force_login(self.worker)
+        for name in ('export-csv', 'export-xlsx', 'export-pdf'):
+            resp = self.client.post(
+                reverse(f'tracking:{name}', args=[self.adda.code]),
+            )
+            self.assertEqual(resp.status_code, 403, name)
+        # No manifest row was written by any refused trigger.
+        from tracking.models import BarcodeExportBatch
+        self.assertEqual(BarcodeExportBatch.objects.count(), 0)
+
+    def test_worker_redownload_403(self):
+        batch, _ = generate_csv(self.adda, self.admin)
+        self.client.force_login(self.worker)
+        resp = self.client.get(
+            reverse('tracking:export-download', args=[batch.export_code]),
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_worker_quick_csv_403(self):
+        # Legacy no-manifest CSV (tracking:barcode-export) — same bug class.
+        self.client.force_login(self.worker)
+        resp = self.client.get(
+            reverse('tracking:barcode-export', args=[self.adda.code]),
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    # ── Service backstop (defense-in-depth) ───────────────────────────────
+
+    def test_service_refuses_worker_directly(self):
+        from django.core.exceptions import PermissionDenied
+        for fn in (generate_csv, generate_xlsx, generate_pdf_summary):
+            with self.assertRaises(PermissionDenied):
+                fn(self.adda, self.worker)
+        batch, _ = generate_csv(self.adda, self.admin)
+        with self.assertRaises(PermissionDenied):
+            regenerate_for_export(batch, self.worker)
+
+    # ── Manager: everything still works ───────────────────────────────────
+
+    def test_manager_export_list_200(self):
+        self.client.force_login(self.manager)
+        resp = self.client.get(reverse('tracking:export-list'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_manager_csv_export_200(self):
+        self.client.force_login(self.manager)
+        resp = self.client.post(
+            reverse('tracking:export-csv', args=[self.adda.code]),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('attachment', resp['Content-Disposition'])
+
+    def test_manager_quick_csv_200(self):
+        self.client.force_login(self.manager)
+        resp = self.client.get(
+            reverse('tracking:barcode-export', args=[self.adda.code]),
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'text/csv; charset=utf-8')
+
+
+class FormulaInjectionTests(_PostCompleteFixture):
+    """PA-13-6: free-text color/size labels must not become live spreadsheet
+    formulas when the CSV/XLSX manifest is opened in Excel/LibreOffice."""
+
+    def test_csv_safe_neutralizes_formula_triggers(self):
+        from production.stages.barcode_generation.export_service import _csv_safe
+        for bad in ('=HYPERLINK("http://evil","x")', '+1+1', '-2', '@SUM(A1)',
+                    '\tred', '\rred'):
+            self.assertEqual(_csv_safe(bad), "'" + bad)
+        # Safe values untouched.
+        self.assertEqual(_csv_safe('Red'), 'Red')
+        self.assertEqual(_csv_safe('CR-000001'), 'CR-000001')
+        self.assertEqual(_csv_safe(42), 42)
+
+    def test_csv_export_neutralizes_malicious_color_name(self):
+        from raw_materials.models import ClothColor
+        from production.stages.barcode_generation.export_service import _render_csv_bytes
+        # Rename a color used by this Adda's barcodes to a formula payload.
+        c = ClothColor.objects.filter(rolls__adda=self.adda).first() or ClothColor.objects.first()
+        c.name = '=cmd|calc'
+        c.save(update_fields=['name'])
+        text = _render_csv_bytes(self.adda).decode('utf-8')
+        # The raw formula must NOT appear as a cell start; the neutralized form does.
+        self.assertNotIn(',=cmd|calc', text)
+        if 'cmd|calc' in text:
+            self.assertIn("'=cmd|calc", text)

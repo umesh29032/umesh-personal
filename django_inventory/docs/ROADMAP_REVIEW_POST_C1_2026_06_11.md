@@ -1,3 +1,13 @@
+---
+id: docs-roadmap-review-post-c1-2026-06-11
+type: receipt
+status: active
+owner: append-only
+scope: project
+anchors: —
+verified: 2026-07-18
+---
+
 # Roadmap Execution Review — post V2-3 + C-1, pre-deployment (2026-06-11)
 
 Owner-requested roadmap-level review. No design, no implementation. Inputs:

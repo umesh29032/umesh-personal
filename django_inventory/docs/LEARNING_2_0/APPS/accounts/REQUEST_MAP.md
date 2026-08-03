@@ -1,3 +1,13 @@
+---
+id: l2-apps-accounts-request-map
+type: topic-canonical
+status: active
+owner: handwritten
+scope: accounts
+anchors: config/accounts/
+verified: 2026-07-13
+---
+
 # accounts — REQUEST_MAP (`/app/`)
 
 ## TL;DR (1 min)

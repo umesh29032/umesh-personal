@@ -1,3 +1,13 @@
+---
+id: learning-05-production-truth
+type: lesson
+status: active
+owner: handwritten
+scope: learning — generic concept
+anchors: —
+verified: 2026-07-13
+---
+
 # Production truth — "kitna kaam hua" ka permanent sach
 
 ## The two tables

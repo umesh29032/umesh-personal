@@ -14,21 +14,17 @@ karna padta hai:
                               parses + finds batch + lazy creates piece row.
 """
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from accounts.services import PRODUCTION_ROLES, user_has_role
+from accounts.services import MANAGEMENT_ROLES, PRODUCTION_ROLES, user_has_role
+from inventory.views.mixins import ProductionRoleMixin as _ProductionRoleMixin
 from production.models import Adda
 from tracking.models import BatchBarcode
 from tracking.services import get_or_create_piece, qr_data_uri, resolve_value
-
-
-class _ProductionRoleMixin(UserPassesTestMixin):
-    def test_func(self):
-        return user_has_role(self.request.user, PRODUCTION_ROLES)
 
 
 def _expand_batches_to_pieces(batches, limit: int | None = None):
@@ -88,6 +84,9 @@ class BarcodeListForAddaView(LoginRequiredMixin, _ProductionRoleMixin, TemplateV
         ctx['total_pieces'] = sum(b.total_pieces for b in batches)
         # Scanned count — how many pieces have BatchBarcode rows.
         ctx['scanned_count'] = BatchBarcode.objects.filter(adda=adda).count()
+        # V1.1 Item 3: template hides export buttons for non-management
+        # (list/print/scan stay PRODUCTION_ROLES — workers legitimately scan).
+        ctx['is_management'] = user_has_role(self.request.user, MANAGEMENT_ROLES)
         return ctx
 
 
@@ -191,3 +190,29 @@ def scan_piece(request, value):
     bc.last_scanned_by = request.user
     bc.save(update_fields=['last_scanned_at', 'last_scanned_by'])
     return render(request, 'tracking/scan_detail.html', {'barcode': bc, 'batch': batch})
+
+@login_required
+@transaction.atomic
+def update_piece_status(request, value):
+    """One-tap status update from the scan page (Module 8, 2026-07-11).
+    Thin wire to the EXISTING single-writer tracking service —
+    mark_status owns validation, gating semantics mirror scan_piece
+    (production staff only; a status write is an audit act)."""
+    if request.method != 'POST':
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(['POST'])
+    if not user_has_role(request.user, PRODUCTION_ROLES):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("Scanning is restricted to production staff.")
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from django.shortcuts import redirect
+    from tracking.services import mark_status
+    try:
+        piece = mark_status(request.user, value,
+                            request.POST.get('status', ''))
+        messages.success(request,
+                         f'{piece.value} → {piece.get_status_display()}')
+    except ValidationError as exc:
+        messages.error(request, '; '.join(getattr(exc, 'messages', [str(exc)])))
+    return redirect('tracking:scan', value=value)

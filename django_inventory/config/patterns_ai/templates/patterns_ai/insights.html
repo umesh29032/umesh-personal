@@ -1,0 +1,129 @@
+{% extends "accounts/base.html" %}
+{# P5 — executive dashboard: every number derived at read, explainable to fact rows #}
+{% block page_title %}Pattern Intelligence — Insights{% endblock %}
+{% block extra_head %}
+<style>
+  .pai-ins .kpis { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px; margin:12px 0; }
+  .pai-ins .kpi { background:#fff; border:var(--border-card,1px solid #e5e0d5); border-radius:12px; padding:12px; text-align:center; }
+  .pai-ins .kpi strong { display:block; font-size:22px; }
+  .pai-ins .kpi span { font-size:12px; color:#666; }
+  .pai-ins .panel { background:#fff; border:var(--border-card,1px solid #e5e0d5); border-radius:12px; padding:16px; margin:12px 0; }
+  .pai-ins .save-pot { color:#20603c; font-weight:600; }
+  .pai-ins .theory { color:#7a5c10; font-size:12px; font-weight:600; }
+  .pai-ins .bar { background:#e8e2d4; border-radius:6px; height:14px; position:relative; }
+  .pai-ins .bar > i { position:absolute; left:0; top:0; bottom:0; background:#2e6e4e; border-radius:6px; }
+  .pai-ins .trend-row { display:grid; grid-template-columns:70px 1fr 40px; gap:8px; align-items:center; margin:4px 0; font-size:13px; }
+  .pai-ins .footer-honesty { font-size:12px; color:#777; margin-top:14px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pai-ins">
+  <div class="page-header">
+    <h1>Insights</h1>
+    <p class="subtitle">Factory-level view of the pattern knowledge base —
+    derived live from immutable facts; nothing here is stored or estimated
+    beyond what the rows prove.</p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><strong>{{ dash.kpis.markers_total }}</strong><span>markers ({{ dash.kpis.markers_generated }} generated)</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.outcomes }}</strong><span>recorded outcomes</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.usages }}</strong><span>active usages</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.geometry_rows }}</strong><span>geometry rows
+      (M {{ dash.kpis.trust_grades.measured }} · P {{ dash.kpis.trust_grades.photo_calibrated }} · U {{ dash.kpis.trust_grades.uncalibrated }})</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.captures }}</strong><span>captures</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.mats_active }}</strong><span>active mats</span></div>
+    <div class="kpi"><strong>{{ dash.kpis.generation_runs }}</strong><span>generation runs · {{ dash.kpis.candidates }} candidates</span></div>
+    <div class="kpi"><strong>{% if dash.suggestions.acceptance_rate_pct %}{{ dash.suggestions.acceptance_rate_pct }}%{% else %}—{% endif %}</strong>
+      <span>suggestion acceptance ({{ dash.suggestions.decided }} decided)</span></div>
+  </div>
+
+  <div class="panel">
+    <h2>Products — proven best vs current practice</h2>
+    <div class="table-responsive"><table>
+      <thead><tr><th>Product</th><th>Best proven</th><th>m/100 (n)</th>
+        <th>Practice</th><th>Potential saving</th><th>Untested</th><th></th></tr></thead>
+      <tbody>
+      {% for r in dash.products %}
+        <tr>
+          <td data-label="Product"><strong>{{ r.product.code }}</strong></td>
+          <td data-label="Best proven">{{ r.best_reference|default:"— none proven" }}</td>
+          <td data-label="m/100 (n)">{% if r.best_m_per_100 %}{{ r.best_m_per_100 }} (n={{ r.best_n }}){% else %}—{% endif %}</td>
+          <td data-label="Practice">{{ r.practice_reference|default:"—" }}</td>
+          <td data-label="Potential saving">
+            {% if r.saving %}
+              {% if r.saving.already_best %}already on best{% else %}
+                <span class="save-pot">{{ r.saving.delta_m_per_100 }} m/100 ({{ r.saving.pct }}%)</span>
+                <div class="theory">POTENTIAL — per 100 garments vs {{ r.saving.baseline_reference }}</div>
+              {% endif %}
+            {% else %}—{% endif %}</td>
+          <td data-label="Untested">{{ r.untested_count }}</td>
+          <td data-label=""><a class="btn" href="{% url 'patterns_ai:advisor' %}?product={{ r.product.pk }}">advise →</a></td>
+        </tr>
+      {% empty %}<tr><td colspan="7">No products with markers yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Manual vs Generated (proven reality only — theory never enters)</h2>
+    <div class="table-responsive"><table>
+      <thead><tr><th>Origin</th><th>Markers</th><th>With reality</th><th>Avg m/100</th></tr></thead>
+      <tbody>
+      {% for o in dash.origins %}
+        <tr>
+          <td data-label="Origin">{{ o.origin }}</td>
+          <td data-label="Markers">{{ o.markers }}</td>
+          <td data-label="With reality">{{ o.with_reality }}</td>
+          <td data-label="Avg m/100">{{ o.avg_m_per_100|default:"— (no facts yet)" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Suggestion spine — proposals vs decisions vs reality</h2>
+    <p>offered {{ dash.suggestions.counts.offered }} ·
+       accepted {{ dash.suggestions.counts.accepted }} ·
+       modified {{ dash.suggestions.counts.modified }} ·
+       rejected {{ dash.suggestions.counts.rejected }}</p>
+    {% if dash.suggestions.accepted_followups %}
+    <div class="table-responsive"><table>
+      <thead><tr><th>#</th><th>Product</th><th>Shown best</th><th>Shown m/100</th>
+        <th>Reality since decision</th></tr></thead>
+      <tbody>
+      {% for f in dash.suggestions.accepted_followups %}
+        <tr>
+          <td data-label="#">{{ f.event.pk }}</td>
+          <td data-label="Product">{{ f.event.product.code }}</td>
+          <td data-label="Shown best">{{ f.shown_reference|default:"—" }}</td>
+          <td data-label="Shown m/100">{{ f.shown_m_per_100|default:"—" }}</td>
+          <td data-label="Reality since">
+            {% if f.since %}{{ f.since.avg_m_per_100 }} m/100 (n={{ f.since.n }})
+            {% else %}— no outcomes yet since the decision{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% else %}<p class="muted">No accepted suggestions yet.</p>{% endif %}
+  </div>
+
+  <div class="panel">
+    <h2>Outcomes recorded (last 6 months)</h2>
+    {% for t in dash.trend %}
+      <div class="trend-row">
+        <span>{{ t.month }}</span>
+        <div class="bar"><i style="width:{{ t.bar_pct }}%;"></i></div>
+        <span>{{ t.count }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <p class="footer-honesty">Savings are POTENTIAL per 100 garments against
+  the factory's own most-used marker; averages carry honest n; "—" means
+  the facts don't exist yet, never a guess. Every figure re-derives from
+  append-only rows on each load.</p>
+</div>
+{% endblock %}
