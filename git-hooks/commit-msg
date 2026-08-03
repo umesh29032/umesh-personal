@@ -53,7 +53,19 @@ if ! printf '%s' "$SUBJECT" | grep -qE "$PATTERN"; then
 fi
 
 # Subject-line length. 72 keeps "git log --oneline" readable in a terminal.
-SUBJECT_LEN=${#SUBJECT}
+#
+# Count CHARACTERS, not bytes. `${#var}` in bash counts bytes when the hook runs
+# WITHOUT a UTF-8 locale — and hooks routinely do: GUI git clients, CI runners and
+# cron all strip the environment. Measured: the same 73-character subject containing
+# one em-dash reports 73 in an interactive shell and 75 under `env -i`, so a legal
+# subject would be rejected with a wrong number and no way to reconcile it against
+# what GitHub counts. python3 is used when present (this is a Django repo, so it
+# always is); otherwise force a UTF-8 locale and fall back.
+if command -v python3 >/dev/null 2>&1; then
+    SUBJECT_LEN=$(printf '%s' "$SUBJECT" | python3 -c 'import sys; print(len(sys.stdin.read()))')
+else
+    SUBJECT_LEN=$(LC_ALL=C.UTF-8 awk '{print length($0)}' <<< "$SUBJECT" 2>/dev/null || printf '%s' "${#SUBJECT}")
+fi
 if [ "$SUBJECT_LEN" -gt 72 ]; then
     red "✖ Subject line is $SUBJECT_LEN chars (max 72)."
     echo
