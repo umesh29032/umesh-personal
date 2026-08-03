@@ -12,8 +12,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import Role, Skill
-from production.models import (Adda, AddaStageRecord, CuttingStream,
-                               Product, Stage, StageCategory, WorkflowStage)
+from production.models import (Adda, AddaStageRecord, Product, Stage, StageCategory, WorkflowStage)
 from production.services import adda_service
 from production.services.adda_service import (advance_lane, create_adda,
                                               resolve_stream)
@@ -39,7 +38,7 @@ class _StreamsWorld(TestCase):
     def setUp(self):
         self.mgr = _mgr()
         self.product = Product.objects.create(code='STRM', name='Streams')
-        cat = StageCategory.objects.get(code='pre_production')
+        StageCategory.objects.get(code='pre_production')
         order = 0
         self.trio = {}
         for code in ('layering', 'cutting_pattern', 'cutting'):

@@ -16,7 +16,7 @@ from accounts.models import Role
 from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
 from patterns_ai.models import (ApprovedLayout, GeneratedMarkerCandidate,
-                                ManufacturingStrategy, MarkerGenerationRun)
+                                MarkerGenerationRun)
 from patterns_ai.services import layout_usage_service as usage_svc
 from patterns_ai.services import pattern_geometry_service as geo
 from patterns_ai.services import strategy_service

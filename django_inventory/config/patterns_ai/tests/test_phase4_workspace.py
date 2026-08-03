@@ -15,7 +15,7 @@ from accounts.models import Role
 from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
 from patterns_ai.models import (GeneratedMarkerCandidate,
-                                MarkerGenerationRun, PieceSizeGeometry)
+                                PieceSizeGeometry)
 from patterns_ai.services import compute_bridge
 from patterns_ai.services import marker_generation_service as gen
 from patterns_ai.services import pattern_geometry_service as geo

@@ -37,7 +37,7 @@ from production.models import (
     ProductPatternAssignment, ProductSize, Stage, WorkflowStage,
 )
 from production.services import (
-    add_bundle_item, add_item_to_bundle, add_pieces_to_bundle, complete_cutting,
+    add_item_to_bundle, add_pieces_to_bundle, complete_cutting,
     create_adda, create_bundle, create_bundle_with_pieces, delete_breakup_row,
     delete_bundle, delete_bundle_item, get_suggested_breakup,
     reopen_cutting, save_cutting_draft, start_cutting, upsert_breakup_row,

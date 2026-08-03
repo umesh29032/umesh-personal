@@ -80,7 +80,6 @@ from production.models import (
 )
 # Stage advancement helper — yeh function `adda.current_stage` ko next
 # WorkflowStage pe move karta hai (or completes Adda agar last stage).
-from production.services.adda_service import advance_to_next_stage
 from production.services._shared import downstream_started_guard, reopen_stage_record
 
 # Module logger — __name__ se per-module namespace milta hai (production.services.*)

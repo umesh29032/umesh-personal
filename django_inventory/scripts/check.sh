@@ -93,7 +93,10 @@ fi
 
 echo ""
 echo "──────────── REPORT-ONLY (never fails the gate) ────────────"
-echo "[ruff] full-repo legacy (changed code is enforced blocking by pre-commit):"
+# NOTE 2026-08-04: full-repo ruff is no longer "legacy debt" — it is at ZERO and is a
+# BLOCKING job in .github/workflows/ci.yml. Kept here for a fast local read; if this
+# line stops saying "All checks passed!", CI will fail. Fix the code, not the gate.
+echo "[ruff] full-repo (ZERO debt since 2026-08-04; BLOCKING in CI, not report-only):"
 echo "       $($PY/ruff check config 2>&1 | tail -1)"
 echo "[import-linter] full acyclic-layers progress (this list IS the M4 worklist):"
 ( cd config && ../$PY/lint-imports 2>&1 | grep -E 'Contracts:' | tail -1 | sed 's/^/       /' ) || true

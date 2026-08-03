@@ -160,7 +160,6 @@ class SkipTransparencyTests(TestCase):
         self.assertEqual(rep["envelope"]["skipped_categories"], ["smoke"])
 
     def test_write_report_preserves_certified_content(self):
-        import os
         with tempfile.TemporaryDirectory() as d:
             rep = build_report(command="verify_production", environment="prod",
                                results=make(n_pass=3))

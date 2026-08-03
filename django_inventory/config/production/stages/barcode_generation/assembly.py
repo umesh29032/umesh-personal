@@ -248,7 +248,7 @@ def append_uncovered_batches(adda):
     every cut piece already has an identity ("nothing new to cover").
     """
     from django.core.exceptions import ValidationError
-    from django.db.models import Max, Sum
+    from django.db.models import Max
     from production.models import AddaProductSizeColorPieceBreakdown
 
     covered = defaultdict(int)

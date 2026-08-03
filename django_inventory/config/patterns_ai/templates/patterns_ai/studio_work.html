@@ -1,9 +1,9 @@
 {% extends "accounts/base.html" %}
-{# M2 — PATTERN INTELLIGENCE STUDIO · WORK MODE (UI freeze §2.4/§2.5/§4).
+{% comment %} M2 — PATTERN INTELLIGENCE STUDIO · WORK MODE (UI freeze §2.4/§2.5/§4).
    One piece × size. Three panes: EVIDENCE STACK (left) · PROPOSAL
    CANVAS + COMPARE (center) · INSPECTOR (right). Desktop-first
    precision workspace (owner carve-out); phone owns only the capture
-   hand-off. Every write = parse → gate → single writer. #}
+   hand-off. Every write = parse → gate → single writer. {% endcomment %}
 {% block page_title %}{{ piece.pattern.name }} · {{ size.label }} · Studio{% endblock %}
 {% block extra_head %}
 <style>

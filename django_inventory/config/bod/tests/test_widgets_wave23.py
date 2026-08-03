@@ -3,7 +3,6 @@ roll_service, production extras == the G-4 extraction, workers tile == the
 distinct over pending_report_tasks, and Section 7 = navigation cards ONLY
 (owner taste ruling 2026-07-18: pure links, zero counts)."""
 
-from django.apps import apps
 from django.test import TestCase
 from django.urls import reverse
 

@@ -6,7 +6,6 @@ synth.py with KNOWN mm ground truth; the pipeline must measure them back
 within the ADR-E tier. Real subprocess calls — the ADR-F bridge is part of
 what P2 promises, so it is what P2 tests.
 """
-import json
 import shutil
 import tempfile
 import unittest
@@ -20,9 +19,7 @@ from django.test import TestCase, override_settings
 from accounts.models import Role
 from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
-from patterns_ai.models import (CalibrationMat, CalibrationMatCheck,
-                                CaptureAsset, GeometryExtraction,
-                                PatternPieceVersion, PieceSizeGeometry)
+from patterns_ai.models import (CaptureAsset, GeometryExtraction)
 from patterns_ai.services import calibration_service as cal
 from patterns_ai.services import capture_service as cap
 from patterns_ai.services import compute_bridge

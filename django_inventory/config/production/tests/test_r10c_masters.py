@@ -27,7 +27,7 @@ class MasterCrudTests(TestCase):
             'code': 'printing', 'name': 'Printing',
             'display_order': 25, 'is_active': 'on'})
         self.assertEqual(resp.status_code, 302)
-        cat = StageCategory.objects.get(code='printing')
+        StageCategory.objects.get(code='printing')
         # …and it appears in the Stage form picker immediately.
         resp = self.client.get(reverse('production:stage-add'))
         self.assertContains(resp, 'Printing')

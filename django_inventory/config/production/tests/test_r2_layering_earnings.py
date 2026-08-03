@@ -114,7 +114,7 @@ class TwoWorkerIndependenceTests(TestCase):
         must still pay 0 (grouped wins over the stale snapshot)."""
         self._report_and_complete(self.a, '30')
         ws = self.sr.workflow_stage
-        other = None  # group onto itself is illegal; simulate via direct flag
+        None  # group onto itself is illegal; simulate via direct flag
         # Grouping needs a later payer stage; T-SHIRT flow has only layering in
         # tests, so pin the guard at the freeze boundary instead: a grouped ws
         # yields rate 0 via effective_pay_rate.

@@ -1,10 +1,10 @@
 {% extends "accounts/base.html" %}
 {% block page_title %}Design System · Styleguide{% endblock %}
 
-{# Living styleguide — renders every token + primitive + component from the design system.
+{% comment %} Living styleguide — renders every token + primitive + component from the design system.
    The "Storybook-lite": one page to eyeball/verify the whole system. Consumes ONLY tokens +
    primitives + the shared _form_styles partial — defines NO component CSS of its own
-   (only page-scoped .sg-* layout helpers, rule 10/11). Change a token/primitive → this updates. #}
+   (only page-scoped .sg-* layout helpers, rule 10/11). Change a token/primitive → this updates. {% endcomment %}
 {% block extra_head %}
 {% include 'shared/_form_styles.html' %}
 <style>

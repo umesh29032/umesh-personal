@@ -14,7 +14,7 @@ from django.test import TestCase
 
 from accounts.models import Role
 from production.models import Adda, Product, Stage, WorkflowStage
-from patterns_ai.models import Marker, MarkerOutcome, MarkerUsage
+from patterns_ai.models import Marker, MarkerOutcome
 from patterns_ai.services import marker_service as ms
 from patterns_ai.services import marker_feedback_service as fb
 from patterns_ai.services.units import mm_to_m, q2, to_int_mm, width_band

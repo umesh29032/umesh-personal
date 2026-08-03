@@ -5,7 +5,6 @@ import unittest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 
 from accounts.models import Role
 from production.models import Product, ProductSize

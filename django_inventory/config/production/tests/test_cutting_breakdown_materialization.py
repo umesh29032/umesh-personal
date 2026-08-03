@@ -40,8 +40,7 @@ from production.models import (
     WorkflowStage,
 )
 from production.services import (
-    add_pieces_to_bundle, complete_cutting, create_adda, create_bundle,
-    reopen_cutting, start_cutting, upsert_breakup_row,
+    complete_cutting, create_adda, reopen_cutting, start_cutting, upsert_breakup_row,
 )
 from raw_materials.models import ClothColor, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls

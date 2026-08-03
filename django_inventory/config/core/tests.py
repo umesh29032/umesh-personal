@@ -609,3 +609,88 @@ class MediaServingTests(TestCase):
         self.client.force_login(user)
         resp = self.client.get('/media/advances/_test_media_priv.txt')
         self.assertEqual(resp.status_code, 200)
+
+
+class TemplateCommentSyntaxTests(TestCase):
+    """A multi-line `{# #}` comment is NOT a comment — and this project has now been
+    bitten by it twice.
+
+    Django honours `{# ... #}` on a SINGLE line only. A block opened with `{#` and
+    closed on a later line is not recognised, so its body becomes live template
+    source. The documented failure mode (UI_COMPONENTS / CLAUDE.md, listed there as a
+    repeat regression) is "text leaks onto the page".
+
+    On 2026-08-04 it produced something worse. `shared/_favicon.html` was written with
+    a multi-line `{# #}` header whose body contained an `{% include %}` tag naming the
+    file itself, as a usage example. The example executed: the template included
+    itself, giving `RecursionError: maximum recursion depth exceeded` and a **500 on
+    every page with a <head>**, the login page included. A leaked comment is cosmetic;
+    a leaked *tag* is an outage.
+
+    So the rule gets a test rather than only a style note.
+    """
+
+    #: Every template that owns a <head>. Kept explicit rather than globbed so that a
+    #: NEW head-owning template is a deliberate addition to this list, not a silent
+    #: omission from the guard.
+    HEAD_TEMPLATES = (
+        'accounts/base.html',
+        'shared/_auth_shell.html',
+        'shared/_favicon.html',
+        'public_home.html',
+        'accounts/signup.html',
+        'accounts/signup_otp.html',
+        '403.html',
+        '404.html',
+        '500.html',
+    )
+
+    def test_no_template_opens_a_multiline_hash_comment(self):
+        """`{#` must be closed with `#}` on the SAME line, in every template."""
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        offenders = []
+        for root in [Path(settings.BASE_DIR)]:
+            for path in root.rglob('*.html'):
+                if any(p in path.parts for p in ('env', 'staticfiles', 'node_modules')):
+                    continue
+                for lineno, line in enumerate(
+                        path.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+                    for m in re.finditer(r'\{#', line):
+                        if '#}' not in line[m.end():]:
+                            rel = path.relative_to(settings.BASE_DIR)
+                            offenders.append(f'{rel}:{lineno}')
+        # NOTE: built with an f-string, not %-formatting. The message names the
+        # {% comment %} tag, whose `%}` a %-format string reads as an invalid
+        # conversion — ruff F509 caught exactly that in the first version of this test.
+        self.assertEqual(
+            offenders, [],
+            f'multi-line {{# #}} found — Django will treat the body as LIVE template '
+            f'source. Use a comment tag instead. Offenders: {offenders}')
+
+    def test_every_head_owning_template_renders(self):
+        """Catches the recursion class directly: a self-including partial cannot
+        render, however the include got there."""
+        from django.template.loader import get_template
+        for name in self.HEAD_TEMPLATES:
+            with self.subTest(template=name):
+                get_template(name)          # compiles
+
+    def test_the_favicon_partial_renders_and_declares_an_icon(self):
+        """The partial must emit exactly the <link rel="icon"> and nothing else —
+        no leaked prose, and above all no leaked include tag."""
+        from django.template.loader import render_to_string
+        out = render_to_string('shared/_favicon.html').strip()
+        self.assertIn('rel="icon"', out)
+        self.assertNotIn('include', out, 'an include tag leaked — this is the 500')
+        self.assertNotIn('WHY IT EXISTS', out, 'comment prose leaked onto the page')
+
+    def test_login_page_serves_and_declares_the_favicon(self):
+        """End-to-end: the page that actually broke. Browsers request /favicon.ico
+        automatically, so a page with no declared icon logs a 404 in every console."""
+        resp = self.client.get('/app/login/password/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('rel="icon"', resp.content.decode())

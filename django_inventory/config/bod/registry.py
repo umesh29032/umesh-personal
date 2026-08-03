@@ -14,7 +14,7 @@ enters ONLY after its Metric Resolution Ladder row is closed at BOD-B
 step-3 STOP for the owner — the BOD never owns a business calculation).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # The owner's chartered section order (charter D1.5 — verbatim, fixed).
 SECTIONS = (

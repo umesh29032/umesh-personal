@@ -8,7 +8,7 @@ from django.test import TestCase
 from accounts.models import Role
 from production.models import (Adda, Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
-from patterns_ai.models import ApprovedLayout, ApprovedLayoutUsage
+from patterns_ai.models import ApprovedLayoutUsage
 from patterns_ai.services import layout_library_service as lib
 from patterns_ai.services import layout_usage_service as usage_svc
 from patterns_ai.services import marker_generation_service as gen

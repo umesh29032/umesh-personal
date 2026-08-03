@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from accounts.models import Role, Skill
 from production.models import (Adda, AddaStageRecord, CuttingStream, Product,
-                               ProductSize, Stage, WorkflowStage)
+                               Stage, WorkflowStage)
 from production.services.adda_service import (add_stream, cancel_stream,
                                               preproduction_joined)
 from tracking.models import AddaHistory
@@ -113,7 +113,7 @@ class CancelStreamTests(_LaneWorld):
         l2 = add_stream(self.adda, fabric_group='body', reason='Recut',
                         user=self.mgr)
         # blocking uncut lane holds the join …
-        sr = AddaStageRecord.objects.create(
+        AddaStageRecord.objects.create(
             adda=self.adda, workflow_stage=self.ws_cut, stream=self.body,
             started_at=timezone.now(), completed_at=timezone.now())
         self.assertFalse(preproduction_joined(self.adda))

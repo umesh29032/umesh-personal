@@ -10,13 +10,13 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from accounts.models import Role, Skill
+from accounts.models import Role
 from production.models import (Adda, AddaStageRecord, Product,
                                ProductPattern, ProductPatternAssignment,
                                ProductSize, Stage, WorkflowStage)
 from production.stages.cutting import service as cutting_svc
 from production.stages.layering import handler as layering_handler
-from patterns_ai.models import ApprovedLayoutUsage, PieceSizeGeometry
+from patterns_ai.models import PieceSizeGeometry
 from patterns_ai.services import layout_library_service as lib
 from patterns_ai.services import layout_usage_service as usage_svc
 from patterns_ai.services import marker_generation_service as gen

@@ -19,7 +19,7 @@ from raw_materials.forms import AssignRollForm
 from raw_materials.models import ClothRoll
 from raw_materials.services import assign_roll_to_adda
 
-from .mixins import ManagementRoleMixin, ProductionRoleMixin
+from .mixins import ManagementRoleMixin
 
 
 class RollAssignView(LoginRequiredMixin, ManagementRoleMixin, FormView):

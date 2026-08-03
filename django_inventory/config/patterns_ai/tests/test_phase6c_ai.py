@@ -73,8 +73,7 @@ class Phase6CAiTests(TestCase):
              'locked': False, 'rotation_deg': 0, 'mirrored': False,
              'allow_180': True},
         ]
-        from django.db import connection
-        before = {t: 0 for t in ()}
+        {t: 0 for t in ()}
         rows_before = (PieceSizeGeometry.objects.count(),
                        Product.objects.count())
         r = self._optimize(placements, effort='fast')

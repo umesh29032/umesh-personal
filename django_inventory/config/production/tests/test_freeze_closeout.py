@@ -125,7 +125,7 @@ class C2C3WorldTestCase(TestCase):
         self.assertTrue(stages['layering'].has_access)      # skilled…
         self.assertFalse(stages['layering'].can_open)       # …but unassigned
         self.assertContains(resp, 'Not assigned')           # honest card
-        self.assertNotContains(resp, f'/stage/layering/?embedded=1')
+        self.assertNotContains(resp, '/stage/layering/?embedded=1')
 
     # ── C-3: report path = assignment AND live access ────────────────────
     def test_report_requires_both_assignment_and_access(self):

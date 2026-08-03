@@ -3,7 +3,6 @@ width bands, saving math, confidence components, SELECT-only brain,
 suggestion decision spine (one-shot, guarded), views.
 """
 import tempfile
-import unittest
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -13,11 +12,10 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import Role
-from production.models import (Adda, Product, ProductSize, Stage,
+from production.models import (Adda, Product, Stage,
                                WorkflowStage)
 from patterns_ai.models import Marker, SuggestionEvent
 from patterns_ai.services import advisor_service as adv
-from patterns_ai.services import compute_bridge
 from patterns_ai.services import marker_feedback_service as fb
 from patterns_ai.services import marker_service as ms
 from patterns_ai.services import suggestion_service as sug

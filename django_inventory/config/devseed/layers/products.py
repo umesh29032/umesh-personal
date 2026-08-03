@@ -54,7 +54,10 @@ def seed_product_and_flow(spec, flow_codes, *, actor, flow_actor=None, stage_cos
                     user=flow_actor, workflow_stage=ws, direction="up")
                 break
     if _codes() != desired:
-        from devseed.layers import DivergenceError
+        # DivergenceError is imported at module level. A *local* re-import here made it
+        # a function-local name for the WHOLE function, so the earlier raise at the
+        # name-mismatch check hit UnboundLocalError instead of DivergenceError —
+        # i.e. the error path reported the wrong failure. Ruff F823 caught it.
         raise DivergenceError(f"flow order unreconcilable: {_codes()} != {desired}")
 
     # Optional binding cost config (R1 rate + R2 payability) via the certified

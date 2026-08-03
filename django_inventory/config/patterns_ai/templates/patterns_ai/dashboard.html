@@ -1,9 +1,9 @@
 {% extends "accounts/base.html" %}
-{# M2 — the PATTERN DASHBOARD is the 5-STATION RAIL (UI freeze §1/§2.1).
+{% comment %} M2 — the PATTERN DASHBOARD is the 5-STATION RAIL (UI freeze §1/§2.1).
    One continuous journey, numbered stations, live verdicts:
    1 Blueprint · 2 Pattern Intelligence Studio (Browse = the Pattern
    Library shelf) · 3 Digital Cutting Table · 4 Layout Library ·
-   5 Manufacturing. The journey never dead-ends. #}
+   5 Manufacturing. The journey never dead-ends. {% endcomment %}
 {% block page_title %}{% if product %}{{ product.code }} · Pattern Dashboard{% else %}Pattern Dashboard{% endif %}{% endblock %}
 {% block extra_head %}
 <style>

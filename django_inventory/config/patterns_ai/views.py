@@ -384,8 +384,8 @@ class MatDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView):
 class MatCommissionView(LoginRequiredMixin, _ManagementOnly, View):
     def post(self, request, pk):
         from patterns_ai.forms import MatCommissionForm
-        from patterns_ai.models import CalibrationMat, CaptureAsset
-        from patterns_ai.services import calibration_service, capture_service
+        from patterns_ai.models import CalibrationMat
+        from patterns_ai.services import calibration_service
         mat = get_object_or_404(CalibrationMat, pk=pk)
         form = MatCommissionForm(request.POST, request.FILES)
         if not form.is_valid():
@@ -793,8 +793,20 @@ class CuttingTableShellView(LoginRequiredMixin, _ManagementOnly,
             return redirect(reverse('patterns_ai:dashboard')
                             + f'?product={product.pk}')
         # M4: pieces-per-garment map (Blueprint count truth, one query)
+        #
+        # ⚠️ DEAD AS OF 2026-08-04 — ruff F841. This dict is built and never read: not
+        # by this view, not by any template. So it costs one DB query per request and
+        # returns nothing. Introduced in `90c1f2f3` (Manufacturing V1 certified release,
+        # 2026-07-19), which suggests an M4 feature that was prepared and never wired up
+        # rather than something that became obsolete.
+        #
+        # NOT REMOVED: patterns_ai is a frozen module and the owner's standing rule is no
+        # refactor of frozen modules without explicit approval. Deleting a prepared-but-
+        # unwired feature is the owner's call, not a lint cleanup. Two options when you
+        # decide: wire it into the payload if M4 still wants it, or delete these six
+        # lines and reclaim the query.
         from patterns_ai.models import PatternPiece as _PP
-        count_by_piece = {
+        count_by_piece = {  # noqa: F841 — see the note above; owner decision pending
             p.pk: (p.assignment.pieces_count if p.assignment_id else 1)
             for p in _PP.objects.filter(product=product)
             .select_related('assignment')}
@@ -1842,7 +1854,6 @@ class GenerateMarkerView(LoginRequiredMixin, _ManagementOnly, View):
                       self._ctx(product, extra))
 
     def post(self, request):
-        from production.models import ProductSize
         from patterns_ai.services import marker_generation_service as gen
         from patterns_ai.services.compute_bridge import ComputeError
         product = get_object_or_404(
@@ -2582,7 +2593,6 @@ class StudioWorkView(LoginRequiredMixin, _ManagementOnly, View):
         return piece, size
 
     def _ctx(self, request, piece, size):
-        import json as _json
         from django.urls import reverse
         from patterns_ai.models import PatternPieceVersion
         from patterns_ai.services import acquisition_service

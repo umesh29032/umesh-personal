@@ -18,6 +18,12 @@ __all__ = [
     'ClothColorArchiveView', 'ClothColorDeleteView',
     'StorageLocationListView', 'StorageLocationCreateView', 'StorageLocationUpdateView',
     'StorageLocationArchiveView', 'StorageLocationDeleteView',
-    'RollListView', 'RollBulkCreateView', 'RollDetailView', 'RollUpdateView',
+    # RollDamageView was missing from __all__ while being imported above and used by
+    # urls.py as `views.RollDamageView` — attribute access works regardless of __all__,
+    # so the URL functioned, but the declared public API was wrong and ruff (F401) read
+    # the import as unused. Deleting the import — ruff's other suggestion — would have
+    # broken the roll-damage route. Adding it here is the correct half of the fix.
+    'RollListView', 'RollBulkCreateView', 'RollDamageView', 'RollDetailView',
+    'RollUpdateView',
     'RollAssignView',
 ]

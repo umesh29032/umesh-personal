@@ -362,8 +362,13 @@ def save_table_layout(*, user, product, width_mm, height_mm, spacing_mm,
     (fills the honest ratio gap) · roll_ref {'id','label'} · recipe_label
     (which Marker Recipe produced this asset — provenance, R1) · notes
     (R3). All data; defaults keep pre-M4 saves byte-identical."""
-    from patterns_ai.models import PatternPiece, PieceSizeGeometry
-    from patterns_ai.models.pieces import PatternPieceVersion
+    # No local model imports here on purpose. PatternPiece, PieceSizeGeometry and
+    # PatternPieceVersion are all imported unconditionally at module level, and
+    # `patterns_ai.models.PatternPieceVersion is patterns_ai.models.pieces.PatternPieceVersion`
+    # (verified), so a local re-import added nothing — while shadowing those names for
+    # the WHOLE function, meaning any future use ABOVE this point would raise
+    # UnboundLocalError. That is exactly the F823 bug this ruff pass found live in
+    # devseed/layers/products.py, where it broke a DivergenceError path.
     _gate(user)
     try:
         width_mm = int(width_mm)

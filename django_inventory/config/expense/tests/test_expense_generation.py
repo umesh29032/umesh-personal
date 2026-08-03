@@ -14,7 +14,6 @@ import unittest.mock as mock
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Sum
 from django.test import TestCase
-from django.utils import timezone
 
 from accounts.models import User
 from inventory.models import Role
@@ -197,7 +196,7 @@ class GenerationTests(_Base):
         self.assertEqual(self._counts(), before)     # NOTHING landed
 
     def test_concurrent_duplicate_serializes_on_the_constraint(self):
-        t = self._rent()
+        self._rent()
         resolved = expense_service._resolve_month(2026, 7)
         # Freeze a stale resolution (template still "due"), then land coverage
         # as the concurrent winner would — the loser must fail CLEANLY.

@@ -5,7 +5,6 @@ append-only sources (transition events, usages, outcomes, lineage). It writes
 NOTHING — test-enforced. Derived numbers reuse marker_feedback_service
 (no math duplication; one METRICS_VERSION).
 """
-from django.db.models import Q
 
 from patterns_ai.models import Marker, MarkerOutcome, MarkerUsage
 from . import marker_feedback_service as fb

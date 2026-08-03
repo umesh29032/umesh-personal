@@ -15,7 +15,6 @@ from accounts.models import User
 from inventory.models import Role
 from expense.models import (
     ExpenseGenerationRecord, ExpenseTemplate, ExpenseTemplateAmountAudit,
-    FactoryExpense,
 )
 from expense.services import expense_service
 

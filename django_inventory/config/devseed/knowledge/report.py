@@ -87,7 +87,6 @@ def render_stdout(report, write):
 def exit_code(report):
     """0 = nothing at/above the ratified threshold (unaccepted); nonzero = the
     count. Accepted findings never fail the exit — they are still PRINTED."""
-    e = report["envelope"]
     if FAILURE_THRESHOLD == BLOCKER:
         n = sum(1 for row in report["body"]
                 if row["severity"] == BLOCKER and not row["accepted"])

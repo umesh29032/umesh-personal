@@ -6,7 +6,6 @@ import shutil
 import tempfile
 import unittest
 from decimal import Decimal
-from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -18,7 +17,7 @@ from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
 from patterns_ai.models import (GeneratedMarkerCandidate, Marker,
                                 MarkerGenerationRun, MarkerTransitionEvent,
-                                PatternPieceVersion, PieceSizeGeometry)
+                                PieceSizeGeometry)
 from patterns_ai.services import compute_bridge
 from patterns_ai.services import marker_feedback_service as fb
 from patterns_ai.services import marker_generation_service as gen
@@ -188,7 +187,7 @@ class GenerationServiceTests(_Base):
                           usable_width_mm=900, ratio={self.size_m: 1})
 
     def test_missing_confirmed_geometry_named(self):
-        naked = self._piece('p3-naked', 'Sleeve')   # no confirmed version
+        self._piece('p3-naked', 'Sleeve')   # no confirmed version
         with self.assertRaises(ValidationError) as cm:
             self.run_real(engine='blf')
         self.assertIn('Sleeve', str(cm.exception))

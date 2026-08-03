@@ -1,8 +1,8 @@
 {% extends "accounts/base.html" %}
-{# Phase 2 — the PATTERN BLUEPRINT module (STEP 1, frozen resp. #1):
+{% comment %} Phase 2 — the PATTERN BLUEPRINT module (STEP 1, frozen resp. #1):
    the product's structural DNA. Piece rows w/ ALL rules editable
    (count · required/optional · pair · fold · grain · fabric group) +
-   the atomic "+ Add Pattern Definition". NEVER geometry/images/DXF. #}
+   the atomic "+ Add Pattern Definition". NEVER geometry/images/DXF. {% endcomment %}
 {% block page_title %}{% if product %}{{ product.code }} · Pattern Blueprint{% else %}Pattern Blueprint{% endif %}{% endblock %}
 {% block extra_head %}
 <style>

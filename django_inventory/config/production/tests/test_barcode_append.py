@@ -10,11 +10,10 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from accounts.models import Role, Skill
+from accounts.models import Role
 from production.models import (Adda, AddaProductSizeColorPieceBreakdown,
                                AddaStageRecord, CuttingRecord, CuttingStream,
-                               Product, ProductSize, Stage, StageCategory,
-                               WorkflowStage)
+                               Product, ProductSize, Stage, WorkflowStage)
 from production.stages.barcode_generation.assembly import (
     append_uncovered_batches, generate_for_adda)
 from raw_materials.models import ClothColor
@@ -145,7 +144,7 @@ class LateLaneNoRegressTests(AppendWorld):
             product=self.product, stage=ops, order=5,
             cost_rate=Decimal('1'))
         lane1 = self._lane()
-        cr = self._cut_rows(lane1, 10)
+        self._cut_rows(lane1, 10)
         # simulate: adda already joined and moved into ops
         self.adda.current_stage = ops_ws
         self.adda.save(update_fields=['current_stage'])

@@ -1,9 +1,9 @@
 {% extends "accounts/base.html" %}
-{# M2 — PATTERN INTELLIGENCE STUDIO · BROWSE MODE (UI freeze §2.3).
+{% comment %} M2 — PATTERN INTELLIGENCE STUDIO · BROWSE MODE (UI freeze §2.3).
    The Pattern Library shelf: size tabs (Product → Size → Piece law),
    the creation checklist (the SAME readiness truth the DCT gate uses),
    shelf rows, the conveyor. One room — [Open in Studio] flips a row
-   into WORK mode. Mobile = browse/view-only (§2.3). #}
+   into WORK mode. Mobile = browse/view-only (§2.3). {% endcomment %}
 {% block page_title %}{% if product %}{{ product.code }} · Pattern Intelligence Studio{% else %}Pattern Intelligence Studio{% endif %}{% endblock %}
 {% block extra_head %}
 <style>

@@ -336,7 +336,7 @@ def full_costs_for_addas(adda_ids):
     through untouched. READ-ONLY; constant query count."""
     from decimal import Decimal
 
-    from django.db.models import Q, Sum
+    from django.db.models import Sum
     from expense.models import StageWorkAssignment
     from production.models import AddaStageRecord
 

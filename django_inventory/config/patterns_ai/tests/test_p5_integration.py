@@ -11,9 +11,9 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import Role
-from production.models import (Adda, Product, ProductSize, Stage,
+from production.models import (Adda, Product, Stage,
                                WorkflowStage)
-from patterns_ai.models import Marker, SuggestionEvent
+from patterns_ai.models import Marker
 from patterns_ai.services import advisor_service as adv
 from patterns_ai.services import intelligence_service as intel
 from patterns_ai.services import marker_feedback_service as fb
@@ -136,7 +136,6 @@ class HealthCommandTests(_Base):
         self.assertIn('media integrity', text)
 
     def test_degraded_exit_on_missing_runtime(self):
-        from patterns_ai.services import compute_bridge
         with override_settings(PATTERNS_AI_COMPUTE_DIR='/nonexistent'):
             out = io.StringIO()
             with self.assertRaises(SystemExit) as cm:

@@ -6,8 +6,7 @@ from django.test import TestCase
 from accounts.models import Role
 from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
-from patterns_ai.models import (CaptureAsset, PatternPiece,
-                                PieceSizeGeometry)
+from patterns_ai.models import (CaptureAsset, PieceSizeGeometry)
 from patterns_ai.services import pattern_design_facade as facade
 from patterns_ai.services import pattern_geometry_service as geo
 from patterns_ai.tests.test_p3_generation import rect_um
@@ -31,7 +30,7 @@ class _W1Base(TestCase):
         draft = geo.get_or_create_draft(user=cls.mgr, piece=cls.front)
         tape = {}
         for size, (w, h) in ((cls.size_s, (480, 660)), (cls.size_m, (505, 675))):
-            row = PieceSizeGeometry.objects.create(   # fixture only
+            PieceSizeGeometry.objects.create(   # fixture only
                 version=draft, size=size, geometry=rect_um(w, h),
                 trust_grade='photo_calibrated', created_by=cls.mgr)
             tape[size.pk] = {'width_mm': w, 'height_mm': h}

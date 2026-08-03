@@ -9,7 +9,6 @@ import re
 
 from django.apps import apps
 from django.test import TestCase
-from django.urls import reverse
 
 CONFIG_DIR = pathlib.Path(__file__).resolve().parents[2]
 PRODUCTION_APPS = ('production', 'expense', 'inventory', 'raw_materials',

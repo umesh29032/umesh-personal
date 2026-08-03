@@ -1,8 +1,8 @@
 {% extends "accounts/base.html" %}
-{# PDM W2R — the PATTERN DESIGN LIBRARY for ONE size (locked workflow).
+{% comment %} PDM W2R — the PATTERN DESIGN LIBRARY for ONE size (locked workflow).
    The complete source of truth for this Product Size: every design row
    carries preview · reference · dims · area · version · status · DXF ·
-   last-updated · contextual action. Issues float to the top. #}
+   last-updated · contextual action. Issues float to the top. {% endcomment %}
 {% block page_title %}{{ product.code }} · Preparing Size {{ section.size.label }}{% endblock %}
 {% block extra_head %}
 <style>

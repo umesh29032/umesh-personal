@@ -6,7 +6,7 @@ derive counting reused cloth exactly once across Addas."""
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 

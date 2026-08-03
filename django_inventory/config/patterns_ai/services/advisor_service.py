@@ -183,7 +183,6 @@ def _confidence(best, width_mm):
 
 def _consistency(best):
     """Spread of the winner's per-outcome m/100 around its mean."""
-    from . import marker_feedback_service as fb
     from . import marker_query_service as q
     vals = [row['metrics']['meters_per_100']
             for row in q.get_marker_outcomes(best['marker'])

@@ -447,7 +447,7 @@ def post_rm_expense(ctx):
     unconsumed (purchases fixture) · roll#3 DAMAGED (purchases-only fixture) ·
     the journey's 2.5kg leftover CONSUMED into a second adda (the chain)."""
     from decimal import Decimal as _D
-    from production.models import Adda, RemainingClothOfClothRoll
+    from production.models import RemainingClothOfClothRoll
     from production.services import adda_service
     from raw_materials.models import ClothRoll
     from raw_materials.services.roll_service import (

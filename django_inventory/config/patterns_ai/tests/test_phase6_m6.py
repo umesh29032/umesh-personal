@@ -1,7 +1,6 @@
 """Phase-6 M6 tests — Pattern Design Hub (Rules J/K/L/M/N §2d):
 derived-only readiness, validation before generation, reference-image UI,
 optional/required UI, collect-once."""
-import io
 import struct
 import zlib
 

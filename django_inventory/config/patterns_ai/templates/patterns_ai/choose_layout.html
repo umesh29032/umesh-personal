@@ -1,7 +1,7 @@
 {% extends "accounts/base.html" %}
-{# Phase 8B — the Adda chooses its manufacturing contract(s) from the
+{% comment %} Phase 8B — the Adda chooses its manufacturing contract(s) from the
    LIBRARY only (rule 9). Stale = shown disabled w/ LAW-11 reason.
-   Void = F1 flow (reason mandatory, history forever). #}
+   Void = F1 flow (reason mandatory, history forever). {% endcomment %}
 {% block page_title %}{{ adda.code }} · Manufacturing Layouts{% endblock %}
 {% block extra_head %}
 <style>

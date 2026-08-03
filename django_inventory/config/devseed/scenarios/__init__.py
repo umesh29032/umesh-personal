@@ -6,7 +6,10 @@ yet (implemented=False everywhere). Implementations land wave-by-wave
 it for spec⇄implementation drift detection (PHASE_12 §6.7 handoff).
 """
 
-from devseed.guard import SPEC_VERSION  # single source for the spec pin
+# The spec pin (SPEC_VERSION) is deliberately NOT re-exported here — it lives in
+# devseed.guard and every consumer imports it from there. It used to be imported into
+# this namespace purely to document that fact, which ruff correctly read as an unused
+# import (F401); a comment documents it without creating a second import path.
 
 # Each entry: class per spec §7 + the layers (spec §2 numbering) it will drive.
 # Golden expected values are quoted from the spec §7 (owner-change-control).

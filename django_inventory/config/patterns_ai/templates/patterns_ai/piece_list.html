@@ -1,8 +1,8 @@
 {% extends "accounts/base.html" %}
-{# PDM W2R — the PRODUCT PATTERN MANAGER (locked workflow 2026-07-08).
+{% comment %} PDM W2R — the PRODUCT PATTERN MANAGER (locked workflow 2026-07-08).
    SIZES ONLY: what sizes exist · which are Ready for Cutting · open one
    size's Pattern Design Library · gated Cutting-Table entry.
-   NO design rows here. GET derived-only; POST = frozen writers. #}
+   NO design rows here. GET derived-only; POST = frozen writers. {% endcomment %}
 {% block page_title %}{% if product %}{{ product.code }} · Pattern Manager{% else %}Pattern Manager{% endif %}{% endblock %}
 {% block extra_head %}
 <style>

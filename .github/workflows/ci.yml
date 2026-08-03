@@ -194,13 +194,18 @@ jobs:
       # happened here once: `bod` was installed but in no test group, so 37
       # tests — including a real UTC/IST date bug — sat outside CI while the
       # battery still reported "all green".
+      # --noinput is deliberate. If a test database from a previous run survives (a
+      # warm/self-hosted runner, or a re-run), Django PROMPTS "Type 'yes' to delete the
+      # test database" — and with no TTY that raises EOFError and the job dies with a
+      # traceback that looks like a code failure. Reproduced locally: exactly that
+      # EOFError at _create_test_db. --noinput only ever touches the TEST database.
       - name: Run the battery
         run: |
           python config/manage.py test \
             core accounts inventory storefront raw_materials production \
             tracking expense machines patterns_ai verification bod \
             learning devseed \
-            --settings=config.settings.local --verbosity 2
+            --settings=config.settings.local --verbosity 2 --noinput
         env:
           DJANGO_SETTINGS_MODULE: config.settings.local
           DB_NAME: inventory_db

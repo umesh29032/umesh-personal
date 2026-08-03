@@ -84,15 +84,13 @@ def _dry_run_rebuild_hash():
     bkg = _builder()
     captured = {}
 
-    class _Sink(io.StringIO):
-        def __exit__(self, *a):  # pragma: no cover - not used as ctx manager
-            return False
-
     real_open = bkg.io.open
 
     def fake_open(path, mode="r", *a, **kw):
         if "w" in mode:
-            sink = _Sink()
+            # `_W` below does the actual capture. An earlier `_Sink(io.StringIO)` was
+            # instantiated here and never used (ruff F841); both it and the class are
+            # gone — the write path is unchanged.
             captured["path"] = path
 
             class _W:

@@ -1,0 +1,39 @@
+{% comment %}
+─────────────────────────────────────────────────────────────────────────────
+THE FAVICON — single owner. Include this inside <head> on every head-owning
+template; never paste the <link> inline (UI_COMPONENTS rule: one owner per
+concern, same pattern as _form_styles.html and _datatables_vendor_css.html).
+
+Usage: an include tag naming this file, placed after <title>.
+
+WHY IT EXISTS. Browsers request /favicon.ico automatically. Nothing served it
+and no template declared an icon, so EVERY page of the ERP logged a 404 in the
+console — surfaced by the browser test of /learn/git/ on 2026-08-03, where it
+was the only failing assertion out of 33.
+
+WHY AN INLINE SVG DATA URI rather than a .ico file:
+  · no binary asset enters git — a binary is a whole new blob on every edit,
+    permanently (git_course ch 37); a favicon would be re-committed on every
+    tweak of the logo
+  · no extra HTTP request, so it cannot 404 again
+  · no collectstatic / STATICFILES_DIRS dependency, so it works identically in
+    dev and production and on the error pages, which must render even when
+    static serving is broken
+
+Colour note: %23a9622f is the URL-encoded form of the copper brand hex. It is
+written encoded (not as a literal #) because a raw # terminates a data URI —
+which also means the design-system ratchet does not read it as an inline raw
+value. Verified: `ds_lint.sh --changed` exits 0 with this staged.
+
+⚠️ THIS BLOCK USES {% comment %}, NOT {# #}, AND THAT IS LOAD-BEARING.
+Django only honours {# #} on a SINGLE line. The first version of this file used a
+multi-line {# #} block, so its body became live template source — and the body
+contained an include tag naming this very file as a usage example. The template
+included itself, producing `RecursionError: maximum recursion depth exceeded` and
+a 500 on every page with a <head>, including the login page. The project's
+standing rule (UI_COMPONENTS / CLAUDE.md) already names this as a repeat
+regression; the failure mode here was worse than the documented "text leaks",
+because the leaked text was executable. Never use multi-line {# #}.
+─────────────────────────────────────────────────────────────────────────────
+{% endcomment %}
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23a9622f'/><text x='16' y='22' font-family='Georgia,serif' font-size='15' font-weight='bold' fill='%23fff' text-anchor='middle'>KE</text></svg>">

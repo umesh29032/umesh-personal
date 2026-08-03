@@ -3,7 +3,6 @@ confirm->export browser path (real compute), editor, DXF import, tampered
 ids. Views stay parse->gate->delegate; these tests prove the wiring."""
 import shutil
 import tempfile
-from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -14,12 +13,10 @@ from accounts.models import Role
 from production.models import (Product, ProductPattern,
                                ProductPatternAssignment, ProductSize)
 from patterns_ai.models import (CalibrationMat, GeometryExtraction,
-                                PatternPieceVersion, PieceSizeGeometry)
+                                PieceSizeGeometry)
 from patterns_ai.services import calibration_service as cal
-from patterns_ai.services import capture_service as cap
-from patterns_ai.services import compute_bridge
 from patterns_ai.services import pattern_geometry_service as geo
-from patterns_ai.tests.test_p2_geometry import (BOARD, PIECE_MM, RUNTIME_OK,
+from patterns_ai.tests.test_p2_geometry import (BOARD, RUNTIME_OK,
                                                 TAPE, synth_golden)
 import unittest
 

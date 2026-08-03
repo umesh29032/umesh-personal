@@ -1,7 +1,28 @@
 # Ruff config — LENIENT START (M0.2). Ratchet rules milestone by milestone.
-# Policy (per owner decision 2026-06-09): keep the gate GREEN from day one;
+#
+# ORIGINAL POLICY (owner decision 2026-06-09): keep the gate GREEN from day one;
 # enforce on CHANGED/NEW code via pre-commit; do NOT red-wall on legacy debt.
-# Full-repo `ruff check` is REPORT-ONLY in scripts/check.sh.
+# Full-repo `ruff check` was therefore REPORT-ONLY in scripts/check.sh.
+#
+# ── UPDATED 2026-08-04: the legacy debt is GONE, so full-repo is now BLOCKING ──
+# The premise of "report-only" was that a full-repo run would red-wall progress. It
+# would have: a full pass found **78 errors** (59 F401 · 16 F841 · 1 F823 · 1 F811 ·
+# 1 F541). Those are now all fixed, so `.github/workflows/ci.yml` runs full-repo ruff
+# as a BLOCKING job — which is strictly stronger than the ratchet and costs nothing
+# while the count is zero. scripts/check.sh keeps its report-only line; it is a
+# developer convenience, not the gate.
+#
+# Two of the 78 were real defects, not tidiness — which is the argument for keeping the
+# full-repo gate blocking rather than reverting to report-only:
+#   · F823 in devseed/layers/products.py — a local re-import shadowed a module-level
+#     name for the whole function, so a DivergenceError path raised UnboundLocalError
+#     instead. The error path was broken.
+#   · F401 in raw_materials/views/__init__.py — `RollDamageView` was missing from
+#     __all__; deleting the "unused" import (ruff's other suggestion) would have broken
+#     the roll-damage URL. The fix was to complete __all__.
+#
+# If this ever red-walls again, fix the code — do not lower the gate. Report-only was a
+# migration strategy, not a destination.
 target-version = "py310"
 line-length = 100
 extend-exclude = ["*/migrations/*", "env", "media", "staticfiles", "*.pdf"]

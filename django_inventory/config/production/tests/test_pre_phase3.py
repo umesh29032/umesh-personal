@@ -122,7 +122,7 @@ class PrePhase3World(TestCase):
 
     def test_damaged_counts_as_capacity_for_bound_and_void(self):
         from production.services import pool_service
-        sr = self._start()
+        self._start()
         self._report(good='10', damaged='5')   # produced 15 on this dim
         from production.stages.generic_stage.service import complete_generic_stage
         complete_generic_stage(adda=self.adda, stage_code='pp3_sew', user=self.mgr)
@@ -153,14 +153,14 @@ class PrePhase3World(TestCase):
         from machines.services import machine_service
         m = machine_service.create_machine(
             code='PP3-01', name='PP3 #1', machine_type=self.mtype, user=self.mgr)
-        sr = self._start()
+        self._start()
         machine_service.assign(machine=m, worker=self.w1, adda=self.adda,
                                user=self.mgr)
         task = self._report()
         self.assertEqual(task.contributions.get().machine_code, 'PP3-01')
 
     def test_machine_code_blank_when_no_assignment(self):
-        sr = self._start()
+        self._start()
         task = self._report()
         self.assertEqual(task.contributions.get().machine_code, '')
 
@@ -211,7 +211,7 @@ class PrePhase3World(TestCase):
     def test_void_guards(self):
         from production.services.worker_task_service import void_submitted_report
         from production.stages.generic_stage.service import complete_generic_stage
-        sr = self._start()
+        self._start()
         task = self._report(good='10')
         with self.assertRaises(PermissionDenied):
             void_submitted_report(task, actor=self.w1, reason='self-serve')

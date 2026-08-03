@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.views.generic import TemplateView
 
 from accounts.services import ROLE_SUPER_ADMIN, user_can_view_financials, user_has_role
-from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
+from raw_materials.models import ClothColor, ClothRoll, ClothType
 
 from .mixins import ProductionRoleMixin
 

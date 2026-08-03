@@ -125,8 +125,8 @@ no product charter and no business logic.)
 | Time-log accordion | `{% include 'inventory/_time_log_styles.html' %}` in extra_head + `_roll_events_accordion.html` / `_adda_events_accordion.html` with `roll_events`/`adda_events` context (select_related, latest 30). Native `<details>/<summary>`, no JS |
 | QR print sheet | `barcode_print_sheet.html` — standalone (no base), A4 grid, ECC-Q; `?size=` small 54/A4 · medium 35 · large modes |
 | Worker roster chips | `_workers_widget.html` via `_WorkerCheckboxes`; chip CSS canonical in base.html (S1-4) |
-| Hinglish comments | templates may use Hinglish in comments; `{# #}` is SINGLE-line only — multi-line MUST use `{% comment %}` (regression history) |
-| Shared partials | `production/_form_styles.html` (form-shell) · `_autosave.html` · `_stage_panel_collapse.html` · `inventory/_time_log_styles.html` |
+| Hinglish comments | templates may use Hinglish in comments; `{# #}` is SINGLE-line only — multi-line MUST use `{% comment %}`. **Now TEST-ENFORCED** (`core.tests.TemplateCommentSyntaxTests`) after recurring on 2026-08-04 with a worse failure than the documented "text leaks": a multi-line `{# #}` in `shared/_favicon.html` contained an `{% include %}` naming its own file as a usage example, the body became live template source, the partial included **itself**, and every page with a `<head>` — login included — returned **500 `RecursionError`**. A leaked comment is cosmetic; a leaked *tag* is an outage |
+| Shared partials | `production/_form_styles.html` (form-shell) · `_autosave.html` · `_stage_panel_collapse.html` · `inventory/_time_log_styles.html` · **`shared/_favicon.html`** (2026-08-04 — THE single favicon owner; include it in `<head>` on every head-owning template, never paste the `<link>` inline). Inline SVG data URI, so no binary asset enters git and there is no request that can 404; the brand hex is written URL-encoded (`%23a9622f`) because a raw `#` would terminate the data URI — which also keeps the design-system ratchet from reading it as an inline raw value |
 | Empty states | every list/table renders an explicit `.empty` row — never a blank card |
 
 ## Template checklist (new pages + updating old pages) — owner rule 2026-06-12
@@ -142,7 +142,7 @@ responsive wrapper · rule-11 verify 360/768/1280 (cache-busted) before "done"
 · `inputmode` on numbers, `aria-label` on icon buttons, `.empty` states ·
 no logic in templates (context flags gate forms; display always renders) ·
 `confirm()` on money/destructive (completion = P2 pending-workers list) ·
-`{# #}` single-line only, multi-line = `{% comment %}`.
+`{# #}` single-line only, multi-line = `{% comment %}`. Enforced by `core.tests.TemplateCommentSyntaxTests.test_no_template_opens_a_multiline_hash_comment`, which scans every `.html` in the project — because this rule was already written down twice and got violated anyway.
 
 **UPDATING old pages:** migrate its duplicated CSS to canonicals while you're
 there (one page = one commit) · unexpected drift → revert, never redesign ·
