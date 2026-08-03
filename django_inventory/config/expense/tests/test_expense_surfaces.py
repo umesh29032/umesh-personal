@@ -88,6 +88,12 @@ class MeeDFullIdentityMatrixTests(_Base):
         cls.acct = _user('surd-acct@test', 'accountant')
         cls.listing = _user('surd-list@test', 'listing_team')
 
+    # Owner ruling 2026-08-02: the ACCOUNTANT read tier. Their expectation is now
+    # PER-SURFACE, not one value — the register is a READ (the per-template status
+    # comes from `generate_monthly_expenses(confirm=False)`, a pure preview), while
+    # add/generate stay writes. Every other identity is unchanged.
+    ACCOUNTANT_READS = {'expense:expense-template-list'}
+
     def test_every_identity_every_surface(self):
         expectations = [
             (None, (302,)), (self.worker, (302, 403)),
@@ -98,8 +104,11 @@ class MeeDFullIdentityMatrixTests(_Base):
             if user:
                 self.client.force_login(user)
             for name in self.URLS:
+                expected = allowed
+                if user is self.acct and name in self.ACCOUNTANT_READS:
+                    expected = (200,)
                 r = self.client.get(reverse(name))
-                self.assertIn(r.status_code, allowed,
+                self.assertIn(r.status_code, expected,
                               f"{getattr(user, 'email', 'anon')} → {name}")
             self.client.logout()
 
@@ -162,7 +171,7 @@ class SurfaceFlowTests(_Base):
         self.assertContains(review, 'Generated from template')
 
     def test_template_list_shows_current_period_status(self):
-        t = self._tpl()
+        self._tpl()          # side effect: creates the template this asserts on
         self.client.force_login(self.mgr)
         url = reverse('expense:expense-template-list') + '?month=2026-07'
         self.assertContains(self.client.get(url), 'Pending generation')

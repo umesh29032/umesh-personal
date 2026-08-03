@@ -180,6 +180,8 @@
     .user-dash .broadcast-product { color: #6b6357; }
     .user-dash .broadcast-date { margin-left: auto; font-size: 12px; color: #8a8071; }
     .user-dash .broadcast-hint { font-size: 12px; color: #8a8071; padding-top: 8px; }
+    /* accounts panel (accountant view): header action link — page-scoped per UI rule 10 */
+    .user-dash .card-link { font-size: 12px; }
     @media (max-width: 600px) {
         .user-dash .broadcast-date { margin-left: 0; width: 100%; }  /* stack on phones */
     }
@@ -213,7 +215,9 @@
                 </li>
                 {% endfor %}
             </ul>
+            {% if does_floor_work %}
             <div class="broadcast-hint">Production started — you'll see a task here if you're assigned.</div>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -223,7 +227,7 @@
     only (expense_month is None for workers — no data even reaches the page).
     Factory-LEVEL costs: deliberately NOT part of any Adda's manufacturing cost.
     {% endcomment %}
-    {% if is_admin_view and expense_month %}
+    {% if expense_month %}
     <div class="card" style="margin-bottom: 18px;">
         <div class="card-header">
             <div class="card-title">Expenses · {{ expense_month.month_value }}</div>
@@ -242,6 +246,52 @@
                 </div>
                 {% endfor %}
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% comment %}
+    Owner ruling 2026-08-02 — the ACCOUNTS panel. A financial reader who is not
+    management used to land on the WORKER dashboard. These are the three numbers
+    their job starts from, all derived live and all read-only. Reuses the card +
+    cream-tile vocabulary of the expense digest above — no new CSS (UI rule 9).
+    {% endcomment %}
+    {% if accounts_panel %}
+    <div class="card" style="margin-bottom: 18px;">
+        <div class="card-header">
+            <div class="card-title">Accounts — where to start</div>
+            <a href="{% url 'expense:material-spend' %}" class="card-link">Material spend →</a>
+        </div>
+        <div class="card-body">
+            {% comment %}Canonical `.stat-grid`/`.stat-card` from base.html (UI_COMPONENTS
+               §dashboards) — the same component the cloth + earnings dashboards use. No
+               inline sizing/radius: the design system is tokens-only, and `.stat-grid`
+               already goes 2-col at ≤560px, so mobile needs nothing extra.{% endcomment %}
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="label">Unpriced rolls</div>
+                    <div class="value">{{ accounts_panel.rolls_unpriced }} / {{ accounts_panel.rolls_total }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Advance exposure</div>
+                    <div class="value">₹{{ accounts_panel.advance_exposure|default:"0.00" }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Pending payable</div>
+                    <div class="value">₹{{ accounts_panel.pending_payable|default:"0.00" }}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">Paid this month ({{ accounts_panel.settlements_count }})</div>
+                    <div class="value">₹{{ accounts_panel.settlements_total|default:"0.00" }}</div>
+                </div>
+            </div>
+            {% if accounts_panel.rolls_unpriced %}
+            <p class="broadcast-hint">
+                {{ accounts_panel.rolls_unpriced }} roll(s) have no cost per kg yet — the system shows them as
+                <strong>unpriced</strong> rather than ₹0, so material cost stays honest until you enter it.
+                <a href="{% url 'raw_materials:roll-list' %}">Price them →</a>
+            </p>
+            {% endif %}
         </div>
     </div>
     {% endif %}
@@ -346,7 +396,8 @@
             <div class="value">{{ helper_data.completed_count }}</div>
         </div>
         <div class="stat-card stat-card--serif">
-            <div class="label">My Active Tasks</div>
+            {# Layering-board scope: counts layering assignments only, not all stages. #}
+            <div class="label">My Active Layerings</div>
             <div class="value">{{ helper_data.active_assigned_count }}</div>
         </div>
         <div class="stat-card stat-card--serif">
@@ -418,11 +469,20 @@
             </ul>
         </div>
     </div>
-    {% else %}
+    {% elif does_floor_work %}
     <div class="empty">
         <h2>No active tasks</h2>
         {# post-OP-1 copy: workers get assigned to ANY operation, not just layering/cutting #}
         <p>Jab manager aapko kaam dega, woh yahan dikhega. (Your assigned work will appear here.)</p>
+    </div>
+    {% else %}
+    {% comment %}Owner feedback 2026-08-02: an accountant/listing_team/student is
+       never assigned floor work, so promising them tasks was simply wrong. Say
+       what their account IS for instead of showing an empty worker panel.{% endcomment %}
+    <div class="empty">
+        <h2>Nothing assigned to you</h2>
+        <p>This account is not set up for factory floor work, so production tasks
+           will not appear here. Use the menu on the left for what your role covers.</p>
     </div>
     {% endif %}
 

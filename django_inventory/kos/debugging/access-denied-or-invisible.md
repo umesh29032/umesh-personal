@@ -19,6 +19,22 @@ related: [feature-rbac-access, project-people-and-roles]
 - A user sees data/buttons meant for another role (the SCARY direction)
 - Accountant blocked from a financial page
 
+> 💡 **Samjho aise:** Is project mein "access" ek cheez nahi, **teen alag
+> cheezein** hain — aur inko mila dena hi sabse common galti hai:
+>
+> - **Role** (manager / worker / accountant) = *"aap kis kism ke user ho"* — ye
+>   decide karta hai kaunse **page** khulenge.
+> - **Skill** (overlock_operator, checker…) = *"aap kaunsa kaam kar sakte ho"* —
+>   ye decide karta hai kaunse **stage** khulenge.
+> - **Assignment** = *"is Adda pe manager ne aapko rakha hai ya nahi"*.
+>
+> Ek worker ko stage tab hi dikhta hai jab **skill AND assignment dono** hon.
+> Isliye "mera worker overlock nahi khol pa raha" ka jawaab aksar role nahi hota
+> — ya to skill nahi lagi, ya us Adda pe roster mein daala hi nahi gaya.
+>
+> ⚠️ Aur ulta case (**koi cheez dikh rahi hai jo nahi dikhni chahiye**) hamesha
+> zyada serious hai. Usse kabhi "baad mein dekhenge" mat kaho.
+
 ## First Five Minutes
 
 1. **Establish WHO, exactly:** role (super_admin/manager/worker/accountant
@@ -86,6 +102,12 @@ Sees too much?
 [rbac-access](../features/rbac-access.md) (the machinery) ·
 [people-and-roles](../project/people-and-roles.md) (the model) ·
 [auth-hardening](../concepts/security/auth-hardening.md) (the front door)
+
+> 🧠 **Remember This:** **Role = kaunsa PAGE · Skill = kaunsa STAGE ·
+> Assignment = kaunsa ADDA.** Worker ko stage khulne ke liye **skill AND
+> assignment dono** chahiye. "Nahi dikh raha" ka jawaab 90% baar skill ya
+> roster hota hai, role nahi. Aur agar kuch **dikh raha hai jo nahi dikhna
+> chahiye** — wo turant dekho, wo dusri wali galti se kahin zyada mehngi hai.
 
 ## Implementation References
 

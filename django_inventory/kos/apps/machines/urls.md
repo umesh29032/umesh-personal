@@ -1,7 +1,7 @@
 ---
 id: app-machines-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "All 5 machine URLs — registry, checkout, checkin — individually."
 related: [app-machines]
@@ -11,6 +11,12 @@ related: [app-machines]
 
 > 📂 [machines app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > Source: `config/machines/urls.py` (mounted at /machines/, all management-gated).
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`machines` app ka kaam: factory ki machinein aur kis worker ke paas kaunsi machine hai.)*
 
 **Reading Strategy** — *Beginner:* §4 → §5 (the checkout/checkin pair IS
 the app). *Senior:* §4's ED (why no scheduling yet).

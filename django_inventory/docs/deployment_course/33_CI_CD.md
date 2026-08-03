@@ -1,6 +1,23 @@
+---
+id: deploy-course-33-ci-cd
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 33 — CI/CD (Continuous Integration / Delivery)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [32 — Error Tracking with Sentry](32_Sentry.md). Next: [34 — Production Security](34_Production_Security.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- explain what CI would catch that a human will not
+- describe the pipeline this project deserves
+- explain why the test battery must run sequentially on a fresh database
+- decide how far to automate deployment
 
 # Purpose
 To automate the path from "I committed code" to "it's safely running in production" — running the checks and the deploy the same way every time, so a human never forgets a step. This chapter maps my **real** automation today (pre-commit hooks + `deploy.sh`) and the CI/CD pipeline I'd add next.
@@ -28,6 +45,8 @@ You want both: pre-commit for speed, CI for authority.
 
 ### Idempotent, scripted deploys
 A deploy should be a **script** (not remembered steps), **safe to re-run**, and **ordered for safety**: back up first, then build, then switch, then verify — with a defined **rollback**.
+
+> 💡 **Samjho aise:** CI wo **darwaze pe khada checker** hai jo har code change pe saare test khud chala deta hai — thaka hua insaan bhool sakta hai, checker nahi. CD uske baad **khud deploy** kar deta hai. Is project ka sach: abhi CI **nahi** hai, aur isi wajah se ek purani galti 7 din tak chhupi rahi thi.
 
 # Real World Example (My ERP)
 **What's automated today:**
@@ -99,6 +118,41 @@ env/bin/python config/manage.py verify_production                  # invariant g
 sh deploy/deploy.sh                            # dump → pull → build → up → prune → smoke
 ```
 
+# Production Walkthrough
+- **No CI configured yet** — the battery runs manually. That is the honest state and it is an open item.
+- What exists is a real asset: **1,408 tests** across ten apps plus devseed and verification suites, run **sequentially against a fresh database** — never in parallel, never with `--keepdb`, because money tests use advisory locks and shared sequences that parallel runs corrupt into false failures.
+- A minimal pipeline: install, `manage.py check --deploy` (ch 24), migrations check, then the battery in that order.
+- Deployment stays manual — the two-command deploy (ch 18) is already short, and a human decides *when* the factory goes down.
+
+# Debugging Guide
+1. **Green locally, red in CI** — usually environment: missing `.env` values, different Postgres version, or a timezone assumption.
+2. **Flaky failures** — first suspect parallelism or shared state, not the code. This project has already seen a wall-clock timeout produce fake failures under load.
+3. **Slow pipeline** — cache dependencies; do not cache the database.
+4. **Passing CI, failing production** — CI does not test the server. That is what `verify_production` is for (ch 30).
+
+# Performance Notes
+- Fresh-database sequential runs are slower and are the correct trade for trustworthy money tests.
+- Dependency caching is the cheapest large win.
+- Split fast checks (lint, `check --deploy`) before the slow battery so obvious breakage fails in seconds.
+
+# Security Considerations
+- **CI secrets are production secrets.** A pipeline with deploy rights is a path into the server.
+- Never echo secrets in build logs; masked variables still leak through `set -x`.
+- Pull requests from forks must not receive secrets.
+- Restrict who can change the pipeline definition — it runs with the pipeline's privileges.
+
+# Architecture Decisions
+- **Tests exist and are trusted; automation of running them is the gap** — capability first, convenience second.
+- **Sequential fresh-database battery** as a hard rule, derived from how the money paths lock.
+- **Manual deploy** so a factory outage is always a human decision.
+- **Recorded as open** rather than partially wired.
+
+# Best Practices
+- Run the full battery before every release, with or without CI.
+- Put `check --deploy` in the pipeline so nobody has to remember it.
+- Never weaken a test to make the pipeline green.
+- Keep the pipeline definition in the repository, reviewed like code.
+
 # Beginner Mistakes
 - **Deploying by remembered steps** → one gets skipped eventually. Script it (`deploy.sh`) and make it re-runnable.
 - **Relying only on pre-commit** → it's per-laptop and skippable (`--no-verify`). Add server-side CI as the authority.
@@ -109,13 +163,31 @@ sh deploy/deploy.sh                            # dump → pull → build → up 
 - **Auto-deploying to prod with no gate** (full Continuous Deployment) before you have solid tests/monitoring → ship bugs fast. Stop at Delivery (human presses go) until confidence is high.
 
 # Interview Questions
-**Junior — "CI vs CD?"** CI automatically runs quality gates (lint/tests/build) on every push to catch breakage early; CD automatically makes every green build deployable (and optionally deploys it), so releasing is one reliable command.
+- **Junior:** "CI vs CD?" — CI automatically runs quality gates (lint/tests/build) on every push to catch breakage early; CD automatically makes every green build deployable (and optionally deploys it), so releasing is one reliable command.
 
-**Mid — "What gates run in your pipeline and where?"** Locally, pre-commit runs `ruff` + a design-system `ds-lint` ratchet on changed files. The authoritative gates (recommended in CI) are `ruff`, `makemigrations --check` (no schema drift), the 1878-test fresh-DB battery, and a `docker build`. Deploy is the scripted `deploy.sh` (dump → pull → build → up → verify).
+- **Mid:** "What gates run in your pipeline and where?" — Locally, pre-commit runs `ruff` + a design-system `ds-lint` ratchet on changed files. The authoritative gates (recommended in CI) are `ruff`, `makemigrations --check` (no schema drift), the 1878-test fresh-DB battery, and a `docker build`. Deploy is the scripted `deploy.sh` (dump → pull → build → up → verify).
 
-**Senior — "Why fresh-DB + sequential tests, and why a migration-drift check?"** Fresh-DB sequential runs catch bugs that `--keepdb`/parallel hide — order dependence, migration replayability, and state leakage between tests — which matters for a money system where a hidden ordering assumption could corrupt totals. `makemigrations --check` fails the build if models changed without a committed migration, preventing a deploy where code and schema disagree ([Ch 27](27_Migrations.md)).
+- **Senior:** "Why fresh-DB + sequential tests, and why a migration-drift check?" — Fresh-DB sequential runs catch bugs that `--keepdb`/parallel hide — order dependence, migration replayability, and state leakage between tests — which matters for a money system where a hidden ordering assumption could corrupt totals. `makemigrations --check` fails the build if models changed without a committed migration, preventing a deploy where code and schema disagree ([Ch 27](27_Migrations.md)).
 
-**Staff — "Design the CI/CD for this ERP and its rollback story."** CI on every push/PR: lint → migration-drift check → the full fresh-DB battery + goldens + `verify_production` → build the image; branch protection blocks merge on red. CD on a release tag: build/push the pinned image, then run the safety-ordered `deploy.sh` (pre-deploy `pg_dump` as the rollback anchor → pull → build → `up` which migrates + collects static → post-deploy `verify_production` + smoke). Rollback is deterministic: `git checkout <previous tag>` + rerun `deploy.sh`; a bad migration restores the pre-deploy dump. Keep it Continuous *Delivery* (human presses go) given a solo operator and financial data, and only move toward auto-deploy once monitoring + error tracking ([Ch 30](30_Monitoring.md)/[Ch 32](32_Sentry.md)) make regressions obvious within minutes. The invariant: no code reaches prod without passing the same gates, and every deploy has a one-command rollback.
+- **Staff:** "Design the CI/CD for this ERP and its rollback story." — CI on every push/PR: lint → migration-drift check → the full fresh-DB battery + goldens + `verify_production` → build the image; branch protection blocks merge on red. CD on a release tag: build/push the pinned image, then run the safety-ordered `deploy.sh` (pre-deploy `pg_dump` as the rollback anchor → pull → build → `up` which migrates + collects static → post-deploy `verify_production` + smoke). Rollback is deterministic: `git checkout <previous tag>` + rerun `deploy.sh`; a bad migration restores the pre-deploy dump. Keep it Continuous *Delivery* (human presses go) given a solo operator and financial data, and only move toward auto-deploy once monitoring + error tracking ([Ch 30](30_Monitoring.md)/[Ch 32](32_Sentry.md)) make regressions obvious within minutes. The invariant: no code reaches prod without passing the same gates, and every deploy has a one-command rollback.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know why fresh-DB **sequential** tests are non-negotiable here? | "Parallel tests are faster and fine." | Because the money paths use **advisory locks and shared sequences** — parallel or `--keepdb` runs turn those into **false failures**, and hide order dependence, migration replayability and state leakage. Slower and trustworthy beats fast and ambiguous on a money system. |
+| Do you know what `makemigrations --check` is for? | "It creates any missing migrations." | It **fails the build** if models and migrations have drifted — no file is written. It catches the "someone changed a model and forgot the migration" class **before** production meets "column does not exist" (ch 27). |
+| Can you order the gates sensibly? | "Run all the tests in CI." | **Fast checks first**: `ruff` → **migration-drift check** → `check --deploy` → then the full fresh-DB battery + goldens + `verify_production`. Obvious breakage should fail in seconds, not after a ten-minute suite. |
+| ⚠️ Do you know what CI secrets really are? | "CI needs the deploy credentials." | **CI secrets are production secrets** — a pipeline with deploy rights is a path into the server. Never echo them (`set -x` leaks masked variables), never expose them to **fork PRs**, and restrict who can edit the pipeline definition, because it runs with the pipeline's privileges. |
+
+**The killer follow-up:** *"Your pipeline is red and the fix is urgent. What do you do?"* — the wrong answer is **weaken or skip the test**. Either fix forward or roll back. A suite that gets relaxed under pressure stops being a gate exactly when you need it most.
+
+# Revision Notes
+- No CI yet — open item, stated honestly. Battery runs manually.
+- **1,408 tests**, run **sequentially on a fresh DB** — never parallel, never `--keepdb` (advisory locks + sequences ⇒ fake failures).
+- Pipeline order: install → `check --deploy` → migrations check → battery.
+- Deploy stays **manual** — a human decides when the factory pauses.
+- ⚠️ CI secrets = production secrets. Never echo them; no secrets to fork PRs.
 
 # Cheat Sheet
 - **CI** = auto gates on push (lint/test/build). **CD** = every green build deployable (human presses go).
@@ -135,6 +207,12 @@ sh deploy/deploy.sh                            # dump → pull → build → up 
 | Rollback | checkout previous tag + `deploy.sh`; bad migration → predeploy dump |
 | Server-side CI | **gap — add `.github/workflows/ci.yml`** |
 
+# Practice Tasks
+1. **Read the code:** find how the battery is invoked today and write it as a pipeline script.
+2. **Debug:** run part of the suite in parallel and observe the money-test failures. Explain the cause.
+3. **Design:** write the CI file you would add, fast checks first.
+4. **Architecture:** argue for manual deployment in a single-factory business.
+
 # Homework
 1. `pre-commit run --all-files` — which two hooks run? What does each reject? (Tie back to the commit that got blocked.)
 2. Run the four "CI-should-run" commands by hand. Which one catches a model change with no migration?
@@ -144,7 +222,7 @@ sh deploy/deploy.sh                            # dump → pull → build → up 
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - GitHub Actions — *docs / quickstart*: https://docs.github.com/en/actions
 - GitHub Actions — *Django example workflow*: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 - pre-commit — *framework docs*: https://pre-commit.com/

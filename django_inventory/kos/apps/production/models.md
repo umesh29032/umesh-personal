@@ -1,7 +1,7 @@
 ---
 id: app-production-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "35 production models in 7 modules — which holds what, who writes it, what protects it?"
 related: [app-production, feature-stage-tracking, feature-cutting]
@@ -10,6 +10,12 @@ related: [app-production, feature-stage-tracking, feature-cutting]
 # production — model knowledge (`config/production/models/`, 7 modules · 35 classes)
 
 > 📂 [production app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ## `core.py` — flow configuration + rates + pool (12 classes)
 

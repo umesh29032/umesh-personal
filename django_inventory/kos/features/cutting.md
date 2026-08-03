@@ -1,7 +1,7 @@
 ---
 id: feature-cutting
 type: feature
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Where do 'pieces' come from — the moment cloth becomes countable, payable units?"
 related: [feature-allocation, feature-stage-tracking, flow-cloth-to-garment]
@@ -58,6 +58,30 @@ bundles/barcodes/downstream ops unlock only when every blocking lane's
 cutting completes; post-join lanes append, never regress. 🔒 Owner-ratified:
 **sequence IS the production cycle — no third abstraction.**
 
+**The lane contract — every per-lane console owes BOTH halves.** The lane trio
+(Layering · Pattern Design · Cutting) runs once *per lane*, so each of those
+three consoles must (1) offer a **lane chooser** when the URL is lane-less and
+the Adda has more than one lane, and (2) stamp the chosen lane onto **every
+form it renders**. Miss half (1) and a deep link renders for an unresolvable
+lane; miss half (2) and the POST arrives lane-less and the service cannot act.
+
+> 💡 **Samjho aise:** teen kaatne ki line chal rahi hain. Console pehle poochta
+> hai *"kaunsi line?"*, aur phir har parchi (form) pe us line ka naam likh deta
+> hai. Naam likhna bhool gaye to parchi counter pe pahunchti hai bina line ke —
+> aur clerk kuch nahi kar sakta. **Chup-chaap kuch nahi hota, bas kaam nahi hota.**
+
+This is not theory: **Pattern Design shipped without either half** and was
+therefore *unstartable on every multi-fabric product* (a real T-shirt = body +
+rib + trim = 3 lanes) while 1,892 tests passed green — the POST silently
+created nothing. Fixed 2026-07-27 by giving the panel the same
+`_request_stream` + `_scope_console_lanes` treatment Layering and Cutting
+already had. Audit: [AUDIT-2 §7](../../docs/AUDIT2_PRODUCTION_ACCESS_FINANCIAL_2026_07_27.md).
+
+**Why service tests could not catch it:** the services were always correct —
+all seven pattern views already read `stream` from POST/GET. The defect lived
+in the *rendered contract* between template and service. A bug can sit entirely
+in what the page **fails to send**.
+
 **Why APSCPB is sacred:** it is the *verified* piece count — the input to
 barcode generation (`preview_barcode_batches`), the cutting stage's pool
 good ([allocation](allocation.md) — read directly, never copied into a
@@ -99,6 +123,7 @@ suites (cutting/stream/R10-B generic).
 - ❌ Creating streams implicitly — seq >1 REQUIRES a declared reason; reasons are data.
 - ❌ Skipping leftover capture at layering complete — mandatory; leftovers are tracked cloth, not waste.
 - ❌ Treating "Pattern Design" rename as a code rename — UI label changed (R8); internal code stays `cutting_pattern`.
+- ❌ Adding or editing a per-lane console without BOTH halves of the lane contract (chooser + `stream` on every form). Verify on a MULTI-lane Adda — a single-lane one resolves the lane implicitly and hides the bug completely.
 - ✅ Always verify: breakdown ≡ barcode preview ≡ pool good on a test Adda after touching any of the three.
 
 ## Interview Notes

@@ -5,13 +5,13 @@ status: generated
 owner: generated
 scope: feature — worker-reporting
 anchors: docs/LEARNING_2_0/PROJECT_BRAIN/FEATURE_INDEX.md
-verified: graph:56207d76ed26
+verified: graph:f48dc8b77c29
 ---
 
 # Feature — Worker reporting
 
 > ⚙️ GENERATED — an index, not truth. Do not hand-edit; fix the source, rebuild the graph, regenerate.
-> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `56207d76ed26` · schema: 1.0.1 · template: feature-doc v1.0.0
+> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `f48dc8b77c29` · schema: 1.0.1 · template: feature-doc v1.0.0
 > Regenerate: `env/bin/python scripts/generate_docs.py --out docs/features`
 
 | Field | Value |
@@ -24,6 +24,8 @@ verified: graph:56207d76ed26
 
 | Route | Mount | View | Card |
 |---|---|---|---|
+| `production:adda-snapshot` | `/production/addas/<str:code>/snapshot/` | `AddaSnapshotView` | [adda-snapshot.md](adda-snapshot.md) |
+| `production:my-work` | `/production/my-work/` | `MyAssignedWorkView` | [my-work.md](my-work.md) |
 | `production:worker-report` | `/production/addas/<str:code>/report/<str:stage_type>/` | `WorkerReportView` | [worker-report.md](worker-report.md) |
 
 ## Member models

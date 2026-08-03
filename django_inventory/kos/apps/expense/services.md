@@ -1,7 +1,7 @@
 ---
 id: app-expense-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Which expense service owns which responsibility, who calls it, what does it write, and how does it fail?"
 related: [app-expense, concept-single-writer, concept-service-layer]
@@ -13,6 +13,12 @@ related: [app-expense, concept-single-writer, concept-service-layer]
 > These 10 modules are the ONLY money writers in the system. Every one:
 > keyword-only args · docstring side-effect contracts · `@transaction.atomic`
 > on writers · loud `ValidationError` refusals that name their fix.
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`expense` app ka kaam: **paisa** — settlement, ledger, advance, payroll. Yahan galti sabse mehngi padti hai.)*
 
 ## The sole-writer table (who holds which pen)
 

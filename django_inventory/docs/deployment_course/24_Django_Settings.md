@@ -1,6 +1,23 @@
+---
+id: deploy-course-24-django-settings
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 24 — Django Settings (base / local / production)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [23 — Environment Variables](23_Environment_Variables.md). Next: [25 — Static vs Media](25_Static_vs_Media.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- explain this project's split settings layout
+- name the settings that decide whether a deploy is safe
+- diagnose the classic settings-related 500s
+- decide where a new setting belongs
 
 # Purpose
 To understand my **settings split** — `base.py`, `local.py`, `production.py` — what changes between dev and prod and *why*, and how `DJANGO_SETTINGS_MODULE` selects the right one. This file decides whether your production site is secure or leaking.
@@ -34,6 +51,8 @@ Django loads the module named by the `DJANGO_SETTINGS_MODULE` env var. My **Dock
 
 ### Why DEBUG=False is non-negotiable
 With `DEBUG=True`, any error shows a full traceback page including settings + local variables (which can contain data/secrets), and `ALLOWED_HOSTS` isn't enforced. In production that's an information-disclosure vulnerability. `production.py` sets `DEBUG=False` — verified in RC1.
+
+> 💡 **Samjho aise:** Ek hi app, do mizaaj: ghar pe (`local`) — galti dikhao, detail do, aaram se. Bahar (`production`) — galti chhupao, tez chalo, sakhti se. Isi liye settings **do file** mein baanti hai. Aur `DEBUG=True` production mein rehna sabse mehnga bhool hai: wo galti ke saath aapka poora ghar dikha deta hai.
 
 # Real World Example (My ERP)
 - **`config/config/settings/`** = `base.py` + `local.py` + `production.py`.
@@ -71,6 +90,44 @@ docker compose exec app python manage.py check --deploy    # flags DEBUG/SSL/coo
 DJANGO_SETTINGS_MODULE=config.settings.local python config/manage.py runserver
 ```
 
+# Production Walkthrough
+- Settings are a **package**, not a file: a shared base plus `local` and `production` modules. Production imports the base and then overrides only what differs.
+- `DJANGO_SETTINGS_MODULE` chooses which one runs. On the server that is the production module; on your laptop, `config.settings.local`.
+- Production sets `DEBUG=False`, a real `ALLOWED_HOSTS`, secure cookies, HSTS, and the database/cache from `.env` (ch 23).
+- `manage.py check --deploy` is the audit that reads these settings and tells you what is still unsafe (ch 34).
+
+# Debugging Guide
+1. **DisallowedHost** — the domain is missing from `ALLOWED_HOSTS`. The error names the host you need to add.
+2. **CSRF verification failed** on HTTPS — `CSRF_TRUSTED_ORIGINS` needs the scheme+domain.
+3. **Infinite redirect loop** — `SECURE_SSL_REDIRECT` on while the proxy header is not trusted; Caddy terminates TLS, so Django must be told the request was secure.
+4. **Static files 404 in production** — `STATIC_ROOT` / `collectstatic` mismatch (ch 26).
+5. **Wrong settings module loaded** — everything looks "local" on the server. Print the module name at start-up when in doubt.
+
+# Performance Notes
+- Settings are imported once; no runtime cost.
+- `CONN_MAX_AGE` here decides connection reuse (ch 21) — one line, large effect.
+- Template caching is on in production and off locally, which is why the local server needs a restart after template edits.
+- Middleware order is a performance and correctness decision, not decoration.
+
+# Security Considerations
+- **`DEBUG=False` is non-negotiable.** With `DEBUG=True`, an error page shows source, settings and environment to the internet.
+- `ALLOWED_HOSTS` blocks Host-header abuse; wildcards defeat it.
+- `SECURE_HSTS_SECONDS`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` — all three matter once HTTPS exists (ch 12).
+- Never import the production module on your laptop; it expects real secrets.
+- `check --deploy` before every release; treat its warnings as a to-do list.
+
+# Architecture Decisions
+- **Split settings** so environment differences are explicit and reviewable, instead of buried in `if DEBUG:`.
+- **Base + overrides** so a shared change cannot be forgotten in one environment.
+- **Everything environment-specific from `.env`**, so the modules themselves are safe to commit.
+- **One production module** rather than per-server files — servers differ by `.env`, not by code.
+
+# Best Practices
+- Add new environment-specific settings to `.env.example` and the base, not to a single environment.
+- Run `check --deploy` in CI (ch 33) so nobody has to remember it.
+- Keep local and production as close as possible; every difference is a class of bug that only appears in one place.
+- Never commit a real secret into a settings module.
+
 # Beginner Mistakes
 - **Shipping `DEBUG=True`** → full tracebacks + secrets to anyone who triggers an error. The cardinal prod sin ([Ch 03](03_HTTP_HTTPS.md)).
 - **`ALLOWED_HOSTS=['*']` in prod** → accepts spoofed Host headers (cache poisoning, etc.). Set the real domain.
@@ -80,13 +137,31 @@ DJANGO_SETTINGS_MODULE=config.settings.local python config/manage.py runserver
 - **Not running `check --deploy`** → miss easy hardening flags Django detects for you.
 
 # Interview Questions
-**Junior — "Why is `DEBUG=False` important in production?"** With DEBUG on, errors expose a full traceback with settings and local variables (potentially secrets/data) and `ALLOWED_HOSTS` isn't enforced — an information-disclosure risk. Off, users get a generic error page.
+- **Junior:** "Why is `DEBUG=False` important in production?" — With DEBUG on, errors expose a full traceback with settings and local variables (potentially secrets/data) and `ALLOWED_HOSTS` isn't enforced — an information-disclosure risk. Off, users get a generic error page.
 
-**Mid — "How does the settings split work and how is the right one chosen?"** A `base.py` holds common config; `local.py`/`production.py` import it and override per-environment. `DJANGO_SETTINGS_MODULE` picks which; the Docker image pins `config.settings.production` so containers always run prod settings.
+- **Mid:** "How does the settings split work and how is the right one chosen?" — A `base.py` holds common config; `local.py`/`production.py` import it and override per-environment. `DJANGO_SETTINGS_MODULE` picks which; the Docker image pins `config.settings.production` so containers always run prod settings.
 
-**Senior — "Which production settings enforce HTTPS correctly behind Caddy, and what breaks if one is missing?"** `SECURE_SSL_REDIRECT` (HTTP→HTTPS), `SECURE_HSTS_SECONDS` (+ subdomains/preload), `SESSION/CSRF_COOKIE_SECURE`, and crucially `SECURE_PROXY_SSL_HEADER` so Django trusts Caddy's `X-Forwarded-Proto`. Without the proxy header, `SECURE_SSL_REDIRECT` sees "HTTP" (Caddy terminated TLS) and loops forever ([Ch 11](11_Reverse_Proxy.md)).
+- **Senior:** "Which production settings enforce HTTPS correctly behind Caddy, and what breaks if one is missing?" — `SECURE_SSL_REDIRECT` (HTTP→HTTPS), `SECURE_HSTS_SECONDS` (+ subdomains/preload), `SESSION/CSRF_COOKIE_SECURE`, and crucially `SECURE_PROXY_SSL_HEADER` so Django trusts Caddy's `X-Forwarded-Proto`. Without the proxy header, `SECURE_SSL_REDIRECT` sees "HTTP" (Caddy terminated TLS) and loops forever ([Ch 11](11_Reverse_Proxy.md)).
 
-**Staff — "How do you guarantee prod never boots with dev settings, and audit hardening continuously?"** Pin `DJANGO_SETTINGS_MODULE=…production` in the image ENV (not relying on `wsgi.py`'s default); run `manage.py check --deploy` in CI and a `verify_production` gate post-deploy asserting `DEBUG=False` + `SECRET_KEY` present + enforcement flags; keep secrets fail-fast (no defaults) so a missing prod var crashes rather than silently degrades; and keep the base/prod split so dev conveniences can't leak in. Defense: pin + verify + fail-fast.
+- **Staff:** "How do you guarantee prod never boots with dev settings, and audit hardening continuously?" — Pin `DJANGO_SETTINGS_MODULE=…production` in the image ENV (not relying on `wsgi.py`'s default); run `manage.py check --deploy` in CI and a `verify_production` gate post-deploy asserting `DEBUG=False` + `SECRET_KEY` present + enforcement flags; keep secrets fail-fast (no defaults) so a missing prod var crashes rather than silently degrades; and keep the base/prod split so dev conveniences can't leak in. Defense: pin + verify + fail-fast.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| `DEBUG=False` — do you know exactly what leaks? | "Debug mode shows errors to users." | It exposes a **full traceback with settings and local variables** — potentially secrets and customer data — **and `ALLOWED_HOSTS` is not enforced**. It is an information-disclosure vulnerability, not an untidy error page. |
+| Can you name the four HTTPS settings behind a proxy? | "Turn on the secure settings." | **`SECURE_SSL_REDIRECT`** · **`SECURE_HSTS_SECONDS`** · **`SESSION_COOKIE_SECURE`/`CSRF_COOKIE_SECURE`** · and crucially **`SECURE_PROXY_SSL_HEADER`** so Django trusts Caddy's `X-Forwarded-Proto`. Omit the last one and you get an **infinite redirect loop** (ch 11). |
+| Do you know how the right settings module is chosen? | "It defaults to the production settings." | **`DJANGO_SETTINGS_MODULE`** — and the image **pins `config.settings.production` in ENV** rather than relying on `wsgi.py`'s default. Relying on a default is how a container boots with dev settings and nobody notices. |
+| Do you audit hardening, or assume it? | "We set the secure settings once." | **`manage.py check --deploy`** in CI plus a **`verify_production`** gate after deploy. Settings drift; a checklist that runs itself is the only kind that keeps working. |
+
+**The killer follow-up:** *"Prove production cannot boot with dev settings."* — the answer is a **mechanism, not a promise**: `DJANGO_SETTINGS_MODULE` pinned in the image ENV, `check --deploy` in CI, and a post-deploy verification gate. "We are careful" is not proof, and this is a question about proof.
+
+# Revision Notes
+- Settings = **package**: base + `local` + `production`; `DJANGO_SETTINGS_MODULE` picks one.
+- Production must have `DEBUG=False`, real `ALLOWED_HOSTS`, secure cookies, HSTS.
+- DisallowedHost → add the domain. CSRF fail on HTTPS → `CSRF_TRUSTED_ORIGINS`.
+- Redirect loop → SSL redirect on but proxy header not trusted.
+- `manage.py check --deploy` = the pre-release audit (ch 34).
 
 # Cheat Sheet
 - **Split:** `base.py` (common) + `local.py` (DEBUG on) + `production.py` (hardened). Import base, override differences.
@@ -105,6 +180,12 @@ DJANGO_SETTINGS_MODULE=config.settings.local python config/manage.py runserver
 | DB | `DATABASE_URL` (dj-database-url, conn_max_age 600, ssl_require) |
 | Deploy gate | `verify_production` (DEBUG off + SECRET_KEY present) |
 
+# Practice Tasks
+1. **Read the code:** diff the production module against base. Every difference — why does it exist?
+2. **Debug:** run `check --deploy` locally with the production module and read every warning.
+3. **Design:** you add a feature flag. Where does it live: base, production, or `.env`? Justify it.
+4. **Architecture:** argue split settings versus one file with `if DEBUG:` branches.
+
 # Homework
 1. `docker compose exec app python -c "from django.conf import settings;print(settings.DEBUG, settings.ALLOWED_HOSTS)"` — confirm prod values.
 2. `manage.py check --deploy` (in the container) — read every warning; which are already satisfied by `production.py`?
@@ -114,7 +195,7 @@ DJANGO_SETTINGS_MODULE=config.settings.local python config/manage.py runserver
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Django docs — *Settings* + *Deployment checklist*: https://docs.djangoproject.com/en/5.0/ref/settings/ · https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 - Django docs — *`manage.py check --deploy`*: https://docs.djangoproject.com/en/5.0/ref/django-admin/#check
 - cookiecutter-django settings split (the canonical pattern): https://cookiecutter-django.readthedocs.io/en/latest/settings.html

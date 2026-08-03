@@ -1,7 +1,7 @@
 ---
 id: pattern-transaction-boundary
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Transaction Boundary pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** One business event = one atomic function = one lock plan.
+
+> 💡 **Samjho aise:** Ek business kaam = **ek hi atomic function**. Ya poora hoga, ya bilkul nahi — aadha-adhoora kabhi nahi. Bijli chali jaaye tab bhi.
 
 **Problem it solves.** Boundaries drawn by code shape (view/request) instead of event shape corrupt half-events.
 

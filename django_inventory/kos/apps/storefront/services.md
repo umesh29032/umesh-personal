@@ -1,7 +1,7 @@
 ---
 id: app-storefront-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "image_service — the upload boundary; and where storefront's future service surface will grow."
 related: [app-storefront, pattern-validation-chain]
@@ -10,6 +10,12 @@ related: [app-storefront, pattern-validation-chain]
 # storefront — service knowledge
 
 > 📂 [storefront app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`storefront` app ka kaam: public website — featured products aur categories jo bahar dikhte hain.)*
 
 ## `image_service.py` — the upload boundary
 

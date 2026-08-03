@@ -22,10 +22,13 @@ from raw_materials.forms import BulkRollForm, RollEditForm
 from raw_materials.models import ClothColor, ClothRoll, ClothType, StorageLocation
 from raw_materials.services import bulk_create_rolls, update_roll_details
 
-from .mixins import ManagementRoleMixin, ProductionRoleMixin, SuperAdminOnlyMixin
+from .mixins import (
+    ManagementRoleMixin, ProductionOrAccountantMixin, ProductionRoleMixin,
+    SuperAdminOnlyMixin,
+)
 
 
-class RollListView(LoginRequiredMixin, ProductionRoleMixin, ListView):
+class RollListView(LoginRequiredMixin, ProductionOrAccountantMixin, ListView):
     """List + filter cloth rolls. Filters via querystring; pagination via Django."""
     template_name = 'raw_materials/roll_list.html'
     model = ClothRoll

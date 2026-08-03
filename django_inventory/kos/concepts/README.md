@@ -45,7 +45,7 @@ before it.
 | [postgresql/](postgresql/README.md) | from-orm-to-sql · indexes · query-performance · locks · constraints | debug ANY slow/wrong query with evidence; design armor the app can't bypass |
 | [architecture/](architecture/README.md) | service-layer · single-writer · two-truths | explain WHY this system is shaped this way — the three decisions everything else follows |
 | [database-design/](database-design/README.md) | append-only-tables | design tables that can face an audit |
-| [testing/](testing/README.md) | testing-strategy | test money like it's money |
+| [testing/](testing/README.md) | testing-strategy · local-testing-environment | test money like it's money — and get a clean factory to hand-test on |
 | [security/](security/README.md) | auth-hardening | attack your own front door before someone else does |
 | [patterns/](patterns/README.md) | 11 cross-app pattern cards | recognize + REUSE what the repo already solved (born from certification evidence) |
 

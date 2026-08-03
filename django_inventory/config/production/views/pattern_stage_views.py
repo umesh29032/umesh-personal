@@ -78,15 +78,25 @@ def _get_pattern_workflow_stage(adda: Adda) -> WorkflowStage | None:
     return adda.product.workflow_stages.filter(stage__code=STAGE_CUTTING_PATTERN).first()
 
 
-def _get_pattern_stage_record(adda: Adda, request=None) -> AddaStageRecord | None:
+def _get_pattern_stage_record(adda: Adda, request=None, *, lane=None
+                              ) -> AddaStageRecord | None:
+    """The pattern SR for this Adda, scoped to a lane when one is known.
+
+    `lane` (an already-resolved CuttingStream) wins over the raw request param —
+    it is what the panel render has resolved through the GAP-3/GAP-4 lane
+    contract. The raw-param branch stays for the action views, which resolve
+    their own lane inside the service call.
+    """
     wf = _get_pattern_workflow_stage(adda)
     if wf is None:
         return None
     qs = AddaStageRecord.objects.filter(adda=adda, workflow_stage=wf)
-    if request is not None:
+    from django.db.models import Q
+    if lane is not None:
+        qs = qs.filter(Q(stream=lane) | Q(stream__isnull=True))
+    elif request is not None:
         raw = request.GET.get('stream') or request.POST.get('stream')
         if raw:
-            from django.db.models import Q
             qs = qs.filter(Q(stream_id=int(raw)) | Q(stream__isnull=True))
     return qs.order_by('stream_id').first()
 
@@ -130,7 +140,33 @@ def _build_pattern_context(request, adda: Adda) -> dict:
       • start_form                          → Section 02 form (management only)
     """
     user = request.user
-    sr = _get_pattern_stage_record(adda, request)
+    # AUDIT-2 P0-1 fix: Pattern Design is a PER-LANE stage (it sits in the lane
+    # trio Layering · Pattern Design · Cutting), so it owes the same lane
+    # contract layering/cutting already implement — GAP-3 (bare multi-lane URL →
+    # lane picker, never a dead end) + GAP-4 (worker sees only their own lanes).
+    # Without it the panel rendered for an unresolvable lane and its forms
+    # carried no `stream`, so pattern-start silently no-op'd on every
+    # multi-lane Adda.
+    from production.views.stage_views import (
+        _request_stream, _scope_console_lanes,
+    )
+    from production.models import CuttingStream
+    lane = _request_stream(request, adda, for_render=True)
+    lanes = list(CuttingStream.objects.filter(
+        adda=adda, cancelled_at__isnull=True).order_by(
+        'fabric_group', 'sequence'))
+    lanes, lane, forbidden = _scope_console_lanes(
+        request, adda, STAGE_CUTTING_PATTERN, lanes, lane)
+    if forbidden:
+        raise PermissionDenied(
+            "That lane isn't assigned to you — open your task from "
+            "My Dashboard.")
+    if lane is None and len(lanes) > 1:
+        # GAP-3: bare multi-lane URL → lane picker, not a dead end.
+        return {'adda': adda, 'needs_lane_choice': True, 'lanes': lanes,
+                'active_lane': None, 'show_lane_switcher': False}
+
+    sr = _get_pattern_stage_record(adda, request, lane=lane)
     wf = _get_pattern_workflow_stage(adda)
     record = getattr(sr, 'cutting_pattern', None) if sr else None
     photos = list(record.photos.select_related('uploaded_by').all()) if record else []
@@ -196,6 +232,12 @@ def _build_pattern_context(request, adda: Adda) -> dict:
 
     return {
         'adda': adda,
+        # Lane contract (AUDIT-2 P0-1) — same keys layering/cutting publish, so
+        # the panel can render the lane switcher and stamp `stream` on its forms.
+        'needs_lane_choice': False,
+        'lanes': lanes,
+        'active_lane': lane,
+        'show_lane_switcher': len(lanes) > 1,
         'stage_record': sr,
         'workflow_stage': wf,
         'record': record,

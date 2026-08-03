@@ -73,10 +73,52 @@ def slug_for_file(u):
     return u["url_name"] or u["id"].split(":", 1)[1].replace(":", "__")
 
 
+# Route namespaces that get NO url-card (2026-08-03 audit).
+#
+# `docs/features/` is a FEATURE-knowledge surface for this factory. Django's admin
+# and allauth's auth pages are framework-provided CRUD: auto-generated one per
+# model x action, carrying zero business meaning. They made up **314 of 538**
+# cards in `_unassigned/` (58%) and actively drowned the 224 real app URLs — the
+# folder could not be navigated, which was the whole point of building it.
+#
+# Worse than noise in one case: a card titled `admin_expense_workerledgerentry_delete`
+# presents "delete a ledger entry" as a documented feature, when the ledger is
+# append-only by design (ADR-0009 / ch 12). Removing it removes a wrong message.
+#
+# Nothing is lost: INV-4b allows a url to have ZERO cards (`documented_by <= 1`),
+# the url NODES stay in the graph either way, and doc nodes are derived from disk —
+# so an ungenerated card creates no dangling reference. The admin remains reachable
+# and unchanged; it simply is not documented as a product feature.
+_CARDLESS_NAMESPACES = ("admin", "_unnamed")
+_CARDLESS_PREFIXES = ("account_", "socialaccount_", "google_")
+
+
+def _wants_card(uid):
+    """False for framework routes (Django admin / allauth). See above.
+
+    The namespace is read from the node ID (`url:<namespace>:<name>`), which is the
+    only place it reliably lives — `url_name` is None for unnamed routes and `label`
+    holds the URL PATH, not the name.
+    """
+    parts = uid.split(":")
+    if len(parts) < 2:
+        return True                      # unexpected shape → keep the card
+    # Two shapes exist in the graph:
+    #   url:<namespace>:<name>   e.g. url:admin:index, url:learning:chapter
+    #   url:<name>               e.g. url:account_login  (allauth: no namespace)
+    ns = parts[1]
+    name = ":".join(parts[2:]) if len(parts) > 2 else parts[1]
+    if ns in _CARDLESS_NAMESPACES:
+        return False
+    return not (ns.startswith(_CARDLESS_PREFIXES)
+                or name.startswith(_CARDLESS_PREFIXES))
+
+
 def build_model(g):
     nodes = {n["id"]: n for n in g["nodes"]}
     apps = {n["app_label"]: n for n in g["nodes"] if n["kind"] == "app"}
     routes = {e["from"]: e["to"] for e in g["edges"] if e["kind"] == "routes_to"}
+    routes = {u: v for u, v in routes.items() if _wants_card(u)}
     url_feat, feat_urls, feat_models = {}, {}, {}
     for e in g["edges"]:
         if e["kind"] != "belongs_to_feature":
@@ -277,9 +319,59 @@ def main():
     outputs.append(render_index(g, m, common))
     for rel, body in outputs:
         write(a.out, rel, body)
+    pruned = [] if a.sample else prune_orphans(a.out, {rel for rel, _ in outputs})
     sys.stderr.write(f"rendered {len(outputs)} files -> {a.out} "
                      f"(graph {common['graph12']}, tpl v{TEMPLATE_VERSION}, "
-                     f"collisions resolved: {len(m['collide'])})\n")
+                     f"collisions resolved: {len(m['collide'])}"
+                     + (f", pruned {len(pruned)} orphan(s)" if pruned else "") + ")\n")
+    for rel in pruned:
+        sys.stderr.write(f"  pruned orphan: {rel}\n")
+
+
+# The exact marker every generated card carries (same string d4_generated.py keys
+# on). A file WITHOUT it is hand-written and must never be pruned.
+GENERATED_BANNER = "⚙️ GENERATED — an index, not truth"
+
+
+def prune_orphans(out_dir, written):
+    """Delete generated cards this run no longer emits. Returns what was removed.
+
+    WHY (2026-08-03): the generator only ever WROTE. Any file it stopped emitting
+    stayed on disk forever as a stale duplicate — same `id:`, old graph stamp — and
+    `knowledge_sync` then reported it as drift. That happened twice in one session:
+
+      • `learning:*` cards moved out of `_unassigned/` once the feature was
+        registered in FEATURE_INDEX, leaving 9 copies behind;
+      • `admin:index` reverted from `admin__index.md` to `index.md` when that move
+        dissolved the filename collision, leaving the namespaced copy behind.
+
+    SAFETY — this can only ever delete a file the generator itself produced:
+      1. it must sit under `out_dir`;
+      2. it must carry the generated banner (hand-written files never do — that is
+         exactly how `HUMAN_GUIDE.md` survives, and why we do not special-case names);
+      3. it must NOT be in this run's output set.
+    All three must hold. A file failing any check is left completely alone.
+    """
+    import os
+    removed = []
+    for root, dirs, files in os.walk(out_dir):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for fn in sorted(files):
+            if not fn.endswith(".md"):
+                continue
+            path = os.path.join(root, fn)
+            rel = os.path.relpath(path, out_dir)
+            if rel in written:
+                continue
+            try:
+                head = io.open(path, encoding="utf-8").read(4096)
+            except OSError:                       # pragma: no cover
+                continue
+            if GENERATED_BANNER not in head:      # hand-written → never touch
+                continue
+            os.remove(path)
+            removed.append(rel)
+    return removed
 
 
 if __name__ == "__main__":

@@ -1,6 +1,23 @@
+---
+id: deploy-course-09-processes-and-services
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 09 — Processes & Services
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [08 — The File System](08_File_System.md). Next: [10 — systemd](10_Systemd.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- tell a process from a service, and say why production needs the second
+- list what is running and kill the right thing
+- explain what happens to your app when you close the terminal
+- name who restarts this project's containers, and when
 
 # Purpose
 To understand what a "running program" actually is on the server — a **process** — how to see them, how they use CPU/RAM, and how a long-running **service** (like Gunicorn or Postgres) differs from a command you run once. This is the vocabulary for "the app is using 100% CPU", "kill the stuck process", and "the container keeps restarting".
@@ -27,6 +44,8 @@ A server program can crash (bug, OOM, transient error). Production must bring it
 
 ### Resource use
 Each process consumes **CPU** (compute) and **RAM** (memory). Gunicorn workers each hold a full copy of Django in RAM — that's why worker count is bounded by RAM ([Ch 14](14_Gunicorn.md)). The **OOM killer**: if the box runs out of RAM, Linux kills the biggest process (often your DB or a worker) to survive — a nasty, silent outage cause.
+
+> 💡 **Samjho aise:** Process ek **chalta hua kaam** hai (aapka app), service wo kaam jo **apne aap shuru hota hai** aur girne pe khud khada ho jaata hai. Terminal se chalaya app aapke logout pe mar jaata hai; service reboot ke baad bhi zinda milti hai. Production ko doosri cheez chahiye.
 
 # Real World Example (My ERP)
 - **Long-running services** (containers with `restart: unless-stopped`): `caddy`, `app` (gunicorn master + **3 workers**), `db` (postgres), `redis`, `backup` (a sleep-loop that wakes at 02:00). Each is a process (or process tree) inside its container.
@@ -78,6 +97,39 @@ docker compose logs --tail 50 app   # last output before it died
 dmesg | grep -i oom        # was the OOM killer invoked? (RAM exhaustion)
 ```
 
+# Production Walkthrough
+- Nothing here is started by hand. **Docker is the supervisor**: `restart: unless-stopped` means a crashed container comes back, and everything starts again after a reboot.
+- Inside the web container, **Gunicorn is itself a supervisor**: a master process plus 3 workers. A worker that dies is replaced without dropping the site.
+- So there are two layers of "keep it running", and knowing which one acted explains most restart mysteries: a *worker* restart is invisible; a *container* restart shows in `docker compose ps` as a recent start time.
+
+# Debugging Guide
+1. **`docker compose ps`** — look at STATUS and uptime. A container that restarted 30 seconds ago is your lead.
+2. **Restart loop?** `logs --tail=100` shows the same fatal error repeating — usually config (`.env`) or a failed migration.
+3. **`docker compose top web`** — is Gunicorn's master plus 3 workers actually there?
+4. **Killed with no error?** Suspect the OOM killer: `free -h`, then `dmesg | tail`.
+5. **Ran fine manually but dies as a service?** Different environment — services do not inherit your shell's variables.
+
+# Performance Notes
+- Each Gunicorn worker is a separate process with its own memory; worker count is bounded by RAM, not ambition.
+- Restarts are not free: in-flight requests are lost unless the shutdown is graceful (Gunicorn drains on `SIGTERM`).
+- A restart loop burns CPU and fills logs — fix the cause rather than raising the retry limit.
+
+# Security Considerations
+- Processes should run as a **non-root user inside the container**; a container escape is far less useful without root.
+- A service that restarts forever on a config error can leak the same secret into logs repeatedly — check what your fatal errors print.
+- Only Docker should manage lifecycle; ad-hoc `nohup` processes are invisible to monitoring and survive nothing.
+
+# Architecture Decisions
+- **Docker restart policies instead of hand-written systemd units per service** — one supervision mechanism for all five containers (ch 10 covers the case where systemd is the right answer).
+- **Gunicorn's own worker supervision** kept, because it recovers from application-level crashes faster than a container restart.
+- **Fail fast on missing dependencies** (Redis/DB) rather than starting degraded — the entrypoint waits for health first.
+
+# Best Practices
+- Never run production processes from an interactive shell.
+- Read STATUS and uptime before reading logs; it tells you *what* happened.
+- Make shutdown graceful so deploys do not drop requests.
+- Keep the restart policy explicit in compose, not implied.
+
 # Beginner Mistakes
 - **`kill -9` as the default.** SIGKILL skips cleanup — half-finished writes, no graceful drain. Try SIGTERM first; reserve `-9` for truly stuck processes.
 - **Running the server in the foreground over SSH** (`gunicorn …` in your terminal) — it dies when you log out. Services must run detached (Docker/systemd do this).
@@ -86,15 +138,33 @@ dmesg | grep -i oom        # was the OOM killer invoked? (RAM exhaustion)
 - **Under-provisioned RAM → OOM kills.** Silent, brutal. Right-size ([Ch 14](14_Gunicorn.md)/[00B](00B_Deployment_Costs_And_Free_Alternatives.md)) and watch `docker stats`.
 
 # Interview Questions
-**Junior — "What's a process? What's a PID?"** A running instance of a program with its own memory; the PID is its unique id the OS uses to reference/signal it.
+- **Junior:** "What's a process? What's a PID?" — A running instance of a program with its own memory; the PID is its unique id the OS uses to reference/signal it.
 
-**Junior — "Difference between SIGTERM and SIGKILL?"** SIGTERM asks the process to shut down cleanly (it can finish work + release resources); SIGKILL forcibly terminates it immediately with no cleanup.
+- **Junior:** "Difference between SIGTERM and SIGKILL?" — SIGTERM asks the process to shut down cleanly (it can finish work + release resources); SIGKILL forcibly terminates it immediately with no cleanup.
 
-**Mid — "How does the site stay up if a Gunicorn worker crashes?"** The Gunicorn master process supervises workers and respawns any that die; the other workers keep serving meanwhile. If the whole container dies, Docker's restart policy brings it back.
+- **Mid:** "How does the site stay up if a Gunicorn worker crashes?" — The Gunicorn master process supervises workers and respawns any that die; the other workers keep serving meanwhile. If the whole container dies, Docker's restart policy brings it back.
 
-**Senior — "Container shows STATE=restarting in a loop. How do you debug?"** It's crash-looping: the process exits non-zero on start and Docker keeps restarting it. Read `docker compose logs` for the startup error (bad env var, DB unreachable, migration failure, port conflict). Fix the root cause; the restart policy is doing its job — the app is the problem.
+- **Senior:** "Container shows STATE=restarting in a loop. How do you debug?" — It's crash-looping: the process exits non-zero on start and Docker keeps restarting it. Read `docker compose logs` for the startup error (bad env var, DB unreachable, migration failure, port conflict). Fix the root cause; the restart policy is doing its job — the app is the problem.
 
-**Staff — "Design graceful shutdown for zero dropped requests during a deploy."** App must trap SIGTERM and drain: stop accepting new connections, finish in-flight requests within a grace window, then exit 0. Ensure the app is PID 1 (via `exec`) so it *receives* Docker's SIGTERM; set Docker's stop grace period ≥ the longest reasonable request; put a proxy (Caddy) in front so it can retry/queue during the brief swap; for true zero-downtime, start the new container and shift traffic before stopping the old ([Ch 33](33_CI_CD.md)). Gunicorn's graceful worker handling covers the app side.
+- **Staff:** "Design graceful shutdown for zero dropped requests during a deploy." — App must trap SIGTERM and drain: stop accepting new connections, finish in-flight requests within a grace window, then exit 0. Ensure the app is PID 1 (via `exec`) so it *receives* Docker's SIGTERM; set Docker's stop grace period ≥ the longest reasonable request; put a proxy (Caddy) in front so it can retry/queue during the brief swap; for true zero-downtime, start the new container and shift traffic before stopping the old ([Ch 33](33_CI_CD.md)). Gunicorn's graceful worker handling covers the app side.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| SIGTERM vs SIGKILL — do you know which one you should ever send? | "Both stop the process, KILL is stronger." | **SIGTERM asks** — the process can finish in-flight work and release resources. **SIGKILL cannot be caught** and skips all cleanup. Reaching for `-9` first is how you truncate a request mid-write. |
+| Do you know what actually keeps the site up? | "Docker restarts it if it crashes." | **Two layers**: the **Gunicorn master respawns dead workers** while the others keep serving, and Docker's **restart policy** covers the whole container dying. Naming both shows you know where a single worker crash stops. |
+| Crash-looping container — can you resist restarting it again? | "I will restart it and see." | A restart loop means the process **exits non-zero at startup** and the policy keeps retrying — so restarting changes nothing. **Read `docker compose logs`** for the startup error: bad env var, DB unreachable, migration failure, port conflict. |
+| Do you know why PID 1 matters? | "The app just needs to run." | Your app must **be PID 1** (start it with `exec`) or it **never receives Docker's SIGTERM** — the shell swallows it, nothing drains, and every deploy kills in-flight requests after the grace period. A one-word `exec` is the whole fix. |
+
+**The killer follow-up:** *"Design graceful shutdown with zero dropped requests during a deploy."* — trap **SIGTERM** → stop accepting new connections → **finish in-flight requests within a grace window** → exit 0; be **PID 1** so the signal arrives; set Docker's stop grace period **longer than your slowest request**. Candidates who skip the PID-1 half have never actually watched a deploy drop traffic.
+
+# Revision Notes
+- Process = a running program. Service = a process that **starts itself and recovers**.
+- Terminal-started apps die at logout; production needs supervision.
+- Here: **Docker supervises containers**; **Gunicorn supervises workers**.
+- `docker compose ps` → STATUS + uptime tells you what restarted.
+- Restart loop = the same fatal error repeating; read the logs, do not raise retries.
 
 # Cheat Sheet
 - **Process** = running program (PID, owner, RAM). **Service/daemon** = long-running process (gunicorn, postgres). Run-once (migrate) exits.
@@ -115,6 +185,12 @@ dmesg | grep -i oom        # was the OOM killer invoked? (RAM exhaustion)
 | Health gate | entrypoint wait-loop blocks until db+redis ready |
 | OOM risk | 3 workers × Django RAM — size the box (2–4 GB) |
 
+# Practice Tasks
+1. **Read the code:** find the `restart:` policy in `docker-compose.yml`. What exactly does its value promise?
+2. **Debug:** run `docker compose top web` (or locally, `ps aux | grep gunicorn`). Identify master vs workers.
+3. **Design:** describe what should happen, step by step, if the app crashes at 3am — and who is notified (ch 30).
+4. **Architecture:** argue when a systemd unit would be better than a Docker restart policy.
+
 # Homework
 1. `docker stats --no-stream` (once the stack runs) — note each container's RAM. Which is largest? How close to the box's limit?
 2. `docker compose exec app ps -ef` — identify the gunicorn master and its 3 workers by PID.
@@ -124,7 +200,7 @@ dmesg | grep -i oom        # was the OOM killer invoked? (RAM exhaustion)
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - DigitalOcean — *Process management in Linux* / `ps`, `kill`, signals: https://www.digitalocean.com/community/tutorials/how-to-use-ps-kill-and-nice-to-manage-processes-in-linux
 - Julia Evans — *signals* (zine/posts, very clear): https://jvns.ca/blog/2015/04/23/what-happens-when-you-press-ctrl-c/
 - Docker docs — *start containers automatically / restart policies*: https://docs.docker.com/config/containers/start-containers-automatically/

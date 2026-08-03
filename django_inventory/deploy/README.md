@@ -29,7 +29,12 @@ condition + entrypoint wait-loop).
    password manager** (it is half of the disaster-recovery pair; the restic
    repo is the other half).
 6. `docker compose up -d --build`
-   - entrypoint waits for db/redis → migrates → collectstatic → gunicorn.
+   - entrypoint waits for db/redis → migrates → **seeds platform master data** → collectstatic → gunicorn.
+   - `seed_master_data --repair-access` is idempotent + additive-only: it fills in the
+     stages/skills/stage-access that migrations do NOT seed (4 of 21 stages, 2 of 10
+     skills), and never overwrites a row you edited in the UI. Without it a fresh
+     production DB cannot run an Adda. Business data (products/rates/cloth/users) is
+     never seeded — enter it yourself, starting with `createsuperuser`.
    - watch: `docker compose logs -f app caddy`.
 7. `docker compose exec app python manage.py createsuperuser`
 8. Owner decision: start CLEAN (re-enter master data via admin UIs — recommended;
@@ -62,7 +67,7 @@ Drill passes when 1-6 complete unaided. Re-run monthly.
 
 ## Deploys / updates
 `./deploy/deploy.sh` — order: pre-deploy dump → `git pull --ff-only` →
-build → `up -d` (entrypoint migrates) → prune. Then smoke.
+build → `up -d` (entrypoint migrates + seeds master data) → prune. Then smoke.
 
 ## Rollback
 - Bad code: `git checkout <previous tag>` → `./deploy/deploy.sh` (skip pull).

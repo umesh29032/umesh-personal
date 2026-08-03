@@ -1,7 +1,7 @@
 ---
 id: app-machines-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Machine + MachineAssignment (and why MachineType is NOT here) — the three-way capability split in schema."
 related: [app-machines, feature-machines]
@@ -10,6 +10,12 @@ related: [app-machines, feature-machines]
 # machines — model knowledge (`models.py`, 101 lines · 2 models + 1 guest)
 
 > 📂 [machines app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`machines` app ka kaam: factory ki machinein aur kis worker ke paas kaunsi machine hai.)*
 
 ## The three-way split (the lesson in schema form)
 

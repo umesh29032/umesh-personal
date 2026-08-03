@@ -1,6 +1,23 @@
+---
+id: deploy-course-37-post-deployment
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 37 — Post-Deployment Operations (Day 2)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [36 — Deploying My ERP](36_My_ERP_Deployment.md). Next: [38 — Common Production Bugs](38_Common_Production_Bugs.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- verify a deploy with evidence rather than optimism
+- run the first-week routine
+- know when to roll back instead of investigating
+- hand a working system to real users
 
 # Purpose
 Deploying is Day 1. **Keeping it running** is every day after — "Day 2 operations." This chapter is the routine of a live system: what to watch, how to ship updates safely, how to keep TLS/deps/backups fresh, and how to not let a healthy launch rot into an outage three weeks later.
@@ -31,6 +48,8 @@ Shipping a change to a *running* system is the common Day-2 action. It must be: 
 
 ### Capacity watch
 Track the golden signals over time ([Ch 30](30_Monitoring.md)); rising latency / DB connections / RAM is the early signal to tune or scale ([Ch 41](41_Scaling.md)) *before* users feel it.
+
+> 💡 **Samjho aise:** Deploy ho gaya = kaam shuru hua, khatam nahi. Pehle ghante mein teen cheez dekho: **kya khul raha hai** (health), **kya toot raha hai** (logs/errors), **kya dheema hai**. Aur ek asli Adda khud chala ke dekho — "site khul gayi" aur "factory chal sakti hai" do alag baatein hain.
 
 # Real World Example (My ERP)
 - **Update loop = `deploy/deploy.sh`:** on the VPS, `git`-tag the new certified release, then `sh deploy/deploy.sh` → pre-deploy `pg_dump` (rollback anchor) → `git pull --ff-only` → `docker compose build app` → `up -d` (entrypoint migrates + collects static) → `docker image prune -f` → smoke-check login/dashboard/media. **Rollback:** `git checkout <previous tag>` + rerun; bad migration → restore the predeploy dump ([Ch 29](29_Restore.md)).
@@ -76,6 +95,46 @@ docker compose build --pull app && docker compose up -d        # pick up base-im
 # + run a restore drill into a scratch DB (Ch29) and assert goldens
 ```
 
+# Production Walkthrough
+The first ten minutes:
+- `docker compose ps` — all services up, none restarting (ch 18).
+- `verify_production` — the project's own post-deploy assertion.
+- Load the site over HTTPS; confirm the certificate and the styling (ch 12, ch 26).
+- Log in as a real role; open one Adda; read one **known** settlement total.
+- Upload one file and see it again (ch 25).
+- Confirm the backup ran, and check its size (ch 28).
+
+The first week: watch disk, watch restarts, read the logs once a day, and let a worker use it on their phone before you declare victory — the mobile path is a functional requirement here, not a finish.
+
+# Debugging Guide
+1. **Anything restarting** — read that service's log immediately; a restart loop is not "settling down".
+2. **Numbers wrong** — stop, do not edit production data. Restore is legitimate (ch 29).
+3. **Slow but working** — measure before tuning (ch 39).
+4. **A worker cannot do their job** — that is a P0 regardless of what monitoring says.
+5. **"It worked yesterday"** — check what deployed since, using your recorded hashes (ch 35).
+
+# Performance Notes
+- The first minute is cold caches; wait before drawing conclusions (ch 22).
+- Watch trends over the first days: memory climbing = leak, memory spiking = traffic.
+- Note your normal so you can recognise abnormal later.
+
+# Security Considerations
+- Re-run `check --deploy` on the deployed configuration (ch 34).
+- Confirm no debug page is reachable and no new port is published.
+- Verify the backup is off-site and readable, not just present.
+- Change any credential that was shared during setup.
+
+# Architecture Decisions
+- **Verification by business truth** — a known total, not a HTTP 200.
+- **A stated first-week routine**, because attention decays and checklists do not.
+- **Rollback as a normal option**, not an admission of failure.
+
+# Best Practices
+- Write down what "normal" looks like on day one.
+- Ask a real user to complete a real task before calling the deploy done.
+- Keep the backup verified weekly, not annually.
+- Deploy again soon and small; long gaps make each deploy riskier.
+
 # Beginner Mistakes
 - **"It launched, I'm done."** → Day 2 is 99% of the lifetime. Set the cadences up front.
 - **Hand-editing files on the server** → prod drifts from git; the next `deploy.sh` `git pull` conflicts or reverts it. Change via git + deploy.
@@ -87,13 +146,31 @@ docker compose build --pull app && docker compose up -d        # pick up base-im
 - **Flipping enforcement flags without the soak** → post-deploy is for *observing* first.
 
 # Interview Questions
-**Junior — "What's 'Day 2 operations'?"** Everything after the first deploy: monitoring, shipping updates, patching dependencies, verifying backups, handling incidents, watching capacity — the ongoing running of the system.
+- **Junior:** "What's 'Day 2 operations'?" — Everything after the first deploy: monitoring, shipping updates, patching dependencies, verifying backups, handling incidents, watching capacity — the ongoing running of the system.
 
-**Mid — "How do you ship an update to the running ERP safely?"** `deploy/deploy.sh`: take a pre-deploy DB dump (rollback anchor), `git pull` the new certified tag, rebuild the app image, `up -d` (entrypoint migrates + collects static), prune, then smoke test + `verify_production`. Rollback is the previous tag + rerun, or restore the dump.
+- **Mid:** "How do you ship an update to the running ERP safely?" — `deploy/deploy.sh`: take a pre-deploy DB dump (rollback anchor), `git pull` the new certified tag, rebuild the app image, `up -d` (entrypoint migrates + collects static), prune, then smoke test + `verify_production`. Rollback is the previous tag + rerun, or restore the dump.
 
-**Senior — "What decays silently on a running site and how do you counter each?"** TLS (Caddy auto-renews; still monitor expiry), dependencies (pin + monthly `pip-audit` + rebuild for CVEs), backups (verify freshness + periodic restore drills, not just "configured"), and disk (prune images, bound logs, cap local dumps). Each is invisible until it causes an outage, so each gets a scheduled check.
+- **Senior:** "What decays silently on a running site and how do you counter each?" — TLS (Caddy auto-renews; still monitor expiry), dependencies (pin + monthly `pip-audit` + rebuild for CVEs), backups (verify freshness + periodic restore drills, not just "configured"), and disk (prune images, bound logs, cap local dumps). Each is invisible until it causes an outage, so each gets a scheduled check.
 
-**Staff — "Design the Day-2 operating rhythm for this single-operator ERP."** Automate the continuous layer (monitoring + alerts on down/5xx/backup-failed/cert<7d, nightly encrypted backups, self-healing restarts). Make releases boring: tag → `deploy.sh` (backup-first, verifiable, one-command rollback), gated by CI. Put the human work on a calendar: weekly (logs/disk/backup-freshness), monthly (dependency+image patching, a restore drill asserting goldens, an access review). Track the golden-signal trend to scale proactively. Close the known gaps (/healthz, external monitor, Sentry, pip-audit) since a solo operator can't eyeball logs 24/7 — automation *is* the second engineer. The invariant: nothing critical depends on someone remembering; it's automated or on a cadence with a verification command.
+- **Staff:** "Design the Day-2 operating rhythm for this single-operator ERP." — Automate the continuous layer (monitoring + alerts on down/5xx/backup-failed/cert<7d, nightly encrypted backups, self-healing restarts). Make releases boring: tag → `deploy.sh` (backup-first, verifiable, one-command rollback), gated by CI. Put the human work on a calendar: weekly (logs/disk/backup-freshness), monthly (dependency+image patching, a restore drill asserting goldens, an access review). Track the golden-signal trend to scale proactively. Close the known gaps (/healthz, external monitor, Sentry, pip-audit) since a solo operator can't eyeball logs 24/7 — automation *is* the second engineer. The invariant: nothing critical depends on someone remembering; it's automated or on a cadence with a verification command.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know what "Day 2" actually contains? | "Keeping an eye on things after launch." | Name it: **monitoring, shipping updates, patching dependencies, verifying backups, incident handling, watching capacity.** The first deploy is one day; Day 2 is every day after, and it is where systems actually fail. |
+| Do you know what decays *silently* on a running site? | "Nothing changes if you do not touch it." | Four things rot while you do nothing: **TLS** (auto-renews, but monitor expiry), **dependencies** (CVEs — pin + periodic `pip-audit` + rebuild), **backups** (freshness *and* restore drills), and **disk**. An untouched server is not a stable server. |
+| Can you verify a deploy with something that means anything? | "I check the site loads after deploying." | `ps` → `verify_production` → HTTPS + styling → real login → **one known settlement total** → one upload → confirm the backup ran **and its size**. A 200 response proves the web server is alive and nothing else. |
+| Do you know the real acceptance test here? | "The tests pass and the site is up." | **A worker completing a real task on a phone.** Mobile is a functional requirement in this project, not polish — so a deploy that a worker cannot use on an Android phone is not done, whatever the suite says. |
+
+**The killer follow-up:** *"What does normal look like on this system?"* — if you cannot answer with numbers you wrote down on day one (memory, disk, request rate, typical logs), **you cannot recognise abnormal later**. Capturing "normal" is the cheapest monitoring that exists, and almost nobody does it.
+
+# Revision Notes
+- Ten-minute check: `ps` → `verify_production` → HTTPS+styling → real login → **known settlement total** → one upload → backup ran + size.
+- First week: disk, restarts, daily logs, and a **worker on a phone** actually doing the job.
+- Restart loop is never "settling down" — read the log now.
+- Wrong numbers ⇒ stop; restore beats editing production data.
+- Record what normal looks like, so abnormal is recognisable later.
 
 # Cheat Sheet
 - **Day 2 = forever.** Continuous (monitor/backup/TLS-renew/self-heal) · per-release (`deploy.sh`) · weekly (logs/disk/backup) · monthly (deps/rebuild/restore-drill/access).
@@ -114,6 +191,12 @@ docker compose build --pull app && docker compose up -d        # pick up base-im
 | Milestone | soak → flip `ENFORCE_*`; S6 retirement (gated) |
 | Tracked backlog | /healthz, external monitor, Sentry, pip-audit |
 
+# Practice Tasks
+1. **Read the code:** find `verify_production` and list exactly what it asserts.
+2. **Debug:** write the command sequence for the ten-minute check as one copy-pasteable block.
+3. **Design:** define your first-week routine with days and checks.
+4. **Architecture:** argue why "a worker completed a real task on a phone" is the true acceptance test here.
+
 # Homework
 1. Run the "weekly health glance" block. Is disk healthy, backup < 26h, TLS > 30 days out? Which would you alert on?
 2. Do a dry update on a TEST stack with `deploy.sh`. Where's the rollback anchor created, and what are the two rollback paths?
@@ -123,7 +206,7 @@ docker compose build --pull app && docker compose up -d        # pick up base-im
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Google SRE Book — *Being On-Call* + *Emergency Response* (operating live systems): https://sre.google/sre-book/being-on-call/
 - Google SRE Workbook — *Simple, reliable operations*: https://sre.google/workbook/table-of-contents/
 - Caddy — *Automatic HTTPS / certificate renewal*: https://caddyserver.com/docs/automatic-https#renewal

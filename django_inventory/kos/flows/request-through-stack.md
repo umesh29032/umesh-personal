@@ -16,6 +16,24 @@ phone. Same skeleton for every click in the system
 ([system-map](../project/system-map.md)) — learn it once here, reuse it on
 any URL you ever debug.
 
+> 💡 **Samjho aise:** Meena ne phone pe **Submit** dabaya. Ab socho ki uski
+> request ek **bank ke andar chalne wali parchi** hai:
+>
+> - **Guard on the gate** (middleware) — *"aap andar aa bhi sakte ho ya nahi?"*
+> - **Reception** (view) — parchi padhta hai, form theek hai ya nahi dekhta.
+>   Reception khud paisa nahi chhoota — bas sahi counter tak bhejta hai.
+> - **The counter clerk** (service) — **asli kaam yahin hota hai.** Register mein
+>   likhna, hisaab lagana, sab isi ka kaam.
+> - **The safe** (database + constraints) — aakhri pehra. Clerk ne galti bhi ki,
+>   to tijori khud mana kar degi.
+>
+> Har click isi raaste se jaata hai. Isliye jab kuch toote, aapko poore project
+> mein dhoondhna nahi padta — bas poochho: **"parchi kis hop pe ruki?"**
+
+**Why learning this one journey is worth more than reading ten files:** every
+bug you will ever hit is *somewhere on this line*. A 403 is the guard. A form
+error is reception. A wrong number is the clerk. A refused save is the safe.
+
 ```
 Meena taps Submit  (POST, CSRF token in form)
 │
@@ -91,6 +109,12 @@ four layers, not one fat one.
 3. View's gates — which service does it call?
 4. Read THAT service's docstring — side effects + guards are declared there
 5. Still confused? The service's tests are worked examples of every refusal
+
+> 🧠 **Remember This:** har request ka ek hi raasta hai —
+> **URL → guard (middleware) → reception (view) → clerk (service) → safe (DB)**.
+> View patla hota hai, service mota — kyunki **saara likhna service karta hai**.
+> Debugging ka pehla sawaal hamesha yahi: *"kaunse hop pe ruka?"* 403 = guard,
+> form error = reception, galat number = clerk, save refuse = safe.
 
 ## Implementation References
 

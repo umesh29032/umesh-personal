@@ -15,6 +15,24 @@ related: [feature-settlement, flow-worker-gets-paid, concept-two-truths]
 This flow tells it from the EVENT's side: every state ADST-0007 can be in,
 and what each arrow costs.
 
+> 💡 **Samjho aise:** Settlement ko ek **bill** samjho jo malik banata hai.
+>
+> - **DRAFT** = bill abhi pencil se likha ja raha hai. Jitni baar chaaho mitao,
+>   badlo, phaad do — kuch nahi hota, kyunki abhi ye sirf kaagaz hai.
+> - **FINALIZED** = bill pe **pen se dastakhat** ho gaye. Ab ye kaagaz nahi,
+>   **paisa** hai. Ledger mein entry chali gayi.
+> - Dastakhat ke baad galti mili? Bill ko **mitaya nahi jaata**. Ek **ulta bill**
+>   (reverse) banta hai jo pehle wale ko kaat deta hai — dono kaagaz record mein
+>   rehte hain, hamesha.
+>
+> Isiliye system draft mein bahut aazadi deta hai aur finalize pe bahut sakhti.
+> **Sasti jagah pe aazadi, mehngi jagah pe pehra.**
+
+**The one line to carry away:** everything before the signature is editable,
+everything after it is *append-only*. An accountant should be able to look at
+this Adda in two years and see not just the final number but every correction
+that produced it, and who made each one.
+
 ```mermaid
 stateDiagram-v2
     [*] --> DRAFT: create_draft (scratchpad, NO money)
@@ -75,6 +93,12 @@ adjust). The expensive transition is one atomic function with everything
 validated up front — *aadha-likha settlement kabhi exist nahi karta.* This
 is the general pattern for any irreversible operation: **make the cheap
 zone rich and the expensive gate thin.**
+
+> 🧠 **Remember This:** **DRAFT = pencil, FINALIZED = pen.** Pencil wale zone
+> mein jitna chaaho theek karo — abhi paisa bana hi nahi. Pen ke baad kuch mitao
+> mat; **ulti entry** (reverse) daalo. Agar kabhi aapko "settlement delete karne"
+> ka mann kare — ruk jao, wahi galat raasta hai. Sahi jawaab hamesha *reverse*
+> hai, kyunki paisa ka record kabhi jhooth nahi bol sakta.
 
 ## Implementation References
 

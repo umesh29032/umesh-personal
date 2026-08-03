@@ -18,7 +18,9 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from django.utils import timezone
 
-from accounts.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import (
+    FINANCIAL_READ_ROLES, MANAGEMENT_ROLES, user_has_role,
+)
 from expense.models import FactoryExpense
 
 logger = logging.getLogger(__name__)
@@ -38,8 +40,21 @@ def record_expense(*, category, amount, expense_date, actor, notes='',
     WARN-and-confirm, never a hard block (corrections / multiple salary
     components are legitimate). Server-enforced; the UI checkbox is sugar.
     """
-    if not user_has_role(actor, MANAGEMENT_ROLES):
-        raise PermissionDenied("Only management can record factory expenses.")
+    # Owner ruling 2026-08-02: recording a factory expense IS the accountant's job,
+    # so the actor gate widens from MANAGEMENT_ROLES to FINANCIAL_READ_ROLES
+    # (= management + accountant). This is a deliberate, owner-authorised MONEY-WRITE
+    # grant and the ONLY one in this change — everything else an accountant gained is
+    # read-only.
+    #
+    # What deliberately did NOT widen, so the books stay correctable only by the owner:
+    #   • void_expense()          — super-admin only + mandatory reason
+    #   • change_template_amount()/regenerate_period() — super-admin only
+    #   • settlement finalize/reverse — untouched; settlement remains THE money boundary
+    # Net effect: an accountant can ADD a cost record but can never erase or rewrite
+    # one. That is standard bookkeeping hygiene (append-only, corrections by the owner).
+    if not user_has_role(actor, FINANCIAL_READ_ROLES):
+        raise PermissionDenied(
+            "Only management or an accountant can record factory expenses.")
     if category not in FactoryExpense.Category.values:
         raise ValidationError("Unknown expense category.")
     try:
@@ -318,8 +333,24 @@ def generate_monthly_expenses(year, month, *, actor, confirm=False):
     from django.db import IntegrityError
     from expense.models import ExpenseGenerationRecord
 
-    if not user_has_role(actor, MANAGEMENT_ROLES):
-        raise PermissionDenied("Only management can generate recurring expenses.")
+    # Owner ruling 2026-08-02 — the gate follows the WRITE, not the call.
+    # This function is two things behind one name: `confirm=False` is a PURE READ
+    # (it returns the plan before touching anything — see the early return below),
+    # and `confirm=True` is the writer. Gating both as a write meant the Recurring
+    # Expenses REGISTER — which renders per-template status from this very preview
+    # path — 403'd for an accountant, even though rendering it writes nothing.
+    #
+    #   confirm=False → FINANCIAL_READ_ROLES  (management + accountant): a preview
+    #   confirm=True  → MANAGEMENT_ROLES      UNCHANGED: creates FactoryExpense rows
+    #
+    # Ordering matters: check the write gate BEFORE any work, exactly as before.
+    if confirm:
+        if not user_has_role(actor, MANAGEMENT_ROLES):
+            raise PermissionDenied(
+                "Only management can generate recurring expenses.")
+    elif not user_has_role(actor, FINANCIAL_READ_ROLES):
+        raise PermissionDenied(
+            "Only management or an accountant can preview recurring expenses.")
     period_key, expense_date_for, due, skipped = _resolve_month(year, month)
     plan = [{'template': t, 'amount': t.amount, 'worker': t.worker,
              'expense_date': expense_date_for(t)} for t in due]

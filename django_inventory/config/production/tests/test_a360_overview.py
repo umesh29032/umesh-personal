@@ -199,7 +199,11 @@ class A360ViewTests(_Base):
         # non-payable ASR aggregate (the view keeps its per-SR display maps);
         # the material arm is 3-queries-for-3-loops neutral. The price of ONE
         # shared assembly across A360 + the costing surface.
-        with self.assertNumQueries(80):
+        # 80 → 57 (2026-08-02, conscious IMPROVEMENT): `user_role_codes()` is now
+        # request-cached in permission_service, so the many role checks this page
+        # performs no longer each re-query `extra_roles`. Biggest single win in the
+        # app; lowered to lock it in.
+        with self.assertNumQueries(57):
             self.client.get(self.URL)
 
 

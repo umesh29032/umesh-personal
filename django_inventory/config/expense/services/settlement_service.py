@@ -107,7 +107,7 @@ def create_settlement(*, user, worker, amount_paid, recoveries=None,
         with connection.cursor() as cur:
             cur.execute('SELECT pg_advisory_xact_lock(%s)', [_SETTLEMENT_REF_LOCK])
 
-    when = settlement_date or timezone.now().date()
+    when = settlement_date or timezone.localdate()
     paid = _q(amount_paid)
     if paid < _ZERO:
         raise ValidationError("Amount paid cannot be negative.")

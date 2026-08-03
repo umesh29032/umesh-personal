@@ -1,7 +1,7 @@
 ---
 id: app-inventory-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Which inventory view module do I open — including the middleware that runs on EVERY request?"
 related: [app-inventory, app-inventory-urls]
@@ -10,6 +10,12 @@ related: [app-inventory, app-inventory-urls]
 # inventory — handler knowledge (8 view modules + the middleware)
 
 > 📂 [inventory app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`inventory` app ka kaam: admin ka hissa — roles, sidebar access, dashboards.)*
 
 ## Handler groups at a glance
 

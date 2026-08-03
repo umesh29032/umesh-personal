@@ -1,7 +1,7 @@
 ---
 id: project-engineering-journey
 type: project
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "In what order should I learn EVERYTHING here — from zero to senior-level mastery of this system and the engineering inside it?"
 related: [project-business-story, project-reading-the-docs]
@@ -12,6 +12,12 @@ related: [project-business-story, project-reading-the-docs]
 > 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
 > *Productive-in-a-day version: [START-HERE](../START-HERE.md). This page
 > is the longer road: expert.*
+
+> 💡 **Samjho aise:** Yeh page ek **raasta** hai, syllabus nahi. Ek hi baithak
+> mein poora padhne ki koshish mat karo — jo stop aaj kaam aa raha hai, wahi
+> padho. Har stop pe ek hi shart hai: **bina dekhe, apne shabdon mein bolo.**
+> Agar bol nahi paaye, to padha nahi — sirf dekha hai. Padhna aur samajhna alag
+> cheezein hain, aur farq sirf bol ke pata chalta hai.
 
 ## How to walk it
 

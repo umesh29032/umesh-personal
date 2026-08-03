@@ -35,7 +35,9 @@ from django.utils import timezone
 from django.views.generic import TemplateView, View
 from django.views.generic.edit import FormView
 
-from accounts.services import MANAGEMENT_ROLES, user_has_role
+from accounts.services import (
+    FINANCIAL_READ_ROLES, MANAGEMENT_ROLES, user_has_role,
+)
 from expense.forms import (
     AdvanceForm, FactoryExpenseForm, SettlementForm, WorkerProfileForm,
 )
@@ -58,8 +60,27 @@ _ZERO = Decimal('0.00')
 
 
 class _ManagementOnly(UserPassesTestMixin):
+    """WRITE gate — unchanged. Settlement finalize, advances, pay-basis, FnF,
+    void, template edits and monthly generation all keep this."""
     def test_func(self):
         return user_has_role(self.request.user, MANAGEMENT_ROLES)
+
+
+class _FinancialRead(UserPassesTestMixin):
+    """READ gate — management **or** accountant (owner ruling 2026-08-02).
+
+    Every financial page used to be `_ManagementOnly`, i.e. read and write behind
+    ONE gate. So a pure `accountant` had no reachable page at all and their
+    FINANCIAL_ROLES capability (supplier + cost-per-kg) was dead code.
+
+    This mixin is deliberately **only** applied to list/detail/report views. It
+    grants no write power — and even if it were misapplied, `expense_service` and
+    `settlement_service` re-check the actor themselves (`void_expense` and the
+    template levers are super-admin-only INSIDE the service). Settlement stays the
+    single money-write boundary.
+    """
+    def test_func(self):
+        return user_has_role(self.request.user, FINANCIAL_READ_ROLES)
 
 
 class _WorkerFromPk:
@@ -69,7 +90,7 @@ class _WorkerFromPk:
 
 
 def _month_start():
-    return timezone.now().date().replace(day=1)
+    return timezone.localdate().replace(day=1)
 
 
 class MyEarningsView(LoginRequiredMixin, TemplateView):
@@ -127,7 +148,7 @@ class WorkerPayrollDetailView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
-class PayrollOverviewView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class PayrollOverviewView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """All workers with live balances — management only."""
     template_name = 'expense/payroll_overview.html'
 
@@ -257,7 +278,7 @@ class SettlementCreateView(LoginRequiredMixin, _ManagementOnly, _WorkerFromPk, T
         ctx['outstanding_advances'] = outstanding_advances(worker)
         ctx['form'] = kwargs.get('form') or SettlementForm(
             initial={'amount_paid': summary['pending_payable']})
-        ctx['today'] = timezone.now().date()
+        ctx['today'] = timezone.localdate()
         return ctx
 
     def post(self, request, *args, **kwargs):
@@ -412,11 +433,11 @@ def _parse_month(request):
             raise ValueError
         return year, month
     except (ValueError, IndexError):
-        today = timezone.now().date()
+        today = timezone.localdate()
         return today.year, today.month
 
 
-class FactoryExpenseListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class FactoryExpenseListView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """Month-scoped list + per-category totals. POST = void (super-admin +
     mandatory reason — enforced by expense_service, never trusted to the UI).
     Voided rows stay visible (struck-through) — nothing disappears."""
@@ -459,7 +480,7 @@ class FactoryExpenseListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
         return redirect(f"{url}?month={month}" if month else url)
 
 
-class FactoryExpenseCreateView(LoginRequiredMixin, _ManagementOnly, FormView):
+class FactoryExpenseCreateView(LoginRequiredMixin, _FinancialRead, FormView):
     """Entry form (mobile-first). Delegates to expense_service.record_expense
     — the salary⇒worker rule and every other guard live there."""
     template_name = 'expense/factory_expense_form.html'
@@ -508,7 +529,7 @@ class FactoryExpenseCreateView(LoginRequiredMixin, _ManagementOnly, FormView):
 # message + redirect. View gates management; the SERVICE enforces SA on the
 # levers (the pay-basis/void house pattern).
 
-class ExpenseTemplateListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class ExpenseTemplateListView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """Template register + each template's CURRENT-period status (straight
     from the SAME preview path generation uses — no second status logic).
     POST actions (SA, service-enforced): deactivate · change_amount."""
@@ -656,7 +677,7 @@ class GenerateExpensesView(LoginRequiredMixin, _ManagementOnly, TemplateView):
 # THIN by contract: parse month → TWO service calls → context. Zero math,
 # zero ORM, zero writes, zero POST routes.
 
-class MaterialSpendView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class MaterialSpendView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """Consumption (PRIMARY) + Purchases (secondary), both basis-labelled;
     honest-NULL banners; never blended with FactoryExpense (sibling link only
     — ADR-0011)."""
@@ -679,7 +700,7 @@ class MaterialSpendView(LoginRequiredMixin, _ManagementOnly, TemplateView):
 # All writes go through adda_settlement_service (single-writer); these views
 # only parse POST inputs and render service output.
 
-class AddaSettlementListView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class AddaSettlementListView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """Pending queue (ready / waiting Addas) + settlement history."""
     template_name = 'expense/adda_settlement_list.html'
 
@@ -723,7 +744,7 @@ class AddaSettlementStartView(LoginRequiredMixin, _ManagementOnly, View):
                                 args=[settlement.reference]))
 
 
-class AddaSettlementDetailView(LoginRequiredMixin, _ManagementOnly, TemplateView):
+class AddaSettlementDetailView(LoginRequiredMixin, _FinancialRead, TemplateView):
     """Draft: labeled preview (settleable / era-A skipped / era-B skipped /
     monthly excluded, R4) + variance + per-advance recovery inputs +
     Finalize/Discard. Finalized:

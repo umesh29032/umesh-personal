@@ -1,7 +1,7 @@
 ---
 id: pattern-tracked-export
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Tracked Export pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Every export is a recorded, re-downloadable artifact — never a fire-and-forget file.
+
+> 💡 **Samjho aise:** Har download **record** hota hai aur dobara utaara ja sakta hai. File bhej ke bhool jaana — allowed nahi.
 
 **Problem it solves.** Un-tracked exports can't be reproduced byte-identically → disputes; regenerating may silently differ.
 

@@ -87,7 +87,7 @@ def _next_export_code() -> str:
     throughput. For factory floor scale (few exports/day) this is sufficient.
     Future hardening: dedicated Postgres sequence per year.
     """
-    year = timezone.now().year
+    year = timezone.localdate().year
     prefix = f'EXP-{year}-'
     last = (
         BarcodeExportBatch.objects

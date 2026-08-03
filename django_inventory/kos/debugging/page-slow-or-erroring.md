@@ -18,6 +18,20 @@ related: [concept-query-performance, concept-pg-locks, concept-django-settings]
 - Saves hanging / deadlock errors under concurrent use
 - Works locally, broken in production
 
+> 💡 **Samjho aise:** Page dheema hone ki sabse aam wajah "server kamzor hai"
+> nahi hoti — wajah hoti hai ki code **ek hi sawaal database se sau baar** pooch
+> raha hai. 50 Adde dikhane hain, aur har Adde ke liye alag query chali jaati hai.
+>
+> Socho: ek aadmi ko 50 files chahiye. Wo 50 baar almirah tak jaata hai, ek-ek
+> file laata hai. Sahi tareeka? **Ek hi baar jaao, saari 50 uthaa lao.**
+> Django mein ye `select_related` / `prefetch_related` hai.
+>
+> Aur "**kal to chal raha tha**" ka matlab aksar yeh hota hai ki data badh gaya.
+> Code wahi hai — 10 rows pe theek tha, 10,000 pe nahi.
+>
+> Isliye pehle **query ginto**, phir code padho. Bina naapé optimize karna sirf
+> andaaza hai.
+
 ## First Five Minutes
 
 1. **Slow or erroring? Different lanes.** Slow → count queries FIRST
@@ -114,6 +128,12 @@ DEADLOCK / HANG
 [query-performance](../concepts/postgresql/query-performance.md) ·
 [indexes](../concepts/postgresql/indexes.md) · [locks](../concepts/postgresql/locks.md) ·
 [settings](../concepts/django/settings.md) · [constraints](../concepts/postgresql/constraints.md)
+
+> 🧠 **Remember This:** dheema page = aksar **N+1 query** (ek hi sawaal sau
+> baar). Almirah tak 50 baar mat jao — `select_related` / `prefetch_related`
+> se ek hi baar mein le aao. "Kal chal raha tha" ka matlab aksar **data badh
+> gaya**, code nahi badla. Hamesha **pehle naapo (query count), phir sudharo** —
+> bina naapé optimize karna sirf andaaza hai.
 
 ## Implementation References
 

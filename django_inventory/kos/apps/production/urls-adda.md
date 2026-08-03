@@ -1,7 +1,7 @@
 ---
 id: app-production-urls-adda
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Adda lifecycle, stage panels, the R10-B generic action set, worker report + review, rate correction — each URL's full learning story."
 related: [app-production-urls]
@@ -10,6 +10,12 @@ related: [app-production-urls]
 # production URLs · Part 2 — Adda Lifecycle · Generic Stage Set · Worker/Review (17)
 
 > 📂 [URL index](urls.md) · [production app](README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ---
 

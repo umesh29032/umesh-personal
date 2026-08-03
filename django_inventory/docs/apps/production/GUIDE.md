@@ -10,6 +10,9 @@ verified: 2026-07-13
 
 # production app — file-by-file GUIDE
 
+
+> **Date primitive (2026-08-01).** Every "today"/"this month" in this app uses `timezone.localdate()`, never `timezone.now().date()` (which returns a **UTC** date and is one day behind for 5.5h daily under `TIME_ZONE=Asia/Kolkata`). Enforced repo-wide by `core.tests.LocalDateGuardTests`. Background: [UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md](../../UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md). In this app it fixed `operations_digest.completed_at__date` (Django's `__date` lookup already converts to IST, so comparing it against a UTC date made the two sides of one filter disagree), the barcode export-code year, and a `date.today()` that read the **server** clock.
+
 > Business view: [config/production/README.md](../../../config/production/README.md).
 > Sabse bada app: Adda lifecycle, stages, worker truth, costing freeze.
 
@@ -169,6 +172,12 @@ debt; `activity_service` verb_map got 'corrected verified qty' +
 forms = plain Django forms per stage (`_shared.py` = worker chips widget).
 urls.py header me poora route-group map. Templates: `_stage_panel_*.html`
 (operator consoles), `worker_report*.html` (phone), `product_flow.html` (editor).
+
+## management/commands/
+| Command | Role |
+|---|---|
+| **Local DB tooling** (`scripts/db.sh` + `scripts/_db_admin.py`) | The one human-facing database tool: **`fresh`** (create+switch+login in one step) · **`run`** · **`check`** (reports the docs/FRESH_DB_REQUIREMENTS.md §3 readiness checklist against the live DB — add a probe to `cmd_check` whenever §3 gains a row) · **`branch`** (fork the current DB as a save-point; nests freely) · `list` (shows `stages · products · addas · users` per DB so you know which is which) · `current` · `new` (create+migrate+seed) · `use` (rewrites the `DB_NAME` line in `.env`, keeps `.env.bak`) · `save`/`backups`/`restore` (pg_dump → `db_backups/`, **gitignored**: dumps hold real worker data + password hashes) · `delete` (auto-backup first, refuses the in-use DB, name-typed-twice confirmation). Guards tested: existing DB · in-use DB · invalid name · **live-looking name on `delete` only** (`prod/production/live` refused UNLESS the name also marks itself disposable — `test/dev/local/tmp/scratch/sandbox/demo/staging/copy/rehearsal` — so `test_production` is allowed; `new` is unrestricted because creating cannot destroy. The first cut guarded `new` too and false-refused `test_production`: **put the guard on the irreversible verb only, or it becomes noise**). `scripts/new_local_db.sh` is now a shim forwarding to `db.sh new`. Human guide: [kos local-testing-environment](../../../kos/concepts/testing/local-testing-environment.md) |
+| `seed_master_data.py` | **The PLATFORM master data a factory cannot run without** (AUDIT-2 2026-07-27): StageCategory · MachineType · Skill · Stage · `Stage.access_by_skill`. Migrations seed only **4 of 21 stages / 2 of 10 skills**, so a fresh production DB previously came up unable to run an Adda (no worker could open any stage). **Idempotent** (natural-key `get_or_create`) and **additive-only** — an existing row is never modified, so owner edits survive; `--repair-access` additionally ADDS missing stage→skill links (it fixes the migration-seeded `cutting` stage, which lacks `cutting_master_helper`) but never removes one. Deliberately seeds NO business data (products/rates/cloth/users). Unlike `devseed` it carries **no DEBUG guard — it is production-safe by design** and runs from `deploy/entrypoint.sh` on every boot. Flags: `--dry-run`, `--repair-access`. Human guide: [kos local-testing-environment](../../../kos/concepts/testing/local-testing-environment.md) |
 
 ## Dots kaise connect (ek request)
 ```

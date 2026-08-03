@@ -19,6 +19,21 @@ related: [feature-cutting, feature-allocation, feature-stage-tracking]
 - Barcode ranges don't match produced pieces
 - "Reported 40 but screen shows 38"
 
+> 💡 **Samjho aise:** Ginti ke jhagde mein pehla sawaal hamesha —
+> **"kaun-si ginti?"** Ek hi Adda mein kai ginti saath-saath chalti hain:
+>
+> - **Cut** = kitne piece kaate gaye
+> - **Allocated** = kis worker ko kitne diye gaye
+> - **Reported** = worker ne kitne bole
+> - **Good / Alter / Missing** = usme se kitne theek, kitne sudharne hain, kitne gum
+> - **Verified** = manager ne ginti theek ki
+>
+> `40` vs `38` ka matlab aksar yeh hota hai ki **40 reported** the aur **38 good**
+> — 2 alter/missing nikal gaye. Dono number sahi hain; sirf naam alag hai.
+>
+> Yaad rakho: **sirf `good` paisa banata hai.** Alter aur missing ki ginti hoti
+> hai (taaki har piece ka hisaab rahe), par unka paisa nahi banta.
+
 ## First Five Minutes
 
 1. **Name the number you're staring at.** This system has FIVE piece
@@ -82,6 +97,12 @@ Which two numbers disagree?
 [cutting](../features/cutting.md) (the mint) · [allocation](../features/allocation.md)
 (pool/bound) · [stage-tracking](../features/stage-tracking.md) (both-hands +
 resolver) · [cloth-to-garment](../flows/cloth-to-garment.md)
+
+> 🧠 **Remember This:** pehla sawaal hamesha **"kaun-si ginti?"** —
+> cut / allocated / reported / good / verified sab alag cheezein hain aur ek
+> saath sahi ho sakti hain. `40 vs 38` matlab aksar 40 reported, 38 good.
+> **Sirf `good` paisa banata hai**; alter aur missing ginti mein hain, paise
+> mein nahi.
 
 ## Implementation References
 

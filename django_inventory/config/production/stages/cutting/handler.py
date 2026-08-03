@@ -106,8 +106,34 @@ class CuttingHandler(StageHandler):
         stages — a later stage-taxonomy review may revise this; the FRAMEWORK is the
         point. Default base schema = quantity-only.)"""
         from raw_materials.models import ClothColor
-        from production.models import ProductSize
+        from production.models import (
+            LayeringRollEntry, ProductSize, RemainingClothOfClothRoll,
+        )
+        # AUDIT-2: offer only the colours actually on this Adda, not the whole
+        # palette — a cutting master could otherwise report a colour that was
+        # never brought here (the downstream stitching reports are already
+        # Adda-scoped, so this also removes an inconsistency between them).
+        # TWO sources, because cloth reaches an Adda two ways:
+        #   1. rolls attached at layering            -> LayeringRollEntry
+        #   2. a leftover piece re-issued into it    -> consume_leftover only
+        #      flips RemainingClothOfClothRoll flags, it creates NO roll entry,
+        #      so source 2 must be unioned in or its colour goes missing.
+        # Fallback to the full active palette when neither source has anything
+        # yet, so the picker is never empty (e.g. a freshly created Adda).
+        laid_ids: set = set()
+        if adda is not None:
+            laid_ids |= set(
+                LayeringRollEntry.objects
+                .filter(stage_record__adda=adda)
+                .values_list('roll__cloth_color_id', flat=True))
+            laid_ids |= set(
+                RemainingClothOfClothRoll.objects
+                .filter(consumed_in_adda=adda)
+                .values_list('roll__cloth_color_id', flat=True))
+        laid_ids.discard(None)
         colors = ClothColor.active.all().order_by('name')
+        if laid_ids:
+            colors = colors.filter(pk__in=laid_ids)
         sizes = ProductSize.objects.filter(
             product=adda.product, is_active=True).order_by('display_order')
         return {

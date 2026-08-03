@@ -42,7 +42,8 @@ kos/
 │   ├── architecture/    service-layer · single-writer · two-truths
 │   ├── database-design/ append-only-tables
 │   ├── postgresql/      locks · constraints · from-orm-to-sql · indexes · query-performance
-│   ├── testing/         testing-strategy      security/  auth-hardening
+│   ├── testing/         testing-strategy · local-testing-environment
+│   │                    security/  auth-hardening
 │   ├── patterns/        11 cross-app reuse cards              ✅ hardening
 │   └── deployment/      production-and-docker             ✅ P8
 └── debugging/       ← symptom-first incident playbooks    ✅ P8
@@ -193,6 +194,7 @@ raw_materials · tracking · machines · storefront · core.)
 | [features/cutting.md](features/cutting.md) | feature | verified_against_code | "Where do 'pieces' come from — the moment cloth becomes countable?" |
 | [features/machines.md](features/machines.md) | feature | verified_against_code | "Who holds which machine now — and who held it last Tuesday?" |
 | [features/rbac-access.md](features/rbac-access.md) | feature | verified_against_code | "What machinery decides exactly what each user sees and reaches?" |
+| [features/learning-courses.md](features/learning-courses.md) | feature | production_verified | "Where do I actually READ the courses, and how does /learn/ work without storing any content?" |
 | [concepts/architecture/two-truths.md](concepts/architecture/two-truths.md) | concept | verified_against_code | "Why can't 'work happened' and 'money owed' be the same fact?" |
 | [flows/cloth-to-garment.md](flows/cloth-to-garment.md) | flow | verified_against_code | "Roll of cloth → barcoded garments: every step and every blocker" |
 | [flows/settlement-lifecycle.md](flows/settlement-lifecycle.md) | flow | verified_against_code | "Every state a settlement passes through — including corrections" |
@@ -204,6 +206,7 @@ raw_materials · tracking · machines · storefront · core.)
 | [concepts/django/migrations.md](concepts/django/migrations.md) | concept | verified_against_code | "How does a money-bearing schema change without losing data?" |
 | [concepts/django/settings.md](concepts/django/settings.md) | concept | verified_against_code | "How can production never boot half-configured?" |
 | [concepts/testing/testing-strategy.md](concepts/testing/testing-strategy.md) | concept | verified_against_code | "What do 1,878 tests actually PIN in a money system?" |
+| [concepts/testing/local-testing-environment.md](concepts/testing/local-testing-environment.md) | concept | production_verified | "My local DB is full of old test junk — how do I get a CLEAN factory to hand-test on, without destroying what I have?" |
 | [concepts/security/auth-hardening.md](concepts/security/auth-hardening.md) | concept | verified_against_code | "What protects the front door — which real attacks were found and closed?" |
 | [project/reading-the-docs.md](project/reading-the-docs.md) | project | verified_against_code | "1,100 docs files — where does a HUMAN start, and when do I go in there?" |
 | [debugging/money-looks-wrong.md](debugging/money-looks-wrong.md) | debugging | verified_against_code | "A money number looks wrong — what do I check, in what order?" |

@@ -1,6 +1,23 @@
+---
+id: deploy-course-01-what-is-deployment
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 01 — What Is Deployment
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Next: [02 — How The Internet Works](02_How_The_Internet_Works.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- say why `runserver` is unfit for production, naming four specific properties
+- draw this project's five containers and what each one does
+- name each component's failure mode without looking it up
+- explain why web concurrency is mostly about *waiting*, not CPU
 
 # Purpose
 To understand what "deploying" actually means, and *why* a production setup looks so different from `python manage.py runserver`. Every later chapter (Caddy, Gunicorn, Docker, Postgres…) is a piece of the answer to this chapter's question. If this chapter clicks, the rest of the course is "filling in the boxes."
@@ -51,6 +68,8 @@ Right now the ERP is just files on my laptop, reachable by nobody. Going "live o
 
 The arc, in one line: **rent a box → git my code onto it → build → run → point a domain → open 80/443.** [Ch 36](36_My_ERP_Deployment.md) does all five for real, command by command; everything between here and there teaches one piece. (Chapter 02 covers the *other* direction — how a user's request travels *back* to reach a live server.)
 
+> 💡 **Samjho aise:** Laptop pe `runserver` chalana **ghar ki rasoi** hai — ek aadmi ke liye khana banao, kaafi hai. Production ek **dhaba** hai: ek saath 50 log aayenge, khana garam chahiye, hygiene chahiye, aur raat 3 baje bhi shutter khula rehna chahiye. Isi liye dhabe mein alag chulha (Gunicorn), alag counter (Caddy), alag store (Postgres) hota hai — ek hi banda sab nahi kar sakta.
+
 # Real World Example (My ERP)
 The exact journey when a worker opens their phone:
 1. Request hits **Caddy** on port 443 (HTTPS). Caddy decrypts it.
@@ -92,6 +111,47 @@ docker compose logs web  # gunicorn's own logs (worker boot, request lines)
 ```
 - `docker compose ps` → shows each service, its state, and which ports are published. You should see **only Caddy** publishing 80/443 to the host; `web`/`db`/`redis` have no host ports (private).
 
+# Production Walkthrough
+The whole stack on one VPS, from `docker-compose.yml`:
+- **Caddy** faces the internet: TLS (certificates fetched and renewed automatically), static files, request limits. If Caddy dies the site is down but the **data is safe**.
+- **Gunicorn**, 3 workers, runs the Django app. A worker crash is auto-recovered; nobody notices.
+- **Postgres 16** is the only irreplaceable component — hence backups (ch 28) and `RESTRICT` foreign keys.
+- **Redis** for cache + login rate-limiting. The app **fails fast** if it is absent — a deliberate correctness choice so the rate limiter is never silently bypassed.
+- **backup** container: nightly `pg_dump -Fc` + media → restic → off-site.
+`deploy/entrypoint.sh` waits for healthy DB+Redis, then migrates, seeds, collects static, and only then starts serving — so the app never boots half-configured.
+
+# Debugging Guide
+"The site is down" — in the order that finds it fastest:
+1. **Is it DNS, TLS, or the app?** `curl -I https://…` tells you which layer answered. No answer at all = network/Caddy; a 502 = Caddy is up but Gunicorn is not.
+2. **`docker compose ps`** — which container is unhealthy or restarting?
+3. **`docker compose logs --tail=50 web`** — the app's own words.
+4. **Did the entrypoint finish?** A failed `migrate` stops the boot; the log says so explicitly.
+5. **Data safe?** Postgres up but app down is a *deployment* incident. Postgres down is a *data* incident — different urgency (ch 40).
+
+# Performance Notes
+- Worker count ≠ core count. Web work is mostly **waiting** (on the DB, on slow clients), so workers are tuned for I/O, not CPU.
+- The reverse proxy buffers slow clients so one bad connection cannot occupy a worker for seconds.
+- `CONN_MAX_AGE = 600` avoids a fresh Postgres handshake per request.
+- The first bottleneck in practice is almost never the server — it is query count (sql_course ch 16).
+
+# Security Considerations
+- **Only Caddy is exposed.** Postgres and Redis are reachable only on the private Docker network — never published to the internet.
+- `DEBUG=False` in production is non-negotiable: `DEBUG=True` turns an error page into a schema-and-settings tour for an attacker.
+- Secrets come from `.env`, which is never in git.
+- TLS everywhere, because a login form over HTTP hands out passwords.
+
+# Architecture Decisions
+- **Single box, five containers** — cheapest and simplest that still keeps the internet away from the app and the data. Matched to a factory's steady, modest load.
+- **Reverse proxy in front of the app server** — different jobs (public-facing hardening vs running Python), and the proxy shields the workers.
+- **Fail fast on missing Redis** rather than degrade silently: a bypassed rate limiter is worse than an error.
+- **One VPS, not Kubernetes** — deliberately. Complexity you cannot debug at 3am is not resilience.
+
+# Best Practices
+- Never run `runserver` in production, for any "temporary" reason.
+- Keep the deploy reproducible: same image, same compose file, same entrypoint.
+- Read the entrypoint once so you know the boot order by heart.
+- Make every component either stateless-restartable or backed up — and know which each one is.
+
 # Beginner Mistakes
 - **Running `runserver` in production** "because it works." It works until strangers or a crawler arrive, then it serializes and falls over.
 - **Exposing Gunicorn's port 8000 to the internet.** Skips every protection the proxy gives; slow clients can freeze it.
@@ -100,17 +160,36 @@ docker compose logs web  # gunicorn's own logs (worker boot, request lines)
 - **One giant worker, or a hundred workers.** Workers cost RAM; the count is a real decision (Chapter 14).
 
 # Interview Questions
-**Junior — "Why can't you use `runserver` in production?"**
+- **Junior:** "Why can't you use `runserver` in production?" — 
 It's a single-threaded dev server on localhost, not hardened, and runs with dev conveniences (auto-reload, and typically `DEBUG=True`) that are unsafe. Production needs concurrency, security, public reachability, and self-recovery — a real WSGI server (Gunicorn) behind a reverse proxy.
 
-**Mid — "What's the difference between a WSGI server and a reverse proxy, and why both?"**
+- **Mid:** "What's the difference between a WSGI server and a reverse proxy, and why both?" — 
 The WSGI server (Gunicorn) *runs the Python app* and manages worker processes. The reverse proxy (Caddy) *faces the internet*: TLS termination, static-file serving, request buffering, limits, and protection from slow/malicious clients. Different jobs; the proxy shields the app server so one slow client can't starve all workers.
 
-**Senior — "The site freezes under load but CPU is near-idle. Why?"**
+- **Senior:** "The site freezes under load but CPU is near-idle. Why?" — 
 Workers are likely all blocked waiting (on the DB, on slow clients), not computing. Web concurrency is mostly about *waiting*, not CPU. Fixes: put a proxy in front to buffer slow clients, raise/adjust worker count or use threads/async for I/O-bound waits, and profile the slow DB queries. (This is why worker count ≠ core count.)
 
-**Staff — "Design the smallest production topology for this ERP and justify each component's existence and failure mode."**
+- **Staff:** "Design the smallest production topology for this ERP and justify each component's existence and failure mode." — 
 Caddy (public, TLS+static+limits; if it dies, site is down but data safe) → Gunicorn N workers (app; a worker crash is auto-recovered) → Postgres (single source of truth; protect with backups + PROTECT FKs) → Redis (cache/rate-limit; app fail-fasts if absent, a deliberate correctness choice so the rate limiter is never silently bypassed). One VPS, one firewall, off-site backups. Justification: minimizes moving parts while keeping the internet away from the app + data, and every component is either stateless-restartable or backed up.
+
+### Why interviewers ask these — and where candidates lose the point
+
+| The question is really testing | Weak answer | What lands |
+|---|---|---|
+| *"Why not runserver?"* — do you know the difference between a dev convenience and a production contract? | "It's slow." | Name the **four** properties (single-threaded · localhost-only · dev conveniences like auto-reload/DEBUG · no self-recovery) and say why each is wrong for strangers hitting it at once. |
+| *"WSGI server vs reverse proxy"* — can you separate responsibilities instead of listing tools? | "Nginx serves the site, Gunicorn runs Python." | **Different jobs**: Gunicorn runs the app and manages workers; the proxy faces the internet (TLS, static, buffering, limits) and *shields* workers so one slow client cannot starve them. |
+| *"Idle CPU but frozen site"* — do you understand that web concurrency is mostly *waiting*? | "Add more CPU / more workers." | Workers are **blocked**, not computing — usually DB waits or slow clients. Buffer at the proxy, tune workers for I/O, profile the slow queries. Explains why worker count ≠ core count. |
+| *"Design the smallest topology"* — can you justify each box **and its failure mode**? | Lists components. | For each box: what it does **and what breaks if it dies** (Caddy down = site down, data safe · worker crash = auto-restarted · Postgres = the only irreplaceable one, hence backups). |
+
+**The meta-signal:** juniors name tools, seniors name **responsibilities and failure modes**. Answer in those terms and the level takes care of itself.
+
+**The killer follow-up:** *"So what breaks if the database disappears right now?"* — every other component is replaceable from git in minutes; **Postgres is the only irreplaceable box**, which is why backups (ch 28) and not redundancy are the answer. Candidates who list all five services as equally critical have not thought about what is actually at risk.
+# Revision Notes
+- `runserver` = dev only: single-threaded, localhost, auto-reload, no recovery.
+- Production shape: **Caddy → Gunicorn → Postgres (+ Redis) + nightly backup**.
+- Proxy faces the internet; app server runs Python. Different jobs.
+- Concurrency is about **waiting**, so worker count ≠ core count.
+- Only Postgres is irreplaceable — everything else restarts.
 
 # Cheat Sheet
 - **Deployment =** turning "runs for me on localhost" into "runs safely for many, over the internet, unattended."
@@ -132,6 +211,12 @@ Caddy (public, TLS+static+limits; if it dies, site is down but data safe) → Gu
 | Exposed to internet? | Only Caddy (80/443); gunicorn/db/redis are private |
 | DEBUG in prod? | `False` (`config/config/settings/production.py`) |
 
+# Practice Tasks
+1. **Read the code:** open `docker-compose.yml` and list all five services with one sentence each on what breaks if it stops.
+2. **Debug:** on your laptop, run `runserver` and then `gunicorn config.wsgi --workers 3`. Note every visible difference (banner, reload, process count).
+3. **Design:** the owner asks "can we skip Caddy and expose Gunicorn directly?" Write the three-sentence refusal.
+4. **Architecture:** argue for and against adding a second VPS. What does it buy at this factory's scale, and what does it cost in complexity?
+
 # Homework
 1. Run `runserver`, then `gunicorn config.wsgi --workers 3 --bind 127.0.0.1:8000`. Write down 3 differences you observe.
 2. From a second device on your wifi, try to reach `http://<laptop-ip>:8000/` after `runserver 127.0.0.1:8000` vs after `runserver 0.0.0.0:8000`. Explain why one is reachable and one isn't. (Answer lands in [Ch 05](05_IP_Address_and_Ports.md).)
@@ -141,7 +226,7 @@ Caddy (public, TLS+static+limits; if it dies, site is down but data safe) → Gu
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Django docs — *Deploying Django* (the official overview): https://docs.djangoproject.com/en/5.0/howto/deployment/
 - Django docs — *Deployment checklist* (bookmark this — [Ch 35](35_Deployment_Checklist.md) leans on it): https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 - Gunicorn — *official docs* (workers, WSGI, settings): https://docs.gunicorn.org/en/stable/

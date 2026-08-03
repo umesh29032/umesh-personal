@@ -18,6 +18,21 @@ related: [feature-ledger, feature-settlement, feature-payroll]
 - Two screens show different amounts for the same thing
 - An advance's remaining looks off after a recovery or reversal
 
+> 💡 **Samjho aise:** "Paisa galat hai" 90% baar paisa galat hota hi nahi —
+> **aap galat khaana dekh rahe hote ho.** Ek hi kaam ke teen alag number hote
+> hain, aur teeno sahi hote hain:
+>
+> - **Expected** = *"itna banta hai"* — sirf hisaab. Ye badalta rehta hai, aur
+>   badalna **normal** hai.
+> - **Earned** = *"settlement ho gaya"* — ab ledger mein pakka likha hai.
+> - **Paid** = *"cash de diya"*.
+>
+> Do screen alag number dikha rahi hain? Pehle poochho: **dono ek hi state
+> dikha rahi hain kya?** Aksar ek Expected dikhati hai aur doosri Earned.
+>
+> Isliye pehla kadam code kholna nahi hai. Pehla kadam hai: *kaunsa number,
+> kis state ka, kis waqt ka?*
+
 ## First Five Minutes — how a senior starts *(the thought process)*
 
 1. **Never debug from the screen.** Screens derive; the ledger is truth.
@@ -93,6 +108,12 @@ jhooth bolna.)*
 [ledger](../features/ledger.md) · [settlement](../features/settlement.md) ·
 [payroll](../features/payroll.md) · [two-truths](../concepts/architecture/two-truths.md) ·
 [append-only-tables](../concepts/database-design/append-only-tables.md)
+
+> 🧠 **Remember This:** paisa "galat" dikhne se pehle poochho —
+> **kaunsa state?** Expected badalta rehta hai (normal), Earned settlement pe
+> banta hai, Paid cash hai. Do screen alag dikhen to pehle state match karo,
+> phir code kholo. Aur ledger mein **kabhi kuch mitao mat** — ulti entry
+> (reverse) hi sahi raasta hai.
 
 ## Implementation References
 

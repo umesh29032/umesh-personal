@@ -1,7 +1,7 @@
 ---
 id: app-raw-materials-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "raw_materials' 31 view classes in 5 modules — which file, which gates?"
 related: [app-raw-materials, app-raw-materials-urls]
@@ -10,6 +10,12 @@ related: [app-raw-materials, app-raw-materials-urls]
 # raw_materials — handler knowledge (5 modules, 31 classes)
 
 > 📂 [raw_materials app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`raw_materials` app ka kaam: **kapda** — roll, cloth type, colour, storage.)*
 
 ## Handler groups at a glance
 

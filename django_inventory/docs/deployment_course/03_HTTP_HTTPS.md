@@ -1,6 +1,23 @@
+---
+id: deploy-course-03-http-https
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 03 — HTTP & HTTPS
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [02 — How The Internet Works](02_How_The_Internet_Works.md). Next: [04 — DNS & Domains](04_DNS_Domains.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- read a request/response pair and name each part
+- explain what HTTPS protects and what it does not
+- say why a login form over HTTP is indefensible
+- name the status codes you will actually debug
 
 # Purpose
 [Ch 02](02_How_The_Internet_Works.md) got the encrypted pipe open between phone and VPS. This chapter is about the *language* spoken inside that pipe — **HTTP** — and the encryption layer that makes it **HTTPS**. Once I can read a raw request and response, "the server returned a 500", "CSRF failed", "mixed content", and "cert expired" stop being scary and become obvious.
@@ -61,6 +78,8 @@ Plain HTTP is readable by anyone on the network path. **TLS** wraps it so the co
 3. **Integrity-checked** — tampering is detected.
 
 **A certificate** is a file, signed by a trusted **Certificate Authority (CA)**, that says "the holder of this private key owns `erp.example.com`." The browser trusts a built-in list of CAs. **Let's Encrypt** is a free, automated CA. The server proves it controls the domain (an ACME challenge), the CA issues a cert valid ~90 days, and it must be **renewed** before expiry. **Caddy does all of this automatically** — request, install, and renew — which is the single biggest reason this project uses Caddy ([Ch 12](12_Caddy.md)).
+
+> 💡 **Samjho aise:** HTTP wo **bhasha** hai jisme browser aur server baat karte hain: *"yeh page do" · "yeh lo, 200 OK"*. HTTPS wahi baat **band lifafe** mein — raste mein koi padh bhi nahi sakta, badal bhi nahi sakta. Isi liye password kabhi HTTP pe nahi bhejte: postcard pe PIN likhne jaisa hai.
 
 # Real World Example (My ERP)
 - Worker submitting a report = a `POST` to `/production/addas/<code>/report/<stage>/` with `{% csrf_token %}` + the quantity fields in the body. My server validates the CSRF token, then the allocation bound.
@@ -123,6 +142,42 @@ curl -v -X POST https://erp.example.com/accounts/login/ -d "login=x&password=y"
 # Request/Response Headers, Cookies, and the body. This is your #1 debugging view.
 ```
 
+# Production Walkthrough
+- **Caddy terminates TLS** and gets its certificate automatically — no manual renewal, which is the classic cause of "the site went down on a Sunday".
+- Traffic *inside* the Docker network (Caddy→Gunicorn) is plain HTTP, and that is fine: it never leaves the machine.
+- Django is told it is behind a proxy so it builds correct `https://` URLs; getting that wrong produces mixed-content and broken redirects.
+- Status codes you will meet here: **502** Caddy up / app down · **413** upload too large · **403** CSRF or permission · **404** honest missing · **500** app exception (ch 32 captures these).
+
+# Debugging Guide
+1. **`curl -I`** first — the status code names the layer.
+2. **502/504** = the proxy could not reach or was not answered by Gunicorn → check the app container.
+3. **403 on a form** = CSRF (wrong origin/proxy headers) far more often than a permission bug.
+4. **Mixed content / redirect loop** = the app does not know it is behind TLS.
+5. **413** = the upload limit, and it is set at the *proxy*, not in Django.
+6. Read the **response headers**, not just the body — they say who answered.
+
+# Performance Notes
+- HTTPS costs one handshake, then nothing meaningful — the "TLS is slow" belief is a decade out of date.
+- HTTP/2 multiplexes many requests on one connection: good for pages with many small assets.
+- Caddy serves static files directly, so Gunicorn workers are never occupied sending CSS.
+- Compression is on by default in Caddy; it reduces bytes, not round-trips.
+
+# Security Considerations
+- **HTTP sends passwords in readable text.** Any shared wifi can capture them. This is the whole reason TLS is mandatory, not optional.
+- HTTPS protects data *in transit* only — it does not protect a weak password, a wide-open permission, or a leaked backup.
+- HSTS tells browsers "never use HTTP for this domain again", closing the downgrade window.
+- Secure + HttpOnly cookies stop session theft via JavaScript and plain-HTTP leaks.
+
+# Architecture Decisions
+- **TLS at the edge, plain HTTP inside** — one place to configure certificates, and no cost on the private network.
+- **Automatic certificates** (Caddy's headline feature) chosen precisely because manual renewal is a recurring human failure.
+- **Upload limits at the proxy** so a huge file is rejected before it ever reaches a Python worker.
+
+# Best Practices
+- Never accept credentials over HTTP, not even "just for testing".
+- Set the proxy headers so Django knows the real scheme and host.
+- Keep an eye on 4xx rates, not just 5xx — a spike in 403s is usually a real bug.
+
 # Beginner Mistakes
 - **Confusing 500 and 502.** 500 = fix your code/logs; 502 = your app process is down/unreachable. Chasing the wrong one wastes hours.
 - **Serving login over HTTP.** Passwords in clear text. Always redirect to HTTPS (you do).
@@ -132,17 +187,35 @@ curl -v -X POST https://erp.example.com/accounts/login/ -d "login=x&password=y"
 - **Forgetting `SECURE_PROXY_SSL_HEADER` behind a proxy.** Django thinks requests are HTTP (Caddy terminated TLS) → infinite redirect loop.
 
 # Interview Questions
-**Junior — "What's the difference between GET and POST?"** GET reads a resource with no side effects and is safe to repeat/cache; POST submits data that changes server state (create/submit) and shouldn't be blindly repeated.
+- **Junior:** "What's the difference between GET and POST?" — GET reads a resource with no side effects and is safe to repeat/cache; POST submits data that changes server state (create/submit) and shouldn't be blindly repeated.
 
-**Junior — "What does a 404 vs 403 vs 500 mean?"** 404 = resource not found; 403 = authenticated but not permitted; 500 = the server crashed handling the request.
+- **Junior:** "What does a 404 vs 403 vs 500 mean?" — 404 = resource not found; 403 = authenticated but not permitted; 500 = the server crashed handling the request.
 
-**Mid — "How does a stateless protocol keep a user logged in?"** After login the server issues a session cookie (`Set-Cookie`); the browser returns it on every request (`Cookie`), letting the server re-identify the session. Security flags: HttpOnly, Secure, SameSite.
+- **Mid:** "How does a stateless protocol keep a user logged in?" — After login the server issues a session cookie (`Set-Cookie`); the browser returns it on every request (`Cookie`), letting the server re-identify the session. Security flags: HttpOnly, Secure, SameSite.
 
-**Mid — "What is a TLS certificate and who issues it?"** A CA-signed file binding a public key to a domain, proving server identity so the client can trust the encrypted channel. Let's Encrypt issues them free/automatically; ~90-day validity requiring renewal (Caddy automates it).
+- **Mid:** "What is a TLS certificate and who issues it?" — A CA-signed file binding a public key to a domain, proving server identity so the client can trust the encrypted channel. Let's Encrypt issues them free/automatically; ~90-day validity requiring renewal (Caddy automates it).
 
-**Senior — "Users report being logged out on every click in production. Diagnose."** Almost certainly the session cookie is `Secure` but the site is being served/hit over HTTP (or the proxy TLS header isn't trusted so Django/redirect logic misbehaves). Check the scheme actually reaching the browser, `SESSION_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER`, and the redirect chain.
+- **Senior:** "Users report being logged out on every click in production. Diagnose." — Almost certainly the session cookie is `Secure` but the site is being served/hit over HTTP (or the proxy TLS header isn't trusted so Django/redirect logic misbehaves). Check the scheme actually reaching the browser, `SESSION_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER`, and the redirect chain.
 
-**Staff — "Design the TLS story for this ERP end to end, including renewal failure."** Caddy terminates TLS at the edge with Let's Encrypt certs, auto-renewing well before the 90-day expiry; HSTS (1yr, preload) forces HTTPS on clients; `SECURE_PROXY_SSL_HEADER` lets Django trust the edge; the Caddy→Gunicorn hop is plaintext on the private Docker net. Renewal-failure mode: Caddy retries automatically; monitor cert expiry (an alert at T-14 days) and ensure ports 80/443 stay open (the ACME HTTP-01 challenge needs 80). If renewal ever fails past expiry, browsers hard-fail — hence monitoring + keeping 80 open are non-negotiable.
+- **Staff:** "Design the TLS story for this ERP end to end, including renewal failure." — Caddy terminates TLS at the edge with Let's Encrypt certs, auto-renewing well before the 90-day expiry; HSTS (1yr, preload) forces HTTPS on clients; `SECURE_PROXY_SSL_HEADER` lets Django trust the edge; the Caddy→Gunicorn hop is plaintext on the private Docker net. Renewal-failure mode: Caddy retries automatically; monitor cert expiry (an alert at T-14 days) and ensure ports 80/443 stay open (the ACME HTTP-01 challenge needs 80). If renewal ever fails past expiry, browsers hard-fail — hence monitoring + keeping 80 open are non-negotiable.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know GET/POST as a **contract**, not syntax? | "GET is for reading, POST is for forms." | GET is **safe and idempotent** — repeatable, cacheable, no side effects. POST **changes state** and must not be blindly repeated. That is why a double-submitted payment form is a real bug and a double-loaded report is not. |
+| 403 vs 404 — do you know which leaks information? | "404 means missing, 403 means blocked." | Correct, plus the security nuance: **403 confirms the resource exists.** For a private object, returning **404** to an unauthorised user avoids revealing that it is there at all — a real design choice, not pedantry. |
+| How does a stateless protocol keep someone logged in? | "The server remembers the user." | It does not. Login issues a **`Set-Cookie`** session cookie; the browser returns it on every request. Then name the three flags interviewers wait for: **HttpOnly, Secure, SameSite**. |
+| Do you know why certificates expire so fast? | "Certificates last a year or so." | **Let's Encrypt is ~90 days, deliberately** — short lifetimes limit the damage from a stolen key and force automation. Caddy renews it; the risk moves from *expiry* to *renewal monitoring*. |
+
+**The killer follow-up:** *"Users report being logged out on every click. Diagnose."* — almost always the session cookie is `Secure` while the request reaching Django looks like **HTTP** (proxy header not trusted). Check the actual scheme, `SESSION_COOKIE_SECURE`, `SECURE_PROXY_SSL_HEADER` and the redirect chain. Guessing "clear the cache" here is the wrong instinct on display.
+
+# Revision Notes
+- HTTP = the request/response language: method, path, headers, body, status.
+- HTTPS = the same, inside TLS. Protects **transit only**.
+- Caddy terminates TLS and renews certs automatically; inside the network is plain HTTP.
+- Codes to know: 502 app down · 413 too big · 403 CSRF/permission · 500 exception.
+- `curl -I` is the fastest "who answered?" tool you have.
 
 # Cheat Sheet
 - **HTTP = request (method+path+headers+body) → response (status+headers+body).**
@@ -165,6 +238,12 @@ curl -v -X POST https://erp.example.com/accounts/login/ -d "login=x&password=y"
 | Host safety | `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` (from `.env`) |
 | Cert issuance | Caddy + Let's Encrypt (automatic) |
 
+# Practice Tasks
+1. **Read the code:** open `deploy/Caddyfile`. Find where TLS and the reverse-proxy target are configured.
+2. **Debug:** stop the app container and `curl -I` the site. Note the exact status Caddy returns and why.
+3. **Design:** the owner wants to accept 50 MB pattern videos. Where do you raise the limit, and what else must change?
+4. **Architecture:** argue whether internal traffic should also be TLS. What threat would that address, and is it present here?
+
 # Homework
 1. `curl -sSIL http://<a-site>/` — find the `301` and the `Location`. That's a redirect in the wild.
 2. Inspect a real cert with the `openssl` command above; note issuer + `notAfter`. How many days left?
@@ -174,7 +253,7 @@ curl -v -X POST https://erp.example.com/accounts/login/ -d "login=x&password=y"
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - MDN — *An overview of HTTP* (the canonical, readable reference): https://developer.mozilla.org/en-US/docs/Web/HTTP/Overview
 - MDN — *HTTP response status codes* (all of them, explained): https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 - MDN — *Using HTTP cookies* (HttpOnly/Secure/SameSite): https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies

@@ -1,7 +1,7 @@
 ---
 id: project-reading-the-docs
 type: project
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "docs/ has 1,100+ files of Claude's engineering memory — as a human, where do I start, what is each pile, and when do I actually need to go in there?"
 related: [project-system-map, project-business-story]
@@ -10,6 +10,17 @@ related: [project-system-map, project-business-story]
 # Reading the docs/ — a human's guide to Claude's engineering memory
 
 > 📂 [Project — the WHY layer](README.md) · [LOS home](../README.md)
+
+> 💡 **Samjho aise:** `docs/` aur `kos/` do alag cheezein hain, aur farq yaad
+> rakhna zaroori hai:
+>
+> - **`docs/` = kaam ka purana record** — kab kya banaya, kyun banaya, kaunsa
+>   bug mila. Hazaar se zyada files. Yeh **history** hai, padhne ki kitaab nahi.
+> - **`kos/` = samajhne ki jagah** — yahin se seekho.
+>
+> Isliye `docs/` mein *ghoomna* nahi hai. Wahan tab jao jab koi **specific
+> sawaal** ho ("yeh decision kyun liya gaya tha?"). Warna aap 1,000 files mein
+> kho jaoge — aur wo aapki galti nahi hogi, wo us folder ka kaam hi nahi hai.
 
 ## Business Purpose
 

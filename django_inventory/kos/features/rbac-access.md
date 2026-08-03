@@ -68,13 +68,56 @@ dual-identity sweeps (WORKER/MANAGEMENT/OFFICE_SUPPORT certifications).
 Real finding class it caught: S2 (public signup created live users) and
 S3 (email-takeover shadow-route) — both closed + pinned.
 
+## Three tiers, not two (accountant READ TIER, 2026-08-02)
+
+**One idea first:** this system used to know only **management** and **everyone else**.
+So an accountant — who is neither a manager nor a worker — fell into "everyone else" and
+got the **worker** experience: a dashboard saying *"Jab manager aapko kaam dega"* and an
+earnings page reading *"Pieces Produced 0"*. An accountant never produces pieces.
+
+**💡 Samjho aise:** accountant **munshi** hai. Bahi-khata *dekhta* hai, kharcha *likhta*
+hai — par **tankhwah baantne ka faisla malik ka**. Dekhna ek cheez, dene ka faisla doosri.
+Pehle system ke paas sirf do darwaze the: malik ka, ya mazdoor ka. Munshi ke liye koi
+darwaza hi nahi tha. Ab teesra darwaza hai — **padho sab, likho sirf kharcha**.
+
+| Tier | Who | What |
+|---|---|---|
+| **Floor** | worker | own assigned stage + own earnings |
+| **Books (new)** | accountant | **read** all financials · **record** a cost · nothing else |
+| **Management** | manager · super admin | everything, incl. settlement |
+
+**The rule that keeps it safe: reads widened, writes did not move.**
+
+An accountant can **add** a cost record but never **erase** one — `void_expense` is
+super-admin-only *inside the service*, not just in the view. That is append-only
+bookkeeping: corrections belong to the owner.
+
+### The subtle bug this exposed (worth remembering)
+
+`generate_monthly_expenses` is **two functions behind one name**:
+
+- `confirm=False` → returns the plan, **writes nothing** (a preview)
+- `confirm=True` → creates the rows
+
+Both were gated as a write. So the recurring-expenses **register** — a read page that
+renders per-template status *from that preview* — returned **403** for an accountant.
+
+> **Gate on what a call WRITES, not on what it is named.** Same lesson as the sidebar:
+> a rule that fires on the safe operation teaches people to ignore it.
+
+### Where the switch lives
+
+Access Control → **Sidebar Access**. Any menu item with a `SidebarItemRule` row is
+governed by the **DB**, and the DB **overrides** the in-code predicate — which is why
+widening `Cloth Rolls` in code was not enough and needed a migration too.
+
 ## Debugging Guide
 
 | Symptom | Start |
 |---|---|
 | "Menu hai par 403" / "menu nahi par URL khulta hai" | Should be impossible — SidebarItemRule row vs middleware; if real, it's a NEW rule bypassing the pair: alarm |
 | Worker can't see a stage | access ∩ assignment: has the skill? on the manager's roster (WST exists)? |
-| Accountant can't reach a page | Pure-vs-composite: accountant is an ADD-ON capability; page-role must admit them first |
+| Accountant can't reach a page | **Fixed 2026-08-02** — they now have a READ TIER (see below). If it still happens: is it a *write* page (correct to refuse), or does the page have a `SidebarItemRule` row that omits accountant? The **DB row overrides the in-code predicate**. |
 | Permission works in view, fails in service | Correct — service re-gates; fix the caller's role, don't loosen the service |
 
 ## Change Impact

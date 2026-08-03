@@ -1,7 +1,7 @@
 ---
 id: pattern-validation-chain
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Validation Chain pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Parse at the edge → business-validate in the service → DB constraints as the floor.
+
+> 💡 **Samjho aise:** Teen chhanniyaan: **form** (shakal theek hai?) → **service** (rule theek hai?) → **database** (aakhri pehra). Upar wali chook jaaye to neeche wali pakad legi.
 
 **Problem it solves.** Single-layer validation fails the paths it doesn't cover.
 

@@ -41,7 +41,7 @@ def record_advance(*, user, worker, amount, advance_date=None, notes='',
     amt = Decimal(str(amount))
     if amt <= 0:
         raise ValidationError("Advance amount must be greater than 0.")
-    when = advance_date or timezone.now().date()
+    when = advance_date or timezone.localdate()
 
     return WorkerAdvance.objects.create(
         worker=worker, amount=amt, advance_date=when,

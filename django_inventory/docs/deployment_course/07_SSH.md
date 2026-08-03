@@ -1,6 +1,23 @@
+---
+id: deploy-course-07-ssh
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 07 — SSH
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [06 — Linux Basics](06_Linux_Basics.md). Next: [08 — The File System](08_File_System.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- log into a server with a key instead of a password
+- explain why a key is safer than any password
+- disable password login without locking yourself out
+- use SSH to reach a private service without opening a port
 
 # Purpose
 My VPS has no monitor or keyboard — the only way in is over the network. **SSH (Secure Shell)** is that door: an encrypted remote login to the server's shell. This chapter is how to get in *safely* (keys, not passwords), how to harden the door so attackers can't, and how to use SSH **tunnels** to reach private services (like Postgres) without exposing them ([Ch 05](05_IP_Address_and_Ports.md)).
@@ -47,6 +64,8 @@ An SSH **tunnel** (port forward) carries another protocol *inside* the encrypted
 ssh -L 5432:localhost:5432 erp
 ```
 `-L 5432:localhost:5432` = "forward my laptop's `localhost:5432` to `localhost:5432` on the server." Point pgAdmin at `localhost:5432`; traffic rides the SSH channel; the DB stays private. (For a Dockerized DB, forward to the container: `-L 5432:db:5432` from a host with access, or expose it only on the server's loopback.)
+
+> 💡 **Samjho aise:** SSH server ke ghar ki **chaabi** hai — aur password se behtar **key** waali chaabi. Password chura sakte hain, key nahi (private key aapke laptop pe hi rehti hai, kabhi network pe nahi jaati). Isi liye pehla kaam: key lagao, phir password login **band** kar do.
 
 # Real World Example (My ERP)
 - I connect with `ssh erp` (using a `~/.ssh/config` alias + an **ed25519** key). My private key never leaves my laptop; the VPS has only my public key in `authorized_keys`.
@@ -107,6 +126,41 @@ sudo sshd -T | grep -Ei 'passwordauthentication|permitrootlogin'
 sudo systemctl status ssh           # is the SSH service running? ([Ch 10])
 ```
 
+# Production Walkthrough
+- SSH is **how every deploy happens**: you log in, pull, and run `docker compose up -d`.
+- It is also the safe route to private services: an SSH tunnel gives you psql access to Postgres **without publishing 5432** (ch 05).
+- The order that avoids disaster: add your key → **verify a new session works** → *then* disable password login. Reversing that order locks you out of your own server.
+
+# Debugging Guide
+1. **`ssh -v`** — verbose output names the exact stage that failed (auth, host key, network).
+2. **"Permission denied (publickey)"** = the key is not in `authorized_keys`, or file permissions are too open (SSH refuses loose permissions on purpose).
+3. **"Connection refused"** = sshd not running / wrong port. **"Timeout"** = firewall.
+4. **Host key changed warning** = either a rebuilt server (expected) or something serious. Do not click through it blindly.
+5. Keep **one session open** while changing SSH config — it is your escape hatch.
+
+# Performance Notes
+- Connection reuse (`ControlMaster`) makes repeated commands feel instant.
+- SSH compression rarely helps on modern links; skip it.
+- Tunnels are fine for admin work but are not a substitute for a proper architecture.
+
+# Security Considerations
+- **Keys over passwords**: the private key never leaves your laptop, so there is nothing to intercept or brute-force.
+- **Disable password authentication** once keys work; that single change removes the entire brute-force attack class.
+- Never share a private key or commit one. Protect it with a passphrase.
+- `root` login disabled; use a normal user + `sudo` (ch 06).
+- Rotate/remove keys when a device is lost — `authorized_keys` is an access list, so review it.
+
+# Architecture Decisions
+- **SSH is the only administrative door**, so it gets the strongest control (keys, no passwords, no root).
+- **Tunnels instead of exposed ports** for database access — temporary access without permanent surface.
+- Deploys run over SSH rather than a push-based agent: fewer moving parts for a single-box setup.
+
+# Best Practices
+- Add the key, test in a *new* terminal, then harden.
+- Use a passphrase on the private key.
+- Keep an inventory of which keys are authorised and why.
+- Never paste a private key into a chat, ticket, or CI variable.
+
 # Beginner Mistakes
 - **Leaving password auth on.** Bots will brute-force port 22 relentlessly. Keys only + fail2ban.
 - **Logging in as root.** Direct root over SSH = one compromised credential owns everything. Normal user + `sudo`.
@@ -116,15 +170,33 @@ sudo systemctl status ssh           # is the SSH service running? ([Ch 10])
 - **Publishing 5432 "just to use pgAdmin."** Use a tunnel; never expose the DB ([Ch 05](05_IP_Address_and_Ports.md)).
 
 # Interview Questions
-**Junior — "Why use SSH keys instead of passwords?"** Keys use asymmetric crypto: the secret private key never leaves your machine and nothing brute-forceable is transmitted, so there's no password for bots to guess or steal — far stronger than a password.
+- **Junior:** "Why use SSH keys instead of passwords?" — Keys use asymmetric crypto: the secret private key never leaves your machine and nothing brute-forceable is transmitted, so there's no password for bots to guess or steal — far stronger than a password.
 
-**Junior — "What is `known_hosts` for?"** It records each server's host key so SSH can verify on later connections that you're talking to the same server, warning you about possible man-in-the-middle if the key changes.
+- **Junior:** "What is `known_hosts` for?" — It records each server's host key so SSH can verify on later connections that you're talking to the same server, warning you about possible man-in-the-middle if the key changes.
 
-**Mid — "How do you connect a local DB tool to production Postgres securely?"** An SSH local port-forward: `ssh -L 5432:localhost:5432 server`, then point the tool at `localhost:5432`. The DB port stays closed to the internet; the connection is tunneled through authenticated, encrypted SSH.
+- **Mid:** "How do you connect a local DB tool to production Postgres securely?" — An SSH local port-forward: `ssh -L 5432:localhost:5432 server`, then point the tool at `localhost:5432`. The DB port stays closed to the internet; the connection is tunneled through authenticated, encrypted SSH.
 
-**Senior — "Harden SSH on a fresh Ubuntu VPS. What do you change and why?"** Add a normal sudo user + your public key; set `PasswordAuthentication no` (kill brute-force) and `PermitRootLogin no` (least privilege); restrict/allow port 22 in the firewall (ideally to known IPs); install `fail2ban` to auto-ban repeat offenders; keep the private key safe with a passphrase + agent. Restart `ssh` and confirm you can still log in *before* closing the old session.
+- **Senior:** "Harden SSH on a fresh Ubuntu VPS. What do you change and why?" — Add a normal sudo user + your public key; set `PasswordAuthentication no` (kill brute-force) and `PermitRootLogin no` (least privilege); restrict/allow port 22 in the firewall (ideally to known IPs); install `fail2ban` to auto-ban repeat offenders; keep the private key safe with a passphrase + agent. Restart `ssh` and confirm you can still log in *before* closing the old session.
 
-**Staff — "A teammate's laptop with an authorized SSH key is stolen. Incident response?"** Immediately remove that public key from every server's `authorized_keys` (and any config-management source of truth), rotate any secrets that key could have reached, review auth logs (`/var/log/auth.log`) for logins from that key after theft, and if in doubt rebuild the box from a known-good image + restore data from backup ([Ch 40](40_Disaster_Recovery.md)). Longer term: short-lived certificates/SSH CA instead of static keys, and per-person keys (never shared) so revocation is surgical.
+- **Staff:** "A teammate's laptop with an authorized SSH key is stolen. Incident response?" — Immediately remove that public key from every server's `authorized_keys` (and any config-management source of truth), rotate any secrets that key could have reached, review auth logs (`/var/log/auth.log`) for logins from that key after theft, and if in doubt rebuild the box from a known-good image + restore data from backup ([Ch 40](40_Disaster_Recovery.md)). Longer term: short-lived certificates/SSH CA instead of static keys, and per-person keys (never shared) so revocation is surgical.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Keys vs passwords — do you know the mechanism? | "Keys are longer and harder to guess." | **Asymmetric crypto: the private key never leaves your machine, and nothing brute-forceable is transmitted.** There is no secret on the wire for a bot to guess. It is a different model, not a stronger password. |
+| Do you know what `known_hosts` protects you from? | "It remembers servers you have connected to." | It pins each server's **host key** so a changed key raises a **man-in-the-middle warning**. Blindly accepting that warning after a rebuild is the moment the protection is thrown away. |
+| Can you harden SSH from memory? | "Use keys and change the port." | **`PasswordAuthentication no`** (kills brute force) · **`PermitRootLogin no`** · a normal sudo user with your public key · firewall 22, ideally to known IPs · **`fail2ban`**. Port-changing is obscurity, not hardening — mention it last or not at all. |
+| Can you use SSH as an access *tool*, not just a login? | "I SSH in and use psql on the server." | **`ssh -L 5432:localhost:5432 server`** — a local port-forward puts production Postgres on your laptop over an authenticated encrypted channel **with the DB port still closed to the internet**, and it vanishes when you disconnect. |
+
+**The killer follow-up:** *"A laptop holding an authorised SSH key is stolen. What do you do, in order?"* — **remove that public key from every `authorized_keys` and from config management first**, then rotate any secret that key could reach, then review `/var/log/auth.log` for logins from that key. Revoke before you investigate — the order is the answer.
+
+# Revision Notes
+- SSH = encrypted remote shell; the **key pair** is the good way in.
+- Private key stays on your laptop, always.
+- Order: add key → verify new session → **then** disable password login.
+- `ssh -v` names the failing stage; "denied (publickey)" is usually permissions.
+- Tunnel to reach Postgres instead of publishing 5432.
 
 # Cheat Sheet
 - **SSH = encrypted remote shell** to port 22. **Use keys, not passwords.**
@@ -145,6 +217,12 @@ sudo systemctl status ssh           # is the SSH service running? ([Ch 10])
 | Off-site copy | `scp`/`rsync` over SSH; restic backups ([Ch 28](28_Backups.md)) |
 | Auth logs | `/var/log/auth.log` on the VPS |
 
+# Practice Tasks
+1. **Read the code:** find where `deploy/README.md` covers SSH access. Does it state the add-key-then-harden order?
+2. **Debug:** run `ssh -v` against any host and identify the authentication stage in the output.
+3. **Design:** write the exact steps to give a second developer access — and to revoke it later.
+4. **Architecture:** argue whether deploys should run over SSH or via a CI push. What changes at what team size?
+
 # Homework
 1. `ssh-keygen -t ed25519 -C "me"` on your laptop. Inspect `~/.ssh/`: which file is private, which public? Check their permissions (`ls -l ~/.ssh`).
 2. If you have any Linux box/VM, `ssh-copy-id` your key to it, then `ssh` in without a password. Note the first-time host-fingerprint prompt (that's `known_hosts` being written).
@@ -154,7 +232,7 @@ sudo systemctl status ssh           # is the SSH service running? ([Ch 10])
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - DigitalOcean — *SSH Essentials: Working with SSH Servers, Clients, and Keys*: https://www.digitalocean.com/community/tutorials/ssh-essentials-working-with-ssh-servers-clients-and-keys
 - DigitalOcean — *How to Set Up SSH Keys on Ubuntu*: https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-22-04
 - Ubuntu Server docs — *OpenSSH*: https://ubuntu.com/server/docs/service-openssh

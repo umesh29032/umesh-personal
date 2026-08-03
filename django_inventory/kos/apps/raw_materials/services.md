@@ -1,7 +1,7 @@
 ---
 id: app-raw-materials-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "roll_service + master_service — the reservation brain's verbs, guards, and failure modes."
 related: [app-raw-materials, concept-single-writer]
@@ -10,6 +10,12 @@ related: [app-raw-materials, concept-single-writer]
 # raw_materials — service knowledge
 
 > 📂 [raw_materials app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`raw_materials` app ka kaam: **kapda** — roll, cloth type, colour, storage.)*
 
 ## `roll_service.py` — the reservation brain 🔒 (sole writer of ClothRoll)
 

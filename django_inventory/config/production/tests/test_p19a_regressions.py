@@ -15,6 +15,7 @@ Both tests are fully self-contained (own product/stage/skill/users) — no
 migration-seed reliance, safe under TransactionTestCase's flush.
 """
 from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
 
 from accounts.models import Skill, User
 from production.models import (
@@ -124,3 +125,104 @@ class MultiLaneWorkerReportTest(TestCase):
         resp = self.client.get(
             f'/production/addas/{self.adda.code}/report/cutting/')
         self.assertEqual(resp.status_code, 404)
+
+
+class MultiLanePatternStartTest(TestCase):
+    """AUDIT-2 P0-1: Pattern Design must be startable on a MULTI-LANE Adda.
+
+    Pattern Design is part of the per-lane trio (Layering · Pattern Design ·
+    Cutting), so its panel owes the same lane contract layering/cutting have:
+    GAP-3 (bare multi-lane URL -> lane picker) + a `stream` on every form.
+    Pre-fix the panel published no lane context, its forms carried no `stream`,
+    and pattern-start silently no-op'd -> zero AddaStageRecord, flow dead at
+    stage 2 on every multi-fabric product (e.g. a real T-shirt = body+rib+trim).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        layering = Stage.objects.get_or_create(
+            code='layering', defaults={'name': 'Layering'})[0]
+        pattern = Stage.objects.get_or_create(
+            code='cutting_pattern', defaults={'name': 'Pattern Design'})[0]
+        skill = Skill.objects.get_or_create(
+            name='cutting_master', defaults={'label': 'Cutting Master'})[0]
+        layering.access_by_skill.add(skill)
+        pattern.access_by_skill.add(skill)
+        cls.product = Product.objects.create(code='P0A2', name='P0 audit2')
+        WorkflowStage.objects.create(
+            product=cls.product, stage=layering, order=1)
+        WorkflowStage.objects.create(
+            product=cls.product, stage=pattern, order=2, cost_method='fixed_cost',
+            cost_rate=500, credits_workers=True)
+        cls.admin = User.objects.create_user(
+            email='p0a2-admin@test', password='x',
+            is_superuser=True, is_staff=True)
+        cls.worker = User.objects.create_user(
+            email='p0a2-worker@test', password='x')
+        cls.worker.skills.add(skill)
+        cls.adda = create_adda(cls.admin, product=cls.product)
+        # Make it genuinely multi-lane, the shape that used to be unstartable.
+        lane1 = resolve_stream(cls.adda, None)
+        # Same fabric group — a NEW group would be a Blueprint change, which
+        # add_stream correctly refuses (lifecycle §6).
+        cls.lane2 = add_stream(cls.adda, fabric_group=lane1.fabric_group,
+                               reason='p0 audit2 second lane', user=cls.admin)
+        cls.lane1 = lane1
+        # Pattern work on a lane opens only once THAT lane's layering is done
+        # (a real per-lane sequencing gate) — satisfy it so the test exercises
+        # the lane contract, not the gate.
+        lay = AddaStageRecord.objects.filter(
+            adda=cls.adda, workflow_stage__stage__code='layering').first()
+        lay.stream = lane1
+        lay.completed_at = timezone.now()
+        lay.save(update_fields=['stream', 'completed_at'])
+        AddaStageRecord.objects.create(
+            adda=cls.adda, workflow_stage=lay.workflow_stage,
+            stream=cls.lane2, completed_at=timezone.now())
+        cls.panel = (f'/production/addas/{cls.adda.code}'
+                     f'/stage/cutting_pattern/')
+
+    def test_bare_multi_lane_panel_offers_a_lane_choice(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(self.panel)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['needs_lane_choice'])
+        self.assertGreater(len(resp.context['lanes']), 1)
+
+    def test_lane_scoped_panel_publishes_the_active_lane(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(f'{self.panel}?stream={self.lane1.pk}')
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.context['needs_lane_choice'])
+        self.assertEqual(resp.context['active_lane'].pk, self.lane1.pk)
+        # The lane must reach the rendered forms, or the POST no-ops again.
+        self.assertContains(resp, "h.name = 'stream'")
+        self.assertContains(resp, f"h.value = '{self.lane1.pk}'")
+
+    def test_pattern_start_creates_the_stage_record_on_that_lane(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            f'/production/addas/{self.adda.code}/pattern/start/',
+            {'workers': [self.worker.pk], 'stream': self.lane1.pk})
+        self.assertEqual(resp.status_code, 302)
+        srs = AddaStageRecord.objects.filter(
+            adda=self.adda, workflow_stage__stage__code='cutting_pattern')
+        self.assertEqual(srs.count(), 1)            # pre-fix: 0
+        self.assertEqual(srs.first().stream_id, self.lane1.pk)
+        self.assertTrue(
+            WorkerStageTask.objects.filter(
+                stage_record=srs.first(), worker=self.worker)
+            .exclude(status=WorkerStageTask.Status.CANCELLED).exists())
+
+    def test_each_lane_gets_its_own_pattern_record(self):
+        self.client.force_login(self.admin)
+        for lane in (self.lane1, self.lane2):
+            self.client.post(
+                f'/production/addas/{self.adda.code}/pattern/start/',
+                {'workers': [self.worker.pk], 'stream': lane.pk})
+        streams = set(
+            AddaStageRecord.objects
+            .filter(adda=self.adda,
+                    workflow_stage__stage__code='cutting_pattern')
+            .values_list('stream_id', flat=True))
+        self.assertEqual(streams, {self.lane1.pk, self.lane2.pk})

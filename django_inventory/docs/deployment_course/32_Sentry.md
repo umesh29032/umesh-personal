@@ -1,6 +1,23 @@
+---
+id: deploy-course-32-sentry
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 32 — Error Tracking with Sentry
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [31 — Logging](31_Logging.md). Next: [33 — CI/CD](33_CI_CD.md). *(Completes Term 6.)*
+
+# Learning Objectives
+By the end of this chapter you can:
+- explain what error tracking adds over logs
+- describe how you would wire it into this project
+- avoid the privacy mistakes error trackers invite
+- decide whether you need it yet
 
 # Purpose
 To stop finding out about production errors from your users. **Error tracking** (Sentry) actively captures every exception with full context — traceback, request, user, release — deduplicates it, and alerts you. This chapter explains why logs alone aren't enough, how Sentry fits a Django + Docker deploy, and how to wire it without leaking data or spending money.
@@ -31,6 +48,8 @@ Sentry's **free tier** (or **self-hosted** Sentry, or the open-source **GlitchTi
 
 ### Releases → know which deploy broke it
 Tag each event with a **release** (e.g. the git SHA / `erp-v1.0.0`). Then Sentry shows "this error started in release X" — instantly tying a regression to the deploy that caused it, and marking it resolved when a later release stops it.
+
+> 💡 **Samjho aise:** Log diary hai; Sentry **alarm + jaanch report** hai. Error hone pe wo aapko turant batata hai, aur saath mein poora scene deta hai: kaunsi line, kaunsa user, kya data, kitni baar. Diary mein wahi baat dhoondhne mein aadha ghanta lagta — Sentry aadhe minute mein de deta hai.
 
 # Real World Example (My ERP)
 - **Status — honest:** Sentry is **not yet wired** in my stack (a tracked gap, like the `/healthz` endpoint in [Ch 30](30_Monitoring.md)). Today production errors surface via `docker compose logs` + the accounts security log. This chapter is the **recommended addition** — one of the highest-value, lowest-cost upgrades for a first real deploy.
@@ -89,6 +108,40 @@ docker compose exec app python -c "import sentry_sdk; sentry_sdk.init(dsn='<DSN>
 docker compose exec app python -c "from django.conf import settings; print('DSN set:', bool(getattr(settings,'SENTRY_DSN','')))"
 ```
 
+# Production Walkthrough
+- **Not currently installed.** This chapter is the design, and the honest status is part of the lesson.
+- The gap it fills: logs are pull ("I went and looked"), error tracking is push ("it told me"). With one owner and no on-call rota, push matters.
+- Wiring would be: a DSN in `.env` (ch 23), initialisation in the production settings module (ch 24), and nothing at all in local settings.
+- The value is grouping — one exception seen 400 times becomes one item with a count, not 400 log lines.
+
+# Debugging Guide
+1. **Events not arriving** — DSN missing or wrong environment; the SDK stays silent by design when unconfigured.
+2. **Everything reported, including handled cases** — noise; filter expected exceptions or you will stop reading it.
+3. **Local errors polluting production data** — always tag the environment; never enable it locally.
+4. **Traceback without context** — attach the request path, user id and release; a traceback alone rarely reproduces.
+
+# Performance Notes
+- Reporting is asynchronous; the request should not wait on it.
+- Sampling keeps volume and cost sane on high-traffic paths.
+- Never let the reporter's failure fail the request — errors about errors are a bad loop.
+
+# Security Considerations
+- **This is the highest-risk integration in the course**: it ships your errors, with context, to a third party.
+- Scrub aggressively — `send_default_pii=False`, and filter `SECRET_KEY`, passwords, tokens, and financial identifiers.
+- Local variables in frames can contain wage data or receipts; know what your SDK captures by default.
+- Treat the DSN as a secret in `.env`; treat access to the dashboard as access to your data.
+
+# Architecture Decisions
+- **Deferred, not forgotten** — recorded as an open item rather than half-built. A half-configured reporter that leaks data is worse than none.
+- **Production-only initialisation**, so laptop noise never mixes with real signal.
+- **Scrubbing before convenience**: default to sending less than the SDK offers.
+
+# Best Practices
+- Configure environment and release tags from day one, or the data is unusable.
+- Set up scrubbing before you set up alerting.
+- Review what one real event contains before trusting the integration.
+- Keep logs (ch 31) regardless; error tracking is an addition, not a replacement.
+
 # Beginner Mistakes
 - **Relying on `docker logs` to *notice* errors** → you won't, at scale/at night. Sentry alerts you actively.
 - **Hardcoding the DSN in code** → it's config; put it in `.env`. Keep init behind `if SENTRY_DSN:` so dev/test stay off.
@@ -99,13 +152,31 @@ docker compose exec app python -c "from django.conf import settings; print('DSN 
 - **Treating Sentry as a log store** → it's for *errors/exceptions*, not your INFO event stream ([Ch 31](31_Logging.md)). Use both for their jobs.
 
 # Interview Questions
-**Junior — "What does Sentry do that logs don't?"** It actively captures every exception, groups duplicates into one issue with a count, attaches context (request, user, release), and alerts you — instead of you having to watch logs to notice an error.
+- **Junior:** "What does Sentry do that logs don't?" — It actively captures every exception, groups duplicates into one issue with a count, attaches context (request, user, release), and alerts you — instead of you having to watch logs to notice an error.
 
-**Mid — "How does Sentry integrate with Django and where does the DSN live?"** Via `sentry-sdk` + `DjangoIntegration`, initialized once at startup (in `production.py`); it hooks Django's error handling to capture unhandled exceptions. The DSN is config, read from an env var in `.env`, not hardcoded.
+- **Mid:** "How does Sentry integrate with Django and where does the DSN live?" — Via `sentry-sdk` + `DjangoIntegration`, initialized once at startup (in `production.py`); it hooks Django's error handling to capture unhandled exceptions. The DSN is config, read from an env var in `.env`, not hardcoded.
 
-**Senior — "What context makes a Sentry issue actionable, and what must you scrub?"** Traceback + local vars, request (URL/method/sanitized params), actor/user, environment, and **release** (so regressions map to a deploy), plus breadcrumbs. You must scrub secrets/PII — `send_default_pii=False` + the default scrubbers strip passwords/tokens/auth headers; for a money app, also strip financial fields you don't want off-site.
+- **Senior:** "What context makes a Sentry issue actionable, and what must you scrub?" — Traceback + local vars, request (URL/method/sanitized params), actor/user, environment, and **release** (so regressions map to a deploy), plus breadcrumbs. You must scrub secrets/PII — `send_default_pii=False` + the default scrubbers strip passwords/tokens/auth headers; for a money app, also strip financial fields you don't want off-site.
 
-**Staff — "How would you roll out error tracking on this ERP safely and cheaply?"** Add `sentry-sdk`, init **production-only** behind an env DSN (empty = disabled, so dev/test and a missing var are fail-safe), `send_default_pii=False`, errors at 100% and `traces_sample_rate` low/0 to control cost/noise, and tag events with the release SHA so regressions tie to deploys. Route alerts to one channel, correlate with the request-id/actor logs for the full story, and keep cost at $0 via the free tier or self-hosted GlitchTip. As it grows: raise trace sampling selectively on hot paths, add source maps if a JS frontend appears, and wire deploy hooks so Sentry knows each release. It layers cleanly on the existing logging/monitoring without touching money-write paths.
+- **Staff:** "How would you roll out error tracking on this ERP safely and cheaply?" — Add `sentry-sdk`, init **production-only** behind an env DSN (empty = disabled, so dev/test and a missing var are fail-safe), `send_default_pii=False`, errors at 100% and `traces_sample_rate` low/0 to control cost/noise, and tag events with the release SHA so regressions tie to deploys. Route alerts to one channel, correlate with the request-id/actor logs for the full story, and keep cost at $0 via the free tier or self-hosted GlitchTip. As it grows: raise trace sampling selectively on hot paths, add source maps if a JS frontend appears, and wire deploy hooks so Sentry knows each release. It layers cleanly on the existing logging/monitoring without touching money-write paths.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know what error tracking adds over logs? | "Sentry stores your errors in one place." | It **groups duplicates into one issue with a count**, attaches context (request, user, **release**), and **alerts you** — so 400 occurrences become one item instead of 400 log lines you have to go looking for. Push, not pull (ch 31). |
+| Do you know what makes an issue *actionable*? | "The traceback tells you what broke." | Traceback **plus** request (URL/method/sanitised params), **actor**, environment, and — the one people forget — **release**, so a regression maps to the deploy that caused it. A traceback with no context rarely reproduces. |
+| Do you know the fail-safe wiring? | "Add the DSN and initialise it." | **Production-only init behind an env DSN, empty = disabled** — so dev, tests and a missing variable are all fail-safe. Initialising unconditionally means laptop noise pollutes real signal and a missing var becomes a crash. |
+| ⚠️ Do you know what this integration risks? | "It only sends error messages." | It **ships your errors, with context, to a third party** — and local variables in frames can contain **wage data or receipts**. So: **`send_default_pii=False`**, scrub secrets and financial identifiers, and **review one real event before trusting it**. Scrubbing comes before alerting. |
+
+**The killer follow-up:** *"You enable Sentry and the first issue arrives. What do you check before you tell the team it is working?"* — **what the event actually contains.** If a settlement amount or a phone number is in the payload, you have just built an exfiltration path with good intentions. Configure scrubbing first, alerting second.
+
+# Revision Notes
+- Error tracking = **push** ("it told me"); logs = **pull** ("I looked"). Both, not either.
+- Not installed here — deferred deliberately, recorded as open.
+- Wiring: DSN in `.env`, init in **production settings only**, environment + release tags.
+- Value = **grouping**: 400 occurrences become one item with a count.
+- ⚠️ It sends your errors off-site. Scrub PII, secrets, wage data **before** enabling alerts.
 
 # Cheat Sheet
 - **Sentry = active error capture + grouping + alerting + context**; logs = the searchable record. Use both.
@@ -127,6 +198,12 @@ docker compose exec app python -c "from django.conf import settings; print('DSN 
 | Release tag | git SHA / `erp-v1.0.0` (regressions → deploy) |
 | Free option | GlitchTip / self-hosted Sentry ($0) |
 
+# Practice Tasks
+1. **Read the code:** confirm no error tracker exists today, and find where you would initialise it.
+2. **Debug:** write the exact settings block, including scrubbing, without enabling it.
+3. **Design:** list the exception types you would filter as expected noise in this ERP.
+4. **Architecture:** argue whether a single-owner factory app needs error tracking before it needs monitoring (ch 30).
+
 # Homework
 1. Explain, with the "500 occurrences = 1 issue" example, why grouping matters vs raw logs.
 2. Write the `sentry_sdk.init(...)` block for `production.py`. Why guard it behind `if SENTRY_DSN:` and put it in prod settings only?
@@ -136,7 +213,7 @@ docker compose exec app python -c "from django.conf import settings; print('DSN 
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Sentry — *Django integration* (setup, DSN, options): https://docs.sentry.io/platforms/python/integrations/django/
 - Sentry — *Data scrubbing / `send_default_pii`*: https://docs.sentry.io/data-management/sensitive-data/
 - Sentry — *Releases* (tie errors to deploys): https://docs.sentry.io/product/releases/

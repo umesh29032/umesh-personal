@@ -18,6 +18,33 @@ verified: 2026-07-13
 > [docs/PROJECT_KNOWLEDGE_MAP.md](../../docs/PROJECT_KNOWLEDGE_MAP.md).
 > (Pre-V2 payroll docs are archived under docs/archive/production/.)
 
+## Who may do what (accountant READ TIER, owner ruling 2026-08-02)
+
+Before this, every page here was `_ManagementOnly` — read and write behind ONE gate — so
+a pure `accountant` had no reachable page and their supplier/cost-per-kg capability was
+dead code. **Reads widened; writes did not move.**
+
+| | accountant | manager / SA |
+|---|---|---|
+| Payroll overview · settlements list/detail · material spend · expense register · recurring register | ✅ read | ✅ |
+| **Record** a factory expense | ✅ *(the one money-write grant)* | ✅ |
+| Record advance · settlement start/finalize · pay-basis · FnF | ❌ | ✅ |
+| **Void** an expense · template create/amount-change · generate a period | ❌ | SA / mgmt only |
+
+Two independent layers: `_FinancialRead` on read views, **plus** the service re-checking
+the actor. `void_expense` and the template levers are super-admin-only *inside*
+`expense_service`, so a mis-gated view still cannot erase a cost record. An accountant can
+**add** but never **erase** — append-only bookkeeping, corrections stay with the owner.
+
+⚠️ **`generate_monthly_expenses` is two functions behind one name.** `confirm=False` is a
+PURE READ (returns the plan before writing) and is allowed for the read tier;
+`confirm=True` writes rows and stays `MANAGEMENT_ROLES`. Gating both as a write made the
+recurring **register** — which renders per-template status from that preview — 403 for an
+accountant. If you add a caller, gate on what it *writes*, not on its name.
+
+Full policy + rationale: [docs/production/RBAC.md](../../docs/production/RBAC.md)
+§ *The accountant READ TIER*.
+
 ## Purpose
 
 Yeh app **paisa** sambhalta hai — aur sirf paisa. Workers ka kaam kitna hua

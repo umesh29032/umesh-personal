@@ -1,7 +1,7 @@
 ---
 id: app-core-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The four abstractions every table inherits — 89 lines that shape hundreds."
 related: [app-core, concept-orm-and-managers]
@@ -11,6 +11,12 @@ related: [app-core, concept-orm-and-managers]
 
 > 📂 [core app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > All abstract — core creates NO tables; it creates SHAPE.
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`core` app ka kaam: saara project jo cheezein baar-baar use karta hai (jaise har table ka created_at/updated_at) — iska apna koi table nahi.)*
 
 ## `TimeStampedModel` (line 18)
 

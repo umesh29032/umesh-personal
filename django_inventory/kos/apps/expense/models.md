@@ -1,7 +1,7 @@
 ---
 id: app-expense-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Which expense model holds what, who may write it, and what protects it?"
 related: [app-expense, feature-ledger, feature-settlement]
@@ -11,6 +11,12 @@ related: [app-expense, feature-ledger, feature-settlement]
 
 > 📂 [expense app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > Line numbers = class definitions (drift-tolerant: search the class name).
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`expense` app ka kaam: **paisa** — settlement, ledger, advance, payroll. Yahan galti sabse mehngi padti hai.)*
 
 ## The money spine
 

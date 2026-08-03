@@ -1,0 +1,47 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}{{ spec.title }} — Learn{% endblock %}
+{% block page_title %}{{ spec.title }}{% endblock %}
+
+{% block content %}
+<div class="learn-page" style="--lp-accent:{{ spec.accent }}">
+  <div class="learn-hero">
+    <span class="lp-eyebrow"><a href="{% url 'learning:index' %}" class="lp-back">← All courses</a></span>
+    <h1>{{ spec.icon }} {{ spec.title }}</h1>
+    <p>{{ spec.blurb }}</p>
+  </div>
+
+  <div class="lp-meta" style="margin-bottom:14px">
+    <span class="lp-chip lp-chip--accent">{{ count }} chapters</span>
+    <span class="lp-chip">generated from the chapters</span>
+  </div>
+
+  <div class="learn-wrap">
+    <main class="learn-main">
+      {% for item in items %}
+      <section class="lp-prose" style="margin-bottom:14px" id="r-{{ item.course.slug }}-{{ item.chapter.slug }}">
+        <h1 style="margin-top:0;border-top:0;padding-top:0">
+          <a href="{% url 'learning:chapter' item.course.slug item.chapter.slug %}"
+             style="text-decoration:none">{{ item.chapter.title }}</a>
+        </h1>
+        <p class="lp-meta">{{ item.course.icon }} {{ item.course.title }}</p>
+        {{ item.html }}
+      </section>
+      {% empty %}
+      <div class="lp-prose"><p>Nothing harvested yet — chapters need a
+        <code>{{ spec.heading }}</code> section.</p></div>
+      {% endfor %}
+    </main>
+
+    <aside class="learn-aside">
+      <details class="lp-toc" open>
+        <summary>Jump to chapter</summary>
+        <ol>
+          {% for item in items %}
+          <li><a href="#r-{{ item.course.slug }}-{{ item.chapter.slug }}">{{ item.chapter.title }}</a></li>
+          {% endfor %}
+        </ol>
+      </details>
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,7 +1,7 @@
 ---
 id: app-accounts-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "permission_service, auth_service, user_service, throttle — the decision brain everyone consults."
 related: [app-accounts, concept-auth-hardening]
@@ -10,6 +10,12 @@ related: [app-accounts, concept-auth-hardening]
 # accounts — service knowledge (the decision brain)
 
 > 📂 [accounts app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`accounts` app ka kaam: log-in, users, roles aur **skills** — kaun andar aa sakta hai aur kaun kaunsa kaam kar sakta hai.)*
 
 ## `permission_service.py` — THE authorization brain 🔒
 

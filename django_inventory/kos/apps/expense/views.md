@@ -1,7 +1,7 @@
 ---
 id: app-expense-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Which expense view/handler do I open, what may it do, and what does it call?"
 related: [app-expense, app-expense-urls]
@@ -13,6 +13,12 @@ related: [app-expense, app-expense-urls]
 > House law first: views PARSE and GATE — **every multi-row/money write
 > happens in the service the view calls**; transaction boundaries live on
 > the service functions, never here ([service-layer](../../concepts/architecture/service-layer.md)).
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`expense` app ka kaam: **paisa** — settlement, ledger, advance, payroll. Yahan galti sabse mehngi padti hai.)*
 
 ## The shared gate mixins (top of file)
 

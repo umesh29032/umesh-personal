@@ -1,6 +1,23 @@
+---
+id: deploy-course-22-redis
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 22 — Redis
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [21 — PostgreSQL](21_PostgreSQL.md). Next: [23 — Environment Variables](23_Environment_Variables.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- say what Redis is actually used for here
+- explain why data loss in Redis is survivable
+- diagnose cache-related surprises
+- decide what must never be stored only in Redis
 
 # Purpose
 To understand the **in-memory data store** in my stack — Redis — what it does for the ERP (cache + the login **rate-limiter**), why the app **refuses to boot without it**, and why it (unlike Postgres) has **no volume**. Redis is small in my stack but load-bearing for security.
@@ -31,6 +48,8 @@ In `docker-compose.yml`, `redis` has **no volume** — its data is **ephemeral**
 
 ### Health
 The compose `redis` healthcheck runs `redis-cli ping` (expects `PONG`) every 5s; `app` waits `service_healthy` before starting ([Ch 18](18_Docker_Compose.md)).
+
+> 💡 **Samjho aise:** Redis ek **notepad** hai jo mez pe pada rehta hai — bahut tez, par bijli gayi to likha gaya mit sakta hai. Isi liye usme **kachcha kaam** rakhte hain: cache, "is IP ne 5 baar galat password daala" waali ginti. Asli hisaab (paisa) kabhi notepad pe nahi — wo almirah (Postgres) mein.
 
 # Real World Example (My ERP)
 - **Service:** `redis` = `redis:7.4.2-alpine` (pinned), `restart: unless-stopped`, **no volume**, healthcheck `redis-cli ping` ([Ch 18](18_Docker_Compose.md)).
@@ -69,6 +88,41 @@ docker compose logs app | tail            # boot fails / wait-loop times out (by
 docker compose start redis                # bring it back
 ```
 
+# Production Walkthrough
+- Runs as the `redis` service, on the private network, **no published port** (ch 19).
+- Used as a **cache and rate-limit counter store**, not as a source of truth. Everything in it can be rebuilt from Postgres.
+- `deploy/entrypoint.sh` waits for Redis to be healthy before the app starts, so the first request does not meet a missing dependency.
+- Because it holds nothing authoritative, restarting Redis is a non-event — that property is the design, not luck.
+
+# Debugging Guide
+1. **Stale page after a data change** — cache invalidation, not a database bug. Confirm by flushing the relevant key and reloading.
+2. **"connection refused" to redis** — service down or wrong `REDIS_URL` (ch 23).
+3. **Rate limiting behaves oddly after a restart** — counters were in memory and are gone. Expected.
+4. **Memory growth** — check `maxmemory` and the eviction policy; without them Redis grows until the host complains.
+5. **Everything slow, Redis fine** — do not assume the cache; measure (ch 39).
+
+# Performance Notes
+- Sub-millisecond reads, in-memory; that is the entire point.
+- The win comes from *not* running the expensive query, so cache the aggregate, not the row you already had.
+- Eviction policy matters: with no `maxmemory`, Redis will happily consume the box.
+- A cache miss storm after a restart can hit Postgres hard — expect a slower first minute after deploy.
+
+# Security Considerations
+- **No password here, justified only by "no published port".** If it were ever exposed, that becomes a serious vulnerability (ch 05).
+- Do not cache sensitive rendered pages under keys shared across users — a cache key must include the user when the content is user-specific.
+- Rate-limit counters are security infrastructure; losing them on restart briefly weakens login protection.
+
+# Architecture Decisions
+- **Cache only, never truth** — so any Redis failure degrades performance, never correctness.
+- **Private network, no auth** — accepted because nothing outside can reach it; documented so the assumption is visible.
+- **Health-gated startup**, same reasoning as the database (ch 18).
+
+# Best Practices
+- Never store anything you cannot recompute.
+- Always include the user in the key for per-user content.
+- Set `maxmemory` and an eviction policy before Redis sets them for you.
+- When a page looks wrong, ask "is this cached?" before debugging the query.
+
 # Beginner Mistakes
 - **Adding a default for `REDIS_URL`** ("so it doesn't crash") → defeats the fail-fast; the app could run with the rate-limiter silently off. Keep it no-default in prod.
 - **Persisting Redis + treating it like a database** → it's a cache/counter store here; the business is Postgres. Don't put durable truth in Redis without deliberate persistence.
@@ -78,13 +132,31 @@ docker compose start redis                # bring it back
 - **Wrong host** (`localhost` vs `redis`) inside the container → connection refused ([Ch 19](19_Docker_Networking.md)).
 
 # Interview Questions
-**Junior — "What is Redis and what's it used for here?"** An in-memory key-value store used as the Django cache and, importantly, to hold the login rate-limiter's per-IP/email counters — fast, shared across workers.
+- **Junior:** "What is Redis and what's it used for here?" — An in-memory key-value store used as the Django cache and, importantly, to hold the login rate-limiter's per-IP/email counters — fast, shared across workers.
 
-**Mid — "Why does the app refuse to boot without Redis?"** Because the login rate-limiter's counters live in the Redis-backed cache; if Redis were missing and the app silently fell back to a local/dummy cache, brute-force protection would be off with no warning. Failing fast forces the operator to fix it rather than run insecure.
+- **Mid:** "Why does the app refuse to boot without Redis?" — Because the login rate-limiter's counters live in the Redis-backed cache; if Redis were missing and the app silently fell back to a local/dummy cache, brute-force protection would be off with no warning. Failing fast forces the operator to fix it rather than run insecure.
 
-**Senior — "Why does Redis have no volume while Postgres does?"** Redis holds rebuildable cache values and ephemeral rate-limit counters — not the business data. A restart cold-caches (recomputed on demand) and resets counters (a brief, acceptable window), so persistence buys little. Postgres holds the money/truth and MUST persist via `pgdata`. Match durability to data value.
+- **Senior:** "Why does Redis have no volume while Postgres does?" — Redis holds rebuildable cache values and ephemeral rate-limit counters — not the business data. A restart cold-caches (recomputed on demand) and resets counters (a brief, acceptable window), so persistence buys little. Postgres holds the money/truth and MUST persist via `pgdata`. Match durability to data value.
 
-**Staff — "What are the security + availability implications of Redis in this stack, and how would you harden/scale it?"** Security: Redis is the enforcement point for brute-force protection, so its availability is a security control (hence fail-fast + healthcheck); keep it private (no published port), and if ever exposed, require auth + TLS. Availability: a single ephemeral instance is fine at this scale; the risk is a restart briefly resetting counters. To scale/harden: enable AUTH, bind to the private net only, add `maxmemory` + an eviction policy to bound RAM, and (if it later brokers Celery or holds sessions you value) enable persistence (AOF) + a volume, or managed Redis with HA. Monitor `used_memory` and evictions.
+- **Staff:** "What are the security + availability implications of Redis in this stack, and how would you harden/scale it?" — Security: Redis is the enforcement point for brute-force protection, so its availability is a security control (hence fail-fast + healthcheck); keep it private (no published port), and if ever exposed, require auth + TLS. Availability: a single ephemeral instance is fine at this scale; the risk is a restart briefly resetting counters. To scale/harden: enable AUTH, bind to the private net only, add `maxmemory` + an eviction policy to bound RAM, and (if it later brokers Celery or holds sessions you value) enable persistence (AOF) + a volume, or managed Redis with HA. Monitor `used_memory` and evictions.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know why this app **refuses to boot** without Redis? | "It needs the cache to work." | Because the **login rate-limiter's counters live in the Redis-backed cache**. A silent fallback to a local/dummy cache would turn **brute-force protection off with no warning** — so failing fast is a *security* decision, not a robustness one. |
+| Why no volume for Redis when Postgres has one? | "Redis is in-memory, so it cannot persist." | It **can** persist — the point is it **should not need to**. It holds rebuildable cache values and ephemeral counters, so a restart cold-caches and resets counters: a brief, **accepted** window. Nothing authoritative lives there, by design. |
+| Do you know the condition that makes "no password" acceptable? | "Redis is internal, so it does not need auth." | Acceptable **only because it publishes no port** (ch 19). State the condition — the moment Redis is exposed, or the network is shared, that assumption becomes a serious vulnerability. Unconditional "internal is safe" is the wrong instinct. |
+| Do you know how to make caching *correct*? | "Cache the page and invalidate on change." | **The key must include the user** for any user-specific content, or one worker sees another's wages. And set **`maxmemory` + an eviction policy**, or Redis grows until the host complains. |
+
+**The killer follow-up:** *"Redis is down. Is your app less secure, or just slower?"* — here, **less secure**, because availability of the rate-limiter is a security control — which is exactly why it fail-fasts instead of degrading. Most candidates answer "just slower" and miss the whole design.
+
+# Revision Notes
+- Redis = **cache + rate-limit counters**, private network, no published port.
+- **Nothing authoritative** lives in it — restart is a non-event by design.
+- Stale page = invalidation problem, not a DB bug.
+- No password is acceptable *only* because it is unreachable from outside.
+- Set `maxmemory` + eviction, or it eats the host.
 
 # Cheat Sheet
 - **Redis = in-memory key-value store:** cache + **login rate-limiter counters** (atomic INCR + TTL). Fast, shared across workers, volatile.
@@ -105,6 +177,12 @@ docker compose start redis                # bring it back
 | Persistence | none (ephemeral by design) |
 | Public? | No `ports:` → private |
 
+# Practice Tasks
+1. **Read the code:** find `REDIS_URL` and every cache use in the project. Is anything cached that cannot be recomputed?
+2. **Debug:** stop the Redis container and see which parts of the app still work. Write down what degraded.
+3. **Design:** pick one expensive dashboard query and design a cache key for it, including invalidation.
+4. **Architecture:** argue whether rate-limit counters belong in Redis or Postgres, given restarts.
+
 # Homework
 1. `docker compose exec redis redis-cli ping` → PONG. What compose directive makes `app` wait for this?
 2. Set + get a cache key via the app (command above). Then `redis-cli KEYS '*'` — see it. What happens to it after `docker compose restart redis`, and why is that OK?
@@ -114,7 +192,7 @@ docker compose start redis                # bring it back
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Redis — *official docs* (data types, TTL, INCR): https://redis.io/docs/latest/
 - Django docs — *Caching / Redis cache backend*: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
 - Redis official Docker image: https://hub.docker.com/_/redis

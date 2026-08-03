@@ -1,7 +1,7 @@
 ---
 id: app-accounts-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "accounts' models — identity, Role, SidebarItemRule, skills: who writes, who consumes, what's sacred?"
 related: [app-accounts, app-inventory-models]
@@ -10,6 +10,12 @@ related: [app-accounts, app-inventory-models]
 # accounts — model knowledge (`config/accounts/models.py`)
 
 > 📂 [accounts app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`accounts` app ka kaam: log-in, users, roles aur **skills** — kaun andar aa sakta hai aur kaun kaunsa kaam kar sakta hai.)*
 
 ## Identity
 

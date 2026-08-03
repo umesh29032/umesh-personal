@@ -135,7 +135,7 @@ def factory_kpis():
 def outcome_trend(months=6):
     """Outcomes recorded per month (simple honest buckets, newest last)."""
     from patterns_ai.models import MarkerOutcome
-    now = timezone.now()
+    now = timezone.localtime()
     buckets = OrderedDict()
     for i in range(months - 1, -1, -1):
         y = now.year
@@ -149,7 +149,11 @@ def outcome_trend(months=6):
     from datetime import timedelta
     since = now - timedelta(days=31 * months + 5)
     for o in MarkerOutcome.objects.filter(created_at__gte=since):
-        key = f'{o.created_at.year}-{o.created_at.month:02d}'
+        # Bucket keys above are built from LOCAL time, so the fill must be local
+        # too — `created_at.month` is the UTC month and disagrees with the key for
+        # 5.5h every day (docs/UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md).
+        created_local = timezone.localtime(o.created_at)
+        key = f'{created_local.year}-{created_local.month:02d}'
         if key in buckets:
             buckets[key] += 1
     peak = max(buckets.values()) if buckets else 0

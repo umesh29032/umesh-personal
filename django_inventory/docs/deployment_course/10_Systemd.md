@@ -1,6 +1,23 @@
+---
+id: deploy-course-10-systemd
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 10 — systemd
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [09 — Processes & Services](09_Processes_and_Services.md). Next: [11 — Reverse Proxy](11_Reverse_Proxy.md). *(Completes Term 2.)*
+
+# Learning Objectives
+By the end of this chapter you can:
+- read a systemd unit file and say what it promises
+- start, stop, enable and inspect a service
+- read `journalctl` to find why something failed to start
+- say why this project mostly does not need its own units
 
 # Purpose
 To understand the thing that starts and supervises long-running programs on a Linux server — **systemd** — because *something* must launch Docker (and your whole stack) automatically when the VPS boots or reboots, restart it if it dies, and give you one place to read its logs.
@@ -37,6 +54,8 @@ Two valid models:
 1. **Non-Docker deploy:** you'd write a `gunicorn.service` unit; systemd runs Gunicorn directly, restarts it, logs it. (Common in tutorials that skip Docker.)
 2. **My Docker deploy:** **systemd's job shrinks to "start `docker.service` on boot"**; then **Docker** (via `restart: unless-stopped` in `docker-compose.yml`) supervises the individual containers ([Ch 09](09_Processes_and_Services.md)). So I don't hand-write unit files per app service — Docker does per-container supervision, systemd just guarantees Docker is up.
    - *Optional polish:* a tiny `docker-compose@erp.service` unit can run `docker compose up -d` at boot so the stack comes back after a reboot even if you never logged in. Otherwise, `restart: unless-stopped` + `docker.service` being enabled already brings containers back on reboot.
+
+> 💡 **Samjho aise:** Systemd server ka **manager** hai jo subah sabse pehle aata hai aur sab kaam shuru karwata hai. Aap use ek **parchi** dete ho (unit file): *"yeh command chalao, gir jaaye to dobara chalao, boot pe khud shuru karo"*. Uske baad aapko yaad rakhne ki zaroorat nahi — manager sambhaal leta hai.
 
 # Real World Example (My ERP)
 - On the VPS, **`systemctl enable --now docker`** guarantees the Docker daemon starts on boot. That's the main systemd action I take.
@@ -82,6 +101,39 @@ systemctl list-units --type=service --state=running   # what's running
 docker compose ps    # were containers restarted automatically? (should be "Up")
 ```
 
+# Production Walkthrough
+- **This project runs on Docker's restart policies, not hand-written units** — one supervision mechanism, five containers, no per-service files to maintain.
+- systemd still matters here because **the Docker daemon itself is a systemd service**: `systemctl status docker` and `journalctl -u docker` are how you diagnose host-level container failures.
+- If you ever run something outside Docker (a cron-like job, a metrics agent), a unit file with `Restart=always` and `After=network.target` is the correct pattern.
+
+# Debugging Guide
+1. **`systemctl status <unit>`** — active, failed, or restarting, plus the last few log lines.
+2. **`journalctl -u <unit> --since "10 min ago"`** — the actual reason.
+3. **"Works by hand, fails as a service"** — environment. A unit does not inherit your shell; declare `Environment=` or `EnvironmentFile=`.
+4. **Enabled vs started confusion:** `start` = now; `enable` = on boot. Forgetting `enable` means it disappears after the next reboot.
+5. **`systemctl daemon-reload`** after editing a unit, or your change is ignored.
+
+# Performance Notes
+- systemd itself is negligible overhead; it is a supervisor, not a runtime.
+- `Restart=always` with no backoff can hammer a failing dependency — set `RestartSec`.
+- Journald keeps logs in memory/disk with limits; unbounded logging is capped rather than filling the disk (a feature).
+
+# Security Considerations
+- Run units as a dedicated non-root user (`User=`), not root.
+- `EnvironmentFile=` is how secrets reach a unit; that file needs owner-only permissions, exactly like `.env` (ch 23).
+- systemd sandboxing options (`ProtectSystem`, `NoNewPrivileges`) are cheap hardening if you do write units.
+
+# Architecture Decisions
+- **Docker restart policies over bespoke units** — chosen for a single-box, five-container deploy where one mechanism is simpler to reason about at 3am.
+- **Docker daemon enabled at boot**, which is the one systemd dependency that actually matters here.
+- **No hidden background jobs**: anything that must run is either a container or a documented unit — never a `nohup` someone remembers.
+
+# Best Practices
+- `enable` *and* `start`, or it will not survive a reboot.
+- Always `daemon-reload` after editing.
+- Log to stdout/journald rather than inventing a log file.
+- Prefer the supervision mechanism you already have over adding a second one.
+
 # Beginner Mistakes
 - **`start` without `enable`.** Works until the first reboot, then the service is dead and "the site randomly went down after a reboot." Use `enable --now`.
 - **Hand-writing unit files when using Docker.** Redundant — Docker's restart policy supervises containers. Just enable `docker.service`.
@@ -90,13 +142,31 @@ docker compose ps    # were containers restarted automatically? (should be "Up")
 - **Assuming reboot brings the app back with no config.** It does *only if* `docker.service` is enabled AND containers have a restart policy (yours do). Verify with a test reboot.
 
 # Interview Questions
-**Junior — "Difference between `systemctl start` and `systemctl enable`?"** `start` runs the service now; `enable` makes it start automatically on every boot. `enable --now` does both.
+- **Junior:** "Difference between `systemctl start` and `systemctl enable`?" — `start` runs the service now; `enable` makes it start automatically on every boot. `enable --now` does both.
 
-**Mid — "In a Dockerized deployment, what does systemd actually manage vs Docker?"** systemd manages the host and the Docker daemon (`docker.service`) — ensuring Docker starts on boot; Docker then manages the individual containers via their restart policies. You typically don't write per-app systemd units.
+- **Mid:** "In a Dockerized deployment, what does systemd actually manage vs Docker?" — systemd manages the host and the Docker daemon (`docker.service`) — ensuring Docker starts on boot; Docker then manages the individual containers via their restart policies. You typically don't write per-app systemd units.
 
-**Senior — "After a VPS reboot the site is down. Walk your checks."** `systemctl status docker` (did the daemon start? is it enabled?), then `docker compose ps` (are containers up/restarting/exited?), then `journalctl -u docker` for daemon errors and `docker compose logs` for app errors. Common root causes: `docker.service` not enabled, a volume/mount issue, or an env var only present in a shell that didn't run at boot.
+- **Senior:** "After a VPS reboot the site is down. Walk your checks." — `systemctl status docker` (did the daemon start? is it enabled?), then `docker compose ps` (are containers up/restarting/exited?), then `journalctl -u docker` for daemon errors and `docker compose logs` for app errors. Common root causes: `docker.service` not enabled, a volume/mount issue, or an env var only present in a shell that didn't run at boot.
 
-**Staff — "Guarantee the full stack returns after any reboot, unattended, and is observable."** Enable `docker.service`; give every container `restart: unless-stopped` (done); optionally add a systemd unit that runs `docker compose up -d` in the project dir at boot (belt-and-suspenders if compose isn't started by the daemon alone); ship container logs to stdout (done) so `docker compose logs`/journald capture them; add an external uptime check ([Ch 30](30_Monitoring.md)) so you *know* within a minute if the reboot didn't fully recover. Test by actually rebooting a staging box.
+- **Staff:** "Guarantee the full stack returns after any reboot, unattended, and is observable." — Enable `docker.service`; give every container `restart: unless-stopped` (done); optionally add a systemd unit that runs `docker compose up -d` in the project dir at boot (belt-and-suspenders if compose isn't started by the daemon alone); ship container logs to stdout (done) so `docker compose logs`/journald capture them; add an external uptime check ([Ch 30](30_Monitoring.md)) so you *know* within a minute if the reboot didn't fully recover. Test by actually rebooting a staging box.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| `start` vs `enable` — the question behind the question. | "start runs it, enable turns it on." | `start` = **now**; `enable` = **on every boot**; `enable --now` = both. The reason it is asked: **a service that was only started does not survive a reboot**, and you find out during an unplanned one. |
+| In a Docker deployment, do you know the division of labour? | "systemd manages the services." | **systemd manages the host and the Docker daemon**; **Docker manages the containers** via their restart policies. You typically write **no per-app unit at all** — and candidates who insist on one have not thought about who restarts whom. |
+| Site down after a reboot — can you order the checks? | "I would run docker compose up." | **`systemctl status docker`** (did the daemon start — is it **enabled**?) → **`docker compose ps`** → `journalctl -u docker` for daemon errors → `docker compose logs` for app errors. The usual root cause is `docker.service` not enabled, which `up` hides rather than fixes. |
+| Can you make the whole stack return unattended? | "The containers will come back." | Only if **`docker.service` is enabled** *and* every container has **`restart: unless-stopped`** (this project does). Optionally a boot-time unit running `docker compose up -d` as belt-and-braces. "Should come back" is not a recovery plan. |
+
+**The killer follow-up:** *"Prove the stack survives a reboot."* — the only acceptable answer is **"I rebooted it and watched it come back"**. Reasoning about restart policies is not evidence; a scheduled reboot test is. Most people discover their daemon was never enabled during a power event.
+
+# Revision Notes
+- systemd = the boot-time manager: starts, restarts, and reports services.
+- `start` = now · `enable` = on boot · you usually need **both**.
+- `systemctl status` then `journalctl -u <unit>` finds the reason.
+- Units do **not** inherit your shell environment — declare it.
+- Here, Docker does the supervising; systemd keeps **Docker** alive.
 
 # Cheat Sheet
 - **systemd** = host PID 1 + service manager; starts/supervises/logs services at boot.
@@ -117,6 +187,12 @@ docker compose ps    # were containers restarted automatically? (should be "Up")
 | SSH service | `ssh.service` (`systemctl restart ssh` after Ch07 hardening) |
 | Hand-written app units? | No — Dockerfile CMD + compose restart replace them |
 
+# Practice Tasks
+1. **Read the code:** confirm Docker is enabled at boot (`systemctl is-enabled docker`). What happens after a reboot if it is not?
+2. **Debug:** run `journalctl -u docker --since "1 hour ago" | tail -20` and identify one real event.
+3. **Design:** write the unit file you would use for a nightly job that runs outside Docker — include user, restart and environment.
+4. **Architecture:** argue why adding systemd units per app service would make this deploy harder, not safer.
+
 # Homework
 1. `systemctl is-enabled docker` on any Docker host — is it set to start on boot? Why does that matter for your ERP surviving a reboot?
 2. `systemctl status ssh` — find its state, PID, and last few log lines. What unit file backs it?
@@ -126,7 +202,7 @@ docker compose ps    # were containers restarted automatically? (should be "Up")
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - DigitalOcean — *Systemd Essentials: services, targets, journalctl*: https://www.digitalocean.com/community/tutorials/systemd-essentials-working-with-services-units-and-the-journal
 - DigitalOcean — *Using journalctl to view logs*: https://www.digitalocean.com/community/tutorials/how-to-use-journalctl-to-view-and-manipulate-systemd-logs
 - Arch Wiki — *systemd* (dense but authoritative reference): https://wiki.archlinux.org/title/Systemd

@@ -1,6 +1,23 @@
+---
+id: deploy-course-36-my-erp-deployment
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 36 — Deploying My ERP (step by step)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [35 — The Deployment Checklist](35_Deployment_Checklist.md). Next: [37 — Post-Deployment Operations](37_Post_Deployment.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- describe this exact deployment end to end, from your laptop to a worker's phone
+- name every moving part and why it exists
+- explain what is deliberately missing
+- deploy it yourself following the written path
 
 # Purpose
 The capstone. Every concept in this course, applied end to end: from a bare VPS to my ERP live on HTTPS with backups running. This chapter mirrors the **real, certified runbook** (`DEPLOYMENT.md` + `deploy/README.md`, frozen at tag `erp-v1.0.0` = commit `90c1f2f3`) in teaching mode — what / why / success / failure at each step.
@@ -16,7 +33,9 @@ buy VPS → SSH keys → firewall → Docker → DNS → clone → .env → up �
 ```
 Two rules govern the whole thing (owner rules): **exact-pinned images** (`caddy:2.9.1`, `postgres:16.6-alpine`, `redis:7.4.2-alpine`, `python:3.10.16-slim`) and **never trust `depends_on` alone** — the entrypoint actively waits for healthy DB+Redis.
 
-# Real World Example (My ERP) = Practical — the 13 steps
+> 💡 **Samjho aise:** Yahan tak sab **auzaar** seekhe; yeh chapter **asli kaam** hai — hamari factory ka apna deploy, apni file ke saath. Baaki chapters theory the; yeh wo page hai jo aap us raat khologe jab sach mein server pe jaana hoga. Isi liye ismein andaaza nahi, **hamare repo ki asli command** likhi hain.
+
+# Real World Example (My ERP) — the 13 steps
 > Placeholders used throughout: server IP `203.0.113.10`, hostname `erp.example.com`. Replace with yours.
 
 ### Step 1 — Buy the VPS
@@ -122,6 +141,42 @@ A backup is unproven until restored. Schedule a drill: `restic restore latest` i
 
 **Updates later** = `sh deploy/deploy.sh` (dump → pull → build → up → prune → smoke); rollback = `git checkout <prev tag>` + rerun, or restore the predeploy dump ([Ch 33](33_CI_CD.md)).
 
+# Practical — dry-run the whole deploy on your laptop first
+Every step below is safe: nothing touches a server, and nothing is irreversible.
+Do this **before** you buy a VPS, so deploy day has no surprises.
+
+```bash
+# 1. Does the compose file resolve with your .env? (catches typos + missing vars)
+docker compose config | head -40
+
+# 2. Does the image build? (catches Dockerfile + dependency errors — ch 17)
+docker compose build web
+
+# 3. Bring the whole stack up locally, exactly as production would
+docker compose up -d --build
+docker compose ps                      # every service "healthy", none restarting
+
+# 4. Did the entrypoint do its four jobs?
+#    (wait-for-health → migrate → seed_master_data → collectstatic)
+docker compose logs web | head -40
+
+# 5. Prove the app answers, and that static files are being served
+curl -sI http://localhost:8000/ | head -3
+
+# 6. Prove the private network works the way ch 19 claims
+docker compose exec web python -c "import socket; print(socket.gethostbyname('db'))"
+
+# 7. Prove a fresh database can actually run the factory (the known blocker)
+docker compose exec web python manage.py seed_master_data --dry-run
+
+# 8. Tear down WITHOUT touching volumes (note: no -v — ch 20)
+docker compose down
+```
+
+If all eight succeed locally, the only things left that can fail on the server
+are **the server itself** (ch 03–07), **DNS** (ch 04) and **your `.env`** (ch 23).
+That is a much smaller list to debug at 11 p.m.
+
 # Visual Diagram
 ```
   ① VPS(2-4GB, India)  ② SSH keys, no-password  ③ ufw 22/80/443  ④ Docker(get.docker.com)
@@ -135,6 +190,53 @@ A backup is unproven until restored. Schedule a drill: `restic restore latest` i
   updates: deploy.sh (dump→pull→build→up→prune→smoke) | rollback: prev tag + deploy.sh / restore predeploy dump
 ```
 
+# Production Walkthrough
+The whole system, in the order a request travels:
+1. **Worker's phone** hits `https://domain` → DNS (ch 04) → the VPS.
+2. **Caddy** terminates TLS with an automatic certificate (ch 12, ch 13), serves static and media directly (ch 25), and proxies everything else.
+3. **Gunicorn**, 3 workers, runs `config.wsgi` (ch 14, ch 15).
+4. **Django** handles the request: permission service gates access, service layer owns multi-row writes, settlement is the only money boundary.
+5. **Postgres** on a private network holds the truth; **Redis** caches (ch 21, ch 22).
+6. **Volumes** persist database, media and certificates (ch 20).
+7. **`deploy/backup.sh`** copies database + media off-site (ch 28).
+
+Deploy itself is: push code → `docker compose up -d --build` → the entrypoint waits for health, collects static, migrates, then starts Gunicorn (ch 18, ch 26, ch 27).
+
+What is deliberately absent: no error tracker (ch 32), no CI (ch 33), no dashboards (ch 30). (A fresh database also needs its platform master data — migrations give only 4 of 21 stages — but the entrypoint now seeds that automatically on every boot.)
+
+# Debugging Guide
+1. **Locate the failure by layer** — Caddy, Gunicorn, Django, Postgres, in that order (ch 31).
+2. **502** = the app is not answering. **504** = it is too slow. Different problems, different fixes.
+3. **Unstyled** = static. **Broken images** = media. **Wrong numbers** = application, and treat it as serious.
+4. **Cannot start an Adda** = master data missing, not a code bug.
+5. **Slow everything** = check host disk and memory first (ch 06).
+
+# Performance Notes
+- 3 Gunicorn workers is a starting point tied to CPU count, not to traffic (ch 14).
+- Caddy serving files keeps workers free for Python.
+- `CONN_MAX_AGE` reuses database connections (ch 21).
+- The first minute after deploy is cold; expect it and do not panic-tune.
+
+# Security Considerations
+- Only 22/80/443 open; key-only SSH (ch 05, ch 07).
+- No published database or cache ports (ch 19).
+- `DEBUG=False`, HSTS, secure cookies, Argon2, rate limiting (ch 34).
+- Settlement-only money writes limit damage even from a valid login.
+- Backups hold everything — encrypt them (ch 28).
+
+# Architecture Decisions
+- **Docker Compose on one VPS** — a solo maintainer can hold this in their head, and it fits the load of one factory.
+- **Caddy over Nginx** for automatic certificates and a short config.
+- **Everything in git**: compose, Caddyfile, entrypoint, backup script.
+- **Recovery over observation**: health checks and restarts before dashboards.
+- **Known gaps recorded**, not hidden — seeding, CI, error tracking.
+
+# Best Practices
+- Follow `deploy/README.md`; treat this chapter as the map, that file as the runbook.
+- Verify with a real financial total after every deploy (ch 35).
+- Keep the deployment simple until real load says otherwise (ch 41).
+- Record every deploy's git hash and time.
+
 # Beginner Mistakes
 - **`ufw enable` before allowing 22** → locked out. 22 first, always (Step 3).
 - **`up` before DNS resolves** → Caddy can't get a cert, then Let's Encrypt rate-limits you (Step 5).
@@ -146,13 +248,31 @@ A backup is unproven until restored. Schedule a drill: `restic restore latest` i
 - **Old `docker-compose` (hyphen)** → the plugin is `docker compose` (space) everywhere here.
 
 # Interview Questions
-**Junior — "What's the first thing you do on a fresh VPS, and why not last?"** Lock down host access — SSH keys, disable password login, firewall to 22/80/443 — before anything else, because a fresh public server is scanned by bots within minutes.
+- **Junior:** "What's the first thing you do on a fresh VPS, and why not last?" — Lock down host access — SSH keys, disable password login, firewall to 22/80/443 — before anything else, because a fresh public server is scanned by bots within minutes.
 
-**Mid — "Why must DNS resolve before the first `docker compose up`?"** Caddy requests a Let's Encrypt cert on first boot, and LE calls back to the domain to verify ownership. If DNS doesn't point at the server, the challenge fails, no cert is issued, and repeated failures get rate-limited — so DNS first, `up` second.
+- **Mid:** "Why must DNS resolve before the first `docker compose up`?" — Caddy requests a Let's Encrypt cert on first boot, and LE calls back to the domain to verify ownership. If DNS doesn't point at the server, the challenge fails, no cert is issued, and repeated failures get rate-limited — so DNS first, `up` second.
 
-**Senior — "Walk the entrypoint sequence and why each step is ordered so."** Wait for *healthy* DB+Redis (don't trust `depends_on` alone) so migrations/queries can't hit a not-ready dependency → `migrate` so the schema matches the code before serving → `collectstatic` so static is present → `exec gunicorn` (PID 1, receives signals) to serve. Ordered so the app never serves a request against an unready DB or missing schema/static.
+- **Senior:** "Walk the entrypoint sequence and why each step is ordered so." — Wait for *healthy* DB+Redis (don't trust `depends_on` alone) so migrations/queries can't hit a not-ready dependency → `migrate` so the schema matches the code before serving → `collectstatic` so static is present → `exec gunicorn` (PID 1, receives signals) to serve. Ordered so the app never serves a request against an unready DB or missing schema/static.
 
-**Staff — "A junior is doing this first deploy alone. What are the three failure points you'd most want guardrails on, and how are they guarded here?"** (1) Lockout — mitigated by "verify new key session before disabling passwords" + provider rescue console + "allow 22 before enable." (2) TLS/DNS ordering — mitigated by an explicit DNS-before-`up` step with a `dig` verification gate and the rate-limit warning. (3) DB password mismatch (silent 120s hang) — mitigated by the "same password in both places" rule + a documented failure signature. Beyond those: the certified tag (no untested code), fail-fast env vars (misconfig crashes loudly not silently), and the verify+backup+restore-drill closeout so "up" is never mistaken for "done, recoverable." The design turns the dangerous steps into gated, self-verifying ones.
+- **Staff:** "A junior is doing this first deploy alone. What are the three failure points you'd most want guardrails on, and how are they guarded here?" — (1) Lockout — mitigated by "verify new key session before disabling passwords" + provider rescue console + "allow 22 before enable." (2) TLS/DNS ordering — mitigated by an explicit DNS-before-`up` step with a `dig` verification gate and the rate-limit warning. (3) DB password mismatch (silent 120s hang) — mitigated by the "same password in both places" rule + a documented failure signature. Beyond those: the certified tag (no untested code), fail-fast env vars (misconfig crashes loudly not silently), and the verify+backup+restore-drill closeout so "up" is never mistaken for "done, recoverable." The design turns the dangerous steps into gated, self-verifying ones.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know what comes first on a fresh VPS, and why? | "Install Docker and deploy the app." | **Lock down host access first** — SSH keys, `PasswordAuthentication no`, firewall to 22/80/443 — because **a fresh public server is scanned by bots within minutes**. Deploying onto an unhardened box means racing them. |
+| Do you know why DNS must resolve before the first `up`? | "DNS can be pointed after deployment." | Caddy requests a cert on first boot and **Let's Encrypt calls back to the domain** to verify ownership. No DNS → failed challenge → no cert → and **repeated failures hit the issuance rate limit**, so you are then blocked by the clock. |
+| Can you justify the entrypoint order? | "It starts the app." | **Wait for *healthy* DB+Redis** (not just `depends_on`) → **`migrate`** so the schema matches the code before any request → **`collectstatic`** → **`exec` Gunicorn** so it becomes PID 1 and receives SIGTERM (ch 09). Every step is ordered against a specific failure. |
+| Can you name the lockout guardrail? | "Be careful with SSH config." | **Verify the new key in a second session BEFORE disabling password login** — and know the provider's rescue console exists. "Be careful" has locked a lot of people out of their own servers; a second open session has not. |
+
+**The killer follow-up:** *"A junior is doing this deploy alone tonight. What are the three things you guard, and how?"* — **(1) lockout** — verify the key in a second session before disabling passwords, rescue console known; **(2) cert rate-limiting** — DNS before first `up`, persistent `caddy_data`; **(3) data loss** — backup before migrate, and never `down -v`. Naming *your own* riskiest steps is the senior signal here.
+
+# Revision Notes
+- Path: **phone → DNS → Caddy (TLS, static/media) → Gunicorn ×3 → Django → Postgres/Redis**, volumes underneath, backups off-site.
+- Deploy = `docker compose up -d --build`; entrypoint waits-for-health → **migrate → seed_master_data → collectstatic** → serve.
+- Absent on purpose: error tracker, CI, dashboards. Fresh DB master data is seeded by the entrypoint.
+- 502 = not answering · 504 = too slow · unstyled = static · broken images = media.
+- One VPS, one compose file, everything in git — chosen for a solo maintainer.
 
 # Cheat Sheet
 - **Order:** VPS → SSH keys → ufw(22 first) → Docker → **DNS(before up)** → clone tag → `.env`(fill+600+pw-manager) → `up -d --build` → superuser → data → **verify+check** → backup landed → restore drill.
@@ -178,6 +298,12 @@ A backup is unproven until restored. Schedule a drill: `restic restore latest` i
 | Recover | restore drill (sentinel 170/₹10,880.25, goldens ₹344.25/₹801/₹633) |
 | Update | `sh deploy/deploy.sh` |
 
+# Practice Tasks
+1. **Read the code:** open `docker-compose.yml`, `deploy/Caddyfile`, `deploy/entrypoint.sh` together and trace one request through all three.
+2. **Debug:** for each of the five symptoms above, write which log you check first.
+3. **Design:** write your own one-page version of this architecture from memory, then diff it against the file.
+4. **Architecture:** argue Compose-on-one-VPS versus a managed platform for this business, in cost and risk terms.
+
 # Homework
 1. From memory, list the 13 steps in order. Which two, if swapped, lock you out or break TLS?
 2. Explain exactly why `POSTGRES_PASSWORD` must equal the password inside `DATABASE_URL`. What's the failure signature?
@@ -187,7 +313,7 @@ A backup is unproven until restored. Schedule a drill: `restic restore latest` i
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - My canonical runbooks: `DEPLOYMENT.md` (teaching kit) + `deploy/README.md` (expert steps 1–11) + `docs/release/` (Operations Handbook).
 - DigitalOcean — *Django + Postgres + Gunicorn + Nginx on Ubuntu 22.04* (classic end-to-end, non-Docker comparison): https://www.digitalocean.com/community/tutorials/how-to-set-up-django-with-postgres-nginx-and-gunicorn-on-ubuntu-22-04
 - Docker docs — *Get Docker (convenience script)*: https://docs.docker.com/engine/install/ubuntu/

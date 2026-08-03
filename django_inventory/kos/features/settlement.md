@@ -1,7 +1,7 @@
 ---
 id: feature-settlement
 type: feature
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "How does the factory decide and record what a worker has earned — and why is that separate from paying them cash?"
 related: [concept-django-transactions, flow-worker-gets-paid]
@@ -26,6 +26,17 @@ Settlement answers three business questions at once:
 **Settlement ≠ payment.** Settlement kehta hai "itna DENA BANTA hai";
 cash dena ek alag event hai (`PayrollSettlement`, `/expense/workers/<id>/settle/`).
 Isse business ko flexibility milti hai — hisaab aaj, cash agle hafte.
+
+> 💡 **Samjho aise:** Settlement wo **ek darwaza** hai jahan "itna banta hai"
+> (hisaab) badal kar "itna pakka mila" (paisa) ban jaata hai.
+>
+> Darwaze se **pehle**: quantity jitni baar chaaho theek karo, kuch nahi bigdega —
+> abhi paisa bana hi nahi hai.
+> Darwaze ke **baad**: entry mitai nahi jaati; galti sudharni ho to **ulti entry**
+> daalte hain (reverse), taaki dono record zinda rahein.
+>
+> Poore system mein paisa banane ki **sirf yahi ek jagah** hai. Isiliye is ek
+> darwaze pe itna tala-pehra hai — baaki jagah aazadi de sakte ho, yahan nahi.
 
 ## Mental Model
 

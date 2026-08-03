@@ -1,7 +1,7 @@
 ---
 id: app-tracking-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "tracking's 6 models — identity, state, memory: who writes each, and what's permanent?"
 related: [app-tracking]
@@ -10,6 +10,12 @@ related: [app-tracking]
 # tracking — model knowledge (`config/tracking/models.py`, 410 lines · 6 models)
 
 > 📂 [tracking app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`tracking` app ka kaam: **history aur barcode** — kya hua, kab hua, kisne kiya.)*
 
 ## Identity (2)
 

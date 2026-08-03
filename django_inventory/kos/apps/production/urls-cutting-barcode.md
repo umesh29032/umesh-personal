@@ -1,7 +1,7 @@
 ---
 id: app-production-urls-cutting-barcode
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Every Cutting and Barcode-Generation URL — the mint and the identity printer, action by action."
 related: [app-production-urls]
@@ -12,6 +12,12 @@ related: [app-production-urls]
 > 📂 [URL index](urls.md) · [production app](README.md) · [LOS home](../../README.md)
 > Handlers: `stages/cutting/service.py` · `stages/barcode_generation/…`.
 > Skill-gated (`_ensure_cutting_skill`); completes management-checked.
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ## Cutting — where quantities are born
 

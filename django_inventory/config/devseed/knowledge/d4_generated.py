@@ -33,13 +33,19 @@ def _gen():
     return generate_docs
 
 
+# Hand-written KOS satellites that live INSIDE the generated folder. Excluded
+# by exact filename, never by a frontmatter field: `owner: handwritten` is
+# editable, so trusting it would let a hand-edited card opt out of detection.
+_HANDWRITTEN = frozenset({"HUMAN_GUIDE.md"})
+
+
 def _generated_files(root=None):
     base = root or GENERATED_ROOT
     out = []
     for r, dirs, files in os.walk(base):
         dirs[:] = [d for d in dirs if d != "__pycache__"]
         for f in sorted(files):
-            if f.endswith(".md"):
+            if f.endswith(".md") and f not in _HANDWRITTEN:
                 out.append(os.path.relpath(os.path.join(r, f), base))
     return sorted(out)
 

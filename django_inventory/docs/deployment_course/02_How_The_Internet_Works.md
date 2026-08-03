@@ -1,6 +1,23 @@
+---
+id: deploy-course-02-how-the-internet-works
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 02 — How The Internet Works
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [01 — What Is Deployment](01_What_Is_Deployment.md). Next: [03 — HTTP & HTTPS](03_HTTP_HTTPS.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- trace a request from a phone in the factory to your Django view
+- explain packets, IP and routing without jargon
+- say what a TCP handshake costs and why keep-alive matters
+- name which hop is responsible when a page will not load
 
 # Purpose
 Before I can put my ERP "on the internet," I need to know what the internet *is* mechanically — how a tap on a worker's phone becomes bytes arriving at my VPS and a page coming back. Without this, terms like DNS, IP, port, TLS, and "reverse proxy" are magic words. With it, deployment is just wiring a pipe I understand.
@@ -33,6 +50,8 @@ The phone is the **client** (initiates the request). My VPS is the **server** (l
 
 ### The whole trip, once
 Worker taps a link → phone asks **DNS** for `erp.example.com` → gets my VPS's **IP** → opens a **TCP** connection to that IP on **port 443** → **TLS** handshake sets up encryption + verifies the cert → phone sends the **HTTP** request inside → it arrives at my VPS, where **Caddy** is listening on 443 → Caddy forwards to **Gunicorn** → Django builds the page → back up the same pipe.
+
+> 💡 **Samjho aise:** Internet ek **courier network** hai. Aapka message chhote-chhote **packets** (lifafe) mein toot ke jaata hai, har lifafe pe pata (IP) likha hota hai, aur raste mein kai **router** (chhaanti karne wale daftar) use aage badhate hain. Lifafe alag-alag raste se ja sakte hain — pahunch ke dobara sahi kramm mein jud jaate hain.
 
 # Real World Example (My ERP)
 - The "stable public address" is my **VPS's public IP** (I get it from the hosting provider). 
@@ -81,6 +100,41 @@ Read the `* ` lines: DNS resolve → `Connected to … port 443` (TCP) → `TLS 
 traceroute erp.example.com          # each line = one router your packets pass through
 ```
 
+# Production Walkthrough
+- A worker's phone on factory wifi → their ISP → the internet → your VPS's public IP → port 443 → **Caddy** → Gunicorn → Django → Postgres, and all the way back.
+- **Every hop is a place it can fail**, which is why ch 39's debugging starts by asking *which hop*.
+- TLS adds a handshake before any data moves; that is why keep-alive connections matter on mobile networks with high latency.
+- The factory's real-world constraint is **latency, not bandwidth** — a phone on patchy wifi feels every extra round-trip, which is the same reason N+1 queries hurt (sql_course ch 16).
+
+# Debugging Guide
+"It doesn't load" — isolate the hop:
+1. **Is it just this device?** Try another phone/network. Factory wifi is a real suspect.
+2. **`ping` / `curl -I` the domain** — no response = DNS or network; response = the app layer.
+3. **Does the IP resolve correctly?** `dig +short yourdomain` (ch 04).
+4. **Is the port open?** A firewall closing 443 looks identical to "server down" from outside.
+5. **Compare from inside the server** (`curl localhost`) — if that works, the problem is between the internet and Caddy, not in the app.
+
+# Performance Notes
+- Each new TCP+TLS connection costs multiple round-trips; HTTP keep-alive amortises that.
+- Packet loss on wifi causes retransmits, which look like "the app is slow" to a user.
+- Compression (Caddy does it) cuts bytes but not round-trips — reducing *requests* helps mobile more than shrinking them.
+- Physical distance is a hard floor: a server far from the factory adds latency you cannot optimise away.
+
+# Security Considerations
+- Data crosses networks you do not control, which is the entire argument for HTTPS (ch 03).
+- Anything on the public internet is scanned within minutes; assume every open port is being probed.
+- Never trust the client's IP for authorisation — it is easy to forge and changes constantly on mobile.
+
+# Architecture Decisions
+- **One public entry point** (443) and nothing else exposed, so the attack surface is one process you configure carefully.
+- **Host near the users** — for a single-factory ERP, a region close to the factory beats a "global" setup nobody needs.
+- **HTTP/2 via Caddy** so many small requests on one connection stop being expensive.
+
+# Best Practices
+- Learn `curl -I` — it answers "which layer replied?" in one command.
+- Keep payloads small for phones; the factory floor is not a fibre connection.
+- Test on a real phone on real factory wifi before declaring a page fast.
+
 # Beginner Mistakes
 - **Confusing DNS with the server.** Pointing the domain (DNS) at the IP does *not* make the app work — a program must also be *listening* on the port. "DNS resolves but the site is down" = the server/proxy isn't running.
 - **Forgetting the port.** `erp.example.com` with nothing listening on 443 = connection refused, even with perfect DNS.
@@ -88,13 +142,31 @@ traceroute erp.example.com          # each line = one router your packets pass t
 - **Firewall confusion.** "It works from the server itself (`curl localhost`) but not from outside" almost always = the firewall/cloud security group isn't allowing 80/443 ([Ch 05](05_IP_Address_and_Ports.md)).
 
 # Interview Questions
-**Junior — "What is DNS?"** The system that translates a human domain name into the numeric IP address of the server, so clients can find it.
+- **Junior:** "What is DNS?" — The system that translates a human domain name into the numeric IP address of the server, so clients can find it.
 
-**Mid — "Walk me through what happens when a user opens `https://erp.example.com`."** DNS resolves the name to the server IP → TCP connection to that IP on port 443 (handshake) → TLS handshake (encrypt + verify certificate) → HTTP request sent inside the encrypted channel → server (Caddy) responds → response travels back over the same connection.
+- **Mid:** "Walk me through what happens when a user opens `https://erp.example.com`." — DNS resolves the name to the server IP → TCP connection to that IP on port 443 (handshake) → TLS handshake (encrypt + verify certificate) → HTTP request sent inside the encrypted channel → server (Caddy) responds → response travels back over the same connection.
 
-**Senior — "The domain resolves correctly but users get connection-refused. Where do you look?"** Something isn't listening on 443, or a firewall blocks it. Check: is the proxy (Caddy) container running and publishing 443 to the host? Is the VPS firewall / cloud security group allowing 80+443? Is DNS pointing at the *current* server IP? `nc -vz <ip> 443` from outside vs `curl localhost` on the box isolates network-vs-app.
+- **Senior:** "The domain resolves correctly but users get connection-refused. Where do you look?" — Something isn't listening on 443, or a firewall blocks it. Check: is the proxy (Caddy) container running and publishing 443 to the host? Is the VPS firewall / cloud security group allowing 80+443? Is DNS pointing at the *current* server IP? `nc -vz <ip> 443` from outside vs `curl localhost` on the box isolates network-vs-app.
 
-**Staff — "Why terminate TLS at the edge (Caddy), and what are the trust-boundary implications for the hop to Gunicorn?"** Terminating at the edge centralizes cert management, offloads crypto from app workers, and lets the proxy inspect/limit/route. The Caddy→Gunicorn hop is plaintext but rides the **private Docker network** never exposed to the internet, so the trust boundary is the host + Docker network isolation; if that network were shared with untrusted tenants you'd re-encrypt (mTLS) that hop. For a single-tenant VPS, plaintext on the private net is the standard, accepted design.
+- **Staff:** "Why terminate TLS at the edge (Caddy), and what are the trust-boundary implications for the hop to Gunicorn?" — Terminating at the edge centralizes cert management, offloads crypto from app workers, and lets the proxy inspect/limit/route. The Caddy→Gunicorn hop is plaintext but rides the **private Docker network** never exposed to the internet, so the trust boundary is the host + Docker network isolation; if that network were shared with untrusted tenants you'd re-encrypt (mTLS) that hop. For a single-tenant VPS, plaintext on the private net is the standard, accepted design.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Can you narrate one request end to end? | "The browser requests the page and the server sends it." | Name the **five steps in order**: DNS resolves the name → **TCP** handshake to that IP on 443 → **TLS** handshake (encrypt + verify the certificate) → HTTP request **inside** the encrypted channel → response back on the same connection. Interviewers listen for whether TLS comes before or after HTTP. |
+| Can you split "network broken" from "app broken"? | "The site is down, so I would restart the server." | **`nc -vz <public-ip> 443` from outside vs `curl localhost` on the box** isolates it in two commands. Refused = nothing listening; timeout = firewall. Restarting first destroys the evidence. |
+| Do you know where TLS should terminate? | "TLS should be end to end everywhere." | Terminate at the **edge** (Caddy): centralises cert management, offloads crypto from app workers, and lets the proxy limit and route. The Caddy→Gunicorn hop is plaintext **on the private Docker network** — a deliberate, standard single-tenant trade. |
+| Do you know when that trade stops being acceptable? | "Private network means it is secure." | The trust boundary is **the host + Docker network isolation**. On a **shared/untrusted** network you would re-encrypt that hop with **mTLS**. Stating the condition under which your own design fails is the senior move. |
+
+**The killer follow-up:** *"DNS resolves correctly but users get connection-refused. Where do you look?"* — refused means **something is not listening**, not that the network is down: is Caddy running and **publishing** 443 to the host, is the cloud security group open, and is DNS pointing at the **current** IP? Candidates who cannot separate those three will restart containers at random.
+
+# Revision Notes
+- Data travels as **packets** with addresses; routers forward them.
+- Names → numbers via DNS (ch 04); numbers + ports reach a process (ch 05).
+- TCP+TLS handshakes cost round-trips → latency is the mobile enemy.
+- Your public entry point is **one port on one IP**: 443 → Caddy.
+- Debug by asking **which hop**, not "why is it broken".
 
 # Cheat Sheet
 - **Internet = numbered packets** routed hop-to-hop; **TCP** makes a reliable ordered stream; **TLS** encrypts+authenticates it; **HTTP** is the message inside.
@@ -113,6 +185,12 @@ traceroute erp.example.com          # each line = one router your packets pass t
 | TLS/cert | Caddy automatic (Let's Encrypt) — [Ch 12](12_Caddy.md) |
 | Host-header safety | Django `ALLOWED_HOSTS` rejects unknown hosts |
 
+# Practice Tasks
+1. **Read the code:** find the ports published in `docker-compose.yml`. Which are public and which are private-network only?
+2. **Debug:** run `curl -I https://<your-domain>` (or localhost) and identify from the response alone which component answered.
+3. **Design:** a worker says the app is slow on the floor but fine in the office. List the three hops you would measure first.
+4. **Architecture:** argue whether a CDN would help this ERP. What does it help, and what does it not?
+
 # Homework
 1. Run `curl -v https://<any-site>/` and label, in the output, the DNS step, the TCP connect, the TLS handshake, your request line, and the response status.
 2. `dig +short <a-domain>` and `nc -vz <that-domain> 443`. Explain what each proves and what each does NOT prove about "is the site up?"
@@ -121,7 +199,7 @@ traceroute erp.example.com          # each line = one router your packets pass t
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - MDN — *How does the Internet work?*: https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Web_mechanics/How_does_the_Internet_work
 - Cloudflare Learning — *How the Internet works* hub: https://www.cloudflare.com/learning/network-layer/how-does-the-internet-work/
 - **Free book** — *High Performance Browser Networking* (Ilya Grigorik; TCP/TLS/HTTP in depth, readable): https://hpbn.co/

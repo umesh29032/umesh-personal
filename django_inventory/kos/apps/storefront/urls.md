@@ -1,7 +1,7 @@
 ---
 id: app-storefront-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "storefront's 9 URLs — one anonymous face + eight listing-team lanes, individually."
 related: [app-storefront]
@@ -13,6 +13,12 @@ related: [app-storefront]
 > Source: `config/storefront/urls.py` (public root mounted by config/urls.py;
 > /storefront/ = listing_team lane). The file's own docstring marks the G2
 > seam: *"order capture lands HERE — never in production."*
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`storefront` app ka kaam: public website — featured products aur categories jo bahar dikhte hain.)*
 
 **Reading Strategy** — *Beginner:* §1. *Intermediate:* §§2–9.
 *Senior:* §1's error-contract note + the absences at the bottom.

@@ -1,0 +1,160 @@
+{% extends "learning/_learn_base.html" %}
+{% block title %}{{ page.ref.title }} — {{ page.course.title }}{% endblock %}
+{% block page_title %}{{ page.course.title }}{% endblock %}
+
+{% block content %}
+<div class="learn-page" style="--lp-accent:{{ page.course.accent }}">
+  <div class="learn-hero">
+    <span class="lp-eyebrow">
+      <a href="{% url 'learning:course' page.course.slug %}" class="lp-back">← {{ page.course.title }}</a>
+    </span>
+    <h1>{{ page.ref.title }}</h1>
+    <p>Chapter {{ page.ref.number }} · about {{ page.reading_minutes }} min read</p>
+  </div>
+
+  <div class="learn-wrap">
+    <main class="learn-main">
+      {% comment %}User-state actions. POST to dedicated endpoints so the
+      content page itself stays GET-only.{% endcomment %}
+      <div class="lp-actions">
+        <button type="button" class="lp-btn" id="lp-done"
+                aria-pressed="{{ state.complete|yesno:'true,false' }}"
+                data-url="{% url 'learning:toggle-complete' page.course.slug page.ref.slug %}">
+          <span class="lp-ico">{% if state.complete %}✓{% else %}○{% endif %}</span>
+          <span class="lp-label">{% if state.complete %}Completed{% else %}Mark complete{% endif %}</span>
+        </button>
+        <button type="button" class="lp-btn" id="lp-mark"
+                aria-pressed="{{ state.bookmarked|yesno:'true,false' }}"
+                data-url="{% url 'learning:toggle-bookmark' page.course.slug page.ref.slug %}">
+          <span class="lp-ico">{% if state.bookmarked %}★{% else %}☆{% endif %}</span>
+          <span class="lp-label">{% if state.bookmarked %}Bookmarked{% else %}Bookmark{% endif %}</span>
+        </button>
+        <span class="lp-chip" style="align-self:center">{{ progress.done }}/{{ progress.total }} in this course</span>
+      </div>
+
+      <div class="lp-prose">{{ page.html }}</div>
+
+      <nav class="lp-nav">
+        {% if page.prev %}
+          <a href="{% url 'learning:chapter' page.course.slug page.prev.slug %}">
+            <span class="lp-dir">← Previous</span>
+            <span class="lp-t">{{ page.prev.title }}</span>
+          </a>
+        {% else %}<span></span>{% endif %}
+        {% if page.next %}
+          <a class="lp-next" href="{% url 'learning:chapter' page.course.slug page.next.slug %}">
+            <span class="lp-dir">Next →</span>
+            <span class="lp-t">{{ page.next.title }}</span>
+          </a>
+        {% endif %}
+      </nav>
+    </main>
+
+    <aside class="learn-aside">
+      {% if page.sections %}
+      <details class="lp-toc" open>
+        <summary>On this page</summary>
+        <ol>
+          {% for s in page.sections %}
+          <li><a href="#{{ s.anchor }}">{{ s.title }}</a></li>
+          {% endfor %}
+        </ol>
+      </details>
+      {% endif %}
+
+      <details class="lp-toc" style="margin-top:12px">
+        <summary>All {{ chapters|length }} chapters</summary>
+        <ol>
+          {% for ch in chapters %}
+          <li><a href="{% url 'learning:chapter' page.course.slug ch.slug %}"
+                 {% if ch.slug == page.ref.slug %}style="font-weight:800;color:var(--lp-accent)"{% endif %}>{{ ch.title }}</a></li>
+          {% endfor %}
+        </ol>
+      </details>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}{# keep the shared keyboard shortcuts from _learn_base #}
+<script>
+// ── progress buttons: POST, then update in place (no reload) ──────────────
+(function () {
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  csrf = csrf ? csrf[1] : '';
+
+  function wire(id, onIcon, offIcon, onText, offText, key) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var nowOn = btn.getAttribute('aria-pressed') !== 'true';
+      var body = new URLSearchParams();
+      if (key === 'complete') body.set('done', nowOn ? '1' : '0');
+      btn.disabled = true;
+      fetch(btn.dataset.url, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrf,
+                  'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString(),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        var on = d[key];
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.querySelector('.lp-ico').textContent = on ? onIcon : offIcon;
+        btn.querySelector('.lp-label').textContent = on ? onText : offText;
+      }).catch(function () {
+        // Network/permission failure: say so rather than silently lying about
+        // saved state.
+        btn.querySelector('.lp-label').textContent = 'Could not save — retry';
+      }).finally(function () { btn.disabled = false; });
+    });
+  }
+  wire('lp-done', '✓', '○', 'Completed', 'Mark complete', 'complete');
+  wire('lp-mark', '★', '☆', 'Bookmarked', 'Bookmark', 'bookmarked');
+
+  /* ── reading heartbeat: time on page + furthest scroll ──────────────────
+     Only counts while the tab is VISIBLE, so a forgotten tab does not inflate
+     "time spent". Sends at most one beat per 30s, and one final beat on the way
+     out via sendBeacon (which survives page unload). */
+  var beatUrl = '{% url "learning:heartbeat" page.course.slug page.ref.slug %}';
+  var visibleSeconds = 0, sent = 0;
+  function depth() {
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    return h <= 0 ? 100 : Math.min(100, Math.round(window.scrollY / h * 100));
+  }
+  setInterval(function () {
+    if (document.visibilityState === 'visible') visibleSeconds++;
+    if (visibleSeconds - sent >= 30) beat(false);
+  }, 1000);
+  function beat(final) {
+    var delta = visibleSeconds - sent;
+    if (delta <= 0 && !final) return;
+    sent = visibleSeconds;
+    var body = new URLSearchParams({s: String(delta), p: String(depth())});
+    if (final && navigator.sendBeacon) {
+      body.set('csrfmiddlewaretoken', csrf);
+      navigator.sendBeacon(beatUrl, body);
+    } else {
+      fetch(beatUrl, {method: 'POST', keepalive: true,
+        headers: {'X-CSRFToken': csrf,
+                  'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body.toString()}).catch(function () {});
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') beat(true);
+  });
+  window.addEventListener('pagehide', function () { beat(true); });
+})();
+
+// Wide tables get their own horizontal scroller so the PAGE never scrolls
+// sideways on a phone (mobile-first rule 11).
+document.querySelectorAll('.lp-prose table').forEach(function (t) {
+  if (t.parentElement.classList.contains('lp-tablewrap')) return;
+  var w = document.createElement('div');
+  w.className = 'lp-tablewrap';
+  t.parentNode.insertBefore(w, t);
+  w.appendChild(t);
+});
+</script>
+{% endblock %}

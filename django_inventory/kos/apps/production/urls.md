@@ -1,7 +1,7 @@
 ---
 id: app-production-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Any of production's 80 URLs — jump to ITS OWN learning section in one click."
 related: [app-production]
@@ -13,6 +13,12 @@ related: [app-production]
 > Source: `config/production/urls.py` (mounted `/production/`, 80 routes).
 > LOS law: every URL has its OWN section — this index routes you there in
 > one click. Four parts, learning order = pipeline order.
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 **Reading Strategy** — *Beginner:* README Mental Model → Part 2's
 `adda-create` + `worker-report` → Part 4's `workspace-complete` (the mint).

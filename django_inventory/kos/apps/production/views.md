@@ -1,7 +1,7 @@
 ---
 id: app-production-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "96 view classes in 15 modules — which file do I open, and what may each group do?"
 related: [app-production, app-production-urls]
@@ -12,6 +12,12 @@ related: [app-production, app-production-urls]
 > 📂 [production app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > Same house law: views parse + gate; stage/production logic lives in
 > services and `stages/<stage>/service.py` handlers.
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ## Handler groups at a glance
 

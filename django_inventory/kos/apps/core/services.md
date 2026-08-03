@@ -1,7 +1,7 @@
 ---
 id: app-core-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "core has no business services — its 'services' are the five enforcement suites that police the whole architecture."
 related: [app-core, concept-testing-strategy]
@@ -12,6 +12,12 @@ related: [app-core, concept-testing-strategy]
 > 📂 [core app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > No service verbs — core acts at BUILD time. `tests.py` hosts five suites
 > that make the architecture's laws executable:
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`core` app ka kaam: saara project jo cheezein baar-baar use karta hai (jaise har table ka created_at/updated_at) — iska apna koi table nahi.)*
 
 | Suite (line) | Enforces |
 |---|---|

@@ -33,7 +33,8 @@ urlpatterns = [
     path("production/", include("production.urls")),        # Adda batches + workflow stages
     path("tracking/", include("inventory.tracking_urls")),  # barcodes + audit history (P4.2: inventory-owned views, tracking namespace preserved)
     path("expense/", include("expense.urls")),              # worker payroll: earnings, advances, payments
-    path("bod/", include("bod.urls")),                       # Phase-15 owner command center (read-only window; SA-only v1)
+    path("bod/", include("bod.urls")),                      # Phase-15 owner command center (read-only window; SA-only v1)
+    path("learn/", include("learning.urls")),               # course reader — renders docs/*_course/*.md (read-only)
     path("machines/", include("machines.urls")),            # R10-A: machine register + operator windows (mgmt-only)
     path("patterns/", include("patterns_ai.urls")),         # P1 Block 1: AI Pattern Intelligence foundation (mgmt-only)
 ]

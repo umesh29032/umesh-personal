@@ -1,7 +1,7 @@
 ---
 id: app-accounts-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Any accounts URL — login, OTP, reset, users, skills, user-types — plus the two routes that are FAMOUSLY absent."
 related: [app-accounts]
@@ -13,6 +13,12 @@ related: [app-accounts]
 > Source: `config/accounts/urls.py` (74 lines). Every auth endpoint is
 > RATE-LIMITED; responses are UNIFORM (anti-enumeration). Admin lanes are
 > Django-superuser gated (`SuperuserRequiredMixin`).
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`accounts` app ka kaam: log-in, users, roles aur **skills** — kaun andar aa sakta hai aur kaun kaunsa kaam kar sakta hai.)*
 
 **Reading Strategy** — *Beginner:* §§1–5 (the login story in order).
 *Intermediate:* §§6–7 (reset pair) → §§8–11 (user admin). *Senior:* the two

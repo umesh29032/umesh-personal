@@ -10,6 +10,42 @@ verified: 2026-07-13
 
 # DEPLOYMENT CAMPAIGN STATUS — the resume anchor
 
+> ## ⛔ NEWEST STATE FIRST — AUDIT-2, 2026-07-27 (owner-ordered pre-go-live audit)
+>
+> **Report: [AUDIT2_PRODUCTION_ACCESS_FINANCIAL_2026_07_27.md](AUDIT2_PRODUCTION_ACCESS_FINANCIAL_2026_07_27.md)** —
+> read it before anything below. It supersedes the P19A pause note as the latest assessment.
+>
+> - **P19A's two CRITICALs (C-1 layering atomic hijack, C-2 multi-lane report 500) are FIXED**
+>   (commit `ebeec580`, 2026-07-20) and were re-verified live this session.
+> - **Live journey PASSED:** `3-PATTI-018` ran **12/12 stages through the real browser with 8
+>   distinct-skill worker accounts** → completed → settlement `ADST-0014` finalized **₹7,146.50**.
+>   Per-stage cost == Σ worker earnings on every payable stage; Option B (no money before
+>   settlement) proven; settlement→ledger exact (**175→201 entries, ₹11,107.75→₹18,254.25**).
+> - **Access control PASSED:** 10 identities × 30 surfaces = 300 live probes; **zero rate/cost
+>   leakage** to worker/accountant/listing_team; per-skill stage isolation exact.
+> - **P0 FOUND AND FIXED (same session, owner-ordered):** Pattern Design could not be started on ANY
+>   multi-lane Adda — the panel lacked the lane contract layering/cutting both have. Fixed in
+>   `_build_pattern_context` + `_stage_panel_cutting_pattern.html`, **4 regression pins added**,
+>   verified live on `T-SHIRT-004` (pattern SR now created on the Body lane). T-SHIRT genuinely has
+>   3 fabric groups (body/rib/trim) so 3 lanes is correct by design — the lanes were never the bug.
+> - **✅ BATTERY 1896/1896 GREEN — NEW BASELINE** (10-app 1150 · patterns_ai 528 · devseed 140 ·
+>   verification 78). Was 1892 with 2 failures. Also resolved: stale static manifest
+>   (`collectstatic`, gitignored artifact) and knowledge-graph drift (rebuilt ×2).
+> - **Also fixed:** F-B orphan sidebar rule (`production:my-work` → registry-only `hidden=True`;
+>   deleting the rule would have REMOVED gating) · F-A false-positive test (asserts the href now,
+>   not prose that also lives in a CSS comment) · **F1 blind-rule** (worker no longer sees the
+>   allocated target before reporting; negative `Remaining` clamped) · cutting report now offers only
+>   the colours actually laid on that Adda · 2 misleading labels. Full table = report §7.
+> - **⛔ THE REAL DEPLOY BLOCKER (P19A H-1, still open):** a fresh production DB gets only **4 of 23
+>   stages** and ~2 of 10 skills; `devseed` is hard-guarded to dev so it can never seed production.
+>   Deploy today = an app that cannot start an Adda. **Phased path to live = report §8.**
+> - **Owner decisions left:** ₹100/piece 3-PATTI cutting rate · unpriced cloth rolls · duplicate
+>   T-SHIRT size "S" · whether `production:my-work` becomes a visible worker menu item.
+> - **Dev-data side effect (disclosed):** `dev.fat.ov1@test.local` password reset to `Audit@1234`.
+> - New test cast: **15 `a2.*@audit.local` accounts, password `Audit@1234`.**
+>
+> ---
+
 > **A fresh session (any AI, any account, zero chat history) resumes the pre-deployment
 > campaign from THIS file.** Read it, then the active phase's own doc, then continue.
 > Update this file after EVERY completed sub-phase (owner standing order).

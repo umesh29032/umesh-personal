@@ -1,7 +1,7 @@
 ---
 id: pattern-configuration-over-code
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Configuration over Code pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Business variability lives in ROWS; code ships capabilities, not cases.
+
+> 💡 **Samjho aise:** Jo cheez factory-dar-factory badalti hai wo **database ki row** mein rakho, code mein `if` mat likho. Naya product aaye to code chhoona hi na pade.
 
 **Problem it solves.** Every hardcoded case = a deploy per business change.
 

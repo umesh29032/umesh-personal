@@ -23,6 +23,27 @@ class ProductionRoleMixin(UserPassesTestMixin):
         return user_has_role(self.request.user, PRODUCTION_ROLES)
 
 
+class ProductionOrAccountantMixin(UserPassesTestMixin):
+    """Production floor **or** accountant — the cloth-roll LIST only.
+
+    Owner ruling 2026-08-02. The accountant's FINANCIAL_ROLES capability (view +
+    edit Supplier and Cost Per KG) is DEFINED on cloth rolls, so gating the roll
+    list to the production floor left that capability as unreachable dead code —
+    a pure accountant could not open the one page their role exists for.
+    RBAC.md's earlier "pure accountant: dispatch-blocked from rm pages BY DESIGN"
+    is superseded for this one view.
+
+    Read only in practice: bulk-add / edit / damage / assign keep their stricter
+    gates, and the financial FIELDS stay governed by `user_can_view_financials` /
+    `user_can_edit_financials` — unchanged.
+    """
+
+    def test_func(self):
+        from accounts.services import ROLE_ACCOUNTANT
+        return user_has_role(self.request.user,
+                             PRODUCTION_ROLES | {ROLE_ACCOUNTANT})
+
+
 class SuperAdminOnlyMixin(UserPassesTestMixin):
     """Sirf Super Admin — single-role rule.
 

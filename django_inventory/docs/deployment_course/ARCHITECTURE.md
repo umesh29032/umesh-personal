@@ -1,10 +1,25 @@
+---
+id: deploy-course-architecture
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # Deployment Architecture — Kapil Enterprises ERP (the complete picture)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). This is the **capstone reference**: the whole deployment on one page, grounded in the real `docker-compose.yml`, `Dockerfile`, `deploy/Caddyfile`, `deploy/entrypoint.sh`, `deploy/backup.sh`. Read it after the chapters, or use it as the map while reading them. Every box links to the chapter that teaches it.
 
 ---
 
-## 1. One-paragraph summary
+#> 💡 **Samjho aise:** Yeh poore ghar ka **naksha** hai — ek page pe har dabba aur unke beech ke teer.
+> Kaunsa chapter kis dabbe ko padhata hai, wo yahin se dikhta hai. Jab kuch samajh
+> na aaye, is naksha pe ungli rakho aur poochho: *"main is waqt kaunse dabbe ki baat
+> kar raha hoon?"* — aadha confusion wahin khatam ho jaata hai.
+
+# 1. One-paragraph summary
 The ERP runs as **five Docker containers on one Ubuntu VPS**, orchestrated by `docker-compose.yml`. The internet reaches only **Caddy** (TLS + reverse proxy), which forwards to **Gunicorn** (3 workers running the Django app), which reads/writes **PostgreSQL** (data of record) and **Redis** (cache + login rate-limiter). A **backup** container dumps Postgres + media nightly to off-site storage via **restic**. Secrets come from a `.env` file; the app never boots half-configured (it waits for healthy DB+Redis, then migrates, collects static, and starts). It is deliberately a *single-box* architecture — cheapest, simplest, and matched to a factory's steady, modest load.
 
 ## 2. The full stack diagram

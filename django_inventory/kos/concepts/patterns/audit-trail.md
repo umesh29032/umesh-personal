@@ -1,7 +1,7 @@
 ---
 id: pattern-audit-trail
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Audit Trail pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Every sensitive mutation leaves WHO/WHAT/WHY as a row.
+
+> 💡 **Samjho aise:** Har important badlaav ke saath teen cheezein likhi jaati hain: **kisne, kya, aur kyun**. Baad mein "yeh kisne kiya?" ka jawaab dhoondhna nahi padta.
 
 **Problem it solves.** 'Who changed this and why' must be answerable without forensics.
 

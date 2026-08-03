@@ -37,6 +37,20 @@ PRODUCTION_ROLES = {ROLE_SUPER_ADMIN, ROLE_MANAGER, ROLE_WORKER}
 # Super Admin is included so universal-view is preserved by every gate.
 FINANCIAL_ROLES = {ROLE_SUPER_ADMIN, ROLE_ACCOUNTANT}
 
+# Owner ruling 2026-08-02 — THE ACCOUNTANT READ TIER.
+# Before this, every financial page was `_ManagementOnly` (read AND write behind one
+# gate), so a pure `accountant` login had NO reachable page: their FINANCIAL_ROLES
+# capability (supplier + cost-per-kg) was unreachable dead code, and their dashboard
+# showed WORKER copy. RBAC.md previously recorded "pure accountant: dispatch-blocked
+# from rm pages BY DESIGN"; that decision is now superseded by owner ruling.
+#
+# The split that makes it safe: READS widen to this set, WRITES do not move.
+# Settlement finalize / advances / pay-basis / FnF / void / template edits all stay
+# management-or-super-admin, at BOTH the view mixin and the service layer — so even
+# if a view were mis-gated, `settlement_service`/`expense_service` still refuse.
+# Settlement remains the single money-write boundary, untouched.
+FINANCIAL_READ_ROLES = MANAGEMENT_ROLES | {ROLE_ACCOUNTANT}
+
 
 # ── Permission helpers ──────────────────────────────────────────────────────
 
@@ -66,7 +80,18 @@ def user_role_codes(user) -> set[str]:
     """
     Return ALL role codes for a user — primary role + any extra_roles.
     Use this when checking access that can be granted via either path.
+
+    REQUEST-CACHED (2026-08-02), same pattern as `user_principal` and
+    `_role_perm_codenames` in this module. Every `user_has_role()` call funnels
+    through here, and each one was firing a fresh `extra_roles` M2M query — so a
+    page doing a dozen role checks paid a dozen queries for an answer that cannot
+    change mid-request. The perf baselines caught this the moment one more caller
+    was added (`user_does_production_work`), which is exactly what they are for.
     """
+    cached = getattr(user, '_rbac_role_codes', None)
+    if cached is not None:
+        return cached
+
     codes: set[str] = set()
     primary = user_role_code(user)
     if primary:
@@ -85,6 +110,10 @@ def user_role_codes(user) -> set[str]:
         for r in roles_iter:
             if r.code:
                 codes.add(r.code)
+    try:
+        user._rbac_role_codes = codes
+    except (AttributeError, TypeError):
+        pass  # bare-ORM mock users in tests — just skip caching
     return codes
 
 
@@ -101,6 +130,55 @@ def user_can_view_financials(user) -> bool:
 def user_can_edit_financials(user) -> bool:
     """Gate for writing Supplier + Cost Per KG fields on cloth rolls."""
     return user_has_role(user, FINANCIAL_ROLES)
+
+
+def user_does_production_work(user) -> bool:
+    """Does this person actually do work on the factory floor?
+
+    WHY (owner feedback 2026-08-02): the app only knew two kinds of person —
+    management (`MANAGEMENT_ROLES`) and "everyone else", who got the WORKER
+    experience. So an `accountant` login landed on a worker dashboard telling them
+    *"Jab manager aapko kaam dega"* and a "My Earnings" page reading
+    *"Pieces Produced 0"*. An accountant never produces pieces.
+
+    True when ANY of these hold:
+      • holds the `worker` role (primary or extra), or
+      • has at least one production **skill** (skill = stage access, so a skill
+        means they are meant to open a stage), or
+      • already has money on the books (a settled/expected earning row).
+
+    The last clause exists so this can only ever *reveal* a money page, never
+    hide one from somebody who has wages to see. Ordering matters: the first two
+    checks read the request-cached principal (0 queries) and only a genuine
+    non-worker pays the single EXISTS.
+    """
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    # Request-cached: both the sidebar predicate and the dashboard context ask
+    # this, and only the answer's *first* computation may cost a query.
+    cached = getattr(user, '_rbac_floor_work', None)
+    if cached is not None:
+        return cached
+
+    answer = False
+    if user_has_role(user, {ROLE_WORKER}):
+        answer = True
+    elif user_principal(user)['skill_ids']:
+        answer = True
+    else:
+        # Lazy import: permission_service is imported very early in app startup,
+        # and accounts must not depend on a domain app at module level
+        # (core/tests.py FoundationPurityTests enforces that direction).
+        try:
+            from expense.models import WorkerLedgerEntry
+            answer = WorkerLedgerEntry.objects.filter(worker=user).exists()
+        except Exception:  # pragma: no cover - DB not ready (migrate/collectstatic)
+            answer = False
+    try:
+        user._rbac_floor_work = answer
+    except (AttributeError, TypeError):
+        pass  # bare-ORM mock users in tests
+    return answer
 
 
 def _role_perm_codenames(user) -> set[str]:
@@ -274,10 +352,30 @@ SIDEBAR: tuple[MenuSection, ...] = (
                      hidden=True, match=()),
             MenuItem('My Dashboard', 'inventory:user_dashboard',
                      hidden=True, match=()),
+            # AUDIT-2 F-B: `production:my-work` ("My Assigned Work") kept a live
+            # SidebarItemRule row after the F-1 dedupe dropped its menu item, so
+            # the P3.4 drift guard failed. The URL itself still WORKS and is
+            # still gated by that rule (workers 200 · listing/accountant 302), so
+            # deleting the rule would REMOVE gating — the wrong repair. Registry-
+            # only (renders for nobody) restores the invariant with zero
+            # behaviour change; workers reach their bundles from My Dashboard's
+            # "Report needed" links. OWNER CHOICE if you'd rather have the page
+            # navigable: drop `hidden=True` and move this entry into Main.
+            MenuItem('My Assigned Work', 'production:my-work',
+                     hidden=True, match=()),
             # Every worker's own earnings page lives in Main, NOT the Payroll
             # section — workers never see the management payroll tools. Ungated
             # on purpose (self-scoped view): payroll is critical, no role gate.
-            MenuItem('My Earnings', 'expense:my-earnings', match=('expense/my',)),
+            # Learning: the course reader. Ungated like My Dashboard/My Earnings —
+            # it is educational content with no business data, and the owner
+            # intends to open it more widely later (kos local-testing-environment).
+            MenuItem('Learn', 'learning:index', match=('learn',)),
+            # Owner feedback 2026-08-02: an accountant/listing_team/student saw
+            # this and got a WORKER page ("Pieces Produced 0"). Show it to people
+            # who actually do floor work OR already have money on the books — the
+            # predicate can only reveal, never hide wages from someone who has them.
+            MenuItem('My Earnings', 'expense:my-earnings', match=('expense/my',),
+                     predicate=user_does_production_work),
         ),
     ),
     # P1-2 (C-2): the core manufacturing flow is the primary operational area, so
@@ -309,11 +407,18 @@ SIDEBAR: tuple[MenuSection, ...] = (
     ),
     MenuSection(
         label='Raw Materials',
-        predicate=_any_role(*PRODUCTION_ROLES),
+        # Accountant included (owner ruling 2026-08-02): their FINANCIAL_ROLES
+        # capability — view + edit Supplier and Cost Per KG — is DEFINED on cloth
+        # rolls, so without section access that capability was dead code. They get
+        # the roll list only; every other item keeps the production-floor gate.
+        predicate=_any_role(*(PRODUCTION_ROLES | {ROLE_ACCOUNTANT})),
         items=(
-            MenuItem('Raw Material Dashboard', 'raw_materials:dashboard', match=('raw-materials/',)),
-            MenuItem('Cloth Dashboard', 'raw_materials:cloth-dashboard', match=('raw-materials/cloth/',)),
-            MenuItem('Cloth Rolls', 'raw_materials:roll-list', match=('raw-materials/rolls',)),
+            MenuItem('Raw Material Dashboard', 'raw_materials:dashboard', match=('raw-materials/',),
+                     predicate=_any_role(*PRODUCTION_ROLES)),
+            MenuItem('Cloth Dashboard', 'raw_materials:cloth-dashboard', match=('raw-materials/cloth/',),
+                     predicate=_any_role(*PRODUCTION_ROLES)),
+            MenuItem('Cloth Rolls', 'raw_materials:roll-list', match=('raw-materials/rolls',),
+                     predicate=_any_role(*(PRODUCTION_ROLES | {ROLE_ACCOUNTANT}))),
             MenuItem('Cloth Types', 'raw_materials:cloth-type-list', match=('raw-materials/cloth-types',)),
             MenuItem('Cloth Colors', 'raw_materials:cloth-color-list', match=('raw-materials/cloth-colors',)),
             MenuItem('Storage Locations', 'raw_materials:storage-list', match=('raw-materials/storage-locations',)),
@@ -335,29 +440,44 @@ SIDEBAR: tuple[MenuSection, ...] = (
         ),
     ),
     MenuSection(
-        label='Payroll',
-        # Management-only section. Workers never see it — their self-service
-        # "My Earnings" lives under Main instead. This is the admin side:
-        # the all-worker overview + advance/payment (settlement) entry.
-        predicate=_any_role(*MANAGEMENT_ROLES),
+        label='Payroll & Accounts',
+        # Management + ACCOUNTANT (owner ruling 2026-08-02). Workers never see it —
+        # their self-service "My Earnings" lives under Main instead.
+        #
+        # READ items widen to FINANCIAL_READ_ROLES so an accountant has a job to do;
+        # WRITE items stay MANAGEMENT_ROLES. The section predicate must be the WIDER
+        # set or the whole section would vanish for an accountant before its items
+        # were ever consulted.
+        predicate=_any_role(*FINANCIAL_READ_ROLES),
         items=(
+            # ── reads: the accountant's actual work ──────────────────────────
             MenuItem('Payroll', 'expense:payroll-overview', match=('expense/payroll',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
+                     predicate=_any_role(*FINANCIAL_READ_ROLES)),
             # V2-2: the earning+recovery event screens (settlement ≠ payment).
+            # Read-only for an accountant: STARTING/finalizing a settlement is a
+            # separate management-gated URL, not this list.
             MenuItem('Adda Settlements', 'expense:adda-settlement-list',
                      match=('expense/settlements',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
-            MenuItem('Record Advance', 'expense:advance-add', match=('expense/advances',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
+                     predicate=_any_role(*FINANCIAL_READ_ROLES)),
             # R5 (PDD §21 / ADR-0011): factory-level running costs (incl.
             # monthly salaries) — a cost record, never a ledger.
             MenuItem('Factory Expenses', 'expense:factory-expense-list',
                      match=('expense/expenses',),
-                     predicate=_any_role(*MANAGEMENT_ROLES)),
-            # MEE-C (Phase 16): recurring templates + monthly generation —
-            # same module extension, gated like Factory Expenses.
+                     predicate=_any_role(*FINANCIAL_READ_ROLES)),
+            # MEE-C (Phase 16): recurring templates + monthly generation.
+            # Accountants READ the schedule; changing a template amount stays
+            # super-admin-only INSIDE expense_service, not just here.
             MenuItem('Recurring Expenses', 'expense:expense-template-list',
                      match=('expense/templates', 'expense/generate'),
+                     predicate=_any_role(*FINANCIAL_READ_ROLES)),
+            # Material spend (cloth ₹/kg) — previously reachable by URL only, with
+            # NO menu entry anywhere. It is the accountant's core report, so it
+            # finally gets one.
+            MenuItem('Material Spend', 'expense:material-spend',
+                     match=('expense/material-spend',),
+                     predicate=_any_role(*FINANCIAL_READ_ROLES)),
+            # ── writes: unchanged, management only ───────────────────────────
+            MenuItem('Record Advance', 'expense:advance-add', match=('expense/advances',),
                      predicate=_any_role(*MANAGEMENT_ROLES)),
         ),
     ),

@@ -1,7 +1,7 @@
 ---
 id: app-inventory-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Any /inventory/ or /tracking/ URL — its own full learning story."
 related: [app-inventory]
@@ -13,6 +13,12 @@ related: [app-inventory]
 > Sources: `config/inventory/urls.py` (app_name=`inventory`) +
 > `config/inventory/tracking_urls.py` (app_name=`tracking` — P4.2: views
 > owned here, namespace preserved so templates never changed).
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`inventory` app ka kaam: admin ka hissa — roles, sidebar access, dashboards.)*
 
 **Reading Strategy** — *Beginner:* §1 (my-dashboard) → §12 (scan) →
 README's Mental Model. *Intermediate:* §5–§7 (the access surfaces) →

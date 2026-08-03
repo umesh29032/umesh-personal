@@ -697,7 +697,7 @@ class LayeringQuickCreateAndAttachView(_LayeringActionBase):
         purchased_raw = (request.POST.get('purchased_date') or '').strip()
         try:
             purchased_date = (
-                _date.fromisoformat(purchased_raw) if purchased_raw else _date.today()
+                _date.fromisoformat(purchased_raw) if purchased_raw else timezone.localdate()
             )
         except ValueError:
             messages.error(request, "Purchased date must be YYYY-MM-DD.")

@@ -1,6 +1,23 @@
+---
+id: deploy-course-39-debugging-production
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 39 — Debugging Production
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [38 — Common Production Bugs](38_Common_Production_Bugs.md). Next: [40 — Disaster Recovery](40_Disaster_Recovery.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- debug a live system in a disciplined order
+- gather evidence without making things worse
+- decide between fixing forward and rolling back
+- keep users informed while you work
 
 # Purpose
 A **method** for finding and fixing bugs on a live system where you *can't* just add `print()` and hit refresh — and where `DEBUG=True` is forbidden. This is the calm, evidence-first procedure that replaces panic-poking a production box.
@@ -34,6 +51,8 @@ Every log line of one request shares a request-id ([Ch 31](31_Logging.md)). Get 
 
 ### Reproduce before you fix
 A bug you can't reproduce isn't understood. Reproduce in staging (same images/config) or via a shell with the triggering input. A fix for an unreproduced bug is a guess.
+
+> 💡 **Samjho aise:** Production debugging ki pehli shart: **guess karna band karo**. Kramm yeh hai — kya toota (symptom) → kab se (logs) → kis hop pe (guard/reception/clerk/tijori) → naapo → phir haath lagao. Aur live server pe seedha "thoda change karke dekhte hain" sabse mehnga raasta hai.
 
 # Real World Example (My ERP)
 - **Tools available, safely:** `docker compose logs` (Gunicorn access + Django tracebacks, correlated by request-id + actor), `manage.py shell` for read-only inspection, `verify_production` (read-only invariant gate — proves whether *data* is consistent), `check --deploy` (config), the accounts security log (auth issues). Sentry would add active capture + grouping ([Ch 32](32_Sentry.md), tracked gap).
@@ -78,6 +97,47 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 git log --oneline erp-v1.0.0..HEAD        # changes since the last-good tag → bisect suspects
 ```
 
+# Production Walkthrough
+The method, in order, every time:
+1. **Observe** — `docker compose ps`, then the logs of the layer that reported the error (ch 31).
+2. **Reproduce** — exactly which user, page, and action? "It's broken" is not a bug report.
+3. **Isolate the layer** — Caddy, Gunicorn, Django, Postgres.
+4. **Form one hypothesis**, test it, write down the result.
+5. **Decide**: fix forward if the cause is understood and the change is small; **roll back** if it is not (ch 35).
+
+Safe evidence-gathering on this stack: `docker compose logs`, `exec … python manage.py shell` for read-only queries, `pg_stat_activity` for what the database is doing right now.
+
+# Debugging Guide
+1. **Never debug with `DEBUG=True` in production.** It exposes settings and source to whoever is watching (ch 34).
+2. **A hang is a lock, not slowness** — look for a long transaction holding `FOR UPDATE` (ch 21).
+3. **Intermittent** = load, cache, or a scheduled job. Correlate with time.
+4. **Only some users affected** = permissions, roles, or per-user cached content (ch 22).
+5. **Nothing in the logs** = wrong service, or the process died before logging.
+6. **Do not run write queries to "test"** — reads only, until you understand the state.
+
+# Performance Notes
+- Measure before optimising: `EXPLAIN ANALYZE` for queries, timing for views.
+- N+1 queries are the most common Django slowness; the query count tells you immediately.
+- One missing index outweighs every server tuning knob (sql_course ch 12).
+- Load matters: this project once saw fake test failures caused purely by load from another process. Remove load before diagnosing.
+
+# Security Considerations
+- Do not paste production logs into third-party tools — they contain personal and financial data (ch 31).
+- Read-only access is enough for almost all diagnosis; use it.
+- Every emergency shortcut (open port, disabled check) must be written down and reverted the same day.
+- Preserve evidence before restarting if a compromise is possible (ch 34).
+
+# Architecture Decisions
+- **A written order of operations**, because incident pressure destroys improvisation.
+- **Rollback is cheap here** — two commands and a backup — so it is a legitimate first response.
+- **Logs per service**, so isolation takes one command.
+
+# Best Practices
+- Write a timeline as you go; you will need it afterwards.
+- One change at a time, and revert what did not help.
+- Tell users what is happening in plain language.
+- After the incident: a pin (test or checklist line), then a short write-up.
+
 # Beginner Mistakes
 - **Turning on `DEBUG=True` in prod** → leaks secrets to users. Use logs/Sentry ([Ch 24](24_Django_Settings.md)).
 - **Poking live data with writes** → a bad "fix" corrupts the money DB. Read-only first; backup before writes.
@@ -88,13 +148,31 @@ git log --oneline erp-v1.0.0..HEAD        # changes since the last-good tag → 
 - **Hot-patching files on the server** → drifts from git; unreproducible. Fix in code → gated deploy.
 
 # Interview Questions
-**Junior — "A production page 500s. What's your first move — and what do you NOT do?"** First: read `docker compose logs app` for the traceback (and its request-id). Do **not** set `DEBUG=True` in production — it leaks secrets; the logs already have the traceback.
+- **Junior:** "A production page 500s. What's your first move – and what do you NOT do?" — First: read `docker compose logs app` for the traceback (and its request-id). Do **not** set `DEBUG=True` in production — it leaks secrets; the logs already have the traceback.
 
-**Mid — "How do you narrow down a production bug quickly?"** Three axes: *when* it started (tie to a deploy → suspect that release), *who/what* triggers it (all users or one, which URL, which input), and *which layer* (error code + which log: Caddy 502/TLS, app 500, DB timeout/lock, config 400/403). Each cut shrinks the search space fast.
+- **Mid:** "How do you narrow down a production bug quickly?" — Three axes: *when* it started (tie to a deploy → suspect that release), *who/what* triggers it (all users or one, which URL, which input), and *which layer* (error code + which log: Caddy 502/TLS, app 500, DB timeout/lock, config 400/403). Each cut shrinks the search space fast.
 
-**Senior — "Walk your method for an intermittent 500 under load on a financial endpoint."** Observe the exact flow/frequency; pull logs by request-id + actor to see the failing requests; check `pg_stat_activity` for locks/slow queries and monitoring for a load correlation; hypothesize a concurrency/race (dev-invisible); reproduce in staging by hammering the endpoint concurrently; fix at the root with atomic + row/advisory locks in the service layer + a reproducing test; take a backup, deploy via the gated path, and verify with `verify_production` + the flow. This mirrors the real C-1/C-2 handling.
+- **Senior:** "Walk your method for an intermittent 500 under load on a financial endpoint." — Observe the exact flow/frequency; pull logs by request-id + actor to see the failing requests; check `pg_stat_activity` for locks/slow queries and monitoring for a load correlation; hypothesize a concurrency/race (dev-invisible); reproduce in staging by hammering the endpoint concurrently; fix at the root with atomic + row/advisory locks in the service layer + a reproducing test; take a backup, deploy via the gated path, and verify with `verify_production` + the flow. This mirrors the real C-1/C-2 handling.
 
-**Staff — "Design your team's production-debugging discipline for a money system."** Codify: DEBUG never on in prod; structured logs with request-id + actor + an error tracker (Sentry) so issues are captured and grouped, not hunted; a staging env mirroring prod to reproduce safely; read-only-first investigation with a backup before any corrective write; root-cause + a reproducing test required before a fix ships (no symptom patches); deploys only via the gated `deploy.sh` (no server hot-edits) so every fix maps to a commit and is reversible; and a "verify the measurement" rule so artifacts aren't chased as bugs. Pair with blameless postmortems that feed tests/monitoring. The invariant: evidence → hypothesis → safe test → root fix → verify, with data safety and reversibility at every step.
+- **Staff:** "Design your team's production-debugging discipline for a money system." — Codify: DEBUG never on in prod; structured logs with request-id + actor + an error tracker (Sentry) so issues are captured and grouped, not hunted; a staging env mirroring prod to reproduce safely; read-only-first investigation with a backup before any corrective write; root-cause + a reproducing test required before a fix ships (no symptom patches); deploys only via the gated `deploy.sh` (no server hot-edits) so every fix maps to a commit and is reversible; and a "verify the measurement" rule so artifacts aren't chased as bugs. Pair with blameless postmortems that feed tests/monitoring. The invariant: evidence → hypothesis → safe test → root fix → verify, with data safety and reversibility at every step.
+
+### Why interviewers ask these — they are testing method, not trivia
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you have a **method** or do you guess? | "I'd check the logs." | An order: reproduce/scope → **when did it start** → which hop (proxy / app / DB) → measure → only then change. Guessing is the failure mode being probed. |
+| Can you resist changing production while blind? | "Try a fix and see." | Read-only investigation first; change one thing, with a way to undo it. Say out loud that a live edit without a rollback path is the actual risk. |
+| Do you know slow ≠ one slow query? | "Optimise the query." | **Count the queries first** — most slow pages are N+1, and no query plan will reveal that. Then EXPLAIN the worst one. |
+
+**What they are really buying:** someone who stays calm and ordered while things burn. Describing the *sequence* proves that better than any single fix.
+
+**The killer follow-up:** *"You have been stuck for 30 minutes and users are blocked. Now what?"* — **roll back and think afterwards.** The answer they are listening for is that you know when to stop debugging; someone who keeps investigating while the factory waits has the wrong instinct, however good their method is.
+# Revision Notes
+- Order: **observe → reproduce → isolate layer → one hypothesis → fix-forward or roll back.**
+- Evidence: `compose logs`, read-only `manage.py shell`, `pg_stat_activity`. **Reads only.**
+- Hang = lock (long `FOR UPDATE`), not slowness. Intermittent = load/cache/cron.
+- Understood + small ⇒ fix forward. Not understood ⇒ **roll back**.
+- ⚠️ Never `DEBUG=True` in production; never paste production logs into third-party tools.
 
 # Cheat Sheet
 - **DEBUG stays FALSE.** Evidence lives in **logs** (grep the **request-id**) + Sentry, not a leaked traceback.
@@ -117,6 +195,12 @@ git log --oneline erp-v1.0.0..HEAD        # changes since the last-good tag → 
 | Safety | pre-deploy dump + nightly restic before corrective writes |
 | Trap avoided | phantom console-errors / ₹1500 false-positive (verify measurement) |
 
+# Practice Tasks
+1. **Read the code:** write the exact commands for steps 1–3 for this project.
+2. **Debug:** hold a row lock in one psql session and diagnose the resulting hang from the other side.
+3. **Design:** write your incident template — timeline, hypothesis, action, result.
+4. **Architecture:** define your own rule for fix-forward versus roll back, and defend it.
+
 # Homework
 1. Given "500 on `/settlement/finalize`, started 14:05, one manager," write your first three commands. Why not `DEBUG=True`?
 2. Practice the request-id trace: cause an error on a TEST stack, grab its id, `grep` the full request. How much faster is that than scrolling?
@@ -126,7 +210,7 @@ git log --oneline erp-v1.0.0..HEAD        # changes since the last-good tag → 
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Django docs — *Logging* (your prod window): https://docs.djangoproject.com/en/5.0/topics/logging/
 - Postgres docs — *`pg_stat_activity`* (see live queries/locks): https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW
 - Google SRE Book — *Effective Troubleshooting*: https://sre.google/sre-book/effective-troubleshooting/

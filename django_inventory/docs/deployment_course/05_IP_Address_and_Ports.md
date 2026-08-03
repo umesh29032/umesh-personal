@@ -1,6 +1,23 @@
+---
+id: deploy-course-05-ip-address-and-ports
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 05 — IP Addresses & Ports
 
 > Part of [Deployment From Zero](00_COURSE_OVERVIEW.md). Prev: [04 — DNS & Domains](04_DNS_Domains.md). Next: [06 — Linux Basics](06_Linux_Basics.md). *(Completes Term 1 — Fundamentals.)*
+
+# Learning Objectives
+By the end of this chapter you can:
+- explain IP + port as building + flat number
+- say why `127.0.0.1` is safer than `0.0.0.0`
+- list which ports this project exposes, and which it must never expose
+- read a `ports:` line in docker-compose and predict the consequence
 
 # Purpose
 To make three fuzzy things precise: **which address** a program listens on (`127.0.0.1` vs `0.0.0.0` vs a public IP), **which port** identifies a program, and **the firewall** that decides what the outside world may reach. These three explain most "works on the server but not from outside" and "port already in use" mysteries, and they're exactly the knobs my `docker-compose.yml` and VPS firewall set.
@@ -43,6 +60,8 @@ Internet ──► [cloud security group: allow 22,80,443] ──► VM
                                                           Docker: only Caddy publishes 80,443
                                                           (db 5432 / redis 6379 = private, unpublished)
 ```
+
+> 💡 **Samjho aise:** IP **building ka pata** hai, port us building ka **flat number**. Ek hi server pe website (80/443), database (5432), aur Redis (6379) — sab alag flat mein. Aur `127.0.0.1` matlab *"isi building ke andar"* — bahar se koi us flat tak pahunch hi nahi sakta.
 
 # Real World Example (My ERP)
 - **Caddy** binds `0.0.0.0:80` and `0.0.0.0:443` *inside its container* and **publishes** them to the host (`docker-compose.yml` `ports: ["80:80","443:443"]` on the caddy service only). So the internet reaches Caddy.
@@ -105,6 +124,40 @@ docker compose ps            # PORTS column — expect only caddy mapping 0.0.0.
 docker port <caddy-container># explicit published mappings
 ```
 
+# Production Walkthrough
+- **Public:** 80 (redirects to HTTPS) and 443. That is the entire public surface.
+- **Private:** Postgres 5432 and Redis 6379 exist **only on the Docker network** — no `ports:` line publishes them, and that omission is a security control, not an oversight.
+- Containers reach each other by **service name** (`db`, `redis`), so no IP is ever hardcoded (ch 19).
+- On your laptop the same services bind to localhost, which is why `db.sh` connects without any firewall concern.
+
+# Debugging Guide
+1. **"Connection refused"** = nothing is listening there. **"Timeout"** = something is filtering (firewall).
+2. **`ss -tlnp`** on the server — what is actually listening, and on which interface?
+3. **Bound to `127.0.0.1` but you need external access?** That is a binding problem, not a firewall one.
+4. **`docker compose ps`** shows published ports; if Postgres shows one, that is a finding.
+5. Test from **inside** the container (`docker compose exec web curl db:5432`) to separate networking from application errors.
+
+# Performance Notes
+- Localhost/private-network traffic never touches the physical network — effectively free.
+- Port exhaustion is a real limit under very high connection churn; keep-alive and pooling avoid it.
+- Each listening service is a process with memory cost; do not run what you do not need.
+
+# Security Considerations
+- **Publishing 5432 to the internet is the single most common fatal mistake** in self-hosted Postgres. Scanners find it within minutes.
+- `0.0.0.0` means "every interface" — only Caddy should ever do that.
+- The firewall should default-deny and allow 22/80/443 only.
+- SSH on 22 is fine *with keys*; the port number is not the protection (ch 07).
+
+# Architecture Decisions
+- **Explicitly do not publish database/cache ports.** Access is via the app's private network only.
+- **One public process** (Caddy), so hardening effort concentrates in one config file.
+- **Service-name addressing** inside Compose so containers can be replaced without touching config.
+
+# Best Practices
+- Audit `ports:` in compose before every deploy — it is a two-line diff that can expose a database.
+- Bind admin tooling to localhost and reach it over SSH, never open a port for it.
+- Keep the firewall rules in the runbook, not only in someone's memory.
+
 # Beginner Mistakes
 - **Binding `0.0.0.0` on a public box with an open firewall by accident** → exposing a dev server / DB to the internet. On a *public* host, "listen everywhere" + "firewall allows it" = "the world can connect."
 - **Publishing the DB port** (`ports: ["5432:5432"]`) "to connect with pgAdmin" → your database is now internet-reachable. Use an SSH tunnel instead ([Ch 07](07_SSH.md)).
@@ -113,15 +166,33 @@ docker port <caddy-container># explicit published mappings
 - **Confusing container-internal `0.0.0.0:8000` with "exposed."** Inside an unpublished container it's private; publishing is what exposes it.
 
 # Interview Questions
-**Junior — "Difference between `127.0.0.1` and `0.0.0.0` when a server binds?"** `127.0.0.1` accepts connections only from the same machine; `0.0.0.0` accepts on all network interfaces (reachable from other machines, subject to the firewall).
+- **Junior:** "Difference between `127.0.0.1` and `0.0.0.0` when a server binds?" — `127.0.0.1` accepts connections only from the same machine; `0.0.0.0` accepts on all network interfaces (reachable from other machines, subject to the firewall).
 
-**Junior — "What's a port?"** A number identifying a specific listening program on a machine, so incoming connections reach the right service (80=HTTP, 443=HTTPS, 22=SSH, 5432=Postgres).
+- **Junior:** "What's a port?" — A number identifying a specific listening program on a machine, so incoming connections reach the right service (80=HTTP, 443=HTTPS, 22=SSH, 5432=Postgres).
 
-**Mid — "Site unreachable from the internet but `curl localhost` works on the VPS. Diagnose."** The app/proxy is fine; the network path is blocked. Check the cloud security group + `ufw` allow 80/443, confirm the proxy publishes those ports, and test from outside with `nc -vz <public-ip> 443` (refused vs timeout tells you listener-vs-firewall).
+- **Mid:** "Site unreachable from the internet but `curl localhost` works on the VPS. Diagnose." — The app/proxy is fine; the network path is blocked. Check the cloud security group + `ufw` allow 80/443, confirm the proxy publishes those ports, and test from outside with `nc -vz <public-ip> 443` (refused vs timeout tells you listener-vs-firewall).
 
-**Senior — "How do you connect a DB GUI to production Postgres without exposing 5432?"** Don't publish 5432. Use an SSH tunnel: `ssh -L 5432:localhost:5432 user@vps` (or `db:5432` via the container), then point the GUI at `localhost:5432`. The DB stays private; access rides the authenticated SSH channel.
+- **Senior:** "How do you connect a DB GUI to production Postgres without exposing 5432?" — Don't publish 5432. Use an SSH tunnel: `ssh -L 5432:localhost:5432 user@vps` (or `db:5432` via the container), then point the GUI at `localhost:5432`. The DB stays private; access rides the authenticated SSH channel.
 
-**Staff — "Design the port/firewall posture for this ERP and justify each open port."** Public: 443 (HTTPS app), 80 (HTTP→HTTPS redirect + ACME challenge), 22 (SSH, ideally key-only and IP-restricted). Everything else denied at both the cloud security group and host `ufw`. Postgres/Redis unpublished (private Docker net) so they're unreachable even if the host firewall were misconfigured — defense in depth. Rationale: minimize attack surface to the two ports the public genuinely needs plus admin access, and make the data stores unreachable by construction, not just by rule.
+- **Staff:** "Design the port/firewall posture for this ERP and justify each open port." — Public: 443 (HTTPS app), 80 (HTTP→HTTPS redirect + ACME challenge), 22 (SSH, ideally key-only and IP-restricted). Everything else denied at both the cloud security group and host `ufw`. Postgres/Redis unpublished (private Docker net) so they're unreachable even if the host firewall were misconfigured — defense in depth. Rationale: minimize attack surface to the two ports the public genuinely needs plus admin access, and make the data stores unreachable by construction, not just by rule.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| `127.0.0.1` vs `0.0.0.0` — do you know it is a security decision? | "They both mean this machine." | `127.0.0.1` accepts **only local** connections; `0.0.0.0` accepts on **every interface**. Binding 0.0.0.0 by accident is how a "local" admin service becomes internet-facing. |
+| Reachable locally, not from outside — can you diagnose in one step? | "The app must be down." | It is not — `curl localhost` proved that. It is the **network path**: cloud security group, host `ufw`, and whether the proxy actually **publishes** the port. **`nc -vz <public-ip> 443`: refused = no listener, timeout = firewall.** That distinction is the whole answer. |
+| Can you reach production Postgres without exposing it? | "Open 5432 to my office IP." | **Do not publish 5432 at all.** `ssh -L 5432:localhost:5432 user@vps`, then point the GUI at `localhost:5432`. Access rides the **authenticated SSH channel** and disappears when you close it — no permanent surface to forget about. |
+| Can you justify every open port? | "80, 443, 22 and 5432 for admin." | Public: **443** (app), **80** (redirect + ACME), **22** (key-only, ideally IP-restricted). Everything else denied at **both** the cloud security group and host `ufw`. Postgres/Redis **unpublished**, so they are unreachable *by construction* even if a firewall rule is wrong — defence in depth. |
+
+**The killer follow-up:** *"Your firewall rule is misconfigured. Is your database exposed?"* — with unpublished ports, **no** — there is nothing listening publicly to reach. That is the difference between a rule you must get right and an architecture that cannot be got wrong, and it is the point of the whole chapter.
+
+# Revision Notes
+- IP = building, **port = flat number**; both needed to reach a process.
+- `127.0.0.1` = this machine only · `0.0.0.0` = every interface (public).
+- This project: **80/443 public; 5432 and 6379 private, never published**.
+- "Refused" = nothing listening · "timeout" = firewall.
+- Compose services talk by **name**, not IP.
 
 # Cheat Sheet
 - **IP** = machine (public = internet-reachable, private/`10./172./192.168.` = LAN, `127.0.0.1` = this box only).
@@ -141,6 +212,12 @@ docker port <caddy-container># explicit published mappings
 | Firewall | VPS `ufw` + cloud security group: allow 22/80/443 |
 | DB admin access | SSH tunnel, never a published 5432 |
 
+# Practice Tasks
+1. **Read the code:** list every `ports:` entry in `docker-compose.yml`. Which are public? Is any of them a mistake?
+2. **Debug:** run `ss -tlnp` locally and identify what is listening on 5432 and on which interface.
+3. **Design:** you need temporary direct psql access to production. Design the safe way (hint: not a firewall rule).
+4. **Architecture:** argue whether moving SSH off port 22 improves security, and what actually does.
+
 # Homework
 1. On any Linux box: `sudo ss -tulpn` — list every listener, its bind address, and process. Which are `0.0.0.0` (exposed if firewall allows) vs `127.0.0.1` (local only)?
 2. Reproduce [Ch 01](01_What_Is_Deployment.md)'s finding: `python -m http.server 8080 --bind 127.0.0.1` (phone can't reach) vs `--bind 0.0.0.0` (phone can). Explain in terms of bind address.
@@ -150,7 +227,7 @@ docker port <caddy-container># explicit published mappings
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Cloudflare Learning — *What is an IP address?*: https://www.cloudflare.com/learning/dns/glossary/what-is-my-ip-address/
 - Cloudflare Learning — *What is a computer port?*: https://www.cloudflare.com/learning/network-layer/what-is-a-computer-port/
 - Wikipedia — *List of TCP and UDP port numbers* (reference): https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers

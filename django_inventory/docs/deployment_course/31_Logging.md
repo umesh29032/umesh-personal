@@ -1,6 +1,23 @@
+---
+id: deploy-course-31-logging
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 31 — Logging
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [30 — Monitoring & Health Checks](30_Monitoring.md). Next: [32 — Error Tracking with Sentry](32_Sentry.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- find any log in this deployment quickly
+- read a Django traceback efficiently
+- explain what must never be logged
+- decide what to log for a new feature
 
 # Purpose
 To understand how a production app tells you **what it's doing and what went wrong** — logs. Where they go in a containerized stack (stdout, not files), how to read them, why my logs carry a **request-id + actor**, and the difference between logging (the ongoing story) and error tracking (the alarm, [Ch 32](32_Sentry.md)).
@@ -33,6 +50,8 @@ File logs must be rotated (`logrotate`) or they fill the disk — a classic outa
 
 ### Never log secrets / PII
 No passwords, tokens, session keys, full card/financial numbers, `os.environ` ([Ch 23](23_Environment_Variables.md)). Logs are read by many and often shipped off-box.
+
+> 💡 **Samjho aise:** Log server ki **diary** hai — kya hua, kab hua, kisne kiya. Bina diary debugging andhere mein tatolna hai. Do niyam: (1) diary mein **password/secret kabhi nahi** likhna, (2) har entry ke saath request-id ho, taaki ek user ke ek click ki poori kahani ek saath padh sako.
 
 # Real World Example (My ERP)
 - **stdout everywhere:** Gunicorn access + error logs go to stdout (`--access-logfile - --error-logfile -`); Django's `LOGGING` in `base.py` uses console handlers → all captured by `docker compose logs`.
@@ -72,6 +91,43 @@ docker compose logs app | grep '<request-id>'  # the full story of that single r
 docker inspect --format '{{.HostConfig.LogConfig}}' $(docker compose ps -q app)   # current log driver/limits
 ```
 
+# Production Walkthrough
+- **Caddy logs** = who asked for what, and the status code — the front door.
+- **Gunicorn/Django logs** = what the application did, including tracebacks (ch 14).
+- **Postgres logs** = slow queries, connection problems, lock waits (ch 21).
+- All reachable via `docker compose logs <service>`, with `-f` to follow and `--tail` to limit.
+- With `DEBUG=False`, tracebacks go to logs, not to the user — which is why logs stop being optional in production (ch 34).
+
+# Debugging Guide
+1. **Layer down, not sideways**: Caddy → Django → Postgres. The first layer that shows the error owns it.
+2. **A 502 in Caddy with nothing in Django** = the app never answered; look at start-up failure.
+3. **Read a traceback bottom-up** — the last frame is the error, the first frames are your code.
+4. **`--tail 100`** beats scrolling; **`-f`** while reproducing beats guessing.
+5. **Nothing in the logs at all** = you are looking at the wrong service or the container never started.
+
+# Performance Notes
+- Excessive logging costs disk and I/O; debug-level logging in production is a self-inflicted outage risk.
+- Unbounded logs fill the disk — rotation is required, not optional (ch 06).
+- Logging inside a loop is a classic slow-request cause.
+- Structured logs are easier to search later; plain prose logs age badly.
+
+# Security Considerations
+- **Never log passwords, tokens, `SECRET_KEY`, or full request bodies.** Logs are read by more people than the database.
+- Personal data in logs inherits every obligation the database has — worker names, wages, phone numbers.
+- Do not log full tracebacks to the user; that is `DEBUG=True` behaviour by another route.
+- Logs are evidence during an incident; protect their integrity and retention.
+
+# Architecture Decisions
+- **Container stdout logging**, so Docker owns collection and rotation rather than the app inventing a scheme.
+- **Per-service separation**, so "which layer failed" is answerable in one command.
+- **Errors to logs, generic page to users** — the split that `DEBUG=False` enforces.
+
+# Best Practices
+- Log the *decision*, not just the event: "refused settlement: over_allocated 3 > tolerance 0".
+- Include an identifier (adda, stage, user id) so a log line is traceable.
+- Rotate and cap. Check log size when you check disk.
+- Before adding a log line, ask whether it could contain a secret or personal data.
+
 # Beginner Mistakes
 - **`print()` for logging** → no levels, no timestamps, no filtering. Use Python's `logging` (already configured).
 - **Writing logs to files in the container** → gone on rebuild, fills the writable layer. Log to **stdout** (12-factor).
@@ -82,13 +138,31 @@ docker inspect --format '{{.HostConfig.LogConfig}}' $(docker compose ps -q app) 
 - **Only logging errors** → no context for *why*. Log key business events at INFO too (started layering, finalized settlement).
 
 # Interview Questions
-**Junior — "Where do logs go in a Dockerized Django app?"** To stdout/stderr — the app doesn't manage log files (12-factor). Docker captures them; you read with `docker compose logs`.
+- **Junior:** "Where do logs go in a Dockerized Django app?" — To stdout/stderr — the app doesn't manage log files (12-factor). Docker captures them; you read with `docker compose logs`.
 
-**Mid — "Why a request-id and actor in your logs?"** To correlate all log lines of a single request out of interleaved concurrent traffic, and to know *who* (user/role) triggered it — turning "a 500 happened" into "this user, this action, this request, this traceback."
+- **Mid:** "Why a request-id and actor in your logs?" — To correlate all log lines of a single request out of interleaved concurrent traffic, and to know *who* (user/role) triggered it — turning "a 500 happened" into "this user, this action, this request, this traceback."
 
-**Senior — "Logs vs error tracking — why both?"** Logs are the continuous event stream you search after the fact (INFO business events + tracebacks, correlated by request-id). Error tracking ([Ch 32](32_Sentry.md)) actively *alerts* on exceptions, deduplicates them, and attaches request/user context — you don't grep logs hoping to notice a new error; Sentry pages you. Logs = the record; Sentry = the alarm. You want the alarm *and* the searchable record.
+- **Senior:** "Logs vs error tracking – why both?" — Logs are the continuous event stream you search after the fact (INFO business events + tracebacks, correlated by request-id). Error tracking ([Ch 32](32_Sentry.md)) actively *alerts* on exceptions, deduplicates them, and attaches request/user context — you don't grep logs hoping to notice a new error; Sentry pages you. Logs = the record; Sentry = the alarm. You want the alarm *and* the searchable record.
 
-**Staff — "Design logging/observability for this ERP as it grows."** Standardize structured (JSON) logs to stdout with a request-id + actor on every line and consistent levels; never log secrets/PII. Bound container logs (`max-size`/`max-file`) now; as volume grows, ship to a centralized store (Loki/ELK/BetterStack) with retention + full-text search + dashboards, and correlate logs↔metrics↔traces by request-id. Treat security/audit events (logins, settlement finalizations, overrides) as durable, tamper-evident logs separate from app chatter. Pair with error tracking (Sentry) for alerting and with the golden-signal metrics for trends. The invariant: every production event is attributable (who/what/when/which-request), searchable, retained appropriately, and free of secrets.
+- **Staff:** "Design logging/observability for this ERP as it grows." — Standardize structured (JSON) logs to stdout with a request-id + actor on every line and consistent levels; never log secrets/PII. Bound container logs (`max-size`/`max-file`) now; as volume grows, ship to a centralized store (Loki/ELK/BetterStack) with retention + full-text search + dashboards, and correlate logs↔metrics↔traces by request-id. Treat security/audit events (logins, settlement finalizations, overrides) as durable, tamper-evident logs separate from app chatter. Pair with error tracking (Sentry) for alerting and with the golden-signal metrics for trends. The invariant: every production event is attributable (who/what/when/which-request), searchable, retained appropriately, and free of secrets.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you know why the app writes no log files? | "Logs go to a file in the container." | **stdout/stderr — 12-factor.** The app does not manage files; **Docker captures the stream** and owns rotation. An app inventing its own log rotation inside a container is a second, worse implementation of a solved problem. |
+| Do you know why a request-id matters? | "For debugging." | To **correlate every line of one request** out of interleaved concurrent traffic — and with the **actor** attached, it turns *"a 500 happened"* into *"this user, this action, this request, this traceback."* Without it, concurrent logs are noise. |
+| Logs vs error tracking — do you know they are not substitutes? | "Logs are enough if you read them." | Logs are a **continuous stream you search afterwards** (pull). Error tracking **alerts and deduplicates** (push) — 400 occurrences become one item with a count. With one maintainer and no on-call rota, **push matters** (ch 32). |
+| Do you know what must never be logged? | "We avoid logging passwords." | **Passwords, tokens, `SECRET_KEY`, full request bodies — and personal data.** Wages, names and phone numbers in logs inherit every obligation the database has, and logs are read by more people and shipped to more places than the database ever is. |
+
+**The killer follow-up:** *"You need to debug a production 500 right now. What do you NOT do?"* — **do not set `DEBUG=True`.** That exposes settings and source to whoever is watching. Read the logs. Anyone who reaches for DEBUG under pressure will eventually leave it on.
+
+# Revision Notes
+- Three layers: **Caddy** (who asked) → **Django/Gunicorn** (what app did) → **Postgres** (queries/locks).
+- `docker compose logs -f --tail 100 <service>`. Debug **downward** in that order.
+- 502 in Caddy + silence in Django = app never answered.
+- Read tracebacks **bottom-up**.
+- ⚠️ Never log passwords, tokens, `SECRET_KEY`, request bodies, or personal data. Rotate logs or they fill the disk.
 
 # Cheat Sheet
 - **Log to stdout/stderr** (12-factor); don't manage files in the container. Gunicorn `--*-logfile -`.
@@ -110,6 +184,12 @@ docker inspect --format '{{.HostConfig.LogConfig}}' $(docker compose ps -q app) 
 | Read with | `docker compose logs -f app` |
 | Growth step | `max-size`/`max-file` → ship to a log service |
 
+# Practice Tasks
+1. **Read the code:** name the log source for each service and the command to read it.
+2. **Debug:** trigger a 500 on a test deploy and follow it from Caddy's line to the Django traceback.
+3. **Design:** write the log lines you would add to the settlement refusal path — and prove none of them leak data.
+4. **Architecture:** argue stdout-to-Docker logging versus the application writing its own files.
+
 # Homework
 1. `docker compose logs --tail 50 app` — identify a Gunicorn access line vs a Django app line. What fields do you see?
 2. Find (or trigger on a TEST stack) an error, grab its request-id, and `grep` the full request story. Why is that easier than reading raw logs?
@@ -119,7 +199,7 @@ docker inspect --format '{{.HostConfig.LogConfig}}' $(docker compose ps -q app) 
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - The Twelve-Factor App — *XI. Logs*: https://12factor.net/logs
 - Python docs — *Logging HOWTO*: https://docs.python.org/3/howto/logging.html
 - Django docs — *Logging*: https://docs.djangoproject.com/en/5.0/topics/logging/

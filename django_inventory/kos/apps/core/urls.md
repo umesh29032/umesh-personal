@@ -1,7 +1,7 @@
 ---
 id: app-core-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "core's URLs — there are none, and that absence is the chapter's first lesson."
 related: [app-core]
@@ -10,6 +10,12 @@ related: [app-core]
 # core — URL knowledge (zero routes, the deepest absence)
 
 > 📂 [core app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`core` app ka kaam: saara project jo cheezein baar-baar use karta hai (jaise har table ka created_at/updated_at) — iska apna koi table nahi.)*
 
 ## The absence, explained
 

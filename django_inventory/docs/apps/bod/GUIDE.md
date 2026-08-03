@@ -10,6 +10,9 @@ verified: 2026-07-18
 
 # bod — app guide (owner command center, Campaign Phase 15)
 
+
+> **Date primitive (2026-08-01).** Every "today"/"this month" in this app uses `timezone.localdate()`, never `timezone.now().date()` (which returns a **UTC** date and is one day behind for 5.5h daily under `TIME_ZONE=Asia/Kolkata`). Enforced repo-wide by `core.tests.LocalDateGuardTests`. Background: [UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md](../../UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md). `bod` was already correct (`timezone.localtime()`); its money-tile cross-check test is what **caught** the divergence. `bod` is also now inside the test battery — it had been in `INSTALLED_APPS` but in no group anyone ran.
+
 > WINDOW, NEVER ENGINE (owner charter: PDD register entry 6; record =
 > [BOD_BUILD_LOG.md](../../BOD_BUILD_LOG.md) §BOD-D1). Read-only · zero models ·
 > Owner/SA-only v1 · every card drills down into its owning module · specialized

@@ -1,7 +1,7 @@
 ---
 id: app-storefront-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "storefront's 7 presentation models — replicas by design; data ownership as the trust boundary."
 related: [app-storefront]
@@ -10,6 +10,12 @@ related: [app-storefront]
 # storefront — model knowledge (`models.py`, 317 lines · 7 models)
 
 > 📂 [storefront app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`storefront` app ka kaam: public website — featured products aur categories jo bahar dikhte hain.)*
 
 ## The ownership decision (the lesson in schema form)
 

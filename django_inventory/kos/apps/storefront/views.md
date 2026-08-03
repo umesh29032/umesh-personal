@@ -1,7 +1,7 @@
 ---
 id: app-storefront-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "storefront's two view modules — the anonymous read and the listing lane."
 related: [app-storefront, app-storefront-urls]
@@ -10,6 +10,12 @@ related: [app-storefront, app-storefront-urls]
 # storefront — handler knowledge (2 modules)
 
 > 📂 [storefront app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`storefront` app ka kaam: public website — featured products aur categories jo bahar dikhte hain.)*
 
 ## Handler groups at a glance
 

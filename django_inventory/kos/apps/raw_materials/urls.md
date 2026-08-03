@@ -1,7 +1,7 @@
 ---
 id: app-raw-materials-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Any /raw-materials/ URL — rolls, damage, assignment, and the three masters, each individually."
 related: [app-raw-materials]
@@ -12,6 +12,12 @@ related: [app-raw-materials]
 > 📂 [raw_materials app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > Source: `config/raw_materials/urls.py`. Management-lane + sidebar-gated;
 > intake is SA-only (master-data lockdown, MGT-A certified).
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`raw_materials` app ka kaam: **kapda** — roll, cloth type, colour, storage.)*
 
 **Reading Strategy** — *Beginner:* §§1–3 → §8 (the reservation!).
 *Intermediate:* §§4–7. *Senior:* §8's guards + §7's honesty semantics +

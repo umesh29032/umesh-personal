@@ -14,6 +14,23 @@ related: [feature-settlement, concept-django-transactions]
 **Cast:** Meena (worker, stitching) · Rakesh (manager) · Malik (owner/super-admin)
 · the system's three money states: **Expected → Earned → Paid**.
 
+> 💡 **Samjho aise:** Meena ne 50 piece silai kiye. Ab teen alag-alag cheezein
+> hain, aur inko gadbad karna hi sabse badi galti hoti hai:
+>
+> - **Expected** = *"itna banta hai"* — sirf hisaab, kaagaz pe. Paisa **nahi** bana.
+> - **Earned** = *"malik ne khaata band kar diya"* (settlement) — ab ye paisa
+>   pakka Meena ka hai, ledger mein likha gaya.
+> - **Paid** = *"haath mein cash aa gaya"*.
+>
+> Beech ka step (**settlement**) hi wo darwaza hai jahan hisaab paisa banta hai.
+> Us darwaze se pehle aap quantity jitni baar chaaho theek kar sakte ho — kuch
+> nahi bigdega. Darwaza band hone ke baad galti sudhaarne ka tareeka alag hai:
+> purani entry **mitai nahi jaati**, ulti entry daali jaati hai (reverse).
+
+**Why this matters more than it looks:** most "the money is wrong" panics come
+from reading one of these three states and thinking it is another. Expected
+changing is *normal*. Earned changing is *an event with a name and an author*.
+
 ```mermaid
 sequenceDiagram
     participant M as Meena (worker)
@@ -94,6 +111,13 @@ har number ledger se derive hota hai. 6 mahine baad bhi har rupaya us
 Golden journeys replay this exact story end-to-end through services and
 assert **byte-identical** money: ₹344.25 (Lower) · ₹801 · ₹633 — plus
 historical ₹225. Change anything in this flow and the goldens are the alarm.
+
+> 🧠 **Remember This:** teen states yaad rakho — **Expected → Earned → Paid**.
+> Settlement se **pehle** quantity theek karna free hai (paisa bana hi nahi).
+> Settlement ke **baad** kuch bhi mitao mat — ulta entry daalo (reverse), taaki
+> puraana record zinda rahe. Aur agar kabhi shak ho ki "paisa galat hai", pehle
+> yeh poocho: *main kaunsa state dekh raha hoon?* Aadhe se zyada confusion wahin
+> khatam ho jaata hai.
 
 ## Walk it yourself (dev)
 

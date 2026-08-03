@@ -1,7 +1,7 @@
 ---
 id: pattern-settlement-gate
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Settlement Gate pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Provisional data flows freely; committed truth passes ONE atomic, locked, audited gate.
+
+> 💡 **Samjho aise:** Ek hi **tang darwaza** jahan hisaab paisa banta hai. Darwaze se pehle sab kuch aaram se badla ja sakta hai; darwaze pe tala, pehra aur register — teeno.
 
 **Problem it solves.** Committing at capture time makes every correction a commitment correction.
 

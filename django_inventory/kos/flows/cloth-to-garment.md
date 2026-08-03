@@ -14,6 +14,25 @@ related: [feature-cutting, feature-stage-tracking, feature-allocation, project-b
 **Cast:** Malik (owner) · Rakesh (manager) · the cutting crew ·
 one Adda: **3-PATTI-003** (a batch of one product).
 
+> 💡 **Samjho aise:** "Adda" ka matlab hai **ek batch** — ek product ka ek lot
+> jo poori factory se hokar guzarta hai. Socho ek **thaan (roll) se lekar packed
+> kapde** tak ka safar.
+>
+> Safar ke do hisse hain, aur farq samajhna zaroori hai:
+> - **Pehla hissa (cutting tak):** yahan tak sirf **kapda** hai — meters aur kilo.
+>   Ginti nahi hoti, tukde nahi hote.
+> - **Cutting ke baad:** ab **piece** ban gaye — ginti shuru. Yahin se har agla
+>   stage in-hi pieces pe kaam karta hai, aur yahin se paisa ka hisaab bhi
+>   piece pe chalta hai.
+>
+> Isiliye **Cutting is the mint** — wahi jagah hai jahan kapda "ginne laayak,
+> paise laayak" cheez banta hai. Cutting ki ginti galat, to aage sab galat.
+
+**One rule that explains most of the gates:** a stage cannot start until the
+stage before it is genuinely finished, because each stage *consumes what the
+previous one produced*. That is why the system refuses so often — it is not
+being difficult, it is refusing to invent pieces that do not exist.
+
 ```mermaid
 flowchart TD
     A[Roll arrives: CR-000142<br/>raw_materials] --> B[Malik starts Adda<br/>one click: product → code 3-PATTI-003<br/>AddaStageRecord per WorkflowStage]
@@ -91,6 +110,13 @@ Golden journeys replay real product configs end-to-end: ₹801 · ₹344.25 ·
 ₹633 settled journeys (FACTORY_OPERATIONS_MASTER = the operational truth of
 16 ops). Dev testing law: DEV-marked Addas, freely created, never a hidden
 dependency.
+
+> 🧠 **Remember This:** Adda = ek batch ka poora safar. **Cutting se pehle kapda,
+> cutting ke baad piece** — aur cutting hi wo jagah hai jahan ginti paida hoti
+> hai (isliye "the mint"). Har stage agle ko pieces "deta" hai, isliye system
+> aage badhne se **mana** karta hai jab tak pichhla stage sach mein poora na ho.
+> Jab koi stage start hi na ho, sabse pehle pichhla stage dekho — 90% baar
+> jawaab wahin milta hai.
 
 ## Implementation References
 

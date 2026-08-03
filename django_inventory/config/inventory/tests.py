@@ -12,6 +12,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import Skill, User
 from inventory.models import Role
@@ -278,3 +279,95 @@ class SidebarAccessSaveTests(TestCase):
         src = inspect.getsource(v.SidebarAccessListView.post)
         self.assertIn('save_sidebar_rules', src)
         self.assertNotIn('.set(', src)
+
+
+class NonFloorRoleExperienceTests(TestCase):
+    """Owner feedback 2026-08-02: an `accountant` login showed a WORKER experience.
+
+    The app only knew two kinds of person — management (`MANAGEMENT_ROLES`) and
+    "everyone else", who got the worker dashboard and the worker earnings page. So
+    an accountant saw *"Jab manager aapko kaam dega"* (your assigned work will
+    appear here — it never would) and a "My Earnings" page reading
+    *"Pieces Produced 0"*. An accountant never produces pieces.
+
+    `user_does_production_work()` is the missing third notion. These pin that a
+    non-floor role stops seeing worker content, and — critically — that a real
+    worker LOSES NOTHING, because the predicate guards a money page.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from accounts.models import Role, Skill
+        cls.roles = {r.code: r for r in Role.objects.all()}
+        cls.skill = Skill.objects.first() or Skill.objects.create(
+            name='t-skill', label='T Skill')
+
+    def _user(self, email, role_code, *, with_skill=False):
+        u = User.objects.create_user(email=email, password='x')
+        if role_code:
+            u.role = self.roles[role_code]
+            u.save(update_fields=['role'])
+        if with_skill:
+            u.skills.add(self.skill)
+        return u
+
+    # ── the predicate itself ─────────────────────────────────────────────────
+    def test_worker_role_does_floor_work(self):
+        from accounts.services import user_does_production_work
+        self.assertTrue(user_does_production_work(self._user('w@t', 'worker')))
+
+    def test_a_skill_alone_counts_as_floor_work(self):
+        """Skill == stage access, so anyone holding one is meant to open a stage —
+        even if their primary role is something else."""
+        from accounts.services import user_does_production_work
+        u = self._user('skilled@t', 'accountant', with_skill=True)
+        self.assertTrue(user_does_production_work(u))
+
+    def test_accountant_and_listing_team_do_not_do_floor_work(self):
+        from accounts.services import user_does_production_work
+        for code in ('accountant', 'listing_team'):
+            self.assertFalse(
+                user_does_production_work(self._user(f'{code}@t', code)), code)
+
+    def test_existing_earnings_reveal_the_page_even_without_role_or_skill(self):
+        """The safety clause: this predicate must never HIDE wages from somebody
+        who actually has money on the books."""
+        from decimal import Decimal
+
+        from accounts.services import user_does_production_work
+        from expense.models import WorkerLedgerEntry
+        u = self._user('paid@t', 'accountant')
+        self.assertFalse(user_does_production_work(u))
+        WorkerLedgerEntry.objects.create(
+            worker=u, entry_type=WorkerLedgerEntry.EntryType.CREDIT,
+            category=WorkerLedgerEntry.Category.STAGE_EARNING,
+            amount=Decimal('1.00'), entry_date=timezone.localdate())
+        u = User.objects.get(pk=u.pk)          # drop the request-cached principal
+        self.assertTrue(user_does_production_work(u),
+                        'a user WITH earnings must still be shown My Earnings')
+
+    # ── the menu ─────────────────────────────────────────────────────────────
+    def test_my_earnings_hidden_from_non_floor_roles_but_kept_for_workers(self):
+        from accounts.services import build_menu_for
+
+        def labels(u):
+            return {i['label'] for s in build_menu_for(u) for i in s['items']}
+        self.assertIn('My Earnings', labels(self._user('w2@t', 'worker')))
+        self.assertNotIn('My Earnings', labels(self._user('acc2@t', 'accountant')))
+        self.assertNotIn('My Earnings', labels(self._user('lt2@t', 'listing_team')))
+
+    # ── the dashboard copy ───────────────────────────────────────────────────
+    def test_worker_copy_is_not_shown_to_a_non_floor_role(self):
+        u = self._user('acc3@t', 'accountant')
+        self.client.force_login(u)
+        body = self.client.get(reverse('inventory:my_dashboard')).content.decode()
+        self.assertNotIn('aapko kaam dega', body,
+                         'accountant was promised assigned work that can never come')
+        self.assertIn('not set up for factory floor work', body)
+
+    def test_worker_still_sees_their_own_task_copy(self):
+        u = self._user('w3@t', 'worker')
+        self.client.force_login(u)
+        body = self.client.get(reverse('inventory:my_dashboard')).content.decode()
+        self.assertIn('aapko kaam dega', body,
+                      'a real worker must still be told where their work appears')

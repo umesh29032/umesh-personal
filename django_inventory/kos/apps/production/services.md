@@ -1,7 +1,7 @@
 ---
 id: app-production-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "14 production services + 6 stage handlers — who owns which responsibility, who calls whom, how does each fail?"
 related: [app-production, concept-single-writer]
@@ -13,6 +13,12 @@ related: [app-production, concept-single-writer]
 > Two layers here: **domain services** (`config/production/services/`) and
 > **stage handlers** (`config/production/stages/<stage>/service.py` — one
 > package per built-in stage + `generic_stage` + shared `base/`).
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ## The sole-writer table
 

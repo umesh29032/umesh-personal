@@ -1,7 +1,7 @@
 ---
 id: app-expense-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Any /expense/ URL — its full learning story: why it exists, everything it touches, everything it can teach me."
 related: [app-expense]
@@ -10,6 +10,12 @@ related: [app-expense]
 # expense — URL Learning Pages (all 17, individually)
 
 > 📂 [expense app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`expense` app ka kaam: **paisa** — settlement, ledger, advance, payroll. Yahan galti sabse mehngi padti hai.)*
 
 **Reading Strategy** — *Beginner:* §1 → §17 → §8 (each simple, each says
 WHY) → the README's Mental Model. *Intermediate:* §2–§5, §9–§12, §14–§16.

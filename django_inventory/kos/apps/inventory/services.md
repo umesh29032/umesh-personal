@@ -1,7 +1,7 @@
 ---
 id: app-inventory-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "What is inventory's runtime machinery — the sidebar trio that touches every request?"
 related: [app-inventory, feature-rbac-access]
@@ -10,6 +10,12 @@ related: [app-inventory, feature-rbac-access]
 # inventory — service knowledge (the sidebar trio + the tombstone)
 
 > 📂 [inventory app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`inventory` app ka kaam: admin ka hissa — roles, sidebar access, dashboards.)*
 
 ## The trio that makes the pair real
 

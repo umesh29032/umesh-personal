@@ -77,7 +77,7 @@ def adda_status_counts(*, from_dt=None, to_dt=None, fields=None) -> dict:
     if 'completed_today' in wanted:
         out['completed_today'] = Adda.objects.filter(
             status=Adda.Status.COMPLETED,
-            completed_at__date=timezone.now().date(),
+            completed_at__date=timezone.localdate(),
         ).count()
     if 'total_completed' in wanted:
         out['total_completed'] = addas.filter(status=Adda.Status.COMPLETED).count()
@@ -132,7 +132,7 @@ def operations_digest() -> dict:
     active_addas = Adda.objects.filter(status=Adda.Status.IN_PROGRESS).count()
     completed_today = Adda.objects.filter(
         status=Adda.Status.COMPLETED,
-        completed_at__date=now.date(),
+        completed_at__date=timezone.localdate(now),
     ).count()
 
     # 5 + 6. Money (reuses the payroll overview's exact definitions)

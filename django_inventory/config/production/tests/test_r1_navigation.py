@@ -100,7 +100,13 @@ class AddaDetailButtonsTests(TestCase):
         self.assertEqual(resp.status_code, 200)         # workers CAN view the Adda
         self.assertNotContains(resp, 'Start Settlement')
         self.assertNotContains(resp, 'Settlement ·')
-        self.assertNotContains(resp, 'Stage Rates')
+        # AUDIT-2 F-A: assert on the LINK, not the prose. The bare string
+        # "Stage Rates" also appears in this page's own CSS comment, so a
+        # whole-response substring match failed while the access control was
+        # in fact correct (no link rendered, and the URL 403s for workers).
+        # The href is the thing a worker must not be handed.
+        self.assertNotContains(
+            resp, f'/production/addas/{self.adda.code}/stage-rates/')
 
 
 class MyWorkSectionTests(TestCase):

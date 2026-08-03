@@ -1,7 +1,7 @@
 ---
 id: app-accounts-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "accounts' ~26 view classes in one file — which handles what, and which are deliberately dead?"
 related: [app-accounts, app-accounts-urls]
@@ -10,6 +10,12 @@ related: [app-accounts, app-accounts-urls]
 # accounts — handler knowledge (`config/accounts/views.py`, one file)
 
 > 📂 [accounts app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`accounts` app ka kaam: log-in, users, roles aur **skills** — kaun andar aa sakta hai aur kaun kaunsa kaam kar sakta hai.)*
 
 ## Handler groups at a glance
 

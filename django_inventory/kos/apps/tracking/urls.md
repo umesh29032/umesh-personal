@@ -1,7 +1,7 @@
 ---
 id: app-tracking-urls
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Where are tracking's URLs? (The absence IS the lesson — and here's the map to the real surface.)"
 related: [app-tracking, app-inventory-urls]
@@ -10,6 +10,12 @@ related: [app-tracking, app-inventory-urls]
 # tracking — URL knowledge (zero routes, by architecture)
 
 > 📂 [tracking app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`tracking` app ka kaam: **history aur barcode** — kya hua, kab hua, kisne kiya.)*
 
 ## The absence, explained (learn from it)
 

@@ -435,7 +435,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
             if amount > _ZERO:
                 ledger_service.log_credit(
                     worker=worker, category='stage_earning', amount=amount,
-                    entry_date=when.date(), created_by=user, assignment=swa,
+                    entry_date=timezone.localdate(when), created_by=user, assignment=swa,
                     notes=f"{settlement.reference} · {adda.code}",
                 )
             worker_expected += amount
@@ -445,7 +445,7 @@ def finalize_adda_settlement(*, settlement, user, variance=None, recoveries=None
         for adv, amt in cleaned_recoveries.get(wid, []):
             debit = ledger_service.log_debit(
                 worker=worker, category='advance_recovery', amount=amt,
-                entry_date=when.date(), created_by=user, advance=adv,
+                entry_date=timezone.localdate(when), created_by=user, advance=adv,
                 notes=f"{settlement.reference} recovery adv#{adv.id}",
             )
             PayrollSettlementItem.objects.create(

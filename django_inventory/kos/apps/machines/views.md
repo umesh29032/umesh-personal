@@ -1,7 +1,7 @@
 ---
 id: app-machines-views
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "machines' single views.py — 5 views, a form, a gate."
 related: [app-machines, app-machines-urls]
@@ -10,6 +10,12 @@ related: [app-machines, app-machines-urls]
 # machines — handler knowledge (`config/machines/views.py`)
 
 > 📂 [machines app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Views = **reception counter**
+>
+> Browser se request aati hai to sabse pehle yahin aati hai. View ka kaam sirf teen cheezein hai: **request padho → permission check karo → service ko bhej do**. View khud database mein likhta **nahi** — isiliye yeh files patli hoti hain. Moti view = design ki galti.
+>
+> *(`machines` app ka kaam: factory ki machinein aur kis worker ke paas kaunsi machine hai.)*
 
 ## Handler groups at a glance
 

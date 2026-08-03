@@ -1,7 +1,7 @@
 ---
 id: feature-allocation
 type: feature
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "How does the system stop workers being paid for more pieces than a stage ever produced?"
 related: [feature-stage-tracking, feature-cutting, concept-two-truths]
@@ -76,6 +76,13 @@ down the flow. Pool starts at cutting — pre-piece stages have nothing to count
 - Worker's report screen scopes its choices to THEIR allocation dims —
   **blind reporting**: labels only, never quantities, so the allocation
   can't anchor what a worker claims.
+- **Blind means EVERY worker-facing surface, not just the entry form.** The
+  report form was always blind, but the *My Assigned Work* dashboard was
+  printing `Allocated` and `Remaining` next to a "report work" button — the
+  anchor arrived one click before the input. Since 2026-07-27 the target is
+  revealed only **after** that bundle is done, and `Remaining` is floored at 0
+  (legacy over-reports used to render as `-4`). Rule: *if a worker can read a
+  target before they type their count, the surface is not blind.*
 
 **The complete-time bound** (S4 Phase 4 → hardened AE-1 2026-07-20): `complete_worker_task`
 checks `Σ(good+alter+missing+damaged) ≤ Σ active allocated` per reported dim. **AE-1 (owner
@@ -116,8 +123,9 @@ NOT settlement/rates (orthogonal by lock — verify it stays that way).
 - ❌ Confusing `pool_service` with expense's `allocation_service` (era-A money path).
 - ❌ Duplicating cutting's breakdown into SPS "for consistency" — cutting's
   pool source is APSCPB, single source, BY DESIGN.
-- ❌ Showing allocation quantities on the worker's report screen — blind
-  reporting prevents anchored claims.
+- ❌ Showing allocation quantities on ANY worker-facing surface before the work
+  is reported — the report form AND the dashboard cards. Blind reporting
+  prevents anchored claims; a target one click upstream anchors just as well.
 - ❌ Taking 5374 inside pool operations or 5375 inside settlement — disjoint namespaces.
 - ✅ Always verify: over-allocation refusal (always-on) + H-2 refusal + reopen
   guard tests green; goldens untouched (no money = no golden drift).

@@ -34,16 +34,18 @@ class G4StatusReadTests(TestCase):
         cls.ip1.save(update_fields=['current_stage'])
         cls.hold = Adda.objects.create(code='G4-HOLD', product=product,
                                        status=Adda.Status.ON_HOLD)
-        # completed_today lookup: __date converts to LOCAL tz while the
-        # filter value is the UTC date (pre-existing dashboard semantics,
-        # preserved verbatim). Pin to noon UTC so both dates agree at any
-        # test-run hour — no midnight-straddle flake.
-        from datetime import datetime, time as dtime, timezone as dttz
-        noon_utc = datetime.combine(timezone.now().date(), dtime(12, 0),
-                                    tzinfo=dttz.utc)
+        # completed_today: Django's `__date` lookup converts a DateTimeField to the
+        # CURRENT timezone (IST) before extracting the date, so the filter value must
+        # also be a LOCAL date — `timezone.localdate()`, not `timezone.now().date()`.
+        # This fixture used to pin the UTC date to match the old (buggy) UTC filter;
+        # both sides are local now. See docs/UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md.
+        # Noon local keeps both dates equal at any test-run hour — no midnight straddle.
+        from datetime import datetime, time as dtime
+        noon_local = timezone.make_aware(
+            datetime.combine(timezone.localdate(), dtime(12, 0)))
         cls.done = Adda.objects.create(code='G4-DONE', product=product,
                                        status=Adda.Status.COMPLETED,
-                                       completed_at=noon_utc)
+                                       completed_at=noon_local)
 
     def test_adda_status_counts(self):
         c = adda_status_counts()

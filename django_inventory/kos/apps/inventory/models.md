@@ -1,7 +1,7 @@
 ---
 id: app-inventory-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Why is inventory/models.py only 15 lines — and where did Role and SidebarItemRule actually go?"
 related: [app-inventory, feature-rbac-access]
@@ -10,6 +10,12 @@ related: [app-inventory, feature-rbac-access]
 # inventory — model knowledge (a shim, and the lesson inside it)
 
 > 📂 [inventory app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`inventory` app ka kaam: admin ka hissa — roles, sidebar access, dashboards.)*
 
 ## The whole file (15 lines)
 

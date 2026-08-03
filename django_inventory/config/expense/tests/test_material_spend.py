@@ -76,8 +76,13 @@ class MaterialSpendMatrixTests(_World):
     def test_identity_matrix_d2_permanent_rule(self):
         url = reverse('expense:material-spend')
         self.assertEqual(self._get(None, url).status_code, 302)       # anon
-        for u in (self.worker, self.acct, self.listing):
+        for u in (self.worker, self.listing):
             self.assertIn(self._get(u, url).status_code, (302, 403), u.email)
+        # Owner ruling 2026-08-02: cloth ₹/kg is the ACCOUNTANT's core report —
+        # it is read-only by shape (POST is 405, asserted below), so admitting a
+        # financial reader opens no write path.
+        self.assertEqual(self._get(self.acct, url).status_code, 200,
+                         self.acct.email)
         for u in (self.mgr, self.sa):                                 # D2: mgmt OK
             self.assertEqual(self._get(u, url).status_code, 200, u.email)
 

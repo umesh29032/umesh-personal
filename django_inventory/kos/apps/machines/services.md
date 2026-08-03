@@ -1,7 +1,7 @@
 ---
 id: app-machines-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "machine_service's 8 verbs — registry, checkout/checkin, derived availability."
 related: [app-machines, concept-single-writer]
@@ -12,6 +12,12 @@ related: [app-machines, concept-single-writer]
 > 📂 [machines app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
 > Sole writer of Machine + MachineAssignment (+ `create_machine_type` as
 > the service-side door to production's master).
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`machines` app ka kaam: factory ki machinein aur kis worker ke paas kaunsi machine hai.)*
 
 | Verb (line) | Job |
 |---|---|

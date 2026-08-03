@@ -1,7 +1,7 @@
 ---
 id: app-production-urls-layering-pattern
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Every Layering and Pattern-Design workspace URL — each action's full learning story."
 related: [app-production-urls]
@@ -14,6 +14,12 @@ related: [app-production-urls]
 > action = one service verb (`stages/layering/service.py` ·
 > `stages/cutting_pattern/service.py`). Gates: stage skill ∩ assignment via
 > mixins. All under `addas/<code>/…`.
+
+> 💡 **Samjho aise** — URLs = **address book**
+>
+> Yeh file batati hai kaunsa web address (jaise `/production/addas/`) kis view pe jaata hai. Jab aapko pata na ho ki koi page kis code se banta hai — **hamesha yahin se shuru karo**.
+>
+> *(`production` app ka kaam: **factory floor** — Adda, stages, worker ka kaam, allocation. Project ka dil yahin hai.)*
 
 ## Layering — cloth meets table
 

@@ -28,7 +28,49 @@ REQUIRED CONTEXT (from _build_pattern_context):
   next_stage      → next WorkflowStage row (for button label)
   start_form      → PatternStartForm or None
   embedded        → bool, true when rendered inside iframe
+  needs_lane_choice / lanes / active_lane / show_lane_switcher
+                  → lane contract, same keys as the layering + cutting panels
 {% endcomment %}
+
+{% if needs_lane_choice %}
+{# GAP-3: bare multi-lane URL (deep link / A360 embedded tab) — pick a lane, never a dead end. #}
+<div class="panel">
+    <div class="panel-head"><div class="panel-title">Choose a cutting lane</div></div>
+    <div class="panel-body">
+        <p class="panel-sub">{{ adda.code }} has {{ lanes|length }} cutting lanes — this console works one lane at a time.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for l in lanes %}
+            <a class="lane-pick" href="?stream={{ l.pk }}{% if request.GET.embedded %}&embedded=1{% endif %}">
+                {{ l.label|title }}{% if l.reason %} <span class="lane-pick-reason">&nbsp;— {{ l.reason|truncatechars:40 }}</span>{% endif %}
+            </a>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+{% if active_lane %}
+{# streams: every POST in this panel carries its lane #}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('form').forEach(function (f) {
+    if (!f.querySelector('input[name=stream]')) {
+      var h = document.createElement('input');
+      h.type = 'hidden'; h.name = 'stream'; h.value = '{{ active_lane.pk }}';
+      f.appendChild(h);
+    }
+  });
+});
+</script>
+{% endif %}
+{% if show_lane_switcher %}
+<div class="lane-switcher" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;">
+  {% for l in lanes %}
+  <a class="lane-chip{% if l.pk == active_lane.pk %} is-active{% endif %}"
+     href="?stream={{ l.pk }}{% if request.GET.embedded %}&embedded=1{% endif %}">
+    {{ l.label|title }}</a>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% if messages %}
 <div class="messages-strip">
@@ -69,6 +111,21 @@ neeche Section 04 me already render hota hai (full thumbnails).
 </div>
 {% endif %}
 <style>
+/* Lane picker + switcher (AUDIT-2 P0 fix). Page-scoped per UI rule 10; tokens only
+   so the design-system ratchet stays green — no inline px/hex. */
+.lane-pick {
+    font-size: 14px; font-weight: 700; padding: 10px 16px; border-radius: 10px;
+    border: 1px solid var(--border-card); text-decoration: none;
+    min-height: 44px;                     /* touch target — mobile-first rule 11 */
+    display: inline-flex; align-items: center;
+}
+.lane-pick-reason { font-weight: 400; color: var(--stone); font-size: 12px; }
+.lane-chip {
+    font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border-card); text-decoration: none; color: var(--stone);
+}
+.lane-chip.is-active { background: var(--copper); color: var(--card-bg); }
+
     .cp-summary-card {
         background: rgba(5,150,105,0.07); border: 1px solid rgba(5,150,105,0.30);
         border-radius: 14px; padding: 16px 18px; margin-bottom: 14px;
@@ -547,6 +604,8 @@ allocation_sum = live sum of proportion_pct (red badge if != 100)
     </div>
 </div>
 {% endif %}
+
+{% endif %}{# needs_lane_choice #}
 
 {% include "production/_stage_panel_collapse.html" %}
 {% include "production/_autosave.html" %}

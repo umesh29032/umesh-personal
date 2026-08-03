@@ -1,7 +1,7 @@
 ---
 id: pattern-append-only-ledger
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Append-Only Ledger pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Money (or any contract-grade truth) as an immutable event log; corrections = compensating rows.
+
+> 💡 **Samjho aise:** Paise ka register **rubber se mitate nahi** — galti ho to *ulti entry* daalte hain. Dono lines zinda rehti hain, isliye do saal baad bhi poori kahani padhi ja sakti hai.
 
 **Problem it solves.** Edited history is unprovable history.
 

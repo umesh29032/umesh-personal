@@ -5,13 +5,13 @@ status: generated
 owner: generated
 scope: feature — machines-assets-operator-possession
 anchors: docs/LEARNING_2_0/PROJECT_BRAIN/FEATURE_INDEX.md
-verified: graph:56207d76ed26
+verified: graph:f48dc8b77c29
 ---
 
 # Feature — Machines: assets + operator possession (R10-A, 2026-07-05)
 
 > ⚙️ GENERATED — an index, not truth. Do not hand-edit; fix the source, rebuild the graph, regenerate.
-> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `56207d76ed26` · schema: 1.0.1 · template: feature-doc v1.0.0
+> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `f48dc8b77c29` · schema: 1.0.1 · template: feature-doc v1.0.0
 > Regenerate: `env/bin/python scripts/generate_docs.py --out docs/features`
 
 | Field | Value |
@@ -22,7 +22,13 @@ verified: graph:56207d76ed26
 
 ## Member routes
 
-No machine-provable member routes — this feature row carries no exact-token url reference (Phase-8 residual R-5 class). Fix at source: enrich FEATURE_INDEX, rebuild the graph, regenerate.
+| Route | Mount | View | Card |
+|---|---|---|---|
+| `machines:add` | `/machines/add/` | `MachineCreateView` | [add.md](add.md) |
+| `machines:assign` | `/machines/<int:pk>/assign/` | `MachineAssignView` | [assign.md](assign.md) |
+| `machines:edit` | `/machines/<int:pk>/edit/` | `MachineUpdateView` | [edit.md](edit.md) |
+| `machines:list` | `/machines/` | `MachineListView` | [list.md](list.md) |
+| `machines:release` | `/machines/assignments/<int:pk>/release/` | `MachineReleaseView` | [release.md](release.md) |
 
 ## Member models
 
@@ -32,7 +38,7 @@ No machine-provable member routes — this feature row carries no exact-token ur
 
 ## Apps touched
 
-Not derivable — no member routes with project-app views.
+- `machines` — [config/machines/README.md](../../../config/machines/README.md) · [docs/apps/machines/GUIDE.md](../../apps/machines/GUIDE.md)
 
 ## Governing docs
 

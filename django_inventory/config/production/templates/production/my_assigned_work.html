@@ -52,12 +52,18 @@ already-frozen visibility number).{% endcomment %}
     <p>Aapke bundles — tap a card to report. Colour &amp; size already chosen for you.</p>
   </div>
 
-  {# ── Workload summary (owner extra requirement) ── #}
+  {% comment %}
+  Workload summary (owner extra requirement).
+  AUDIT-2 F1: the summary stays, but WITHOUT Allocated/Remaining. Blind
+  reporting means a worker must not be shown the target quantity before they
+  report it, otherwise the number can simply be copied back. What remains is
+  the worker's OWN achievement (bundles, completed, earnings) — theirs to see
+  by the Expected→Earned→Paid visibility rule. Per-bundle targets appear only
+  after that bundle is done (see the card grid below).
+  {% endcomment %}
   <div class="mw-summary">
     <div class="cell"><span class="lbl">Active bundles</span><span class="val">{{ summary.bundles }}</span></div>
-    <div class="cell"><span class="lbl">Allocated</span><span class="val">{{ summary.allocated|floatformat:"-2" }}</span></div>
     <div class="cell"><span class="lbl">Completed</span><span class="val">{{ summary.completed|floatformat:"-2" }}</span></div>
-    <div class="cell"><span class="lbl">Remaining</span><span class="val">{{ summary.remaining|floatformat:"-2" }}</span></div>
     <div class="cell"><span class="lbl">Expected earnings</span><span class="val">₹{{ summary.expected|floatformat:2 }}</span></div>
   </div>
   {% if summary.stages %}<p class="mw-stages">Current stage{{ summary.stages|pluralize }}: {{ summary.stages|join:" · " }}</p>{% endif %}
@@ -72,12 +78,22 @@ already-frozen visibility number).{% endcomment %}
     </div>
     <div class="adda">{{ c.stage_name }} · Adda {{ c.adda_code }}{% if c.mode == 'partial' %} · partial{% endif %}</div>
     <div class="mw-grid">
+      {% comment %}
+      AUDIT-2 F1: Allocated/Remaining are the TARGET — revealing them before the
+      work is reported breaks blind reporting, so they appear only once this
+      bundle is done. `remaining` is floored at 0 for display: a legacy
+      over-report (reported > allocated) used to render as e.g. "-4".
+      {% endcomment %}
+      {% if c.status == 'done' %}
       <div class="g"><span class="lbl">Allocated</span><span class="v">{{ c.allocated|floatformat:"-2" }}</span></div>
+      {% endif %}
       <div class="g"><span class="lbl">Completed</span><span class="v">{{ c.completed|floatformat:"-2" }}</span></div>
-      <div class="g"><span class="lbl">Remaining</span><span class="v">{{ c.remaining|floatformat:"-2" }}</span></div>
+      {% if c.status == 'done' %}
+      <div class="g"><span class="lbl">Remaining</span><span class="v">{% if c.remaining > 0 %}{{ c.remaining|floatformat:"-2" }}{% else %}0{% endif %}</span></div>
+      {% endif %}
       <div class="g"><span class="lbl">Expected</span><span class="v">₹{{ c.expected_earning|floatformat:2 }}</span></div>
     </div>
-    {% if c.allocated %}<div class="mw-progress"><i style="width:{% widthratio c.completed c.allocated 100 %}%"></i></div>{% endif %}
+    {% if c.allocated and c.status == 'done' %}<div class="mw-progress"><i style="width:{% widthratio c.completed c.allocated 100 %}%"></i></div>{% endif %}
     {% if c.status == 'done' %}
       <a class="cta done" href="{% url 'production:worker-report' c.adda_code c.stage_code %}?color={{ c.color_id }}&size={{ c.size_id }}{% if c.stream_id %}&stream={{ c.stream_id }}{% endif %}">View report</a>
     {% else %}

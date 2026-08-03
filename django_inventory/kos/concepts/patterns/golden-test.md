@@ -1,7 +1,7 @@
 ---
 id: pattern-golden-test
 type: concept
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "The Golden Test pattern — where is it used across apps, and how do I reuse it instead of reinventing it?"
 related: [readme-concepts-patterns]
@@ -14,6 +14,8 @@ related: [readme-concepts-patterns]
 > canonical pages; this card is the cross-app map + reuse contract.
 
 **Purpose.** Real business scenarios replayed end-to-end, asserting byte-identical outcomes.
+
+> 💡 **Samjho aise:** Ek asli kaam ka poora safar test mein dobara chalaya jaata hai, aur **paisa paise tak match** hona chahiye (jaise ₹344.25). Kuch bhi khiska to yeh test turant chillata hai.
 
 **Problem it solves.** Unit tests can all pass while the composed money math drifts.
 

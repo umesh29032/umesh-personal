@@ -1,6 +1,23 @@
+---
+id: deploy-course-18-docker-compose
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 18 — Docker Compose (my whole stack, service by service)
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [17 — Dockerfile](17_Dockerfile.md). Next: [19 — Docker Networking](19_Docker_Networking.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- read this project's compose file and predict what `up -d` does
+- explain depends_on with healthchecks versus without
+- deploy and roll back with two commands
+- say which lines in that file are security decisions
 
 # Purpose
 To read **my actual `docker-compose.yml`** — the single file that declares all five services, how they're wired, their volumes, health gates, and restart policies. This file *is* my deployment topology as code. `docker compose up -d` turns it into a running ERP; understanding it means understanding the whole stack ([ARCHITECTURE.md](ARCHITECTURE.md)).
@@ -82,6 +99,8 @@ volumes: { pgdata: , media: , caddy_data: , caddy_config: , backups: }   # named
 ### Why the healthcheck ordering matters
 Without it, `app` could start, try to `migrate`, and crash because Postgres wasn't ready yet. With `service_healthy`, Compose holds `app` until the DB passes `pg_isready`. My stack doubles down: the app **also** runs its own wait-loop in `entrypoint.sh` before migrating — so even a flaky healthcheck can't cause a half-up boot.
 
+> 💡 **Samjho aise:** Ek tiffin se kaam nahi chalta: app ka tiffin, database ka tiffin, Redis ka tiffin. Compose wo **thali** hai jisme teeno rakhe hain aur ek hi command (`up`) se poora khana lag jaata hai. Ek file mein likha hota hai kaun kisse baat karega, kis order mein shuru honge.
+
 # Real World Example (My ERP)
 - `docker compose up -d` boots the stack in dependency order: `db`+`redis` start and become healthy → `app` starts (waits healthy, migrates, collects static, runs gunicorn) → `caddy` starts (gets cert, proxies to `app:8000`) → `backup` sleeps until 02:00. See [ARCHITECTURE.md §5](ARCHITECTURE.md).
 - **Only `caddy` has `ports:`** (80/443) — the internet-facing rule, enforced in this file ([Ch 05](05_IP_Address_and_Ports.md)/[Ch 11](11_Reverse_Proxy.md)).
@@ -121,6 +140,42 @@ docker inspect --format '{{.State.Health.Status}}' $(docker compose ps -q db)   
 docker compose ps            # STATE column: "healthy"/"starting"/"unhealthy"
 ```
 
+# Production Walkthrough
+- One file describes the whole system: five services, their images, volumes, networks, environment and restart policies. **The file *is* the deployment.**
+- `docker compose up -d --build` is the deploy. Compose replaces only what changed and leaves volumes alone.
+- **`depends_on` alone is not enough** — it waits for *started*, not *ready*. That is why `deploy/entrypoint.sh` also waits for DB+Redis to be genuinely healthy before migrating. Both belts are deliberate.
+- Environment comes from `.env`, so the same compose file works on any machine (ch 23).
+
+# Debugging Guide
+1. **`docker compose config`** — renders the file with variables resolved. A missing `.env` value shows up here as empty, which explains a lot of "why is it connecting to nothing".
+2. **`docker compose ps`** then **`logs <service>`** — status first, then the story.
+3. **One service restarting** = its own fatal error. **Everything restarting** = usually a shared dependency (db) or the host (memory/disk).
+4. **Change had no effect?** You edited the file but did not re-run `up -d`, or you edited inside a container.
+5. **`docker compose down -v` is dangerous** — `-v` removes volumes, i.e. your database. Know that flag by heart.
+
+# Performance Notes
+- Compose adds no runtime overhead; it is orchestration at start-up only.
+- Build caching is per-service — an unchanged service is not rebuilt.
+- Startup order costs seconds at deploy time; health-gated startup trades a little time for a lot of reliability.
+
+# Security Considerations
+- **Every `ports:` line is a public exposure decision** (ch 05). Postgres and Redis have none, on purpose.
+- Secrets come from `.env`, never inline in the compose file, which is in git.
+- Private network by default: services reach each other by name and nothing else can.
+- Pinned image tags so a deploy does not silently upgrade a dependency (ch 16).
+
+# Architecture Decisions
+- **Compose over Kubernetes** — one file a solo maintainer can hold in their head.
+- **Health-gated startup**, because "started" is not "ready" and a migration against a not-yet-ready database is a bad first minute.
+- **Restart policies over manual supervision** (ch 09).
+- **All infrastructure in git**: compose file, Caddyfile, entrypoint, backup script.
+
+# Best Practices
+- Run `docker compose config` before deploying a changed file.
+- Never type `down -v` on production. Ever.
+- Keep the file short and commented — it is the map anyone will read first.
+- Review `ports:` and image tags on every change.
+
 # Beginner Mistakes
 - **`docker compose down -v`** → deletes the named volumes = **your database** ([Ch 20](20_Docker_Volumes.md)). Use plain `down`.
 - **Adding `ports:` to `db`/`app` "to debug"** → exposes them to the internet ([Ch 05](05_IP_Address_and_Ports.md)). Use `expose` + an SSH tunnel ([Ch 07](07_SSH.md)).
@@ -131,13 +186,31 @@ docker compose ps            # STATE column: "healthy"/"starting"/"unhealthy"
 - **Forgetting `--build`** → `up -d` after a code change reuses the old image; the change doesn't appear ([Ch 17](17_Dockerfile.md)).
 
 # Interview Questions
-**Junior — "What does docker-compose.yml do?"** Declares a multi-container app — its services, images/builds, volumes, networks, and dependencies — so one command (`docker compose up`) starts the whole stack reproducibly.
+- **Junior:** "What does docker-compose.yml do?" — Declares a multi-container app — its services, images/builds, volumes, networks, and dependencies — so one command (`docker compose up`) starts the whole stack reproducibly.
 
-**Mid — "Difference between `ports` and `expose`?"** `ports` publishes a container port to the host (internet-reachable); `expose` only makes it reachable by other containers on the Docker network. Only Caddy uses `ports` here, keeping app/db/redis private.
+- **Mid:** "Difference between `ports` and `expose`?" — `ports` publishes a container port to the host (internet-reachable); `expose` only makes it reachable by other containers on the Docker network. Only Caddy uses `ports` here, keeping app/db/redis private.
 
-**Senior — "How does this file guarantee the app never migrates against a not-ready database?"** `app`'s `depends_on` uses `condition: service_healthy` for `db` and `redis`, so Compose won't start `app` until their healthchecks (`pg_isready`, `redis-cli ping`) pass; and the app's own `entrypoint.sh` runs a second wait-loop before `migrate`. Two independent gates → no half-up boot.
+- **Senior:** "How does this file guarantee the app never migrates against a not-ready database?" — `app`'s `depends_on` uses `condition: service_healthy` for `db` and `redis`, so Compose won't start `app` until their healthchecks (`pg_isready`, `redis-cli ping`) pass; and the app's own `entrypoint.sh` runs a second wait-loop before `migrate`. Two independent gates → no half-up boot.
 
-**Staff — "Critique this Compose file for a production single-VPS deploy; what's strong, what would you add?"** Strong: pinned images, only-Caddy-public, health-gated ordering + app wait-loop, named volumes for state, `restart: unless-stopped`, secrets via `.env`, a dedicated off-site backup service. Additions to consider: explicit `logging` limits (log rotation to cap disk), resource limits (`mem_limit`) to prevent one service OOMing the box, a healthcheck on `app` itself (for a `/healthz`), and a `networks:` block if you later want to isolate the backup/db on a separate internal network. None are blockers at current scale.
+- **Staff:** "Critique this Compose file for a production single-VPS deploy; what's strong, what would you add?" — Strong: pinned images, only-Caddy-public, health-gated ordering + app wait-loop, named volumes for state, `restart: unless-stopped`, secrets via `.env`, a dedicated off-site backup service. Additions to consider: explicit `logging` limits (log rotation to cap disk), resource limits (`mem_limit`) to prevent one service OOMing the box, a healthcheck on `app` itself (for a `/healthz`), and a `networks:` block if you later want to isolate the backup/db on a separate internal network. None are blockers at current scale.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| `ports` vs `expose` — do you know which one is a security decision? | "Both make the port available." | **`ports` publishes to the host and therefore the internet**; `expose` only advertises it to other containers. In this stack **only Caddy uses `ports`** — that single distinction is what keeps Postgres and Redis unreachable. |
+| Do you know `depends_on` is not enough by itself? | "`depends_on` waits for the database." | Plain `depends_on` waits for **started, not ready**. This file uses **`condition: service_healthy`** with `pg_isready` / `redis-cli ping`, **and** the entrypoint waits again. Two belts, deliberately — a migration against a not-ready database fails confusingly. |
+| Can you deploy and roll back from memory? | "docker compose up." | **`docker compose up -d --build`** replaces only what changed and **leaves volumes alone** — which is what makes it safe to run casually. Rollback = the previous image plus the backup, both identified **before** you start. |
+| Can you critique the file rather than admire it? | "It looks well organised." | Strengths: **pinned images, only-Caddy-public, health-gated ordering, named volumes, `restart: unless-stopped`, secrets from `.env`**. Gaps worth naming: no CI, no error tracking, no dashboards. Naming your own gaps is the answer. |
+
+**The killer follow-up:** **⚠️ *"What does `docker compose down -v` do?"*** — it **deletes the named volumes, which is your database.** Anyone who does not flinch at `-v` should not have production access. Know that flag by heart, and never type it on a machine with real data.
+
+# Revision Notes
+- One file = the whole system: services, volumes, network, env, restart.
+- Deploy = `docker compose up -d --build`; volumes survive.
+- **`depends_on` waits for started, not ready** — health-gate in the entrypoint too.
+- `docker compose config` resolves variables; use it before deploying.
+- ⚠️ `down -v` deletes volumes — that is your database.
 
 # Cheat Sheet
 - **Compose = stack topology as code**; `up -d` runs it, `down` removes containers (**`down -v` deletes volumes/DB**).
@@ -159,6 +232,12 @@ docker compose ps            # STATE column: "healthy"/"starting"/"unhealthy"
 | State volumes | `pgdata`★, `media`★, `caddy_data`, `caddy_config`, `backups` |
 | Backup service | `backup` → `backup.sh` → restic off-site |
 
+# Practice Tasks
+1. **Read the code:** run `docker compose config` and compare the output with the raw file. What did `.env` fill in?
+2. **Debug:** remove a required variable from `.env`, run `config`, and see how the failure appears.
+3. **Design:** write the exact two-command deploy and the exact rollback for this project.
+4. **Architecture:** argue why the entrypoint waits for health even though `depends_on` exists.
+
 # Homework
 1. `docker compose config` — read the resolved file. Which service has `ports:`? Why only that one?
 2. Trace the boot order from `depends_on` + healthchecks: which two services must be *healthy* before `app` starts, and what commands prove their health?
@@ -168,7 +247,7 @@ docker compose ps            # STATE column: "healthy"/"starting"/"unhealthy"
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Docker docs — *Compose file reference* (services/volumes/healthcheck/depends_on): https://docs.docker.com/reference/compose-file/
 - Docker docs — *Control startup order / depends_on + healthcheck*: https://docs.docker.com/compose/how-tos/startup-order/
 - Docker docs — *Compose in production*: https://docs.docker.com/compose/how-tos/production/

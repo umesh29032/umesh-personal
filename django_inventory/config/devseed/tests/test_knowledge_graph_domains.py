@@ -142,6 +142,23 @@ class Domain4Tests(SimpleTestCase):
         self.assertEqual(detect_generated_stale(
             graph12="aaaaaaaaaaaa", files=["x/x.md"], reader=lambda rel: GOOD_CARD), [])
 
+    def test_handwritten_kos_satellite_is_not_a_generated_artifact(self):
+        """docs/features/ holds generated cards AND one hand-written KOS guide
+        (added by the KOS v1.0 commit). The guide has no generated banner by
+        design, so scanning it produced a permanent false BLOCKER that stopped
+        knowledge_sync from ever exiting clean. Excluded by exact filename —
+        NOT by `owner: handwritten`, which is editable and would let a real
+        hand-edited card opt out of detection."""
+        from devseed.knowledge.d4_generated import _generated_files, _HANDWRITTEN
+        import os
+        import tempfile
+        self.assertIn("HUMAN_GUIDE.md", _HANDWRITTEN)
+        with tempfile.TemporaryDirectory() as d:
+            for name in ("card.md", "HUMAN_GUIDE.md"):
+                with open(os.path.join(d, name), "w") as fh:
+                    fh.write("x")
+            self.assertEqual(_generated_files(root=d), ["card.md"])
+
     def test_fence_corruption(self):
         docs = {
             "docs/clean.md": "no fences here\n",

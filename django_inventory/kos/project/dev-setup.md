@@ -1,7 +1,7 @@
 ---
 id: project-dev-setup
 type: project
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "Fresh machine → working dev environment → first safe commit. The canonical onboarding runbook (certification task 18's fix)."
 related: [kos-start-here, project-tech-stack]
@@ -20,6 +20,19 @@ Django 5.0.1 + PostgreSQL app, venv-based, `.env`-configured, seeded by its
 own `devseed` engine. Redis is production-only for dev purposes — local
 settings use in-memory cache, so you can skip Redis today
 ([tech-stack](tech-stack.md)).
+
+> 💡 **Samjho aise:** Setup mein aap chaar alag cheezein bitha rahe ho, aur
+> yeh jaanna ki kaun kya karta hai aadha kaam aasaan kar deta hai:
+>
+> - **Python + venv** = project ki apni alag toolbox, taaki doosre projects se
+>   jhagda na ho
+> - **PostgreSQL** = wo almirah jahan saara data rehta hai (project folder mein
+>   data **nahi** hota)
+> - **`.env`** = chaabiyaan aur settings — kaunsi database kholni hai, password
+>   kya hai. Ye file **kabhi git mein nahi jaati**
+> - **`migrate`** = khaali database mein saare tables bana dena
+>
+> Kuch bhi atke to poochho: *chaar mein se kaunsa hissa nahi bola?*
 
 ## 1. Clone + Python
 

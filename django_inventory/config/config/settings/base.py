@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'patterns_ai',   # AI Pattern Intelligence (P1 Block 1 — foundation)       # R10-A: physical machines + operator possession windows (assets only; downstream of production)
     'verification',  # Phase-13 read-only verification engine — production-PRESENT by design (VER-D1); no models/migrations/URLs
     'bod',            # Phase-15 Business Operating Dashboard — owner command center; WINDOW never engine (read-only, zero models)
+    'learning',       # course reader — a WINDOW over docs/*_course/*.md; zero models, GET-only
 ]
 
 # AUTHENTICATION_BACKENDS: Django kaise verify karta hai ki user valid hai

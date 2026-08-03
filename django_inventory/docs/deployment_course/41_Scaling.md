@@ -1,6 +1,23 @@
+---
+id: deploy-course-41-scaling
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # 41 — Scaling
 
 > Part of [Deployment Course](00_COURSE_OVERVIEW.md). Prev: [40 — Disaster Recovery](40_Disaster_Recovery.md). Next: [42 — Final Deployment Playbook](42_Final_Playbook.md).
+
+# Learning Objectives
+By the end of this chapter you can:
+- resist scaling before you need it
+- identify the real bottleneck with measurements
+- name the ordered steps this project would take
+- explain why one VPS is the right answer today
 
 # Purpose
 To know **when** and **how** to make the stack handle more load — and, just as important, when *not* to. Scaling is a path you walk only when the numbers demand it. This chapter maps the path from my single-VPS stack to a larger one, in the order the bottlenecks actually appear.
@@ -35,6 +52,8 @@ You can only run *N* app instances if a request can hit *any* of them. That need
 
 ### Match the tool to the scale (don't cargo-cult)
 One factory on one VPS does **not** need Kubernetes, microservices, or multi-region. The single-VPS Compose stack is the *correct* architecture for the current load; scaling is a known path, not a current task. Add complexity only when a measured ceiling forces it.
+
+> 💡 **Samjho aise:** Scaling ki seedhi: pehle **kaam kam karo** (N+1 hatao, index lagao) → phir **badi machine** → phir connection pooling → phir padhne ke liye copy (replica) → phir table baanto. 90% log pehli seedhi pe hi ruk jaate hain, kyunki asli dikkat wahin thi. Sidha "sharding chahiye" bolna jaldi-baazi hai.
 
 # Real World Example (My ERP)
 - **Current = single VPS, and that's right:** one factory, users in one region, one Compose stack (Caddy + 3 Gunicorn sync workers + Postgres + Redis + backup) on 2–4 GB. Load is modest; the architecture fits. No premature scaling.
@@ -78,6 +97,43 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 # gunicorn ... --workers $((2*$(nproc)+1)) --max-requests 1000 --max-requests-jitter 100
 ```
 
+# Production Walkthrough
+- Today: **one VPS, five containers, 3 Gunicorn workers.** For one factory with tens of concurrent users that is not a compromise; it is correct (ch 36).
+- The ordered path if load ever arrives: **measure** → fix queries and add indexes → cache the expensive aggregates (ch 22) → increase workers within CPU limits (ch 14) → bigger VPS (vertical) → separate the database → only then multiple app servers.
+- Almost every real slowness in a Django ERP is a missing index or an N+1 query, not a shortage of servers.
+- Note this project's own constraint: money paths use advisory locks, so more workers do not multiply throughput on settlement — that path is intentionally serialised.
+
+# Debugging Guide
+1. **Slow requests** — count queries first. N+1 is the default answer (sql_course ch 12).
+2. **CPU pinned** — Python work; profile the view before adding workers.
+3. **"Too many connections"** — workers × threads exceeded `max_connections` (ch 21). Scaling workers has a database cost.
+4. **Slow only under concurrency** — a lock, not capacity.
+5. **Memory climbing** — a leak; more RAM postpones it, it does not fix it.
+
+# Performance Notes
+- Indexes: milliseconds of work for orders-of-magnitude gains.
+- Caching an aggregate beats caching a row you already had.
+- Vertical scaling is boring, cheap and immediate — prefer it far longer than instinct suggests.
+- Horizontal scaling introduces shared-session, shared-media and shared-lock problems; each is real work.
+
+# Security Considerations
+- Every added component is new attack surface (load balancer, replica, object store).
+- Shared sessions across app servers need a shared store — usually Redis, which then holds security-relevant state (ch 22).
+- More servers mean more places for secrets to live; distribution is a leak risk.
+- Complexity is itself a security cost for a solo maintainer.
+
+# Architecture Decisions
+- **Scale up before out**, because one machine is dramatically simpler to secure and reason about.
+- **Fix the query before buying the server** — the cheapest scaling is deleting work.
+- **Serialised money paths accepted**, because correctness outranks throughput on settlement.
+- **No premature distribution**: the current design is deliberately sized to one factory.
+
+# Best Practices
+- Never scale without a measurement that names the bottleneck.
+- Add an index and re-measure before touching infrastructure.
+- Know your worker-to-connection arithmetic before raising worker counts.
+- Write down what "too slow" means in numbers, before you start.
+
 # Beginner Mistakes
 - **Scaling on a hunch** → wasted money/complexity. Measure the golden signals first.
 - **Reaching for Kubernetes/microservices at one-factory scale** → huge complexity, new failure modes, slower iteration. Vertical + Compose is correct here.
@@ -88,13 +144,31 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 - **Doing slow work in the request** → blocks web workers. Move to a queue.
 
 # Interview Questions
-**Junior — "Vertical vs horizontal scaling?"** Vertical = a bigger machine (simplest, no architecture change). Horizontal = more machines/instances behind a load balancer (higher ceiling + redundancy, but needs statelessness + shared DB/cache/media).
+- **Junior:** "Vertical vs horizontal scaling?" — Vertical = a bigger machine (simplest, no architecture change). Horizontal = more machines/instances behind a load balancer (higher ceiling + redundancy, but needs statelessness + shared DB/cache/media).
 
-**Mid — "What do you scale first and how do you decide?"** Measure the golden signals to find the bottleneck. Usually app CPU/RAM first — tune Gunicorn workers, then go vertical (bigger VPS). Don't scale on a hunch; scale on a measured ceiling.
+- **Mid:** "What do you scale first and how do you decide?" — Measure the golden signals to find the bottleneck. Usually app CPU/RAM first — tune Gunicorn workers, then go vertical (bigger VPS). Don't scale on a hunch; scale on a measured ceiling.
 
-**Senior — "What's the prerequisite for running multiple app instances here, and what's the bottleneck order?"** Statelessness: shared sessions/cache (already Redis) and shared media — so today the blocker is media on a local volume, which must move to object storage before scale-out. Bottleneck order: app CPU/RAM → database (indexes, pooling, replicas) → connections (PgBouncer) → static/media (CDN) → then horizontal app instances behind Caddy, plus a queue for slow work.
+- **Senior:** "What's the prerequisite for running multiple app instances here, and what's the bottleneck order?" — Statelessness: shared sessions/cache (already Redis) and shared media — so today the blocker is media on a local volume, which must move to object storage before scale-out. Bottleneck order: app CPU/RAM → database (indexes, pooling, replicas) → connections (PgBouncer) → static/media (CDN) → then horizontal app instances behind Caddy, plus a queue for slow work.
 
-**Staff — "Lay out the scaling roadmap for this ERP and defend not doing it now."** Now, a single-VPS Compose stack is correct: one factory, one region, modest load — added distributed-systems complexity would only add failure modes and slow iteration. The roadmap, driven strictly by measured signals: (1) vertical resize + worker tuning (cheap, no arch change); (2) DB — indexes, query tuning, PgBouncer, then managed Postgres + read replica; (3) media/static → object storage + CDN (also improves DR and latency); (4) horizontal app instances behind Caddy's load-balancing (statelessness already mostly satisfied via Redis); (5) a task queue on the existing Redis for reports/exports. Each step is taken only when a golden signal crosses a threshold, keeping cost and complexity proportional to real load. The invariant: scale in response to measurement, take the smallest next step, and never adopt an architecture the load doesn't justify.
+- **Staff:** "Lay out the scaling roadmap for this ERP and defend not doing it now." — Now, a single-VPS Compose stack is correct: one factory, one region, modest load — added distributed-systems complexity would only add failure modes and slow iteration. The roadmap, driven strictly by measured signals: (1) vertical resize + worker tuning (cheap, no arch change); (2) DB — indexes, query tuning, PgBouncer, then managed Postgres + read replica; (3) media/static → object storage + CDN (also improves DR and latency); (4) horizontal app instances behind Caddy's load-balancing (statelessness already mostly satisfied via Redis); (5) a task queue on the existing Redis for reports/exports. Each step is taken only when a golden signal crosses a threshold, keeping cost and complexity proportional to real load. The invariant: scale in response to measurement, take the smallest next step, and never adopt an architecture the load doesn't justify.
+
+### Why interviewers ask these — and the answer that separates levels
+
+| Testing for | Weak answer | What lands |
+|---|---|---|
+| Do you scale on measurement or on instinct? | "Traffic is growing, so we need more servers." | **Measure the bottleneck first.** Order: fix queries/indexes → cache aggregates → tune workers within RAM → **bigger VPS** → split the DB → multiple app servers. Almost every "we need to scale" in a Django ERP is **one missing index or an N+1**. |
+| Do you know the prerequisite for multiple app instances? | "Add a load balancer and run two containers." | **Statelessness.** Sessions/cache are already shared via Redis, so **the blocker today is media on a local volume** — it must move to object storage first. Adding instances before that gives you users whose uploads exist on only one of two servers. |
+| Do you know worker scaling has a database cost? | "More workers means more throughput." | **Workers × threads must respect `max_connections`** (ch 21), and each worker holds a full copy of the app in RAM — so the ceiling is memory and connections, not ambition. Scaling workers is how people take the database down while trying to serve more traffic. |
+| Can you defend NOT scaling? | "We should build for scale early." | One factory, one region, modest load: **a single-VPS Compose stack is correct**, and distributed complexity would only add failure modes for a solo maintainer. The mature answer is **a documented scale path that is deliberately not built yet**. |
+
+**The killer follow-up:** *"Money paths use advisory locks. What does that mean for scaling?"* — settlement is **serialised on purpose**, so more workers will not make it faster. **Correctness outranks throughput there** — and knowing which parts of your system refuse to parallelise, and why, is the difference between scaling and hoping.
+
+# Revision Notes
+- Today: **1 VPS, 5 containers, 3 workers** — correct for one factory, not a compromise.
+- Order: **measure → indexes/N+1 → cache aggregates → more workers (within CPU) → bigger VPS → split DB → multiple app servers.**
+- Most Django slowness = missing index or N+1, not servers.
+- Workers × threads must respect `max_connections` — scaling workers costs DB connections.
+- Money paths use advisory locks: **serialised on purpose**, so more workers will not speed settlement.
 
 # Cheat Sheet
 - **Measure first** (golden signals: latency, CPU/RAM, DB conns). Scale on signal, not hunch.
@@ -116,6 +190,12 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 | Blocker to scale-out | media on local volume → object storage first |
 | Policy | scale on measured signal; ADR-0010 growth path |
 
+# Practice Tasks
+1. **Read the code:** find the worker count and thread setting, and compute the connection demand.
+2. **Debug:** find one N+1 query in this project and fix it with `select_related`/`prefetch_related`. Measure both times.
+3. **Design:** define "too slow" for a worker reporting production, in milliseconds.
+4. **Architecture:** argue why serialised settlement is acceptable, and what would have to change to parallelise it safely.
+
 # Homework
 1. `docker stats` + the connection-count query — is your current ceiling app or DB? What's the headroom?
 2. What single change must happen before you can run two `app` containers, and why? (Hint: where do uploads live?)
@@ -125,7 +205,7 @@ docker compose exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
 
 ---
 
-## Further Reading & Live Resources
+# Further Reading & Live Resources
 - Gunicorn — *How many workers? / worker tuning*: https://docs.gunicorn.org/en/stable/design.html#how-many-workers
 - PgBouncer (connection pooling): https://www.pgbouncer.org/ · Django + PgBouncer notes: https://docs.djangoproject.com/en/5.0/ref/databases/#transaction-pooling-server-side-cursors
 - Django docs — *Database optimization* (`select_related`/`prefetch_related`, indexes): https://docs.djangoproject.com/en/5.0/topics/db/optimization/

@@ -141,7 +141,7 @@ def allocate_stage_work(*, user, stage_record, worker, allocated_quantity,
     )
     ledger_service.log_credit(
         worker=worker, category=WorkerLedgerEntry.Category.STAGE_EARNING,
-        amount=amount, entry_date=entry_date or timezone.now().date(),
+        amount=amount, entry_date=entry_date or timezone.localdate(),
         created_by=user, assignment=assignment,
         notes=f"{stage_record.adda.code} · {ws.stage.name}",
     )

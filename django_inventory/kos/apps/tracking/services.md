@@ -1,7 +1,7 @@
 ---
 id: app-tracking-services
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "tracking's two service monopolies — the history pen and the barcode toolkit: verbs, callers, guards."
 related: [app-tracking, concept-single-writer]
@@ -10,6 +10,12 @@ related: [app-tracking, concept-single-writer]
 # tracking — service knowledge (2 files, read both whole)
 
 > 📂 [tracking app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Services = **counter ke peeche baitha clerk**
+>
+> **Asli kaam yahin hota hai** — database mein likhna, hisaab lagana, rules lagana. Is project ka sabse bada niyam: *har likhne ka kaam service mein hoga, view mein kabhi nahi*. Isi wajah se paisa surakshit rehta hai — har table ka **ek hi** likhne wala hota hai.
+>
+> *(`tracking` app ka kaam: **history aur barcode** — kya hua, kab hua, kisne kiya.)*
 
 ## `history_service.py` (48 lines) — THE history pen 🔒
 

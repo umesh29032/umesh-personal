@@ -1,7 +1,7 @@
 ---
 id: app-raw-materials-models
 type: app
-verified: 2026-07-19
+verified: 2026-07-27
 knowledge_confidence: verified_against_code
 answers: "raw_materials' 4 models — the roll FSM, the reservation binding, and the three masters."
 related: [app-raw-materials]
@@ -10,6 +10,12 @@ related: [app-raw-materials]
 # raw_materials — model knowledge (`models.py`, 4 models)
 
 > 📂 [raw_materials app](README.md) · [Apps](../README.md) · [LOS home](../../README.md)
+
+> 💡 **Samjho aise** — Models = **database ke tables**
+>
+> Yeh file batati hai is app mein **kaunsi cheezein store hoti hain** aur har cheez ke kaunse column hain. Socho Excel ki sheets ki list — kaunsi sheet, aur usme kaunse columns. Code mein ek `class` = ek table.
+>
+> *(`raw_materials` app ka kaam: **kapda** — roll, cloth type, colour, storage.)*
 
 ## `ClothRoll` (line 102) — the star
 

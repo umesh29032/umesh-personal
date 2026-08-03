@@ -1,3 +1,13 @@
+---
+id: deploy-course-00-course-overview
+type: lesson
+status: active
+owner: handwritten
+scope: deployment, operations — this ERP shipped to a VPS
+anchors: docker-compose.yml, deploy/entrypoint.sh, deploy/Caddyfile, deploy/backup.sh
+verified: 2026-08-01
+---
+
 # Deployment From Zero — my personal DevOps university
 
 > **Who this is for:** me (Umesh), six months from now, having forgotten everything.
@@ -5,6 +15,12 @@
 > **Rule of this course:** never a generic example. Every concept is explained on **my real ERP** — my Docker setup, my Caddy config, my Postgres, my production settings, my deploy scripts.
 
 ---
+
+> 💡 **Samjho aise:** Yeh course ka **naksha aur niyam** hai — kaunsa chapter kis kramm mein, aur har
+> chapter ke andar wahi 12 khaane. Ek hi baithak mein poora padhne ki koshish mat
+> karo; jo cheez aaj kaam aa rahi hai wahi kholo. Aur har stop pe ek shart: **bina
+> dekhe, apne shabdon mein bol ke dikhao** — bol nahi paaye to padha nahi, sirf
+> dekha hai.
 
 ## How to use this folder
 

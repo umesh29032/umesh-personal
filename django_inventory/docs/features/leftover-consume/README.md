@@ -5,13 +5,13 @@ status: generated
 owner: generated
 scope: feature — leftover-consume
 anchors: docs/LEARNING_2_0/PROJECT_BRAIN/FEATURE_INDEX.md
-verified: graph:56207d76ed26
+verified: graph:f48dc8b77c29
 ---
 
 # Feature — Leftover consume
 
 > ⚙️ GENERATED — an index, not truth. Do not hand-edit; fix the source, rebuild the graph, regenerate.
-> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `56207d76ed26` · schema: 1.0.1 · template: feature-doc v1.0.0
+> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `f48dc8b77c29` · schema: 1.0.1 · template: feature-doc v1.0.0
 > Regenerate: `env/bin/python scripts/generate_docs.py --out docs/features`
 
 | Field | Value |
@@ -22,15 +22,19 @@ verified: graph:56207d76ed26
 
 ## Member routes
 
-No machine-provable member routes — this feature row carries no exact-token url reference (Phase-8 residual R-5 class). Fix at source: enrich FEATURE_INDEX, rebuild the graph, regenerate.
+| Route | Mount | View | Card |
+|---|---|---|---|
+| `production:layering-use-leftover` | `/production/addas/<str:code>/layering/use-leftover/` | `LayeringConsumeLeftoverView` | [layering-use-leftover.md](layering-use-leftover.md) |
 
 ## Member models
 
-No machine-provable member models (`belongs_to_feature` model edges: 0).
+| Model | Table | Single writer |
+|---|---|---|
+| `production.RemainingClothOfClothRoll` | `production_remainingclothofclothroll` | not machine-known |
 
 ## Apps touched
 
-Not derivable — no member routes with project-app views.
+- `production` — [config/production/README.md](../../../config/production/README.md) · [docs/apps/production/GUIDE.md](../../apps/production/GUIDE.md)
 
 ## Governing docs
 

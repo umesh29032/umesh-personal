@@ -10,6 +10,16 @@ verified: 2026-07-13
 
 # expense app — file-by-file GUIDE (all the money)
 
+
+> **Accountant READ TIER (2026-08-02).** Read views here use `_FinancialRead`
+> (management **+ accountant**); every write view keeps `_ManagementOnly`, and the
+> service re-checks the actor independently. An accountant may **record** a factory
+> expense but never **void** one. `generate_monthly_expenses(confirm=False)` is a
+> pure preview and is allowed; `confirm=True` stays management. Policy:
+> [RBAC.md](../../production/RBAC.md) § *The accountant READ TIER*.
+
+> **Date primitive (2026-08-01).** Every "today"/"this month" in this app uses `timezone.localdate()`, never `timezone.now().date()` (which returns a **UTC** date and is one day behind for 5.5h daily under `TIME_ZONE=Asia/Kolkata`). Enforced repo-wide by `core.tests.LocalDateGuardTests`. Background: [UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md](../../UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md). The three money-record dates fixed there were `settlement_date` (`settlement_service.py`), ledger `entry_date` (`allocation_service.py`) and the advance date (`advance_service.py`) — a blank `required=False` date field took the UTC fallback, so a settlement finalised at 01:00 IST on the 1st landed in the previous month. Existing rows were NOT rewritten (append-only).
+
 > Business view: [config/expense/README.md](../../../config/expense/README.md).
 
 > **🛡 Worker Role Certification Phase B (V1.1 item-4) — CLOSED OUT

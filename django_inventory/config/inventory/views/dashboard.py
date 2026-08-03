@@ -14,12 +14,14 @@ Role-aware sections:
   • is_admin_view flag       — future admin-only metrics ke liye reserved
 """
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Exists, OuterRef, Sum
+from django.db.models import Count, Exists, OuterRef, Q, Sum
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from ..services import MANAGEMENT_ROLES, user_has_role
+from ..services import (
+    FINANCIAL_ROLES, MANAGEMENT_ROLES, user_does_production_work, user_has_role,
+)
 
 
 def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
@@ -255,18 +257,83 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
     # R5 (PDD §21/§23): this-month factory-expense digest — management only
     # (workers never load expense data for their dashboard). Read-only ctx,
     # same graceful-degrade posture as the production panels above.
+    # Owner ruling 2026-08-02: an ACCOUNTANT gets this digest too — it is the
+    # centre of their job, not an admin extra. Same read-only, graceful-degrade
+    # posture; no write path is opened by showing a total.
     expense_month = None
-    if is_admin_view:
+    show_expense_digest = is_admin_view or user_has_role(
+        request.user, FINANCIAL_ROLES)
+    if show_expense_digest:
         try:
             from expense.services import expense_service
-            today = timezone.now().date()
+            today = timezone.localdate()
             expense_month = expense_service.monthly_totals(today.year, today.month)
             expense_month['month_value'] = f"{today.year:04d}-{today.month:02d}"
         except Exception:
             expense_month = None
 
+    # ── The accountant panel (owner ruling 2026-08-02) ───────────────────────
+    # A financial reader who is NOT management previously landed on the WORKER
+    # dashboard. Give them the three numbers their job actually starts from, all
+    # derived live (never stored), all read-only:
+    #   • unpriced rolls  — the honest-NULL policy shows a roll as "unpriced"
+    #                       rather than ₹0, and chasing those is bookkeeping work
+    #                       nobody currently owned;
+    #   • advances outstanding — money lent that must come back;
+    #   • settlements this month — what has actually been paid out.
+    accounts_panel = None
+    if not is_admin_view and user_has_role(request.user, FINANCIAL_ROLES):
+        accounts_panel = {}
+        try:
+            # NOTE: Count/Q/Sum come from the MODULE-level import above. Importing
+            # them locally here made Python treat them as function locals for the
+            # WHOLE function, breaking two earlier uses (ruff F823 caught it).
+            from expense.models import PayrollSettlement
+            from expense.services import payroll_service
+            from raw_materials.models import ClothRoll
+            today = timezone.localdate()
+            rolls = ClothRoll.objects.aggregate(
+                total=Count('id'),
+                unpriced=Count('id', filter=Q(cost_per_kg__isnull=True)),
+            )
+            accounts_panel['rolls_total'] = rolls['total'] or 0
+            accounts_panel['rolls_unpriced'] = rolls['unpriced'] or 0
+            # REUSE the canonical aggregate — never re-derive money here. It
+            # already excludes REVERSED recoveries (PA-12-A); a hand-rolled
+            # "unrecovered advances" sum would understate exposure after any
+            # settlement reversal, and `WorkerAdvance` has no is_recovered flag
+            # because recovery is derived, not stored.
+            totals = payroll_service.payroll_totals()
+            accounts_panel['advance_exposure'] = totals['advance_exposure']
+            accounts_panel['pending_payable'] = totals['pending_payable']
+            paid = PayrollSettlement.objects.filter(
+                settlement_date__year=today.year,
+                settlement_date__month=today.month,
+            ).aggregate(n=Count('id'), total=Sum('amount_paid'))
+            accounts_panel['settlements_count'] = paid['n'] or 0
+            accounts_panel['settlements_total'] = paid['total']
+        except Exception:
+            # Same posture as every other panel here: a missing field or a
+            # not-ready DB must degrade to "no panel", never a 500 on login.
+            accounts_panel = None
+
+    # Owner feedback 2026-08-02: the page had only TWO modes — management, or
+    # "everyone else = worker". So an accountant/listing_team/student saw worker
+    # copy ("Jab manager aapko kaam dega") and an empty assigned-work panel. This
+    # third flag lets the template stay silent instead of speaking to the wrong
+    # person. Management is unaffected (they get the admin view either way).
+    # Only the NON-admin branch of the template renders worker copy, and the
+    # predicate's safety clause costs one EXISTS for a person with no worker role
+    # and no skills — i.e. exactly management. Skip it for them: they never see
+    # the block it controls. (The sidebar's "My Earnings" predicate computes it
+    # lazily and request-caches, so a manager who genuinely has earnings still
+    # gets the menu item.)
+    does_floor_work = (False if is_admin_view
+                       else user_does_production_work(request.user))
+
     return {
         'is_admin_view': is_admin_view,
+        'does_floor_work': does_floor_work,
         'my_active_stages': my_active_stages,
         'helper_data': helper_data,
         'my_activity': my_activity,
@@ -274,6 +341,7 @@ def _build_dashboard_context(request, *, is_admin_view: bool) -> dict:
         'broadcast_addas': broadcast_addas,
         'is_skilled_user': is_skilled_user,
         'expense_month': expense_month,
+        'accounts_panel': accounts_panel,
     }
 
 
