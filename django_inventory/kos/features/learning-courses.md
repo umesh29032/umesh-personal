@@ -126,7 +126,7 @@ chapter of every course**. Three pages ride on it:
 
 | Page | Built from | Today |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` | **499 questions**, Junior→Staff |
+| `/learn/interview/` | `# Interview Questions` | **502 questions**, Junior→Staff |
 | `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
 | `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 
@@ -136,7 +136,7 @@ chapter of every course**. Three pages ride on it:
 
 ## Plus: search, progress and shortcuts
 
-- **Search** (`/learn/search/`) — literal match across all 72 chapters, ranked by
+- **Search** (`/learn/search/`) — literal match across all **113** pages, ranked by
   hit count, snippet cleaned of markdown and the term highlighted. Not fuzzy on
   purpose: a result is never a mystery.
 - **Progress** — opening a chapter *is* the signal, so the continue-learning card,
@@ -150,7 +150,7 @@ chapter of every course**. Three pages ride on it:
 
 Every chapter has an `# Interview Questions` section whose bullets are labelled
 `**Junior:** … — answer`. The app **harvests those** into one page grouped by
-level: currently **499 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 107),
+level: currently **502 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 110),
 each with its answer and a link back to the chapter that teaches it.
 
 Nothing is written twice. Fix a question in the chapter and the prep page fixes
@@ -237,7 +237,7 @@ silently.
 **One idea first:** a generated page can be *wrong by being incomplete*, and it
 will never tell you. It renders. It looks finished. It is missing half the content.
 
-**💡 Samjho aise:** *(ye kahani 2026-08-01 ki hai, jab bank mein 339 sawaal the — aaj 499 hain.)*
+**💡 Samjho aise:** *(ye kahani 2026-08-01 ki hai, jab bank mein 339 sawaal the — aaj 502 hain.)*
 socho tumne 339 sawaal ek notebook mein likhe. Ab ek naukar ko
 bola: "notebook se sawaal chipka do board pe." Wo sirf un pages se chipkata hai jinke
 top pe **bilkul** `Interview Questions` likha ho. Tumne ek page pe likh diya
@@ -273,7 +273,7 @@ cd ~/umesh-personal/django_inventory
 grep -rhoE '^-\s+\*\*(Junior|Mid|Senior|Staff):\*\*' \
   docs/sql_course docs/deployment_course docs/git_course | wc -l
 ```
-Expected output: `499`  *(339 before the git course was added)*
+Expected output: `502`  *(339 before the git course was added)*
 
 > **Match the parser's exact shape, not an approximation of it.** The parser wants a bullet:
 > `- **Junior:** …`. Earlier versions of this check used a looser `\*\*(Junior|Mid|…)\b`,
@@ -294,7 +294,7 @@ Expected output: `499`  *(339 before the git course was added)*
 env/bin/python config/manage.py shell --settings=config.settings.local -c \
   "from learning import services as S; print(S.interview_questions()['total'])"
 ```
-Expected output: `499`
+Expected output: `502`
 
 **Same number = nothing lost.** Different numbers = go find the format that does not
 match. The test `test_every_labelled_question_reaches_the_interview_bank` now does
@@ -337,7 +337,7 @@ Nothing in the database changes, because the courses have no database.
 app use padh ke dikhata hai — isi liye course aur docs **kabhi alag nahi ho
 sakte**. Naya course chahiye? `.md` folder + registry mein ek line — **git course
 2026-08-03 ko bilkul isi tarah aaya**, 41 files + ek line, aur teeno generated page
-khud bhar gaye. Aur interview page **khud ban jaata hai** chapters se — **499
+khud bhar gaye. Aur interview page **khud ban jaata hai** chapters se — **502
 sawaal**, level ke hisaab se, jawaab ke saath.
 
 ## Implementation References

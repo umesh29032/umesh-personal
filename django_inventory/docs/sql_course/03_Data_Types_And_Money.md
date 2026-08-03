@@ -191,6 +191,23 @@ Types are why the audit could prove ₹18,254.25 to the paisa on the live system
   converts on display; naive timestamps invite timezone bugs.
 - **Senior:** *Precision/scale of numeric(12,2)?* — 12 significant digits, 2
   after the decimal → max ±9,999,999,999.99. Know your ceiling before payroll grows.
+- **Staff:** *How do you keep money correct across an entire system, not just one
+  column?* — The column type is necessary and nowhere near sufficient. `numeric` stops
+  float drift, but the expensive bugs live above it. You need one write path — this
+  project has a single-writer service per ledger/audit table, and settlement is the
+  *only* money-write boundary, so a new write path elsewhere is a design review, not a
+  code review. You need append-only history with reversing entries rather than
+  `UPDATE`s, so a correction is auditable instead of invisible. You need database-level
+  `CHECK` constraints as the last line of defence, because application validation is
+  bypassable by a shell or a migration — there are **71** `CheckConstraint`s declared in
+  the models here (147 occurrences once historical migrations are counted, since each one
+  is replayed there). You need
+  a fixed rounding policy applied at exactly one place, since rounding twice is a real
+  source of one-paisa drift. And you need golden tests that assert exact totals, not
+  approximations: ₹344.25 must stay byte-identical, because a money test that tolerates
+  a delta cannot detect the bug it exists to catch. Finally, get the *date basis* right —
+  this project shipped a defect where a UTC-derived date stamped IST ledger rows, wrong
+  for 5.5 hours daily and a whole month on the 1st.
 
 ### Why interviewers ask these — and the answer that separates levels
 

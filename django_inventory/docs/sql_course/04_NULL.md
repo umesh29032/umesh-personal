@@ -171,6 +171,22 @@ NULL is a *policy* on the live system, not an accident:
   you model each?* — NULL for unknown; real 0 for a true zero; sometimes a
   separate status column for not-applicable. Cite a real system that shows
   "unpriced" rather than ₹0 (mine).
+- **Staff:** *NULL breaks the guarantees people assume. Where does that actually bite,
+  and what do you do about it?* — Three places, and they are all silent. **Aggregates:**
+  `SUM` and `AVG` skip NULLs, so an average over partially-missing data is an average of
+  a different population than the reader believes — `AVG(rate)` across unrated stages is
+  not the average rate. **Uniqueness:** in standard SQL, NULLs are distinct for a unique
+  constraint, so a `UNIQUE` column happily accepts many NULL rows; if "at most one active
+  record" matters, you need a partial unique index (`WHERE deleted_at IS NULL`), not a
+  nullable unique column. **Joins and `NOT IN`:** a NULL anywhere in a `NOT IN` subquery
+  makes the whole predicate never true, which silently returns zero rows rather than
+  erroring — `NOT EXISTS` is the safe form. The structural answer is to make NULL a
+  deliberate, documented choice rather than a default: `NOT NULL` plus a default wherever
+  absence is not a real state, a `CHECK` constraint when nullability is conditional, and
+  the honest three-way distinction (unknown / zero / not-applicable) modelled explicitly.
+  This codebase learned the payable version of that: `good` is `NOT NULL` because it is
+  what gets paid, while `alter` and `missing` are nullable observations — the money column
+  is not allowed to be ambiguous.
 
 ### Why interviewers ask these — and the answer that separates levels
 

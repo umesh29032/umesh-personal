@@ -162,8 +162,9 @@ Each block is a `### Why interviewers ask these` H3 holding a **3–4 row table*
 (`Testing for | Weak answer | What lands`) plus **The killer follow-up** — the brutal
 question that separates memorised answers from real experience.
 
-- **Section presence:** ✅ 67/67 teaching chapters, test-pinned.
-- **§6 item 15 interior structure:** ✅ **69/69**, test-pinned by
+- **Section presence:** ✅ **107/107** teaching chapters, test-pinned (67/67 at 2026-08-01;
+  +40 when the git course landed 2026-08-03).
+- **§6 item 15 interior structure:** ✅ **107/107** (69/69 at 2026-08-01), test-pinned by
   `test_every_chapter_has_the_why_interviewers_ask_block` (checks presence, row count,
   the killer follow-up, and that no cell contains a stray pipe that would break the table).
 
@@ -239,14 +240,14 @@ from a request body. Pinned by `test_dashboard_is_isolated_between_users` and
 |---|---|
 | Course reader (`/learn/`, index → course → chapter) | ✅ built 2026-07-31 |
 | Markdown = single source of truth, zero content models | ✅ enforced by test |
-| SQL course (26 ch) · Deployment course (46 ch) = 72 pages | ✅ served |
+| SQL course (26 ch) · Deployment course (46 ch) · **Git & GitHub course (41 ch)** = **113 pages** | ✅ served (git added 2026-08-03) |
 | On-page TOC · prev/next · `.md`→URL rewriting (multi-tab) | ✅ |
-| Generated interview bank (**339 Q**: J96/M93/S83/Staff67 — SQL 154 + Deployment 185) | ✅ |
+| Generated interview bank (**502 Q**: J136/M133/S123/Staff110 — SQL 157 + Deployment 185 + Git 160) | ✅ |
 | Mobile-first verified 360 / 768 / 1280 px, zero overflow | ✅ |
 | Adding a course = 1 registry entry + a folder | ✅ |
 | **Progress · resume · completion % · streak · bookmarks** | ✅ built 2026-07-31 (migration `0001`, additive) |
-| Generated revision pages — **Common Mistakes + Cheat Sheets** (69 chapters each) | ✅ built (same harvest engine as the interview bank) |
-| **Search** across all 72 chapters (ranked, marked snippets) | ✅ built |
+| Generated revision pages — **Common Mistakes + Cheat Sheets** (**109** chapters each) | ✅ built (same harvest engine as the interview bank) |
+| **Search** across all **113** pages (ranked, marked snippets) | ✅ built |
 | **Keyboard shortcuts** (`/` search · `j`/`k` chapters · `g i` · `g l`) | ✅ built |
 | **Personalised dashboard** — continue-learning · recommended next · active/completed courses · recently opened · weekly activity bars · 6 stat tiles | ✅ built 2026-07-31 |
 | **Time spent + scroll depth** (visible-tab heartbeat, clamped, `sendBeacon` on exit) | ✅ built |
@@ -257,11 +258,12 @@ from a request body. Pinned by `test_dashboard_is_isolated_between_users` and
 | Deployment course: **Hinglish Samjho boxes 46/46** | ✅ done 2026-07-31 |
 | **SQL course: section presence — 25 of 25 chapters** | ✅ **COMPLETE 2026-07-31** (every chapter now carries Learning Objectives · Production Walkthrough · Debugging Guide · Performance Notes · Security Considerations · Architecture Decisions · Best Practices · Revision Notes · Practice Tasks, each citing something real from this repo) |
 | **Deployment course: section presence — 44 of 44 chapters** | ✅ **COMPLETE 2026-08-01** (ch 01–42 + 00A hosting + 00B costs; every new section cites a real file/number from this repo) |
+| **Git & GitHub course: section presence — 40 of 40 chapters** | ✅ **COMPLETE 2026-08-03** — 5 parts (Foundations 01–08 · Branching 09–17 · Collaboration 18–24 · Discipline 25–33 · Recovery 34–40). Taught from this repo's own workflow (`CONTRIBUTING.md`, `git-hooks/`, `ci.yml`, `CODEOWNERS`) and its real incidents (PR #15's 289 commits · merge `83a144ba` · the 2 committed `pg_dump` files and why history was NOT rewritten · the dead `/deploy/` CODEOWNERS rule · the stale-`main` 296-vs-1 trap). **Honest about the free tier**: branch protection / required reviews / required checks / CODEOWNERS auto-assign / secret scanning are all PAID on private repos, so each of the 3 protection layers is taught *with its weakness stated* plus the 3 failures nothing catches |
 | **19-section contract pinned by test, not by hope** | ✅ `ChapterContractTests` fails if any chapter drops a section |
 | **Every chapter feeds every generated page** | ✅ pinned — a written-but-invisible section now fails the suite |
-| **§6 item 15 interior structure — "why the interviewer asks" + "common wrong answer"** | ✅ **69/69 COMPLETE 2026-08-01** — every teaching chapter has a `### Why interviewers ask these` table (3–4 rows: testing-for / weak answer / what lands) + a killer follow-up. Test-pinned incl. table-cell integrity. |
+| **§6 item 15 interior structure — "why the interviewer asks" + "common wrong answer"** | ✅ **107/107 COMPLETE 2026-08-03** (69/69 at 2026-08-01) — every teaching chapter has a `### Why interviewers ask these` table (3–4 rows: testing-for / weak answer / what lands) + a killer follow-up. Test-pinned incl. table-cell integrity. |
 | Deployment course: more/richer diagrams | ⏳ avg ~5.7 per chapter today |
-| 7-field frontmatter (DOC_STANDARDS §13) on all 72 course files | ✅ 2026-08-01 — `knowledge_sync` WARN 672 → 17 (the 17 left are pre-existing debt on other docs) |
+| 7-field frontmatter (DOC_STANDARDS §13) on all **113** course files | ✅ 2026-08-03 (72 at 2026-08-01) — `knowledge_sync` WARN 672 → 17 (the 17 left are pre-existing debt on other docs) |
 | Test battery | ✅ **1992 green, all 14 installed apps, 0 failures** — `bod` (37) is now INSIDE the gate; it never was through the 1878/1896 baselines. The UTC-vs-IST date bug class it exposed is fixed (10 sites). See [UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md](UTC_LOCAL_DATE_BUG_CLASS_2026_08_01.md). |
 | Public / no-login access for sharing | ⏳ **owner decision** |
 | Quizzes · certificates · achievements | 🔮 later |

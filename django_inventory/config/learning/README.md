@@ -61,7 +61,7 @@ in `REVISION_PAGES`:
 
 | Page | Harvests | Today |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` (by level) | **499** questions |
+| `/learn/interview/` | `# Interview Questions` (by level) | **502** questions |
 | `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
 | `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 
@@ -70,7 +70,7 @@ page would quietly become the whole chapter.
 
 ## Search
 
-`/learn/search/?q=…` — literal substring match over all 72 chapters, ranked by hit
+`/learn/search/?q=…` — literal substring match over all **113** pages, ranked by hit
 count, with a cleaned-up snippet (markdown punctuation stripped, term `<mark>`ed,
 HTML escaped **before** the mark is inserted). Deliberately not fuzzy: a result is
 never a mystery. The corpus is cached and excludes each chapter's H1 + nav
@@ -87,10 +87,11 @@ ctrl/meta/alt, so no browser shortcut is stolen. Lives in `_learn_base.html`;
 
 `services.interview_questions()` harvests every `- **Junior|Mid|Senior|Staff:**
 question — answer` bullet from inside each chapter's `# Interview Questions`
-section. Currently **499 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 107)
-— SQL 154 + Deployment 185. Every chapter also carries a `### Why interviewers ask
+section. Currently **502 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 110)
+— SQL 157 + Deployment 185 + **Git 160**. Every chapter also carries a `### Why interviewers ask
 these` table (VISION §6 item 15: why the interviewer asks + the common wrong answer +
-a killer follow-up) — **69/69 as of 2026-08-01**, pinned by
+a killer follow-up) — **107/107 as of 2026-08-03** (69/69 when the contract was first
+completed, before the git course), pinned by
 `test_every_chapter_has_the_why_interviewers_ask_block`.
 
 The deployment 185 were invisible until 2026-08-01:
@@ -146,7 +147,7 @@ generated page picked it up with no other code change:
 |---|---|---|
 | courses | 2 | **3** (SQL 26 · Deployment 46 · **Git 41**) |
 | pages served | 72 | **113** |
-| interview bank | 339 | **499** (Junior 136 · Mid 133 · Senior 123 · Staff 107) |
+| interview bank | 339 | **502** (Junior 136 · Mid 133 · Senior 123 · Staff 110) |
 | mistakes / cheat-sheet pages | 69 chapters each | **109** each |
 | teaching chapters on the 19-section contract | 67 | **107** |
 

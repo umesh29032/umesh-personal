@@ -39,7 +39,7 @@ forbidden; per-user progress models are allowed** — that is the two-layer law 
 
 | URL | Harvested heading | Coverage |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` | **499 Qs** — Junior 136 · Mid 133 · Senior 123 · Staff 107 (SQL 154 + Deployment 185 + **Git 160**) |
+| `/learn/interview/` | `# Interview Questions` | **502 Qs** — Junior 136 · Mid 133 · Senior 123 · Staff 110 (SQL 157 + Deployment 185 + **Git 160**) |
 | `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
 | `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 

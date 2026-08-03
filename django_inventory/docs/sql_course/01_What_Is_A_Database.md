@@ -178,6 +178,19 @@ Same three words, on the live server:
 - **Senior:** *What actually happens between client and server on one query?* —
   connection (auth) → SQL text → parse → plan → execute → rows stream back; the
   client never touches data files.
+- **Staff:** *When is a relational database the wrong choice?* — When your access
+  pattern genuinely fights the model, not when the data "feels unstructured". Real
+  cases: append-only event streams at volumes where you never query a single row
+  (a log store), full-text search at scale (a dedicated index), caches and
+  ephemeral counters (Redis — this project uses it exactly there, and deliberately
+  does **not** back it up because nothing durable lives in it), and blobs, which
+  belong in object storage with only the *path* in the database. The failure mode I
+  would push back on is the opposite one: reaching for a document store to avoid
+  designing a schema, then re-implementing joins, constraints and transactions in
+  application code — badly. This project keeps money in Postgres precisely because
+  it needs `numeric`, constraints and transactions; but it keeps uploaded photos on
+  disk and the session cache in Redis. Choose per access pattern, not per fashion,
+  and be able to name what you would lose.
 
 ### Why interviewers ask these — and the answer that separates levels
 
