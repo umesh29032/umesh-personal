@@ -119,9 +119,11 @@ sh deploy/deploy.sh                            # dump → pull → build → up 
 ```
 
 # Production Walkthrough
-- **No CI configured yet** — the battery runs manually. That is the honest state and it is an open item.
-- What exists is a real asset: **1,408 tests** across ten apps plus devseed and verification suites, run **sequentially against a fresh database** — never in parallel, never with `--keepdb`, because money tests use advisory locks and shared sequences that parallel runs corrupt into false failures.
-- A minimal pipeline: install, `manage.py check --deploy` (ch 24), migrations check, then the battery in that order.
+- **CI now exists** (2026-08-03): `.github/workflows/ci.yml` at the monorepo root, four jobs on every PR into `main` — `lint` (ruff + design-system ratchet), `migrations` (`makemigrations --check`), `test` (the full battery against a `postgres:16.6-alpine` service), `docs` (`knowledge_sync` must report BLOCKER=0). `test` declares `needs: [lint, migrations]`, so a typo never costs a full battery run. This chapter's earlier "no CI yet" note is superseded — see also [Git Course ch 28](../git_course/28_CI_With_GitHub_Actions.md), which teaches this exact file line by line.
+- The asset CI protects: **2,033 tests** across all 14 installed apps, run **sequentially against a fresh database** — never in parallel, never with `--keepdb`, because money tests use advisory locks and shared sequences that parallel runs corrupt into false failures. Measured wall clock: **424 s**.
+- **Free-tier arithmetic matters here.** Private-repo Actions is metered at ~2,000 minutes/month (public repos are unlimited). At ~7 minutes a run, that is roughly 280 runs/month — ample for a 1–2 person team. `concurrency: cancel-in-progress` means pushing twice does not pay twice, and a `paths` filter means edits to unrelated monorepo folders start no run at all. If minutes ever get tight, a **self-hosted runner on the deploy VPS** is free and unlimited; upgrading the plan is the last resort, not the first.
+- Two real gotchas this file had to solve, both worth knowing: **GitHub Actions rejects YAML anchors** (`&x`/`*x`), so the database env block is repeated by hand; and the DB is configured through `DB_*` variables rather than `DATABASE_URL`, because `base.py` forces `ssl_require=True` on the `DATABASE_URL` branch — which a plain service container cannot satisfy, producing an SSL error that looks like a real failure.
+- Deployment stays manual — the two-command deploy (ch 18) is already short, and a human decides *when* the factory goes down. CI gates the *merge*, not the *deploy*.
 - Deployment stays manual — the two-command deploy (ch 18) is already short, and a human decides *when* the factory goes down.
 
 # Debugging Guide
@@ -183,9 +185,11 @@ sh deploy/deploy.sh                            # dump → pull → build → up 
 **The killer follow-up:** *"Your pipeline is red and the fix is urgent. What do you do?"* — the wrong answer is **weaken or skip the test**. Either fix forward or roll back. A suite that gets relaxed under pressure stops being a gate exactly when you need it most.
 
 # Revision Notes
-- No CI yet — open item, stated honestly. Battery runs manually.
-- **1,408 tests**, run **sequentially on a fresh DB** — never parallel, never `--keepdb` (advisory locks + sequences ⇒ fake failures).
-- Pipeline order: install → `check --deploy` → migrations check → battery.
+- **CI exists** since 2026-08-03: `.github/workflows/ci.yml`, four jobs — lint · migrations · test · docs — on every PR into `main`.
+- **2,033 tests** in **424 s**, run **sequentially on a fresh DB** — never parallel, never `--keepdb` (advisory locks + sequences ⇒ fake failures).
+- Pipeline order: install → `check` → migrations check → battery; `test` `needs:` the cheap jobs so a typo never costs 45 minutes.
+- Free tier: ~2,000 private Actions min/month (public unlimited) ⇒ ~280 runs; `concurrency` cancels superseded runs; self-hosted runner on the VPS if it ever gets tight.
+- Two traps: **Actions rejects YAML anchors**; use `DB_*` vars not `DATABASE_URL` (the latter forces `ssl_require=True`).
 - Deploy stays **manual** — a human decides when the factory pauses.
 - ⚠️ CI secrets = production secrets. Never echo them; no secrets to fork PRs.
 

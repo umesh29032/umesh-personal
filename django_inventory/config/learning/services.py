@@ -277,11 +277,29 @@ def _section_body(raw: str, heading: str) -> str | None:
     Prefix-tolerant on purpose: a chapter may enrich its heading
     (`# Beginner Mistakes (the greatest hits)`) and must still feed the
     generated pages. An exact-match regex silently dropped those chapters.
+
+    FENCE-AWARE (fix 2026-08-03). The end-of-section scan must ignore `# ` lines
+    inside ``` fenced blocks. A plain `^#\\s+` split truncated the section at the
+    first shell comment written at column 0 — and that is not a hypothetical
+    shape: git's own merge output contains `# Conflicts:`, and a Cheat Sheet
+    quoting it lost everything after that line. Silent, no error, content simply
+    absent from the generated page — the same failure class as the three defects
+    in VISION §10b. Found while authoring git_course ch 12.
     """
     parts = re.split(rf'^#\s+{re.escape(heading)}\b.*$', raw, flags=re.M)
     if len(parts) < 2:
         return None
-    return re.split(r'^#\s+', parts[1], flags=re.M)[0].strip() or None
+    after = parts[1]
+
+    # Walk lines, tracking fence state; stop at the first H1 OUTSIDE a fence.
+    end, fence = len(after), False
+    for m in re.finditer(r'^(```|#\s+)', after, re.M):
+        if m.group(1) == '```':
+            fence = not fence
+        elif not fence:
+            end = m.start()
+            break
+    return after[:end].strip() or None
 
 
 @lru_cache(maxsize=8)

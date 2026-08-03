@@ -202,7 +202,7 @@ The whole system, in the order a request travels:
 
 Deploy itself is: push code → `docker compose up -d --build` → the entrypoint waits for health, collects static, migrates, then starts Gunicorn (ch 18, ch 26, ch 27).
 
-What is deliberately absent: no error tracker (ch 32), no CI (ch 33), no dashboards (ch 30). (A fresh database also needs its platform master data — migrations give only 4 of 21 stages — but the entrypoint now seeds that automatically on every boot.)
+What is deliberately absent: no error tracker (ch 32), no dashboards (ch 30). **CI is no longer absent** — `.github/workflows/ci.yml` gates every PR since 2026-08-03 (ch 33). (A fresh database also needs its platform master data — migrations give only 4 of 21 stages — but the entrypoint now seeds that automatically on every boot.)
 
 # Debugging Guide
 1. **Locate the failure by layer** — Caddy, Gunicorn, Django, Postgres, in that order (ch 31).

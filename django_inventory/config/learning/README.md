@@ -61,9 +61,9 @@ in `REVISION_PAGES`:
 
 | Page | Harvests | Today |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` (by level) | 339 questions |
-| `/learn/revise/mistakes/` | `# Beginner Mistakes` | 69 chapters |
-| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | 69 chapters |
+| `/learn/interview/` | `# Interview Questions` (by level) | **499** questions |
+| `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
+| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 
 A test pins that a harvest **stops at the next H1** — otherwise every revision
 page would quietly become the whole chapter.
@@ -87,7 +87,7 @@ ctrl/meta/alt, so no browser shortcut is stolen. Lives in `_learn_base.html`;
 
 `services.interview_questions()` harvests every `- **Junior|Mid|Senior|Staff:**
 question — answer` bullet from inside each chapter's `# Interview Questions`
-section. Currently **339 questions** (Junior 96 · Mid 93 · Senior 83 · Staff 67)
+section. Currently **499 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 107)
 — SQL 154 + Deployment 185. Every chapter also carries a `### Why interviewers ask
 these` table (VISION §6 item 15: why the interviewer asks + the common wrong answer +
 a killer follow-up) — **69/69 as of 2026-08-01**, pinned by
@@ -137,6 +137,21 @@ nothing in these views is user-specific, so nothing else has to move.
 3. That's it — index card, chapter list, prev/next, TOC and interview harvesting
    all come for free. `test_every_markdown_file_is_reachable` will hold you to
    serving every file.
+
+**Proven, not theoretical.** `git_course` was added on 2026-08-03 exactly this way — one
+`Course(slug='git', folder='git_course', …)` entry plus a folder of 41 files — and every
+generated page picked it up with no other code change:
+
+| | before | after |
+|---|---|---|
+| courses | 2 | **3** (SQL 26 · Deployment 46 · **Git 41**) |
+| pages served | 72 | **113** |
+| interview bank | 339 | **499** (Junior 136 · Mid 133 · Senior 123 · Staff 107) |
+| mistakes / cheat-sheet pages | 69 chapters each | **109** each |
+| teaching chapters on the 19-section contract | 67 | **107** |
+
+That is the core law working: the markdown is the single source of truth, and the app is a
+window. No model, no migration, no data entry — and no second copy to keep in sync.
 
 ## The dashboard is DERIVED, not stored
 

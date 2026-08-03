@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# pre-push — refuse to push directly to a protected branch.
+#
+# WHY THIS FILE EXISTS
+# GitHub's server-side branch protection is a PAID feature on private repos
+# (free on public only). This repo is private and stays on the free plan, so
+# "you may not push to main" is enforced here instead — on the client, for free.
+#
+# Honest limitation: hooks live in .git/hooks/, which git does NOT clone. This
+# is therefore only binding on machines where `git-hooks/install.sh` has been
+# run. That is why installing it is step 1 of onboarding (CONTRIBUTING.md §9),
+# and why collaborators get Read access + a fork (§2 Layer 2) — that layer IS
+# server-side and needs no plan upgrade.
+#
+# Git calls pre-push with: $1 = remote name, $2 = remote URL
+# and feeds "<local ref> <local sha> <remote ref> <remote sha>" on stdin,
+# one line per ref being pushed.
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+PROTECTED_BRANCHES="main master"
+ZERO_SHA="0000000000000000000000000000000000000000"
+
+red()  { printf '\033[31m%s\033[0m\n' "$*"; }
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+dim()  { printf '\033[2m%s\033[0m\n' "$*"; }
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Strip refs/heads/ to get the branch name being pushed TO.
+    branch="${remote_ref#refs/heads/}"
+
+    for protected in $PROTECTED_BRANCHES; do
+        [ "$branch" = "$protected" ] || continue
+
+        # A deletion push (local_sha all zeros) is even more dangerous.
+        if [ "$local_sha" = "$ZERO_SHA" ]; then
+            red "✖ BLOCKED: refusing to DELETE the protected branch '$branch'."
+            exit 1
+        fi
+
+        red "✖ BLOCKED: direct push to protected branch '$branch'."
+        echo
+        bold "  Why:"
+        echo "    'main' must always be deployable. A direct push skips CI, skips"
+        echo "    review, and leaves no record of why the change happened."
+        echo
+        bold "  Do this instead:"
+        echo "    git switch -c feat/my-change      # branch off your work"
+        echo "    git push -u origin feat/my-change # push the BRANCH"
+        echo "    # then open a Pull Request on GitHub"
+        echo
+        bold "  Already committed onto $branch by mistake?"
+        echo "    git switch -c feat/my-change      # your commits come with you"
+        echo "    git switch $branch"
+        echo "    git reset --hard origin/$branch   # restore $branch to the remote"
+        dim  "    (--hard discards local changes on $branch — your commits are safe"
+        dim  "     on the new branch you just created.)"
+        echo
+        bold "  Genuinely need to override (releases, hotfix with owner approval)?"
+        echo "    git push --no-verify origin $branch"
+        dim  "    Typing --no-verify is the point: it makes this a decision, not an accident."
+        echo
+        exit 1
+    done
+done
+
+exit 0

@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CODEOWNERS — who must review what.
+#
+# ⚠️ HONEST NOTE ON THE FREE TIER
+# GitHub's *automatic reviewer assignment* from this file is a paid feature on
+# private repositories (free on public repos only). This repo is private and
+# stays on the free plan, so GitHub will not auto-request these reviewers today.
+#
+# The file is still committed, and still does real work:
+#   1. it is the written record of who owns which part of the system, which is
+#      what a reviewer needs to know before approving a money path;
+#   2. the PR template points at it, so ownership is checked by a human;
+#   3. the moment this repo goes public — or a plan is ever bought — automatic
+#      assignment starts working with zero further changes.
+#
+# Syntax: <path pattern>  <owner(s)>.  Last matching rule wins, so the most
+# specific patterns go at the BOTTOM.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default: the owner reviews everything not claimed below.
+*                                           @umesh29032
+
+# ── Money. The highest-risk surface in the system. ──────────────────────────
+# Settlement is the ONLY money-write boundary in this codebase, and each
+# ledger/audit table has exactly ONE writer service (CLAUDE.md rules 4 & 5).
+# A new money-write path outside these services is a STOP, not a nitpick.
+/django_inventory/config/expense/                       @umesh29032
+/django_inventory/config/expense/services/              @umesh29032
+/django_inventory/config/production/services/           @umesh29032
+
+# ── Access control. A widened gate is a silent, permanent privilege grant. ──
+/django_inventory/config/accounts/services/             @umesh29032
+/django_inventory/config/accounts/migrations/           @umesh29032
+/django_inventory/config/inventory/middleware.py        @umesh29032
+
+# ── Migrations. Irreversible against real data. ─────────────────────────────
+/django_inventory/config/*/migrations/                  @umesh29032
+
+# ── Deploy + CI. A mistake here breaks production or leaks a secret. ───────
+# NOTE: deploy/ lives under django_inventory/, NOT at the monorepo root. A
+# leading slash anchors to the root, so a bare `/deploy/` rule here would never
+# match anything — a silently DEAD rule that reads as coverage. Caught by the
+# path-existence check taught in git_course ch 23; keep that check in mind
+# whenever you add a rule, because GitHub never warns you about this.
+/django_inventory/deploy/                               @umesh29032
+/.github/                                               @umesh29032
+/git-hooks/                                             @umesh29032
+/.gitignore                                             @umesh29032
+/django_inventory/.env.example                          @umesh29032
+
+# ── Frozen architecture. Change only with an explicit owner ruling. ────────
+# These carry 🔒 locks in CLAUDE.md; a PR touching them needs the ruling quoted.
+/django_inventory/docs/PRODUCT_DESIGN_DOCUMENT.md       @umesh29032
+/django_inventory/docs/ARCHITECTURE_V2.md               @umesh29032
+/django_inventory/docs/adr/                             @umesh29032
+/django_inventory/CLAUDE.md                             @umesh29032

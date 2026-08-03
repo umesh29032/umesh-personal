@@ -191,7 +191,7 @@ The whole course, condensed into what you actually do:
 
 **Symptom index**: DisallowedHost ch 24 · unstyled ch 26 · broken images ch 25 · 502 ch 14/31 · 504 ch 39 · CSRF ch 24 · `db` name ch 19 · disk full ch 06 · lost data ch 29 · cannot start an Adda → run `seed_master_data`.
 
-**Open items, honestly**: no CI (ch 33), no error tracker (ch 32), no dashboards (ch 30), fresh-database seeding required.
+**Open items, honestly**: no error tracker (ch 32), no dashboards (ch 30). *(Two former items are now closed: **CI exists** since 2026-08-03 — `.github/workflows/ci.yml`, four jobs on every PR, ch 33; and fresh-database seeding is wired into `deploy/entrypoint.sh` via `seed_master_data --repair-access`.)*
 
 # Debugging Guide
 1. **Symptom → chapter**, using the index above. Do not start from theory.

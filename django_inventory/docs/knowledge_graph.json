@@ -5550,7 +5550,7 @@
       "census": {
         "adr": 12,
         "app": 14,
-        "doc": 772,
+        "doc": 813,
         "feature": 38,
         "model": 93,
         "service": 59,
@@ -5560,7 +5560,7 @@
       },
       "git_head": "unknown"
     },
-    "content_hash": "sha256:f48dc8b77c29f1b35e69c1bf543df3ddda4d839fbd5b5b5927eaeb8513f9b03b",
+    "content_hash": "sha256:4ed4a2180bcf03ab77f7f8e617edab47e00ba863f82153708b3974b36c233473",
     "schema_version": "1.0.1"
   },
   "nodes": [
@@ -15155,6 +15155,539 @@
       "lifecycle": "generated",
       "owner_class": "generated",
       "path": "docs/features/worker-reporting/worker-report.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/00_COURSE_OVERVIEW.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/00_COURSE_OVERVIEW.md",
+      "kind": "doc",
+      "label": "00_COURSE_OVERVIEW.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/00_COURSE_OVERVIEW.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/01_What_Version_Control_Is.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/01_What_Version_Control_Is.md",
+      "kind": "doc",
+      "label": "01_What_Version_Control_Is.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/01_What_Version_Control_Is.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/02_Install_And_Configure.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/02_Install_And_Configure.md",
+      "kind": "doc",
+      "label": "02_Install_And_Configure.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/02_Install_And_Configure.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/03_The_Three_Trees.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/03_The_Three_Trees.md",
+      "kind": "doc",
+      "label": "03_The_Three_Trees.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/03_The_Three_Trees.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/04_Your_First_Repository.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/04_Your_First_Repository.md",
+      "kind": "doc",
+      "label": "04_Your_First_Repository.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/04_Your_First_Repository.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/05_How_Git_Stores_Everything.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/05_How_Git_Stores_Everything.md",
+      "kind": "doc",
+      "label": "05_How_Git_Stores_Everything.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/05_How_Git_Stores_Everything.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/06_The_Commit_Graph.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/06_The_Commit_Graph.md",
+      "kind": "doc",
+      "label": "06_The_Commit_Graph.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/06_The_Commit_Graph.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/07_Gitignore.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/07_Gitignore.md",
+      "kind": "doc",
+      "label": "07_Gitignore.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/07_Gitignore.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/08_Reading_History.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/08_Reading_History.md",
+      "kind": "doc",
+      "label": "08_Reading_History.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/08_Reading_History.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/09_What_A_Branch_Really_Is.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/09_What_A_Branch_Really_Is.md",
+      "kind": "doc",
+      "label": "09_What_A_Branch_Really_Is.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/09_What_A_Branch_Really_Is.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/10_Creating_And_Switching_Branches.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/10_Creating_And_Switching_Branches.md",
+      "kind": "doc",
+      "label": "10_Creating_And_Switching_Branches.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/10_Creating_And_Switching_Branches.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/11_Merging.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/11_Merging.md",
+      "kind": "doc",
+      "label": "11_Merging.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/11_Merging.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/12_Merge_Conflicts.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/12_Merge_Conflicts.md",
+      "kind": "doc",
+      "label": "12_Merge_Conflicts.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/12_Merge_Conflicts.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/13_Rebase.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/13_Rebase.md",
+      "kind": "doc",
+      "label": "13_Rebase.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/13_Rebase.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/14_Interactive_Rebase.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/14_Interactive_Rebase.md",
+      "kind": "doc",
+      "label": "14_Interactive_Rebase.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/14_Interactive_Rebase.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/15_Undo_Reset_Revert_Restore.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/15_Undo_Reset_Revert_Restore.md",
+      "kind": "doc",
+      "label": "15_Undo_Reset_Revert_Restore.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/15_Undo_Reset_Revert_Restore.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/16_Reflog.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/16_Reflog.md",
+      "kind": "doc",
+      "label": "16_Reflog.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/16_Reflog.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/17_Stash_And_Worktrees.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/17_Stash_And_Worktrees.md",
+      "kind": "doc",
+      "label": "17_Stash_And_Worktrees.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/17_Stash_And_Worktrees.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/18_Remotes.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/18_Remotes.md",
+      "kind": "doc",
+      "label": "18_Remotes.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/18_Remotes.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/19_Push_Fetch_Pull.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/19_Push_Fetch_Pull.md",
+      "kind": "doc",
+      "label": "19_Push_Fetch_Pull.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/19_Push_Fetch_Pull.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/20_Forks_And_The_Fork_Flow.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/20_Forks_And_The_Fork_Flow.md",
+      "kind": "doc",
+      "label": "20_Forks_And_The_Fork_Flow.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/20_Forks_And_The_Fork_Flow.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/21_Pull_Requests.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/21_Pull_Requests.md",
+      "kind": "doc",
+      "label": "21_Pull_Requests.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/21_Pull_Requests.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/22_Code_Review.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/22_Code_Review.md",
+      "kind": "doc",
+      "label": "22_Code_Review.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/22_Code_Review.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/23_CODEOWNERS_And_Templates.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/23_CODEOWNERS_And_Templates.md",
+      "kind": "doc",
+      "label": "23_CODEOWNERS_And_Templates.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/23_CODEOWNERS_And_Templates.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/24_Branching_Strategies.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/24_Branching_Strategies.md",
+      "kind": "doc",
+      "label": "24_Branching_Strategies.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/24_Branching_Strategies.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/25_Conventional_Commits.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/25_Conventional_Commits.md",
+      "kind": "doc",
+      "label": "25_Conventional_Commits.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/25_Conventional_Commits.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/26_Pre_Commit_Hooks.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/26_Pre_Commit_Hooks.md",
+      "kind": "doc",
+      "label": "26_Pre_Commit_Hooks.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/26_Pre_Commit_Hooks.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/27_Pre_Push_Protection.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/27_Pre_Push_Protection.md",
+      "kind": "doc",
+      "label": "27_Pre_Push_Protection.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/27_Pre_Push_Protection.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/28_CI_With_GitHub_Actions.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/28_CI_With_GitHub_Actions.md",
+      "kind": "doc",
+      "label": "28_CI_With_GitHub_Actions.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/28_CI_With_GitHub_Actions.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/29_Semantic_Versioning_And_Tags.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/29_Semantic_Versioning_And_Tags.md",
+      "kind": "doc",
+      "label": "29_Semantic_Versioning_And_Tags.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/29_Semantic_Versioning_And_Tags.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/30_Changelog.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/30_Changelog.md",
+      "kind": "doc",
+      "label": "30_Changelog.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/30_Changelog.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/31_Signed_Commits.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/31_Signed_Commits.md",
+      "kind": "doc",
+      "label": "31_Signed_Commits.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/31_Signed_Commits.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/32_Dependabot_And_Supply_Chain.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/32_Dependabot_And_Supply_Chain.md",
+      "kind": "doc",
+      "label": "32_Dependabot_And_Supply_Chain.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/32_Dependabot_And_Supply_Chain.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/33_Secrets_And_Leaks.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/33_Secrets_And_Leaks.md",
+      "kind": "doc",
+      "label": "33_Secrets_And_Leaks.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/33_Secrets_And_Leaks.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/34_Rewriting_History.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/34_Rewriting_History.md",
+      "kind": "doc",
+      "label": "34_Rewriting_History.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/34_Rewriting_History.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/35_Bisect.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/35_Bisect.md",
+      "kind": "doc",
+      "label": "35_Bisect.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/35_Bisect.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/36_Monorepo_Submodules_Subtrees.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/36_Monorepo_Submodules_Subtrees.md",
+      "kind": "doc",
+      "label": "36_Monorepo_Submodules_Subtrees.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/36_Monorepo_Submodules_Subtrees.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/37_Large_Files_And_Performance.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/37_Large_Files_And_Performance.md",
+      "kind": "doc",
+      "label": "37_Large_Files_And_Performance.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/37_Large_Files_And_Performance.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/38_Git_Internals_Hands_On.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/38_Git_Internals_Hands_On.md",
+      "kind": "doc",
+      "label": "38_Git_Internals_Hands_On.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/38_Git_Internals_Hands_On.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/39_Disaster_Playbook.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/39_Disaster_Playbook.md",
+      "kind": "doc",
+      "label": "39_Disaster_Playbook.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/39_Disaster_Playbook.md",
+      "tier": "T2"
+    },
+    {
+      "anchors": [
+        "docs/git_course/40_The_Workflow_Assembled.md"
+      ],
+      "doc_type": "lesson",
+      "id": "doc:docs/git_course/40_The_Workflow_Assembled.md",
+      "kind": "doc",
+      "label": "40_The_Workflow_Assembled.md",
+      "lifecycle": "active",
+      "owner_class": "handwritten",
+      "path": "docs/git_course/40_The_Workflow_Assembled.md",
       "tier": "T2"
     },
     {

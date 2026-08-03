@@ -50,6 +50,12 @@ puzzle.
 | [rbac-access.md](rbac-access.md) | What machinery decides what each user sees/reaches? (every URL, every menu) |
 | [learning-courses.md](learning-courses.md) | Where do I actually READ the courses, and how does `/learn/` work without storing any content? |
 
+**How work enters the repo:**
+
+| Page | Real question it answers |
+|---|---|
+| [engineering-workflow.md](engineering-workflow.md) | How does code get INTO this repo — and how is `main` protected when GitHub's branch protection is a paid feature? |
+
 *(URL dhoondh rahe ho? Feature page ke "Related URLs" section mein exact
 routes + unke WHY milte hain; structural chain generated cards mein hai.)*
 

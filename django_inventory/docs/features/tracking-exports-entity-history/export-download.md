@@ -5,13 +5,13 @@ status: generated
 owner: generated
 scope: route — url:tracking:export-download
 anchors: config/config/urls.py
-verified: graph:f48dc8b77c29
+verified: graph:4ed4a2180bcf
 ---
 
 # URL card — `export-download`
 
 > ⚙️ GENERATED — an index, not truth. Do not hand-edit; fix the source, rebuild the graph, regenerate.
-> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `f48dc8b77c29` · schema: 1.0.1 · template: url-card v1.0.0
+> Generator: `scripts/generate_docs.py` · source: `docs/knowledge_graph.json` · graph: `4ed4a2180bcf` · schema: 1.0.1 · template: url-card v1.0.0
 > Regenerate: `env/bin/python scripts/generate_docs.py --out docs/features`
 
 ## Route

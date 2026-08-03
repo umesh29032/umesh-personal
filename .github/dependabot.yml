@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Dependabot — automated dependency update PRs.
+#
+# FREE on every plan, including private repos. This is the one piece of
+# big-tech supply-chain hygiene that costs nothing here, so there is no excuse
+# not to run it.
+#
+# WHY IT MATTERS: this project pins exact versions (Django==5.0.1,
+# psycopg2-binary==2.9.9, …). Pinning is correct — it makes deploys
+# reproducible — but a pin is also a decision to stay on that version until
+# someone acts. Without Dependabot, "someone acts" means "someone remembers",
+# and a published Django security release can sit unapplied for months.
+#
+# Dependabot opens a PR; CI runs the full battery against it; a green PR is a
+# safe upgrade with evidence. That is the whole point.
+# ─────────────────────────────────────────────────────────────────────────────
+version: 2
+updates:
+  # ── Python dependencies ───────────────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: /django_inventory        # where requirements*.txt lives
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Asia/Kolkata
+    # Cap concurrent PRs: five open dependency PRs is a review queue, not
+    # security. Small and steady beats a flood nobody reads.
+    open-pull-requests-limit: 5
+    commit-message:
+      # Conventional Commits, so the commit-msg hook and the CHANGELOG
+      # generator both accept Dependabot's commits with no special-casing.
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    labels: [dependencies, python]
+    groups:
+      # Group the noisy-but-safe patch bumps into ONE PR so CI runs once for
+      # them instead of five times — free minutes are finite (see ci.yml).
+      patch-updates:
+        patterns: ['*']
+        update-types: [patch]
+    ignore:
+      # Django 5.1 RENAMED CheckConstraint(check=) to condition=. This codebase
+      # has 26 CheckConstraints using check=, so a 5.1 bump is a code migration,
+      # not a version bump. Deliberately excluded until that work is scheduled.
+      # See CLAUDE.md and docs/adr/ — recorded so a future reader knows this is
+      # a decision, not neglect.
+      - dependency-name: Django
+        update-types: [version-update:semver-minor, version-update:semver-major]
+
+  # ── GitHub Actions versions ───────────────────────────────────────────────
+  # actions/checkout@v4 etc. go stale too, and a deprecated action starts
+  # failing builds with no code change on your side.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+      include: scope
+    labels: [dependencies, github-actions]

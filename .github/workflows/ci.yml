@@ -1,0 +1,262 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CI — the merge gate for django_inventory.
+#
+# WHY THIS EXISTS
+# `main` must always be deployable. This workflow is the mechanical check that a
+# pull request has not broken that promise: lint, missing migrations, the full
+# test battery against a real Postgres, and the documentation drift gate.
+#
+# FREE-TIER DISCIPLINE (owner ruling: no paid plans)
+#   • private-repo Actions is metered at ~2,000 min/month (public = unlimited)
+#   • `concurrency` cancels superseded runs, so pushing twice never pays twice
+#   • `paths` means edits to sibling monorepo folders start no run at all
+#   • every job has `timeout-minutes` so a hung job cannot drain the month
+#   • the cheap jobs gate the expensive one — `test` (45 min) only runs if
+#     `lint` (10 min) passed, so a typo never costs a full battery
+#   • if minutes ever get tight: a self-hosted runner on the deploy VPS is free
+#     and unlimited. Upgrade the plan LAST, not first.
+#
+# MONOREPO NOTE
+# The git root is /umesh-personal; the Django project is the django_inventory/
+# subdirectory. GitHub only reads .github/workflows/ from the ROOT, which is why
+# this file lives here while every step runs with `working-directory`.
+#
+# NO YAML ANCHORS ANYWHERE IN THIS FILE. GitHub Actions' parser rejects YAML
+# anchors/aliases (&x / *x), so the db env block is repeated by hand. Repetition
+# is the lesser evil versus a workflow that will not parse.
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['django_inventory/**', '.github/workflows/ci.yml']
+  push:
+    branches: [main]
+    paths: ['django_inventory/**', '.github/workflows/ci.yml']
+  workflow_dispatch:        # lets you run it by hand from the Actions tab
+
+# One in-flight run per branch. A second push cancels the first instead of
+# queueing it — the older result is worthless anyway, and the minutes are real.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this workflow only ever reads the repo.
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. LINT ────────────────────────────────────────────────────────────────
+  lint:
+    name: lint (ruff + design-system ratchet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: django_inventory
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # the ratchet needs history to find the merge base
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      # Lenient F set, matching .pre-commit-config.yaml so local and CI agree.
+      # A rule that fires in CI but not locally trains people to ignore CI.
+      - name: ruff
+        run: |
+          ruff check --force-exclude \
+            --exclude '**/migrations/**' --exclude env --exclude staticfiles \
+            config/
+
+      # THE RATCHET, made to work in CI.
+      # scripts/ds_lint.sh --changed inspects the STAGED index (it was written
+      # for pre-commit). In CI nothing is staged, so it would exit 0 and prove
+      # nothing. `git reset --soft <merge-base>` re-presents every commit in
+      # this PR as staged changes — so the script runs unmodified and sees
+      # exactly the lines this PR adds. No fork of the linter, one source of
+      # truth for the rule.
+      - name: design-system ratchet (new inline raw values)
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        run: |
+          # checkout used fetch-depth: 0, so origin/<base> is already local.
+          BASE="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          echo "merge base: $BASE"
+          git reset --soft "$BASE"
+          bash django_inventory/scripts/ds_lint.sh --changed
+
+  # ── 2. MIGRATIONS ──────────────────────────────────────────────────────────
+  migrations:
+    name: migrations are complete
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: django_inventory
+    services:
+      postgres:
+        image: postgres:16.6-alpine       # same major as production
+        env:
+          POSTGRES_DB: inventory_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # A model edited without a matching migration is the classic "works on my
+      # machine, 500s on deploy" bug. --check --dry-run fails instead of writing.
+      #
+      # DB_* vars deliberately, NOT DATABASE_URL: base.py forces
+      # ssl_require=True on the DATABASE_URL branch, which a plain service
+      # container cannot satisfy — it would fail with an SSL error, not a real one.
+      - name: makemigrations --check
+        run: python config/manage.py makemigrations --check --dry-run
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.local
+          DB_NAME: inventory_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          SECRET_KEY: ci-only-not-a-real-secret
+
+      - name: Django system check
+        run: python config/manage.py check --fail-level ERROR
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.local
+          DB_NAME: inventory_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          SECRET_KEY: ci-only-not-a-real-secret
+
+  # ── 3. TESTS ───────────────────────────────────────────────────────────────
+  # Gated on lint+migrations: a 45-minute battery should not run to tell you
+  # about a lint error a 3-minute job already found. Free minutes are finite.
+  test:
+    name: test battery (14 apps, sequential fresh DB)
+    needs: [lint, migrations]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: django_inventory
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_DB: inventory_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # SEQUENTIAL on a FRESH database — never --parallel, never --keepdb.
+      # This suite asserts exact money totals and golden settlement figures;
+      # parallel workers and a reused DB both make those flaky, and a flaky
+      # money test is worse than no money test at all.
+      #
+      # All 14 INSTALLED_APPS are named explicitly rather than using bare
+      # `test`, because a new app silently missing from the gate has already
+      # happened here once: `bod` was installed but in no test group, so 37
+      # tests — including a real UTC/IST date bug — sat outside CI while the
+      # battery still reported "all green".
+      - name: Run the battery
+        run: |
+          python config/manage.py test \
+            core accounts inventory storefront raw_materials production \
+            tracking expense machines patterns_ai verification bod \
+            learning devseed \
+            --settings=config.settings.local --verbosity 2
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.local
+          DB_NAME: inventory_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          SECRET_KEY: ci-only-not-a-real-secret
+
+  # ── 4. DOCS ────────────────────────────────────────────────────────────────
+  docs:
+    name: documentation drift (knowledge_sync)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: django_inventory
+    services:
+      postgres:
+        image: postgres:16.6-alpine
+        env:
+          POSTGRES_DB: inventory_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      # CLAUDE.md rule 12: code change ⇒ docs change, same PR. This project
+      # treats documentation drift as an architecture bug, so it gets a gate.
+      # BLOCKER=0 is required; WARN is advisory and does not fail the build.
+      - name: knowledge_sync must report BLOCKER=0
+        run: |
+          python config/manage.py knowledge_sync \
+            --settings=config.settings.local | tee sync.log
+          if grep -qE 'BLOCKER=[1-9]' sync.log; then
+            echo "::error::knowledge_sync reported BLOCKERs — docs are out of sync with the code."
+            exit 1
+          fi
+          echo "✓ BLOCKER=0"
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.local
+          DB_NAME: inventory_db
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          SECRET_KEY: ci-only-not-a-real-secret

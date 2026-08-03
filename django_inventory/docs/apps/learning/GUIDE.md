@@ -10,7 +10,9 @@ verified: 2026-08-01
 
 # learning — app guide (the in-app engineering academy, `/learn/`)
 
-> **WINDOW over the markdown, plus per-user progress.** The vision is owner-locked:
+> **WINDOW over the markdown, plus per-user progress.** Three courses: SQL (26 pages) ·
+> Deployment (46) · **Git & GitHub (41, added 2026-08-03)** = **113 pages**.
+> The vision is owner-locked:
 > 🔒 [LEARNING_PLATFORM_VISION.md](../../LEARNING_PLATFORM_VISION.md). Deeper prose
 > lives in [config/learning/README.md](../../../config/learning/README.md); the human
 > page is [kos/features/learning-courses.md](../../../kos/features/learning-courses.md).
@@ -31,21 +33,21 @@ forbidden; per-user progress models are allowed** — that is the two-layer law 
 | `views.py` | 4 GET-only `TemplateView`s (index/course/chapter/interview + revision + search) and 3 POST-only progress endpoints. **Gated by `_LearningAccessMixin`** — login + the `learning:index` Access-Control row, so ONE checkbox governs the whole section. Without it a rule on `learning:index` would hide the menu link and still serve `/learn/sql/14-indexes/` by direct URL, because `can_access_url_name()` returns True for any url_name with no rule. Denial mirrors `SidebarAccessMiddleware`: message + 302 to the dashboard, or 403 for AJAX |
 | `urls.py` | `/learn/` namespace (10 routes) |
 | `templates/learning/` | `_learn_base.html` (shell, keyboard shortcuts) + index · course · chapter · interview · revision · search. Page CSS scoped under `.learn-page` (UI rule 10) |
-| `tests/test_learning.py` | **57 tests.** Core-law alarms · reachability · render · progress isolation · search · and the **five anti-content-loss pins** added 2026-08-01 (contract presence · every chapter feeds every generated page · every question has an answer · wrapped answers not truncated · every chapter has its why-they-ask table) |
+| `tests/test_learning.py` | **69 tests.** Core-law alarms · reachability · render · progress isolation · search · the **five anti-content-loss pins** from 2026-08-01 (contract presence · every chapter feeds every generated page · every question has an answer · wrapped answers not truncated · every chapter has its why-they-ask table) · plus **two added 2026-08-03**: a column-0 `# ` inside a ``` fence must not truncate a harvested section, and every harvested section corpus-wide must show all of its content (see *Content-loss lessons* below) |
 
 ## The generated pages (nothing is written twice)
 
 | URL | Harvested heading | Coverage |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` | **339 Qs** — Junior 96 · Mid 93 · Senior 83 · Staff 67 (SQL 154 + Deployment 185) |
-| `/learn/revise/mistakes/` | `# Beginner Mistakes` | 69 chapters |
-| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | 69 chapters |
+| `/learn/interview/` | `# Interview Questions` | **499 Qs** — Junior 136 · Mid 133 · Senior 123 · Staff 107 (SQL 154 + Deployment 185 + **Git 160**) |
+| `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
+| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 
 Adding a revision page = one row in `REVISION_PAGES`. No new parsing code.
 
 ## The 19-section chapter contract
 
-All **67 teaching chapters** (SQL 25 + deployment 42) carry the full contract; the
+All **107 teaching chapters** (SQL 25 + deployment 42 + **git 40**) carry the full contract; the
 course-overview pages and `deployment_course/ARCHITECTURE.md` are deliberate
 exemptions (`EXEMPT` in the tests). `ChapterContractTests` fails the suite if any
 chapter loses a section, so the contract is pinned rather than hoped for.
@@ -68,6 +70,14 @@ not show it.** No errors, no visual breakage — only counting found them.
 3. The level regex was `$`-anchored per line, but answers wrap over several lines.
    **All 185 deployment questions were missing**, and 6 more had no answer. Now
    `_level_items()` parses whole bullet blocks.
+
+4. **A column-0 `# ` inside a fenced code block truncated the harvest** (found 2026-08-03 while
+   authoring `git_course/12_Merge_Conflicts.md`). `_section_body()` ended a section at the first
+   `^#\s+` line, ignoring fence state — and `# Conflicts:` is *git's own merge output*, so a Cheat
+   Sheet quoting it lost everything after that line. Silent: no error, no visual breakage. Fixed
+   fence-aware, and pinned twice — a unit pin proven to fail against the old implementation, and a
+   corpus pin asserting every harvested section shows its full length. The verifier script had the
+   identical bug and was fixed with it.
 
 Also: `## Further Reading` was H2 in the deployment course, so the H1-built TOC never
 listed the last section of any chapter; and pages that section with H2 had an empty

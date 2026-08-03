@@ -65,6 +65,17 @@ COURSES: tuple[Course, ...] = (
         level='Absolute beginner → production-capable',
         accent='#8b5a2b',
     ),
+    Course(
+        slug='git',
+        folder='git_course',
+        title='Git & GitHub From Zero',
+        tagline='From "what is a commit" to the workflow big tech runs — branches, '
+                'rebase, reflog, PR review, CI and release discipline, built on this '
+                'repo’s own hooks, CI and real incidents.',
+        icon='🌿',
+        level='Absolute beginner → team-workflow fluent',
+        accent='#5a4b8b',
+    ),
 )
 
 COURSES_BY_SLUG = {c.slug: c for c in COURSES}

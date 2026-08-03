@@ -94,8 +94,30 @@ pehle bhugat li hai). **Ek hi sach, do jagah dikhta hai.**
 | `/learn/revise/mistakes/` · `/learn/revise/cheatsheet/` | generated revision pages |
 | `/learn/search/?q=` | search every chapter |
 
-Two courses today: **SQL & PostgreSQL From Zero** (26 chapters) and **Deployment
-From Zero** (46) — 72 pages in total.
+Three courses today: **SQL & PostgreSQL From Zero** (26 pages), **Deployment From Zero**
+(46) and **Git & GitHub From Zero** (41, added 2026-08-03) — **113 pages** in total.
+
+### What the git course is for (added 2026-08-03)
+
+40 teaching chapters in five parts: **Foundations** (01–08) → **Branching** (09–17) →
+**Collaboration** (18–24) → **Discipline** (25–33) → **Recovery & depth** (34–40).
+
+Two things make it different from every git tutorial:
+
+1. **It is taught from THIS repo's own workflow and its real incidents** — `CONTRIBUTING.md`,
+   the three `git-hooks/`, `ci.yml`, `CODEOWNERS`; PR #15's 289 commits; the merge commit
+   `83a144ba` with its two parents; `.git` at 97 MB; the **two committed `pg_dump` files** and
+   why history was deliberately *not* rewritten; the **dead `/deploy/` CODEOWNERS rule**; the
+   stale-local-`main` **296-vs-1** trap; `bod` sitting outside the test gate.
+2. **It is honest about money.** Branch protection, required reviews, required status checks,
+   CODEOWNERS auto-assignment and secret scanning are **paid on private repos**. Most guides
+   just say "enable branch protection". This one names the paid line, shows the free path, and
+   states each layer's weakness — including the two failures **nothing** catches.
+
+> 💡 **Samjho aise:** iska sabse kaam ka sabaq: **jo muft wala taala hai, wo paid se bhi
+> mazboot hai.** Collaborator ko **Read** do aur **fork** se kaam karwao — uske paas push ki
+> chaabi **hi nahi** hoti. Paid branch protection kehta hai "chaabi hai, par us darwaze pe
+> nahi". Chaabi na dena behtar hai.
 
 ## Three pages that write themselves
 
@@ -104,9 +126,9 @@ chapter of every course**. Three pages ride on it:
 
 | Page | Built from | Today |
 |---|---|---|
-| `/learn/interview/` | `# Interview Questions` | **339 questions**, Junior→Staff |
-| `/learn/revise/mistakes/` | `# Beginner Mistakes` | 69 chapters |
-| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | 69 chapters |
+| `/learn/interview/` | `# Interview Questions` | **499 questions**, Junior→Staff |
+| `/learn/revise/mistakes/` | `# Beginner Mistakes` | **109** chapters |
+| `/learn/revise/cheatsheet/` | `# Cheat Sheet` | **109** chapters |
 
 > 💡 **Samjho aise:** Yeh teen page **likhe nahi gaye** — chapters se **nikaale**
 > gaye hain. Chapter mein sudhaar karo, page apne aap sudhar jaata hai. Ek hi
@@ -128,7 +150,7 @@ chapter of every course**. Three pages ride on it:
 
 Every chapter has an `# Interview Questions` section whose bullets are labelled
 `**Junior:** … — answer`. The app **harvests those** into one page grouped by
-level: currently **339 questions** (Junior 96 · Mid 93 · Senior 83 · Staff 67),
+level: currently **499 questions** (Junior 136 · Mid 133 · Senior 123 · Staff 107),
 each with its answer and a link back to the chapter that teaches it.
 
 Nothing is written twice. Fix a question in the chapter and the prep page fixes
@@ -215,14 +237,16 @@ silently.
 **One idea first:** a generated page can be *wrong by being incomplete*, and it
 will never tell you. It renders. It looks finished. It is missing half the content.
 
-**💡 Samjho aise:** socho tumne 339 sawaal ek notebook mein likhe. Ab ek naukar ko
+**💡 Samjho aise:** *(ye kahani 2026-08-01 ki hai, jab bank mein 339 sawaal the — aaj 499 hain.)*
+socho tumne 339 sawaal ek notebook mein likhe. Ab ek naukar ko
 bola: "notebook se sawaal chipka do board pe." Wo sirf un pages se chipkata hai jinke
 top pe **bilkul** `Interview Questions` likha ho. Tumne ek page pe likh diya
 `Interview Questions (poora course, 4 levels)` — bas, wo page skip ho gaya. Board pe
 board dikh raha hai, bhara hua lag raha hai, **koi error nahi** — par 185 sawaal
 gayab. Yahi hua tha.
 
-Teen alag-alag versions of the same mistake were found on 2026-08-01:
+Teen alag-alag versions of the same mistake were found on 2026-08-01 — **aur ek chautha
+2026-08-03 ko** (neeche #4):
 
 1. The harvester wanted an **exact** heading, so `# Beginner Mistakes (the greatest
    hits)` matched nothing.
@@ -230,6 +254,12 @@ Teen alag-alag versions of the same mistake were found on 2026-08-01:
    source of truth inside the app whose whole law is "one source of truth".
 3. The rule read **one line only**, but answers wrap over several lines. So the
    deployment course's 185 questions were dropped, and 6 more lost their answers.
+4. **(2026-08-03)** A `# ` at column 0 **inside a ``` code fence** ended the section
+   early. And this is not a contrived shape: `# Conflicts:` is *git's own merge output*,
+   quoted in the git course's conflicts chapter — so a Cheat Sheet showing that line
+   would have silently lost everything after it. Fixed fence-aware, and pinned twice:
+   one unit test proven to fail against the old code, and one corpus test asserting
+   every harvested section shows its full length.
 
 ### How to check it yourself (any generated page)
 
@@ -240,19 +270,31 @@ differ, content is being lost.
 cd ~/umesh-personal/django_inventory
 
 # 1. What do the chapters CLAIM? (count every level label written by hand)
-grep -rhoE '\*\*(Junior|Mid|Senior|Staff)\b' docs/sql_course docs/deployment_course | wc -l
+grep -rhoE '^-\s+\*\*(Junior|Mid|Senior|Staff):\*\*' \
+  docs/sql_course docs/deployment_course docs/git_course | wc -l
 ```
-Expected output: `339`
+Expected output: `499`  *(339 before the git course was added)*
 
-> The `\b` matters: without it, `**Middleware:**` in ch 26 counts as a "Mid"
-> question and you get `340`. A counting check is only useful if the count is exact.
+> **Match the parser's exact shape, not an approximation of it.** The parser wants a bullet:
+> `- **Junior:** …`. Earlier versions of this check used a looser `\*\*(Junior|Mid|…)\b`,
+> and it produced *false alarms twice*:
+>
+> - without `\b`, `**Middleware:**` counted as a "Mid" question → `340`;
+> - **with** `\b` it still over-counted, because `\b` matches before a hyphen — so
+>   `**Mid-flight:` and `**Mid-rebase:` in the git course's rebase chapters counted as
+>   questions → `501` against a real `499`.
+>
+> That second one is the instructive failure: the check reported 2 missing questions when
+> nothing was missing at all. **A counting check that is looser than the parser will cry wolf,
+> and a check that cries wolf gets ignored — which is worse than no check.** Requiring the
+> full `- **Level:**` bullet makes the count exactly what the harvester sees.
 
 ```bash
 # 2. What does the PAGE actually show?
 env/bin/python config/manage.py shell --settings=config.settings.local -c \
   "from learning import services as S; print(S.interview_questions()['total'])"
 ```
-Expected output: `339`
+Expected output: `499`
 
 **Same number = nothing lost.** Different numbers = go find the format that does not
 match. The test `test_every_labelled_question_reaches_the_interview_bank` now does
@@ -293,9 +335,10 @@ Nothing in the database changes, because the courses have no database.
 
 `/learn/` ek **khidki** hai, godown nahi. Content `docs/*.md` mein hi rehta hai;
 app use padh ke dikhata hai — isi liye course aur docs **kabhi alag nahi ho
-sakte**. Naya course chahiye? `.md` folder + registry mein ek line. Aur interview
-page **khud ban jaata hai** chapters se — 339 sawaal, level ke hisaab se, jawaab
-ke saath.
+sakte**. Naya course chahiye? `.md` folder + registry mein ek line — **git course
+2026-08-03 ko bilkul isi tarah aaya**, 41 files + ek line, aur teeno generated page
+khud bhar gaye. Aur interview page **khud ban jaata hai** chapters se — **499
+sawaal**, level ke hisaab se, jawaab ke saath.
 
 ## Implementation References
 

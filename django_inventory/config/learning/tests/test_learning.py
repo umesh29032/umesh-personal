@@ -9,6 +9,8 @@ What these PIN (the promises that must not silently break):
   6. The interview page is GENERATED from the chapters, so it can never drift.
   7. Unknown course/chapter → 404, never a 500.
 """
+import re
+
 from django.apps import apps
 from django.test import TestCase
 from django.urls import reverse
@@ -476,6 +478,69 @@ class ChapterContractTests(TestCase):
         self.assertEqual(len(items), 2)
         self.assertIn('second reason', items[0][1])
         self.assertNotIn('Next?', items[0][1])   # must stop at the next bullet
+
+    def test_a_column_zero_hash_inside_a_code_fence_does_not_truncate(self):
+        """Anti-content-loss pin #5 (2026-08-03).
+
+        `_section_body` used a plain `^#\\s+` split to find the end of a section,
+        which treated a shell comment written at column 0 INSIDE a ``` fence as
+        the next H1 — silently discarding the rest of the section. No error, no
+        visual breakage; the content was simply not on the generated page.
+
+        This is not a contrived shape. Git's own merge output contains
+        `# Conflicts:`, and `git_course/12_Merge_Conflicts.md` quotes it twice.
+        A Cheat Sheet showing that line would have lost everything after it.
+
+        Same failure class as the three defects in VISION §10b, so it gets the
+        same treatment: a fix plus a pin that fails if the fix is reverted.
+        """
+        doc = ('# Cheat Sheet\n'
+               '```bash\n'
+               'git status\n'
+               '# Conflicts:\n'            # ← column 0, inside a fence
+               'git add resolved.py\n'
+               '```\n'
+               'tail prose\n'
+               '\n'
+               '# My ERP Section\n'
+               'must NOT be included\n')
+        body = services._section_body(doc, 'Cheat Sheet')
+        self.assertIn('git add resolved.py', body,
+                      'content after a column-0 # inside a fence was dropped')
+        self.assertIn('tail prose', body)
+        self.assertNotIn('must NOT be included', body,
+                         'the section must still stop at the real next H1')
+
+    def test_every_harvested_section_shows_all_of_its_content(self):
+        """The pin above proves the unit; this proves the corpus.
+
+        For every chapter of every course, the harvested body must be as long as
+        the section actually is (measured fence-aware). A shortfall means real
+        authored content is missing from a generated page.
+        """
+        shortfalls = []
+        for course in COURSES:
+            for ref in services.chapters_for(course.slug):
+                raw = (DOCS_ROOT / course.folder / ref.filename).read_text()
+                for heading in ('Beginner Mistakes', 'Interview Questions',
+                                'Cheat Sheet', 'Revision Notes', 'Practice Tasks'):
+                    body = services._section_body(raw, heading)
+                    if body is None:
+                        continue
+                    after = re.split(rf'^#\s+{re.escape(heading)}\b.*$',
+                                     raw, flags=re.M)[1]
+                    end, fence = len(after), False
+                    for m in re.finditer(r'^(```|#\s+)', after, re.M):
+                        if m.group(1) == '```':
+                            fence = not fence
+                        elif not fence:
+                            end = m.start()
+                            break
+                    if len(after[:end].strip()) > len(body) + 5:
+                        shortfalls.append(
+                            f'{course.slug}/{ref.filename} "{heading}": '
+                            f'{len(body)} of {len(after[:end].strip())} chars')
+        self.assertEqual(shortfalls, [], f'truncated sections: {shortfalls}')
 
     def test_further_reading_is_a_toc_section_in_both_courses(self):
         """It is the last section of every chapter; at H2 it was unreachable."""
